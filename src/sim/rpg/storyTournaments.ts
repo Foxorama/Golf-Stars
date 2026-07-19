@@ -49,6 +49,10 @@ export interface StoryTournament {
   sigilName: string;
   /** The signature prize blurb. */
   prize: string;
+  /** GS-story-tournament-reward: the NAMED reward-club id GRANTED into the bag on a first win (a `quest:`/
+   *  `major:` id resolved through `NAMED_STORY_CLUBS`). The majors used to name a prize club in `prize` but
+   *  never hand it over (the Emerald Invitational bug); this is the club that actually lands. Absent = none. */
+  rewardClubId?: string;
   /** GS-story-route-rewards: a ship GRANTED on winning this major (the route's signature ride). Absent = none. */
   rewardShipId?: string;
   /** Host/rival flavour for the tournament lobby (lore-card style). */
@@ -69,6 +73,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     sigilId: 'sigil-emerald',
     sigilName: 'The Emerald Sigil',
     prize: 'The Verdant Wood — a reliable fairway wood, your first real reward.',
+    rewardClubId: 'major:emerald',
     intro: [
       'The rookie major, hosted by Sir Aldous Greensward — genteel old-guard chair of the Galactic Tour, ' +
         'pompous and kind and utterly ignorant of the Game beneath his tournament. A warm twin-sun, and a ' +
@@ -88,6 +93,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     sigilId: 'sigil-ember',
     sigilName: 'The Ember Sigil',
     prize: 'The Forgefire Driver — reborn in the fire, longer than anything you own.',
+    rewardClubId: 'major:ember',
     intro: [
       'The anvil-world of Orion, staged by Magnus Cinder — a bombastic pyromaniac promoter who’ll do ' +
         'anything for spectacle, and who took Coil money without ever knowing what he sold. Halfway ' +
@@ -111,6 +117,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     sigilId: 'sigil-storm',
     sigilName: 'The Storm Sigil',
     prize: 'The Galewarden Irons — control clubs that read the wind true.',
+    rewardClubId: 'major:storm',
     intro: [
       'The tour "postponed" it; the Coil runs a shadow tournament in the eye of the Dragon’s storm, and ' +
         'you crash it to take the Sigil before they can corrupt it. The rough itself seems to move.',

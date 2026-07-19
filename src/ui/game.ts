@@ -73,6 +73,7 @@ import {
 } from '../sim/rpg/story';
 import { storyItemKind, buyStoryCard, worldHasShop } from '../sim/rpg/storyShop';
 import { applyStoryGear, equipStoryGear, unequipStoryGear } from '../sim/rpg/storyGear';
+import { applyStoryClubEffects } from '../sim/rpg/storyClubEffects';
 import { hireStoryCaddy, setActiveStoryCaddy, applyStoryCaddy, worldCaddy } from '../sim/rpg/storyCaddies';
 import { allyTalk } from '../sim/rpg/storyAllies';
 import { isHeraldAgent } from '../sim/rpg/storyHeraldCrew';
@@ -348,7 +349,7 @@ export function reduce(state: UiState, action: Action): UiState {
         // Build the champion's strokeplay run and fold in the developed Story loadout (the `storyPlayWorld`
         // pattern): the equipped bag + gear + active caddy, so free-roam plays with everything you earned.
         const base = startRun(state.run.seed, STROKEPLAY_FORMAT, {}, champion.characterId, 0, DEFAULT_BAG_TIER, []);
-        const loadout = applyStoryCaddy(applyStoryGear({ ...base.loadout, bag: storyBagClubs(champion) }, champion), champion);
+        const loadout = applyStoryClubEffects(applyStoryCaddy(applyStoryGear({ ...base.loadout, bag: storyBagClubs(champion) }, champion), champion), champion);
         run = { ...base, loadout };
       } else if (keepGolfer) {
         run = startRun(state.run.seed, STROKEPLAY_FORMAT, state.metaUpgrades, state.run.loadout.characterId, state.run.ascension, state.run.bagTier, state.run.unlockedClubs);
@@ -418,7 +419,7 @@ export function reduce(state: UiState, action: Action): UiState {
       const bag = storyBagClubs(state.story);
       // GS-story-gear: fold the campaign's equipped gear (glove/hat/shoes/ball) effects onto the loadout.
       // GS-story-caddies: then the active caddy (a friend on the bag folds a real effect + shows on course).
-      const loadout = applyStoryCaddy(applyStoryGear({ ...run0.loadout, bag }, state.story), state.story);
+      const loadout = applyStoryClubEffects(applyStoryCaddy(applyStoryGear({ ...run0.loadout, bag }, state.story), state.story), state.story);
       const run = {
         ...run0,
         loadout,
@@ -550,7 +551,7 @@ export function reduce(state: UiState, action: Action): UiState {
       if (!q || !worldId) return state;
       const run0 = startRun(state.run.seed, STROKEPLAY_FORMAT, {}, state.story.characterId, 0, DEFAULT_BAG_TIER, []);
       const bag = storyBagClubs(state.story);
-      const loadout = applyStoryCaddy(applyStoryGear({ ...run0.loadout, bag }, state.story), state.story);
+      const loadout = applyStoryClubEffects(applyStoryCaddy(applyStoryGear({ ...run0.loadout, bag }, state.story), state.story), state.story);
       const run = {
         ...run0,
         loadout,
@@ -720,7 +721,7 @@ export function reduce(state: UiState, action: Action): UiState {
       const run0 = startRun(state.run.seed, STROKEPLAY_FORMAT, {}, state.story.characterId, 0, DEFAULT_BAG_TIER, []);
       const bag = storyBagClubs(state.story);
       // GS-story-caddies: the active caddy folds into the tournament loadout too (auto ≡ interactive).
-      const loadout = applyStoryCaddy(applyStoryGear({ ...run0.loadout, bag }, state.story), state.story);
+      const loadout = applyStoryClubEffects(applyStoryCaddy(applyStoryGear({ ...run0.loadout, bag }, state.story), state.story), state.story);
       const run = {
         ...run0,
         loadout,

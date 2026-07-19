@@ -19,9 +19,11 @@ import {
   recordWorldClear,
   keyToOtherRealm,
   storyComplete,
+  resolveStoryClub,
   STORY_CHAPTER_COUNT,
   type StoryState,
 } from '../src/sim/rpg/story';
+import { storyClubEffectLabel } from '../src/sim/rpg/storyClubEffects';
 
 function clearWorlds(story: StoryState, ids: string[]): StoryState {
   let s = story;
@@ -50,6 +52,14 @@ describe('Galaxy Tournaments (GS-story-tournament)', () => {
     }
     // Every tournament names a host (no bare placeholders); the bible's named cast is in place (GS-story-hosts).
     for (const t of STORY_TOURNAMENTS) expect(t.host.length).toBeGreaterThan(0);
+    // GS-story-tournament-reward: the trunk majors (Ch.1–3) promise a CLUB — it must be a real, resolving,
+    // effect-carrying reward club (the Emerald Invitational used to name a prize and never grant it).
+    for (const ch of [1, 2, 3]) {
+      const t = tournamentForChapter(ch)!;
+      expect(t.rewardClubId, `chapter ${ch} prize club id`).toBeTruthy();
+      expect(resolveStoryClub(t.rewardClubId!), `chapter ${ch} prize club resolves`).toBeTruthy();
+      expect(storyClubEffectLabel(t.rewardClubId!), `chapter ${ch} prize club effect`).toBeTruthy();
+    }
     expect(tournamentForChapter(1)!.host).toBe('Sir Aldous Greensward');
     expect(tournamentForChapter(2)!.host).toBe('Magnus Cinder');
     expect(tournamentForChapter(4, 'herald')!.host).toBe('Sister Ecdysis');

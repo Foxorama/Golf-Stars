@@ -25,6 +25,7 @@ import { shopItem } from '../sim/rpg/economy';
 import { staticCourseSpec } from '../sim/course/staticCourses';
 import { allyInspectOverlayHTML } from '../render/storyCrew';
 import { activeQuest, questWorld, questById, questGiverName } from '../sim/rpg/storyQuests';
+import { storyClubEffectLabel } from '../sim/rpg/storyClubEffects';
 import { storyObjective } from '../sim/rpg/storyGuide';
 import { isHeraldAgent } from '../sim/rpg/storyHeraldCrew';
 import { heraldAgentOverlayHTML } from '../render/storyHeraldOverlay';
@@ -367,6 +368,11 @@ export function storyResultScreen(): string {
              <div style="margin:10px auto 0;max-width:460px;background:#181322;border:1px solid #3a2f4a;border-left:3px solid #a97b25;border-radius:10px;padding:10px 14px;text-align:left;">
                <div style="font-size:13px;font-weight:800;color:#f0c874;">🎁 ${quest.rewardName}</div>
                <div style="font-size:12.5px;color:#c6bcd6;margin-top:2px;">${quest.rewardBlurb}</div>
+               ${
+                 storyClubEffectLabel(quest.rewardClubId)
+                   ? `<div style="font-size:12px;font-weight:700;color:#7fe0a0;margin-top:6px;">✦ Special: ${storyClubEffectLabel(quest.rewardClubId)}</div>`
+                   : ''
+               }
              </div>`
           : r.wasPrologue
             ? `<p><em>As the gallery roars, a shadow falls across the 18th green. Something vast is descending from the sky…</em></p>
