@@ -77,6 +77,7 @@ import { applyStoryClubEffects } from '../sim/rpg/storyClubEffects';
 import { hireStoryCaddy, setActiveStoryCaddy, applyStoryCaddy, worldCaddy } from '../sim/rpg/storyCaddies';
 import { allyTalk } from '../sim/rpg/storyAllies';
 import { isHeraldAgent, applyHeraldCaddies } from '../sim/rpg/storyHeraldCrew';
+import { isOtherGolfer } from '../sim/rpg/storyCast';
 import { acceptQuest, completeQuest, activeQuest, questWorld } from '../sim/rpg/storyQuests';
 import { isStoryShipId, buyStoryShip, equipStoryShip, worldIsShipVendor } from '../sim/rpg/storyShips';
 import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
@@ -542,7 +543,10 @@ export function reduce(state: UiState, action: Action): UiState {
       // genuine crew member, so a stray tap can't open a mute card.
       if ((state.screen !== 'story' && state.screen !== 'shipInterior') || !state.story) return state;
       const realCaddy = state.story.hiredCaddyIds.includes(action.caddyId) && !!allyTalk(action.caddyId);
-      if (!realCaddy && !isHeraldAgent(action.caddyId)) return state;
+      // GS-story-cast: a tapped standee may also be one of your three friend golfers (the OTHER playable
+      // characters travelling with you) — same inspect/talk/close plumbing, the screen branches on the id.
+      const friendGolfer = isOtherGolfer(state.story, action.caddyId);
+      if (!realCaddy && !isHeraldAgent(action.caddyId) && !friendGolfer) return state;
       return { ...state, storyAllyInspectId: action.caddyId, storyAllyTalk: 0 };
     }
 

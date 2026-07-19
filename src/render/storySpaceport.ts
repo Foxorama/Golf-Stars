@@ -24,6 +24,8 @@ import { crewRoster, allyName } from '../sim/rpg/storyAllies';
 import { heraldCrew, type HeraldAgent } from '../sim/rpg/storyHeraldCrew';
 import { storyBarName, type StoryState } from '../sim/rpg/story';
 import { questOfferable } from '../sim/rpg/storyQuests';
+import { otherGolfers } from '../sim/rpg/storyCast';
+import type { Character } from '../sim/rpg/characters';
 
 /** The Parrot's lore bust, made embeddable at 320×340 inside a positioned `<g transform>` (the Crow's Nest
  *  idiom) so the bird behind the bar is unmistakably the same character. */
@@ -485,6 +487,18 @@ export function spaceportSceneHTML(story: StoryState): string {
         .join('') + active;
   }
 
+  // GS-story-cast: your three friends — the OTHER playable golfers — travel with you and gather in the
+  // clubhouse (mid-deck, in front of the bar), each tappable → their friend talk card. On the HERALD path
+  // they've turned away from you (they stay Wardens, and become your Ch.5 opponents), so the sanctum shows
+  // none of them — their absence IS the betrayal. Only past the prologue (chapter ≥ 1), like the crew.
+  const friendStandees =
+    !herald && story.chapter >= 1
+      ? otherGolfers(story)
+          .slice(0, FRIEND_SPOTS.length)
+          .map((ch, i) => friendStandee(ch, FRIEND_SPOTS[i]!))
+          .join('')
+      : '';
+
   return `${SPACEPORT_STYLE}
     <div class="gs-sclub-scene${herald ? ' gs-sclub-scene--herald' : ''}">
       ${spaceportArt(story.equippedShipId, herald)}
@@ -492,9 +506,42 @@ export function spaceportSceneHTML(story: StoryState): string {
       ${hotspot({ type: 'openStoryShipyard' }, `🚀 Hangar`, { l: 1, t: 12, w: 25, h: 36 }, `Hangar — fly your fleet (${shipName})`, 'top')}
       ${hotspot({ type: 'openStoryLocker' }, '🎒 Locker', { l: 1, t: 49, w: 25, h: 26 }, 'Locker — build your bag and gear', 'bottom')}
       ${hotspot({ type: 'openStoryBar' }, `🍺 ${storyBarName(herald)}`, { l: 63, t: 10, w: 36, h: 40 }, `${storyBarName(herald)} — talk to the ${herald ? 'Crow' : 'Parrot'}`, 'top')}
+      ${friendStandees}
       ${crewStandees}
       ${playerBtn}
     </div>`;
+}
+
+/** GS-story-cast: mid-deck spots where your three friend golfers gather (in front of the bar, behind the
+ *  lower crew). Fixed (byte-stable) so identity is stable; clear of the player, the door hotspots + the
+ *  active caddy at your side. */
+const FRIEND_SPOTS: { left: number; top: number }[] = [
+  { left: 34, top: 71 },
+  { left: 50, top: 67 },
+  { left: 66, top: 72 },
+];
+
+/** One friend golfer as a feet-anchored standee (their signature look via `golferPreviewSVG`, drawn a touch
+ *  smaller so they read further back on the deck). Tap → their friend talk card (`storyInspectAlly`, widened
+ *  in the reducer to accept a playable-golfer id). */
+function friendStandee(ch: Character, spot: { left: number; top: number }): string {
+  const figure = golferPreviewSVG(undefined, undefined, undefined, {
+    skin: ch.style.skin,
+    shirtBase: ch.style.shirt,
+    capColor: ch.style.cap,
+    hair: ch.style.hair,
+    uid: `sclubfriend${ch.id.replace(/[^a-z0-9]/gi, '')}`,
+    w: 60,
+    h: 175,
+  });
+  return `<button class="gs-sclub-golfer gs-sclub-friend"
+      data-action='${JSON.stringify({ type: 'storyInspectAlly', caddyId: ch.id })}'
+      aria-label="Talk to ${ch.name}, your friend"
+      style="left:${spot.left}%;top:${spot.top}%;width:11cqw;">
+      <span class="gs-sclub-shadow" style="background:radial-gradient(ellipse at 50% 50%, ${ch.style.cap}55, #0000 70%);"></span>
+      ${figure}
+      <span class="gs-sclub-plate gs-sclub-plate--friend">${ch.shortName}</span>
+    </button>`;
 }
 
 /** Herald crew deck spots — Voss (index 0) at your side, the rest gathered along the deck. */
@@ -596,4 +643,11 @@ const SPACEPORT_STYLE = `<style>
   /* Herald scene: tint the door labels toward the Coil palette. */
   .gs-sclub-scene--herald .gs-sclub-hot:hover,.gs-sclub-scene--herald .gs-sclub-hot:focus-visible{background:#b060c018;border-color:#b060c066;box-shadow:inset 0 0 24px #7fe0a022;}
   .gs-sclub-scene--herald .gs-sclub-hot:hover .gs-sclub-lab,.gs-sclub-scene--herald .gs-sclub-hot:focus-visible .gs-sclub-lab{background:#2a1236;border-color:#b060c0;color:#ecd8f4;}
+  /* GS-story-cast: your three friend golfers gather mid-deck, behind the player + active caddy (lower
+     z-index), a touch dimmer so they read "further back"; a cool steel plate marks them apart from the
+     gold player/caddy plates. */
+  .gs-sclub-friend{z-index:14;filter:drop-shadow(0 5px 5px #0009) brightness(.92) saturate(.9);}
+  .gs-sclub-friend:hover,.gs-sclub-friend:focus-visible{z-index:23;filter:drop-shadow(0 9px 8px #000b) brightness(1.05);}
+  .gs-sclub-plate--friend{background:linear-gradient(180deg,#5a7fb0,#2f4a6e);border-color:#1b2c42;color:#eaf2ff;
+    box-shadow:inset 0 1px 0 #bcd6ff77,0 1px 2px #0008;font-family:inherit;}
 </style>`;
