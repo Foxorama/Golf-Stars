@@ -240,13 +240,20 @@ function questBannerHTML(story: StoryState): string {
   if (!q) return '';
   const world = q ? questWorld(q) : undefined;
   const worldName = world ? staticCourseSpec(world)?.name ?? 'their world' : 'their world';
+  // GS-story-quest-beat: the accepted quest gives the ally a spoken send-off (their authored `offer`
+  // dialogue, otherwise unused) before you fly — a story beat, not an instant drop into another round —
+  // and it's a shorter NINE-hole round (GS-story-quest-9), not a repeat 18 on the world you just cleared.
+  const offer = q.offer.map((l) => `<p style="margin:0 0 6px;color:#e6ddf0;font-size:13px;line-height:1.5;">${l}</p>`).join('');
   return `
     <section style="max-width:520px;margin:12px auto 0;">
-      <button class="gs-btn" style="background:linear-gradient(180deg,#1e1630,#140e1e);border-color:#5a3f8a;color:#d6c2ff;text-align:left;padding:12px 16px;"
-        data-action='${JSON.stringify({ type: 'playStoryQuest' })}'>
-        <div style="font-size:15px;font-weight:800;">🗺 ${q.title} — with ${questGiverName(q).split(' ')[0]}</div>
-        <div style="font-size:12px;color:#b8a8e0;font-weight:600;margin-top:2px;">Fly to ${worldName} and play it together ›</div>
-      </button>
+      <div style="background:linear-gradient(180deg,#1e1630,#140e1e);border:1px solid #5a3f8a;border-radius:12px;padding:14px 16px;">
+        <div style="font-size:15px;font-weight:800;color:#d6c2ff;">🗺 ${q.title} — with ${questGiverName(q).split(' ')[0]}</div>
+        <div style="margin:8px 0 10px;">${offer}</div>
+        <button class="gs-btn" style="background:linear-gradient(180deg,#2a1e44,#1a1230);border-color:#7a5ab0;color:#e2d4ff;width:100%;text-align:left;padding:11px 14px;"
+          data-action='${JSON.stringify({ type: 'playStoryQuest' })}'>
+          <div style="font-size:13.5px;font-weight:800;">Fly to ${worldName} and play it together — 9 holes ›</div>
+        </button>
+      </div>
     </section>`;
 }
 

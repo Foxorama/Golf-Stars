@@ -4,6 +4,7 @@ import {
   questForCaddy,
   questWorld,
   questOfferable,
+  questBeatPending,
   acceptQuest,
   completeQuest,
   activeQuest,
@@ -11,9 +12,12 @@ import {
 } from '../src/sim/rpg/storyQuests';
 import { STORY_CADDY_STOCK } from '../src/sim/rpg/storyCaddies';
 import { defaultStoryState, resolveStoryClub } from '../src/sim/rpg/story';
+import { staticCourseSpec, regenerateStaticCourse } from '../src/sim/course/staticCourseSpecs';
 
 function withCaddy(caddyId: string, over: Record<string, unknown> = {}) {
-  return { ...defaultStoryState('feather-fade'), hiredCaddyIds: [caddyId], chapter: 5, ...over };
+  // A world cleared ELSEWHERE (past the GS-story-quest-beat gate) so the quest is offerable by default;
+  // the beat test overrides clearedWorldIds to exercise the "just recruited" hold.
+  return { ...defaultStoryState('feather-fade'), hiredCaddyIds: [caddyId], chapter: 5, clearedWorldIds: ['standrews-18'], ...over };
 }
 
 describe('Story ally side quests (GS-story-quests)', () => {
@@ -78,5 +82,29 @@ describe('Story ally side quests (GS-story-quests)', () => {
   it('accept is a no-op when not offerable (wrong chapter, not recruited)', () => {
     const early = withCaddy('driver-dan', { chapter: 1 });
     expect(acceptQuest(early, 'quest-dan')).toBe(early);
+  });
+
+  it('GS-story-quest-9: every quest world builds a valid, distinct 9-hole quest layout', () => {
+    for (const q of STORY_QUESTS) {
+      const world = questWorld(q)!;
+      const spec = staticCourseSpec(world)!;
+      // regenerateStaticCourse re-validates fairness + throws on an unfair hole, so this proves each
+      // venue can compose a fair NINE-hole quest round.
+      const c = regenerateStaticCourse({ ...spec, seed: `${spec.seed}:quest`, opts: { ...spec.opts, holes: 9 } });
+      expect(c.holes.length, `${world} quest holes`).toBe(9);
+    }
+  });
+
+  it('GS-story-quest-beat: holds the offer until you have played on elsewhere', () => {
+    const world = questWorld(questForCaddy('driver-dan')!)!; // derelict-18
+    // recruited + chapter reached, but the ONLY world cleared is the ally's own home world → wait a beat
+    const justRecruited = withCaddy('driver-dan', { chapter: 3, clearedWorldIds: [world] });
+    expect(questOfferable(justRecruited, 'driver-dan')).toBe(false);
+    expect(questBeatPending(justRecruited, 'driver-dan')).toBe(true);
+    expect(acceptQuest(justRecruited, 'quest-dan')).toBe(justRecruited); // can't accept during the beat
+    // fly on, clear somewhere else → the quest opens up (and the beat is no longer pending)
+    const movedOn = { ...justRecruited, clearedWorldIds: [world, 'standrews-18'] };
+    expect(questOfferable(movedOn, 'driver-dan')).toBe(true);
+    expect(questBeatPending(movedOn, 'driver-dan')).toBe(false);
   });
 });

@@ -608,6 +608,17 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   only, every effect only ever HELPS. Shown as "✦ Special: …" on the quest recap, the tournament lobby prize,
   and the locker card. Guarded by `tests/story-club-effects.test.ts` (coverage: every named reward club has an
   effect; fold is a no-op when none equipped; effects never hurt).
+- **GS-story-quest-9 / GS-story-quest-beat** — ✅ *shipped*. An ally side quest used to be a full 18-hole
+  round offered the instant you recruited them, so it read as "you just cleared this world — now play it
+  again." Two fixes: (1) a quest is now a shorter **9-hole** round on a **DISTINCT** layout — `currentCourse`
+  regenerates the venue spec with `holes:9` + a `:quest`-salted seed when `run.storyQuest` is set (a normal
+  world round / Star-Tour round has no `storyQuest`, so it's byte-for-byte the pinned 18). (2) The quest
+  offer holds a **beat**: `questOfferable` now also requires the player to have cleared at least one world
+  OTHER than the ally's home world (`clearedElsewhere`) — so it opens up only once you've flown on and come
+  back, never on the same clubhouse visit as the recruit; `questBeatPending` drives a "give it a beat — play
+  on" crew-card message for the waiting state. The accepted-quest banner now shows the ally's authored
+  `offer` dialogue (previously unused) as a spoken send-off before you fly. Guarded by `story-quests.test.ts`
+  (the beat gate holds then opens) + `story-flow.test.ts` (a quest round is 9 holes).
 
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.

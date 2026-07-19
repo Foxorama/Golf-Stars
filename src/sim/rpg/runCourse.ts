@@ -35,6 +35,7 @@ import {
 } from '../course/themes';
 import { getFormat, stopSpecFor, type StopSpec } from './formats';
 import { buildStaticCourse } from '../course/staticCourses';
+import { staticCourseSpec, regenerateStaticCourse } from '../course/staticCourseSpecs';
 import type { Run } from './run';
 
 /** Deterministic seed for the course at the current stop. */
@@ -128,7 +129,13 @@ export function currentCourse(run: Run): Course {
   // other format sets → the generated path below is byte-for-byte unchanged.
   if (run.staticCourseId) {
     const effect = run.staticEffect ?? 'none';
-    const course = buildStaticCourse(run.staticCourseId);
+    // GS-story-quest-9: an ally SIDE QUEST is a shorter NINE-hole round on their home world — and a DISTINCT
+    // layout from the 18 you cleared to recruit them (a quest-salted seed + holes:9), never a replay of the
+    // same holes. A normal world round / Star-Tour round (no `storyQuest`) is byte-for-byte the pinned 18.
+    const spec = run.storyQuest ? staticCourseSpec(run.staticCourseId) : undefined;
+    const course = spec
+      ? regenerateStaticCourse({ ...spec, seed: `${spec.seed}:quest`, opts: { ...spec.opts, holes: 9 } })
+      : buildStaticCourse(run.staticCourseId);
     const withEffect = applyEffectPhysics(course, effect);
     return armTentHoles(
       { ...withEffect, meta: { ...withEffect.meta, effect } },
