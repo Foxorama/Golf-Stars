@@ -13,7 +13,7 @@ import { renderHoleSVG, renderPuttOverlaySVG, PUTT_OVERLAY_ID, renderShotOverlay
 import { type ProjectOptions } from './render/project';
 import { shotView, previewShot, previewBackspin, resolveAimTarget, awaitingPutt, canPuttFringe, type AimMode } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
-import { drawCaddy, hasCaddyArt } from './render/caddyArt';
+import { drawStoryFigure, hasStoryFigure } from './render/storyFigure';
 import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND, DEFAULT_PUTT_RANGE, MANUAL_IDEAL_PACE, puttBreakYd, puttBreakBow, puttBandDistanceFactor, idealPuttAim, puttPathPreview } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
 import { archetypeFor } from './sim/course/themes';
@@ -3030,13 +3030,14 @@ function render(): void {
   // screen re-renders — live while charging), so no rAF.
   document.querySelectorAll<HTMLCanvasElement>('canvas.gs-caddycv[data-caddy]').forEach((cv) => {
     const id = cv.dataset.caddy;
-    if (!hasCaddyArt(id)) return;
+    if (!hasStoryFigure(id)) return;
     const ctx = cv.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, cv.width, cv.height);
-    // The figure is authored ~64u tall; draw it scaled to fill the badge, feet near the bottom.
-    // Mirror the portrait in left-handed mode (GS-lefty) so the caddy faces with the flipped cast.
-    drawCaddy(ctx, id, cv.width / 2, cv.height - 8, cv.height * 0.92, performance.now(), lefty());
+    // The figure is authored ~64u tall; draw it scaled to fill the badge, feet near the bottom. Warden
+    // caddies use their on-course drawCaddy figure; Coil (Herald) clubhouse agents use drawCoilAgent — one
+    // dispatcher (drawStoryFigure). Mirror in left-handed mode (GS-lefty) so the caddy faces the flipped cast.
+    drawStoryFigure(ctx, id!, cv.width / 2, cv.height - 8, cv.height * 0.92, performance.now(), lefty());
   });
 
 

@@ -619,17 +619,21 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   on" crew-card message for the waiting state. The accepted-quest banner now shows the ally's authored
   `offer` dialogue (previously unused) as a spoken send-off before you fly. Guarded by `story-quests.test.ts`
   (the beat gate holds then opens) + `story-flow.test.ts` (a quest round is 9 holes).
-- **GS-story-fullbody** — ✅ *shipped* (`render/storyStandee.ts`). The clubhouse crew stood as their portrait
-  BUST (head+chest, 320×340) feet-anchored, so the chest bottom sat on the floor ("heads/chests on the
-  ground"). `fullBodyStandeeSVG` wraps each character's existing bust as the head+TORSO of a proper standing
-  figure by drawing a per-character LOWER BODY beneath it so the FEET meet the floor: `human` (legs+shoes,
-  trouser colour mirroring the on-course `drawCaddy`), `robe` (a floor-length cult robe — the Herald agents),
-  `bird` (the Parrot's scaly legs+talons), `creature` (the Mole's dirt mound). Pure SVG (no new art per
-  character — reuses the bust identity), works for BOTH clubhouse variants (`CADDY_STANDEE` per caddy +
-  `HERALD_STANDEE` for the tinted cult agents), stays in the string-builder (testable, no canvas mount).
-  `.gs-sclub-cav` sizing dialled for the taller full-body aspect. Preview: `node scripts/storyclub-preview.mjs`.
-  Guarded by `tests/story-standee.test.ts` (the bust is preserved on top; the figure is taller than the bust;
-  every recruitable ally has an intentional standee look).
+- **GS-story-fullbody** → **superseded by GS-story-figures.** The first fix wrapped each portrait BUST as the
+  head+torso of a figure with drawn legs beneath (`storyStandee.ts`) — but a bust authored as head+chest with
+  stick-legs bolted under it read as programmer-art (big head / short legs), rejected on sight. Removed.
+- **GS-story-figures** — ✅ *shipped* (`render/coilAgentArt.ts` + `render/storyFigure.ts`; see
+  `docs/decisions/art-style.md`). The clubhouse crew now use the game's OWN full-body art: Warden allies draw
+  through their on-course `caddyArt.ts drawCaddy` figure (Dan's driver over the shoulder, Sandy's sand-spray,
+  the Mole's mound, the Parrot's tricorne), and the Coil agents get a new `drawCoilAgent` sibling — hooded,
+  robed cultists in the venom-violet house style (the gaunt hood-down Apostate, the Viper with her serpent, the
+  anonymous Keepers). ONE dispatcher (`drawStoryFigure`/`hasStoryFigure`) turns any story-character id into its
+  figure; the standees emit `<canvas class="gs-caddycv" data-caddy=id>` and the existing app.ts mount pass
+  (shared with the on-course caddy badges) draws them — so clubhouse + course share one figure rule, no bust
+  hybrid. `CREW_SPOTS`/sizing re-tuned so the cast reads spread, not piled. Preview:
+  `node scripts/storyclub-preview.mjs`. Guarded by `tests/story-figure.test.ts` (every recruitable ally + every
+  Coil agent resolves to a figure/look). Establishes the reference-first process in `art-style.md` so visuals
+  stop getting revisited 6–7 times.
 
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.
