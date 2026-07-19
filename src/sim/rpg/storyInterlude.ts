@@ -12,8 +12,9 @@
  * real face you've seen. The only mechanical consequence is a credit outcome; the weight is the story.
  */
 
-import { CHARACTERS, type Character } from './characters';
+import { CHARACTERS, getCharacter, type Character } from './characters';
 import { otherGolfers } from './storyCast';
+import { betrayerId } from './storyBetrayal';
 import { addCredits, type StoryState, type StoryAlignment } from './story';
 
 export type InterludeSpeaker = 'friend' | 'you' | 'parrot' | 'coil';
@@ -83,11 +84,15 @@ export function interludeSeen(story: StoryState, alignment: StoryAlignment): boo
   return story.seenStoryBeats[interludeBeatId(alignment)] === true;
 }
 
-/** The "friend" golfer for the beat — the first of your three tour-mates (GS-story-cast's shared seam;
- *  behaviour-identical to the old "first roster golfer who isn't the protagonist"). The betrayal rework
- *  (GS-story-betrayer) later swaps this for a partner-choice-derived friend/betrayer. */
+/** The "friend" golfer for the beat — the BETRAYER, the odd one out of your two team-Sigil partner picks
+ *  (GS-story-betrayer). This is the friend who fell to the Coil (Warden: win them back) / whom the rite
+ *  demands (Herald: cut them loose). With no team Sigil played yet the betrayer resolves to your first
+ *  tour-mate, so this stays behaviour-identical to the old "first non-protagonist" default. */
 export function interludeFriend(story: StoryState): Character {
-  return otherGolfers(story)[0] ?? CHARACTERS[0]!;
+  return betrayerCharacterOr(story);
+}
+function betrayerCharacterOr(story: StoryState): Character {
+  return getCharacter(betrayerId(story)) ?? otherGolfers(story)[0] ?? CHARACTERS[0]!;
 }
 
 /**

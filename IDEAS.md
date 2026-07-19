@@ -65,8 +65,9 @@ default). One focused, tested, auto-merged PR each:
 - **GS-story-stableford** — ✅ *shipping*: Sigil 3 (Storm Championship) is single-person STABLEFORD (points,
   higher wins; attack every flag). Points recap + leaderboard; The Choice still fires after the win.
 - **GS-story-charquests** — per-character quests unlocked once you partner that golfer; signature reward.
-- **GS-story-betrayer** — pure `storyBetrayal.ts` (betrayer = odd-one-out; finale team comps) +
-  `corruptedGolferLook` costume swap.
+- **GS-story-betrayer** — ✅ *shipping*: pure `storyBetrayal.ts` — betrayer = odd-one-out of your two
+  partner picks; Warden loyal ally + Herald opponent pair; Coil champion-not-your-guide; `corruptedLookOpts`
+  costume. The interlude's fallen/betrayed friend is now the actual betrayer.
 - **GS-story-betrayal-warden** — Warden Ch.4/5 beats + the 2v2 best-ball matchplay finale (You + loyal
   friend vs Betrayer + Coil champion).
 - **GS-story-betrayal-herald** — Herald Ch.4 beats keyed to your first completed caddy quest (+ whether you
