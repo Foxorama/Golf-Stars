@@ -23,7 +23,7 @@ import { worldIsShipVendor } from '../sim/rpg/storyShips';
 import { worldCaddy, storyCaddyHired, activeStoryCaddy, STORY_CADDY_PRICE } from '../sim/rpg/storyCaddies';
 import { shopItem } from '../sim/rpg/economy';
 import { staticCourseSpec } from '../sim/course/staticCourses';
-import { crewWallHTML, allyInspectOverlayHTML } from '../render/storyCrew';
+import { allyInspectOverlayHTML } from '../render/storyCrew';
 import { activeQuest, questWorld, questById, questGiverName } from '../sim/rpg/storyQuests';
 import { storyObjective } from '../sim/rpg/storyGuide';
 
@@ -285,8 +285,9 @@ function spaceClubhouseHTML(story: StoryState): string {
 
     ${missionPanelHTML(story)}
 
-    <!-- GS-story-clubhouse-scene: the interactive Mothership clubhouse — tap the star chart, hangar, locker,
-         or the bar to go there; your golfer + active caddy stand on the deck, the Parrot tends the bar. -->
+    <!-- GS-story-clubhouse-scene + GS-story-crew-scene: the interactive Mothership clubhouse — tap the star
+         chart, hangar, locker, or the bar to go there; your golfer + your recruited crew stand on the deck
+         (tap an ally to talk), the Parrot tends the bar. -->
     <section style="max-width:620px;margin:8px auto 0;">
       ${spaceportSceneHTML(story)}
       <p style="text-align:center;color:var(--gs-dim);font-size:12px;line-height:1.45;margin:8px 0 0;">
@@ -297,8 +298,6 @@ function spaceClubhouseHTML(story: StoryState): string {
     ${tournamentBannerHTML(story)}
 
     ${questBannerHTML(story)}
-
-    ${crewWallHTML(story)}
 
     <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:14px auto 0;">
       ${hubFooterHTML()}

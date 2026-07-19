@@ -21,7 +21,7 @@ import { shipById } from '../sim/rpg/ships';
 import { prognosticParrotPortraitSVG } from './loreArt';
 import { caddyPortraitSVG } from './caddyPortraits';
 import { activeStoryCaddy } from '../sim/rpg/storyCaddies';
-import { shopItem } from '../sim/rpg/economy';
+import { crewRoster, allyName } from '../sim/rpg/storyAllies';
 import type { StoryState } from '../sim/rpg/story';
 
 /** The Parrot's lore bust, made embeddable at 320×340 inside a positioned `<g transform>` (the Crow's Nest
@@ -198,8 +198,7 @@ export function spaceportSceneHTML(story: StoryState): string {
         h: 210,
       })
     : '';
-  const caddyId = activeStoryCaddy(story);
-  const caddyName = caddyId ? shopItem(caddyId)?.name ?? 'your caddy' : '';
+  const activeCaddyId = activeStoryCaddy(story);
 
   // Your golfer, feet-anchored on the deck, centre-front. Tap → your locker (change your bag & gear).
   const playerBtn = ch
@@ -213,14 +212,18 @@ export function spaceportSceneHTML(story: StoryState): string {
       </button>`
     : '';
 
-  // Your active caddy, a portrait standee beside you. Tap → talk to them (the ally card). Only when on the bag.
-  const caddyBtn = caddyId
-    ? `<button class="gs-sclub-caddy" data-action='${JSON.stringify({ type: 'storyInspectAlly', caddyId })}'
-        aria-label="Talk to ${caddyName}, on your bag" style="left:63%;top:84%;">
-        <span class="gs-sclub-cav">${caddyPortraitSVG(caddyId)}</span>
-        <span class="gs-sclub-cplate">🎒 ${caddyName.split(' ')[0]}</span>
-      </button>`
+  // GS-story-crew-scene: your recruited allies stand around the clubhouse (not just a wall below). The ACTIVE
+  // caddy stands at your side ("on the bag"); the rest gather along the deck by the bar. Each is a tappable
+  // portrait standee → their ally talk card. Empty until you recruit someone out in the galaxy.
+  const crew = crewRoster(story);
+  const activeStandee = activeCaddyId
+    ? crewStandee(activeCaddyId, { left: 62, top: 85 }, true)
     : '';
+  const others = crew.filter((id) => id !== activeCaddyId);
+  const crewStandees = others
+    .slice(0, CREW_SPOTS.length)
+    .map((id, i) => crewStandee(id, CREW_SPOTS[i]!, false))
+    .join('');
 
   return `${SPACEPORT_STYLE}
     <div class="gs-sclub-scene">
@@ -229,9 +232,33 @@ export function spaceportSceneHTML(story: StoryState): string {
       ${hotspot({ type: 'openStoryShipyard' }, `🚀 Hangar`, { l: 1, t: 12, w: 25, h: 36 }, `Hangar — fly your fleet (${shipName})`, 'top')}
       ${hotspot({ type: 'openStoryLocker' }, '🎒 Locker', { l: 1, t: 49, w: 25, h: 26 }, 'Locker — build your bag and gear', 'bottom')}
       ${hotspot({ type: 'openStoryBar' }, "🍺 The Crow's Nest", { l: 63, t: 10, w: 36, h: 40 }, "The Crow's Nest — talk to the Parrot", 'top')}
+      ${crewStandees}
       ${playerBtn}
-      ${caddyBtn}
+      ${activeStandee}
     </div>`;
+}
+
+/** Deck spots (left%, top%) where non-active crew allies stand around the clubhouse — an arc across the deck
+ *  that avoids the centre-front player and the door hotspots. Fixed (byte-stable), so identity is stable. */
+const CREW_SPOTS: { left: number; top: number }[] = [
+  { left: 31, top: 91 }, // left-front, clear of the locker label + the far-left doors
+  { left: 56, top: 79 }, // mid, in front of the bar
+  { left: 72, top: 90 },
+  { left: 85, top: 81 },
+  { left: 93, top: 92 },
+];
+
+/** One crew ally as a feet-anchored portrait standee on the deck. Tap → their ally talk card. The active
+ *  caddy (on the bag) gets a pink ring + a 🎒 plate; the rest get a plain name plate. */
+function crewStandee(caddyId: string, spot: { left: number; top: number }, active: boolean): string {
+  const name = allyName(caddyId).split(' ')[0];
+  return `<button class="gs-sclub-caddy${active ? ' gs-sclub-caddy--on' : ''}"
+      data-action='${JSON.stringify({ type: 'storyInspectAlly', caddyId })}'
+      aria-label="Talk to ${allyName(caddyId)}${active ? ', on your bag' : ''}"
+      style="left:${spot.left}%;top:${spot.top}%;">
+      <span class="gs-sclub-cav">${caddyPortraitSVG(caddyId)}</span>
+      <span class="gs-sclub-cplate">${active ? `🎒 ${name}` : name}</span>
+    </button>`;
 }
 
 const SPACEPORT_STYLE = `<style>
@@ -263,11 +290,14 @@ const SPACEPORT_STYLE = `<style>
     background:linear-gradient(180deg,#e8c266,#a97b25);border:1px solid #5c3f12;box-shadow:inset 0 1px 0 #fff6cf,0 1px 2px #0008;
     font-family:Georgia,serif;font-size:clamp(8px,2.1cqw,11.5px);font-weight:800;color:#2a1a05;white-space:nowrap;}
   .gs-sclub-caddy{position:absolute;background:none;border:0;padding:0;cursor:pointer;color:inherit;text-align:center;
-    transform:translate(-50%,-100%);z-index:18;transition:transform .15s ease;}
-  .gs-sclub-caddy:hover,.gs-sclub-caddy:focus-visible{outline:none;transform:translate(-50%,-100%) scale(1.06);}
-  .gs-sclub-cav{display:block;width:13cqw;max-width:64px;aspect-ratio:1;border-radius:50%;overflow:hidden;margin:0 auto;
-    background:radial-gradient(circle at 50% 38%,#243042,#0e1219);border:2px solid #f0a8c8aa;box-shadow:0 4px 8px #0009;}
+    transform:translate(-50%,-100%);z-index:16;transition:transform .15s ease;}
+  .gs-sclub-caddy:hover,.gs-sclub-caddy:focus-visible{outline:none;transform:translate(-50%,-100%) scale(1.07);z-index:22;}
+  .gs-sclub-caddy--on{z-index:19;}
+  .gs-sclub-cav{display:block;width:11cqw;max-width:54px;aspect-ratio:1;border-radius:50%;overflow:hidden;margin:0 auto;
+    background:radial-gradient(circle at 50% 38%,#243042,#0e1219);border:2px solid #4a5566cc;box-shadow:0 4px 8px #0009;}
+  .gs-sclub-caddy--on .gs-sclub-cav{width:13cqw;max-width:62px;border-color:#f0a8c8;box-shadow:0 4px 10px #000a,0 0 8px #f0a8c866;}
   .gs-sclub-cav svg{width:150%;height:150%;transform:translate(-16%,6%);}
-  .gs-sclub-cplate{display:inline-block;margin-top:2px;padding:1px 7px;border-radius:10px;background:#231018;
-    border:1px solid #6a3a52;font-size:clamp(7px,1.9cqw,10.5px);font-weight:700;color:#f0a8c8;white-space:nowrap;}
+  .gs-sclub-cplate{display:inline-block;margin-top:2px;padding:1px 7px;border-radius:10px;background:#0e141ecc;
+    border:1px solid #33465f;font-size:clamp(7px,1.8cqw,10px);font-weight:700;color:#cdd8ea;white-space:nowrap;}
+  .gs-sclub-caddy--on .gs-sclub-cplate{background:#231018cc;border-color:#6a3a52;color:#f0a8c8;}
 </style>`;
