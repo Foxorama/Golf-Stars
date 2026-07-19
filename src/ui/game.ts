@@ -627,7 +627,15 @@ export function reduce(state: UiState, action: Action): UiState {
     }
 
     case 'storyCloseItem': {
-      if (state.screen !== 'storyShop' && state.screen !== 'storyLocker' && state.screen !== 'storyShipyard') return state;
+      // Must accept every screen that can OPEN an item card (`storyInspectItem` above) — including the ship
+      // interior — or the lore card can't be dismissed (the aboard-ship undismissable-popup bug).
+      if (
+        state.screen !== 'storyShop' &&
+        state.screen !== 'storyLocker' &&
+        state.screen !== 'storyShipyard' &&
+        state.screen !== 'shipInterior'
+      )
+        return state;
       return { ...state, storyItemInspectId: undefined };
     }
 

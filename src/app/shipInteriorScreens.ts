@@ -28,7 +28,6 @@ import { shipInspectOverlay } from './storyShipyardScreens';
 import {
   STORY_SHIP_UPGRADES,
   ownsUpgrade,
-  upgradeRevealed,
   combatRating,
   categoryRating,
   type UpgradeCategory,
@@ -162,13 +161,13 @@ function roomPanel(room: ShipRoom, story: StoryState, theme: { trim: string }): 
 
 /** The weapons/engine outfitting panel — buyable upgrade cards for one category (the shipyard, aboard). */
 function outfitPanel(cat: UpgradeCategory, title: string, blurb: string, story: StoryState, theme: { trim: string }): string {
-  const items = STORY_SHIP_UPGRADES.filter(
-    (u) => u.category === cat && (upgradeRevealed(story, u) || ownsUpgrade(story, u.id)),
-  );
+  // GS-story-ship-interior-owned: aboard your ship you ONLY see what's INSTALLED (owned) — outfitting
+  // (buying) happens at a ship-vendor world's shipyard, not in the hull. Unowned parts never show here.
+  const items = STORY_SHIP_UPGRADES.filter((u) => u.category === cat && ownsUpgrade(story, u.id));
   const catRating = categoryRating(story, cat);
   const cards = items.length
     ? `<div class="si-grid">${items.map((u) => outfitCard(u, story)).join('')}</div>`
-    : `<p class="si-flavour">Nothing stocked here yet — clear more worlds to unlock this bay's arsenal.</p>`;
+    : `<p class="si-flavour">Nothing installed yet — outfit this bay at a ship-vendor world's shipyard, then it shows here.</p>`;
   return `<div class="si-panel" style="--ac:${theme.trim};">
     <div class="si-panel-head"><b>${title}</b><span class="si-panel-rating">⚔ ${catRating}</span></div>
     <p class="si-flavour">${blurb}</p>

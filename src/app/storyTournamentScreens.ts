@@ -49,12 +49,12 @@ function rivalHalftimeLine(rivalId: string, brag: boolean): string {
       '"You play beautifully when you’re angry. Good. Hold onto that. It’s the first honest thing I’ve seen you do."',
     ],
     'driver-dan': [
-      '"…I taught you the front nine, kid. Don’t make me teach you the back nine too. Sit DOWN."',
-      '"Ha! There he is. THERE’s my golfer. Come on then — beat the old man. I dare you. Break my heart."',
+      '"I’ve read this wreck for forty years, kid. Don’t make me walk you round the back nine too. Sit DOWN."',
+      '"Ha! There it is — the fire the Parrot saw in you. Come on then, beat the old man. I dare you. Break my heart."',
     ],
     penelope: [
       '"Your pace is frantic. Your reads are panicked. You already lost, dear — you just haven’t stopped moving yet."',
-      '"You’re still ahead. Still fighting. …I read putts for you once. I know you never could let go. It will cost you."',
+      '"You’re still ahead. Still fighting. …I’ve read greens for a hundred Wardens who thought they could win alone. I know how it ends. It will cost you."',
     ],
   };
   const pair = lines[rivalId] ?? [
@@ -75,7 +75,7 @@ function rivalTaunt(rivalId: string): string {
     case 'driver-dan':
       return '"Don’t make me do this, kid. …Fine. Come on then. Show me the Parrot was wrong about you."';
     case 'penelope':
-      return '"I read your putts for a hundred worlds. I know exactly how you miss. Come and be still with me."';
+      return '"I’ve read a hundred worlds of putts. I know exactly how a lost golfer misses. Come and be still with me."';
     default:
       return '"The club champion doesn’t lose at home. Nice of you to travel all this way to watch."';
   }

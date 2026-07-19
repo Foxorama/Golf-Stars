@@ -724,6 +724,26 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   joining the legendary Comet ball — each dearer and stocked only in deep worlds both paths visit. Existing
   rare/epic values unchanged (their tests still hold). The locker gear panel now states the one-per-slot rule
   outright. Guarded by a tier-ladder + no-stack test in `tests/story-shop.test.ts`.
+- **GS-story-map-fixes** — ✅ *shipped* (a player-reported bug batch). Four fixes:
+  (1) **Herald caddy prose** (`storyTournaments.ts` + `storyTournamentScreens.ts`) — the Herald majors called
+  Driver Dan "your first caddy" and Penelope the Warden "who once read your putts", but on the Herald path you
+  can NEVER recruit a Warden caddy (`hireStoryCaddy` no-ops for `herald`) and Dan's world (`derelict-18`) only
+  unlocks at Chapter 5 anyway, so the personal-caddy history was almost always fiction. Reframed both (intros +
+  the `rivalHalftimeLine`/`rivalTaunt` dialogue) to their true canonical role — the Order's old road-caddy /
+  the Wardens' green-reader you've turned against — so the betrayal lands in every playthrough. Content-only.
+  (2) **Ship-interior owned-only** (`shipInteriorScreens.ts`) — the Weapons/Engine bays aboard your ship now
+  show ONLY installed (owned) upgrades (`ownsUpgrade` filter, matching the `outfitCard` "you only see what's
+  INSTALLED" intent); you outfit at a ship-vendor world's SHIPYARD, not in the hull.
+  (3) **Ship-interior undismissable card** (`ui/game.ts`) — the `storyCloseItem` reducer guard was missing the
+  `shipInterior` screen (its sibling `storyInspectItem` had it), so an aboard lore card could never be closed.
+  Guard widened.
+  (4) **FIRE fires the equipped weapon + service icons** — the star-map FIRE button fired the ship HULL's
+  cosmetic default gun, ignoring owned weapon UPGRADES; `tourWeaponFor(shipId, ownedShipUpgradeIds)`
+  (`render/shipWeapons.ts`) now fires the BEST owned weapon upgrade (nova › railgun › scatter) and falls back
+  to the hull gun byte-identically when none are owned (Star Tour records-chase). And the map destinations gain
+  **service badges** (`starTourMap.ts serviceBadges`) — 🚀 on the 5 ship-vendor SHIPYARD worlds (the key
+  differentiator for finding where to arm up), 🛒 on any PRO SHOP world — so you can read where to shop
+  straight off the chart. All render/data + a reducer guard; no save/rng/`_gs*` hooks.
 
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.

@@ -172,9 +172,9 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     intro: [
       'You wear the Coil’s mark now, and Sister Ecdysis — the Shedmaker, who forges the cult’s cursed ' +
         'relics from serpent-scale — presides over your rite. At the Eridanus Atolls you desecrate a ' +
-        'Warden shrine to drown its wards — and the Warden sent to stop you is Penelope, who once read ' +
-        'your putts. She does not recognise the golfer you have become.',
-      'Play the rite, put your old friend to the sword, and take the Drowned Sigil.',
+        'Warden shrine to drown its wards — and the Warden sent to stop you is Penelope, whose putting ' +
+        'reads have steadied the Order’s champions for years. She does not recognise the golfer you have become.',
+      'Play the rite, put the old Warden to the sword, and take the Drowned Sigil.',
       '🐦‍⬛ "Four Sigils, and the serpent exhales a little deeper. This is the drowning, Herald — the first world you take FOR the Long Rest instead of against it. It should feel like a sin. That feeling is how you know it is working."',
     ],
   },
@@ -215,8 +215,9 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     prize: 'The Coil anoints you its Herald. The fifth Sigil forges the key to the finale.',
     intro: [
       'The Ghost Wreck, where the Coil harvests the dead — and the last Wardens who might stop you make ' +
-        'their stand. Driver Dan, your first caddy, stands on the tee against you with everything he has ' +
-        'left. There is no going back from what you do here.',
+        'their stand. Driver Dan, the old road-caddy who has carried bags for the Order since before you ' +
+        'were born, stands on the tee against you with everything he has left — still certain the golfer ' +
+        'the Parrot chose is somewhere under the Coil’s mark. There is no going back from what you do here.',
       'Crush the old man, complete the rite, and be anointed the Coil’s Herald.',
       '🐦‍⬛ "The fifth Sigil, Herald, and the Green Key is yours — not to lock the root, but to OPEN it. Ragnarök has a hand on the door now, and that hand is yours. Take it. Let the tired universe rest."',
     ],
