@@ -11,7 +11,7 @@
  * pure transitions (offer → accept → play → complete-with-reward). Screens/round wiring live in app/ui.
  */
 
-import { equipStoryClub, type StoryState } from './story';
+import { equipStoryClub, NAMED_STORY_CLUBS, type StoryState } from './story';
 import { allyHomeWorld, allyName } from './storyAllies';
 import { factionForCaddy, factionById } from './factions';
 import { storyCaddyHired } from './storyCaddies';
@@ -60,8 +60,8 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
       '"Behind the seat, kid — reach in. That’s my old driver. Solar-forged, drove a ball clean across a ring ' +
         'system once. I want you swinging it now. Somebody oughta. Go save the universe with it."',
     ],
-    rewardClubId: 'club:solar:D',
-    rewardName: "The Long Haul — Dan's Driver",
+    rewardClubId: 'quest:dan',
+    rewardName: NAMED_STORY_CLUBS['quest:dan']!.name,
     rewardBlurb: 'A solar-forged long-haul driver, drop-hitched from the wreck of the Long Haul. Enormous carry.',
   },
   {
@@ -81,8 +81,8 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
       '"Take the wedge, champion. Sand-Saver’s Second — solar-forged, opens like a dream. From now on there’s ' +
         'no such thing as an unplayable lie. Sandy’s orders."',
     ],
-    rewardClubId: 'club:solar:SW',
-    rewardName: "Sand-Saver's Second",
+    rewardClubId: 'quest:sandy',
+    rewardName: NAMED_STORY_CLUBS['quest:sandy']!.name,
     rewardBlurb: 'The wedge that finally beat the buried lie. Escapes anything, from anywhere.',
   },
   {
@@ -99,12 +99,12 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
     ],
     complete: [
       '🎒 "Patient’s stable. Colour’s back. Ha — you rang, I answered, everybody lives. That’s the practice."',
-      '"Here — the Phoenix Scalpel. Warm-forged, precise as a suture. Chip with it and the ball always finds ' +
+      '"Here — the Phoenix Scalpel. Solar-forged, precise as a suture. Chip with it and the ball always finds ' +
         'a pulse near the pin. Doctor’s orders."',
     ],
-    rewardClubId: 'club:masters:PW',
-    rewardName: 'The Phoenix Scalpel',
-    rewardBlurb: 'A surgeon’s pitching wedge, warm-forged for precision. Every chip finds a pulse by the pin.',
+    rewardClubId: 'quest:chipinski',
+    rewardName: NAMED_STORY_CLUBS['quest:chipinski']!.name,
+    rewardBlurb: 'A surgeon’s pitching wedge, solar-forged for precision. Every chip finds a pulse by the pin.',
   },
   {
     id: 'quest-penelope',
@@ -124,8 +124,8 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
       '"The Star-Reader — solar-true, weighted for surrender, not for effort. Every read it gives you is honest. ' +
         'Putt as if the ball has already stopped. It nearly has."',
     ],
-    rewardClubId: 'club:solar:putter',
-    rewardName: 'The Star-Reader',
+    rewardClubId: 'quest:penelope',
+    rewardName: NAMED_STORY_CLUBS['quest:penelope']!.name,
     rewardBlurb: 'The Putters’ Guild trial putter — solar-true, weighted for surrender. Reads run honest and long.',
   },
   {
@@ -142,11 +142,11 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
     ],
     complete: [
       '🎒 "Three-wood. Low, into the wind, hold it left. …I called it. I CALLED IT and I didn’t take it back!"',
-      '"This is Conviction — I forged it myself, on the Links, and I’m not asking if you like it. It’s a Planet ' +
-        'wood and it’s YOURS and it flies dead straight because for once I was sure. Take it. …You like it?"',
+      '"This is Conviction — I forged it myself, on the Links, and I’m not asking if you like it. It’s ' +
+        'solar-forged and it’s YOURS and it flies dead straight because for once I was sure. Take it. …You like it?"',
     ],
-    rewardClubId: 'club:tour:3W',
-    rewardName: 'Conviction',
+    rewardClubId: 'quest:sam',
+    rewardName: NAMED_STORY_CLUBS['quest:sam']!.name,
     rewardBlurb: 'The wood Sam forged the day he finally trusted his own read. Flies dead straight.',
   },
   {
@@ -166,8 +166,8 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
       '"From the deepest seam I dug this: the Dowser, a solar iron that hums toward the hole through any ground. ' +
         'It reads the break with its own bones. Now you carry a little of the deep with you, champion."',
     ],
-    rewardClubId: 'club:solar:7i',
-    rewardName: 'The Dowser',
+    rewardClubId: 'quest:mole',
+    rewardName: NAMED_STORY_CLUBS['quest:mole']!.name,
     rewardBlurb: 'A solar iron dowsed from beneath the mire — it hums toward the hole through any ground.',
   },
 ];

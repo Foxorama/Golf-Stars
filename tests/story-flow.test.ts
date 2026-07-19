@@ -797,7 +797,8 @@ describe('Ally side quests (GS-story-quests)', () => {
     expect(claimed.screen).toBe('story');
     expect(claimed.story?.completedQuestIds).toContain('quest-dan');
     expect(claimed.story?.activeQuestId).toBeUndefined();
-    expect(claimed.story?.equippedBagIds).toContain('club:solar:D');
+    // GS-story-quest-club: the reward is the NAMED ally-gift club (its own name in the bag), not the generic set club
+    expect(claimed.story?.equippedBagIds).toContain('quest:dan');
   });
 
   it('a quest cannot be accepted before its chapter, and only one runs at a time', () => {

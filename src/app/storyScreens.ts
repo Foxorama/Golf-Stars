@@ -391,7 +391,8 @@ export function storyResultScreen(): string {
               `${worldHasShop(r.courseId) ? `<button class="gs-btn" data-action='${JSON.stringify({ type: 'openStoryShop', worldId: r.courseId })}'>🛒 Visit the Pro Shop</button>` : ''}
              ${worldIsShipVendor(r.courseId) ? `<button class="gs-btn" data-action='${JSON.stringify({ type: 'openStoryShipyard', worldId: r.courseId })}'>🚀 Visit the Shipyard</button>` : ''}
              ${recapCaddyHTML(state.story, r.courseId)}
-             <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'storyRoundContinue' })}'>Back to the clubhouse ›</button>`
+             <button class="gs-btn" data-action='${JSON.stringify({ type: 'openStoryMap' })}'>🗺 Back to the star chart — fly on ›</button>
+             <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'storyRoundContinue' })}'>🚀 Return to the clubhouse ›</button>`
       }
     </div>`;
 }

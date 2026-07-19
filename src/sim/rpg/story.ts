@@ -304,26 +304,57 @@ export function storyComplete(story: StoryState): boolean {
 // ── Pure progression helpers (immutable: never mutate `story`, always return a new object) ──────────
 
 /**
+ * NAMED quest-reward clubs (GS-story-quest-club): a friend's signature gift carries its OWN name into the
+ * BAG (not the generic "Solar Storm Sand Wedge"), and every quest reward is the SAME tier so no ally's gift
+ * is worse than another's (the parity fix). Each maps a `quest:<key>` id → a base club (all legendary
+ * `solar` stats for parity) + the custom display name. Owned as the `quest:<key>` id; `resolveStoryClub`
+ * rebuilds the base club and overrides the name. Keeping the name here (single source) keeps the recap +
+ * the bag in sync. Referenced from `storyQuests.ts` (which imports this — no cycle, story.ts imports nothing
+ * from there).
+ */
+export const NAMED_STORY_CLUBS: Record<string, { base: string; name: string }> = {
+  'quest:dan': { base: 'club:solar:D', name: "The Long Haul — Dan's Driver" },
+  'quest:sandy': { base: 'club:solar:SW', name: "Sand-Saver's Second" },
+  'quest:chipinski': { base: 'club:solar:PW', name: 'The Phoenix Scalpel' },
+  'quest:penelope': { base: 'club:solar:putter', name: 'The Star-Reader' },
+  'quest:sam': { base: 'club:solar:3W', name: 'Conviction' },
+  'quest:mole': { base: 'club:solar:7i', name: 'The Dowser' },
+};
+
+/** The real `club:<set>:<type>` base id a Story-owned club id maps to — a `quest:<key>` reward resolves to
+ *  its base; any other id is itself. Used wherever art/theme/type is derived off the id. */
+export function storyRewardBaseId(id: string): string {
+  return NAMED_STORY_CLUBS[id]?.base ?? id;
+}
+
+/**
  * Resolve a Story-owned club id to a real `Club`. A PLAIN id (`'3W'`, `'putter'`) resolves off the
  * taxonomy; a THEMED reward id (`club:<set>:<type>`, e.g. `club:tour:3W`) rebuilds the themed reward
  * club (its carry bonus + set/rarity + "Planet 3-Wood" name) through the shared reward machinery, so a
- * bought Pro-Shop club plays exactly as the same Voyage reward would. Unknown ids → undefined. Pure.
+ * bought Pro-Shop club plays exactly as the same Voyage reward would; a NAMED quest reward (`quest:<key>`)
+ * rebuilds its base club and overrides the name with the ally's signature. Unknown ids → undefined. Pure.
  */
 export function resolveStoryClub(id: string): Club | undefined {
-  if (id.startsWith('club:')) {
-    const [, setId, type] = id.split(':');
+  const named = NAMED_STORY_CLUBS[id];
+  const realId = named?.base ?? id;
+  if (realId.startsWith('club:')) {
+    const [, setId, type] = realId.split(':');
     const set = clubSetById(setId);
-    if (set && type && clubById(type)) return buildRewardClub(set, type);
+    if (set && type && clubById(type)) {
+      const club = buildRewardClub(set, type);
+      return named ? { ...club, name: named.name } : club;
+    }
     return undefined;
   }
-  const base = clubById(id);
+  const base = clubById(realId);
   return base ? { ...base } : undefined;
 }
 
-/** The bag TYPE an owned-club id occupies (for one-per-type dedupe): a themed id's base type, else the
- *  id itself. `club:tour:3W` → `'3W'`, `'putter'` → `'putter'`. */
+/** The bag TYPE an owned-club id occupies (for one-per-type dedupe): a themed/quest id's base type, else
+ *  the id itself. `club:tour:3W` → `'3W'`, `quest:sandy` → `'SW'`, `'putter'` → `'putter'`. */
 export function storyClubType(id: string): string {
-  return id.startsWith('club:') ? id.split(':')[2] ?? id : id;
+  const realId = storyRewardBaseId(id);
+  return realId.startsWith('club:') ? realId.split(':')[2] ?? realId : realId;
 }
 
 /** Resolve the equipped bag ids to real `Club` rows (themed-aware; skips ids that resolve to nothing). */
