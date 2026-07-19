@@ -25,6 +25,9 @@ import {
   storyWorldUnlocked,
   storyWorldById,
   storyComplete,
+  NAMED_STORY_CLUBS,
+  resolveStoryClub,
+  storyClubType,
   type StoryState,
 } from '../src/sim/rpg/story';
 import { DEFAULT_SHIP_ID } from '../src/sim/rpg/ships';
@@ -249,5 +252,26 @@ describe('story-state model (GS-story-save)', () => {
       expect(migrateStory({ alignment: 'herald' }).alignment).toBe('herald');
       expect(migrateStory({ alignment: 'nonsense' }).alignment).toBeUndefined();
     });
+  });
+});
+
+describe('named quest-reward clubs (GS-story-quest-club)', () => {
+  it('every ally-gift club carries its OWN name into the bag and is the SAME (legendary) tier — parity', () => {
+    for (const [id, def] of Object.entries(NAMED_STORY_CLUBS)) {
+      const club = resolveStoryClub(id);
+      expect(club, `${id} resolves`).toBeTruthy();
+      // the BAG shows the signature name, not the generic set name ("Solar Storm Sand Wedge")
+      expect(club!.name).toBe(def.name);
+      // parity: no ally's gift is a lower tier than another's
+      expect(club!.rarity).toBe('legendary');
+      // dedupe still keys off the base club TYPE
+      expect(storyClubType(id)).toBe(def.base.split(':')[2]);
+    }
+  });
+
+  it("Sandy's and Dr Chipinski's rewards are now equal tier (the reported parity bug)", () => {
+    expect(resolveStoryClub('quest:sandy')!.rarity).toBe(resolveStoryClub('quest:chipinski')!.rarity);
+    expect(resolveStoryClub('quest:sandy')!.name).toBe("Sand-Saver's Second");
+    expect(resolveStoryClub('quest:chipinski')!.name).toBe('The Phoenix Scalpel');
   });
 });

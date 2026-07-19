@@ -458,11 +458,13 @@ export function reduce(state: UiState, action: Action): UiState {
     }
 
     case 'openStoryMap': {
-      // GS-story-map: open the galaxy star-map navigator from the spaceport clubhouse (post-recruitment). It
-      // REUSES the Star Tour `starTour` screen in a story context — app.ts's dispatch handler flags
-      // `starTourView.storyMode` so the chart plots the campaign's charted worlds + flies the story ship.
-      if (state.screen !== 'story' || !state.story) return state;
-      return { ...state, screen: 'starTour' };
+      // GS-story-map: open the galaxy star-map navigator from the spaceport clubhouse (post-recruitment) OR
+      // straight from a world-clear recap (`storyResult`) so finishing a world drops you back on the chart to
+      // fly on / fly home (GS-story-worldclear-map). It REUSES the Star Tour `starTour` screen in a story
+      // context — app.ts's dispatch handler flags `starTourView.storyMode` so the chart plots the campaign's
+      // charted worlds + flies the story ship.
+      if ((state.screen !== 'story' && state.screen !== 'storyResult') || !state.story) return state;
+      return { ...state, screen: 'starTour', lastStoryRound: undefined };
     }
 
     case 'exitStoryMap': {

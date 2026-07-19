@@ -352,21 +352,21 @@ const SPACEPORT_STYLE = `<style>
   .gs-sclub-plate{display:inline-block;margin-top:2px;padding:2px 8px;border-radius:3px;
     background:linear-gradient(180deg,#e8c266,#a97b25);border:1px solid #5c3f12;box-shadow:inset 0 1px 0 #fff6cf,0 1px 2px #0008;
     font-family:Georgia,serif;font-size:clamp(8px,2.1cqw,11.5px);font-weight:800;color:#2a1a05;white-space:nowrap;}
+  /* Crew members stand on the deck as PROPER figures — their full portrait bust (head + shoulders + coat),
+     feet-anchored, not a cropped floating head. A soft ground shadow + drop-shadow sits them in the room. */
   .gs-sclub-caddy{position:absolute;background:none;border:0;padding:0;cursor:pointer;color:inherit;text-align:center;
     transform:translate(-50%,-100%);z-index:16;transition:transform .15s ease;}
-  .gs-sclub-caddy:hover,.gs-sclub-caddy:focus-visible{outline:none;transform:translate(-50%,-100%) scale(1.07);z-index:22;}
+  .gs-sclub-caddy:hover,.gs-sclub-caddy:focus-visible{outline:none;transform:translate(-50%,-100%) scale(1.06);z-index:22;}
   .gs-sclub-caddy--on{z-index:19;}
-  .gs-sclub-cav{display:block;width:11cqw;max-width:54px;aspect-ratio:1;border-radius:50%;overflow:hidden;margin:0 auto;
-    background:radial-gradient(circle at 50% 38%,#243042,#0e1219);border:2px solid #4a5566cc;box-shadow:0 4px 8px #0009;}
-  .gs-sclub-caddy--on .gs-sclub-cav{width:13cqw;max-width:62px;border-color:#f0a8c8;box-shadow:0 4px 10px #000a,0 0 8px #f0a8c866;}
-  .gs-sclub-cav svg{width:150%;height:150%;transform:translate(-16%,6%);}
-  .gs-sclub-cplate{display:inline-block;margin-top:2px;padding:1px 7px;border-radius:10px;background:#0e141ecc;
-    border:1px solid #33465f;font-size:clamp(7px,1.8cqw,10px);font-weight:700;color:#cdd8ea;white-space:nowrap;}
-  .gs-sclub-caddy--on .gs-sclub-cplate{background:#231018cc;border-color:#6a3a52;color:#f0a8c8;}
-  /* Herald (Coil) crew — venom-violet ring + plate; the mentor (Voss) gets the emphasised ring. */
-  .gs-sclub-caddy--herald .gs-sclub-cav{border-color:#b060c0cc;}
-  .gs-sclub-caddy--herald.gs-sclub-caddy--on .gs-sclub-cav{border-color:#c98ad8;box-shadow:0 4px 10px #000a,0 0 9px #b060c088;}
-  .gs-sclub-caddy--herald .gs-sclub-cplate{background:#1a0f24cc;border-color:#5a3a6a;color:#d6b8e8;}
+  .gs-sclub-cav{display:block;width:17cqw;max-width:96px;margin:0 auto -1cqw;filter:drop-shadow(0 5px 5px #000a);}
+  .gs-sclub-cav svg{width:100%;height:auto;display:block;}
+  .gs-sclub-caddy--on .gs-sclub-cav{width:20cqw;max-width:112px;filter:drop-shadow(0 6px 6px #000b) drop-shadow(0 0 7px #f0a8c8aa);}
+  .gs-sclub-cplate{display:inline-block;margin-top:2px;padding:1px 7px;border-radius:10px;background:#0e141edd;
+    border:1px solid #33465f;font-size:clamp(7px,1.8cqw,10px);font-weight:700;color:#cdd8ea;white-space:nowrap;position:relative;z-index:1;}
+  .gs-sclub-caddy--on .gs-sclub-cplate{background:#231018ee;border-color:#6a3a52;color:#f0a8c8;}
+  /* Herald (Coil) crew — venom-violet glow on the active mentor; violet plate. */
+  .gs-sclub-caddy--herald.gs-sclub-caddy--on .gs-sclub-cav{filter:drop-shadow(0 6px 6px #000b) drop-shadow(0 0 8px #b060c0cc);}
+  .gs-sclub-caddy--herald .gs-sclub-cplate{background:#1a0f24ee;border-color:#5a3a6a;color:#d6b8e8;}
   /* Herald scene: tint the door labels toward the Coil palette. */
   .gs-sclub-scene--herald .gs-sclub-hot:hover,.gs-sclub-scene--herald .gs-sclub-hot:focus-visible{background:#b060c018;border-color:#b060c066;box-shadow:inset 0 0 24px #7fe0a022;}
   .gs-sclub-scene--herald .gs-sclub-hot:hover .gs-sclub-lab,.gs-sclub-scene--herald .gs-sclub-hot:focus-visible .gs-sclub-lab{background:#2a1236;border-color:#b060c0;color:#ecd8f4;}

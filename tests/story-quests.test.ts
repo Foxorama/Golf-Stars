@@ -38,7 +38,7 @@ describe('Story ally side quests (GS-story-quests)', () => {
     const dan = questForCaddy('driver-dan')!;
     expect(dan.minChapter).toBe(3);
     expect(questWorld(dan)).toBe('derelict-18'); // his old rig
-    expect(dan.rewardClubId).toBe('club:solar:D');
+    expect(dan.rewardClubId).toBe('quest:dan'); // GS-story-quest-club: a NAMED ally-gift club
   });
 
   it('offerable only when recruited, chapter reached, none active, and not already done', () => {
@@ -67,9 +67,9 @@ describe('Story ally side quests (GS-story-quests)', () => {
     const done = completeQuest(accepted, 'quest-dan');
     expect(done.activeQuestId).toBeUndefined();
     expect(questDone(done, 'quest-dan')).toBe(true);
-    // the reward club is owned AND in the equipped bag
-    expect(done.ownedClubIds).toContain('club:solar:D');
-    expect(done.equippedBagIds).toContain('club:solar:D');
+    // the reward club is owned AND in the equipped bag (the NAMED ally-gift id)
+    expect(done.ownedClubIds).toContain('quest:dan');
+    expect(done.equippedBagIds).toContain('quest:dan');
 
     // completing a non-active quest is a no-op
     expect(completeQuest(done, 'quest-dan')).toBe(done);

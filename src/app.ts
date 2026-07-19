@@ -2044,11 +2044,12 @@ function stepStarTour(): void {
         }
       }
       if (v.dockingAtPort) {
-        // Docked home at the spaceport (GS-star-tour-port) → into the Clubhouse (the map's way out).
+        // Docked home at the spaceport (GS-star-tour-port) → the map's way out. In STORY mode that's the
+        // Story spaceport clubhouse (`exitStoryMap`), NOT the title cosmetic Clubhouse (the routing bug).
         v.dockingAtPort = false;
         stAnim.raf = 0;
         sfx.click();
-        dispatch({ type: 'openClubhouseHall' });
+        dispatch(v.storyMode && state.story ? { type: 'exitStoryMap' } : { type: 'openClubhouseHall' });
         return;
       }
       if (v.flyingToYggdrasil) {

@@ -14,6 +14,7 @@ import { clubSetById, shopItem } from '../sim/rpg/economy';
 import {
   resolveStoryClub,
   storyClubType,
+  storyRewardBaseId,
   storyBagFull,
   MAX_STORY_BAG,
   type GearSlot,
@@ -51,13 +52,15 @@ function accordion(id: string, icon: string, title: string, summary: string, bod
     </section>`;
 }
 
-/** The art id for a club: a themed id as-is, else the plain 'starter' skin so it draws a real club head. */
+/** The art id for a club: a themed/quest id → its base themed id, else the plain 'starter' skin. */
 function clubArtId(id: string): string {
-  return id.startsWith('club:') ? id : `club:starter:${storyClubType(id)}`;
+  const base = storyRewardBaseId(id);
+  return base.startsWith('club:') ? base : `club:starter:${storyClubType(id)}`;
 }
 function clubTheme(id: string): string | undefined {
-  if (!id.startsWith('club:')) return undefined;
-  return clubSetById(id.split(':')[1])?.theme;
+  const base = storyRewardBaseId(id);
+  if (!base.startsWith('club:')) return undefined;
+  return clubSetById(base.split(':')[1])?.theme;
 }
 function clubArt(id: string): string {
   const club = resolveStoryClub(id);
@@ -230,13 +233,30 @@ function gearSlotRow(slot: GearSlot): string {
     </div>`;
 }
 
-/** The id to inspect for a club: themed ids carry lore directly; a plain club maps to its 'starter' card. */
+/** The id to inspect for a club: themed + quest ids carry lore directly; a plain club maps to its 'starter' card. */
 function lorableId(id: string): string {
-  return id.startsWith('club:') ? id : `plain:${storyClubType(id)}`;
+  return id.startsWith('club:') || id.startsWith('quest:') ? id : `plain:${storyClubType(id)}`;
 }
 
-/** Resolve any locker id (themed club / `plain:<type>` / gear) to a display card for the lore overlay. */
+/** Resolve any locker id (themed / quest / `plain:<type>` / gear) to a display card for the lore overlay. */
 function lockerCard(id: string): StoryCard | undefined {
+  if (id.startsWith('quest:')) {
+    // A named ally-gift club (GS-story-quest-club) — its own signature name + legendary tier.
+    const club = resolveStoryClub(id);
+    const type = storyClubType(id);
+    if (!club) return undefined;
+    return {
+      id,
+      kind: 'club',
+      name: club.name,
+      rarity: club.rarity ?? 'legendary',
+      price: 0,
+      tag: "An ally's gift · Legendary",
+      blurb: '',
+      detail: type === 'putter' ? ['A solar-true putter — reads run honest and long.'] : [`Carries ~${club.carry} yd.`],
+      lore: ["A friend's signature club, forged out in the galaxy and given to you when you played their story true. It carries a little of them on every swing."],
+    };
+  }
   if (id.startsWith('plain:')) {
     const type = id.slice('plain:'.length);
     const club = resolveStoryClub(type);

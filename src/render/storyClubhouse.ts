@@ -203,8 +203,11 @@ export function earthClubhouseSceneHTML(activeId: string | null): string {
   const figures = CHARACTERS.map((ch, i) =>
     clubhouseGolferAt(ch, EARTH_SPOTS[i % EARTH_SPOTS.length]!, ch.id === activeId),
   ).join('');
+  // isolation:isolate confines the golfers' high z-indices to this scene's own stacking context, so the
+  // fixed stats overlay (z-index 60, a later sibling) always paints ABOVE them — without it the feet-anchored
+  // figures (z up to ~915) bled on top of the inspect card (the "golfers overlay the stat screen" bug).
   return `${eclubStyle()}
-    <div style="container-type:inline-size;position:relative;width:100%;aspect-ratio:4/3;max-width:620px;
+    <div style="container-type:inline-size;position:relative;isolation:isolate;width:100%;aspect-ratio:4/3;max-width:620px;
       margin:0 auto;border:1px solid #3a2f1f;border-radius:16px;overflow:hidden;background:#140d07;">
       ${earthClubhouseArt()}
       ${figures}
