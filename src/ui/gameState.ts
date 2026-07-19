@@ -263,6 +263,19 @@ export interface UiState {
     wasPrologue: boolean;
     /** GS-story-quests: the ally side quest this round fulfilled (its recap offers the reward), or absent. */
     questId?: string;
+    /** GS-story-qualifiers: when this world was a QUALIFYING EVENT (a chapter world, not the Sigil venue),
+     *  the field result — your finishing place, the field, the top-N bar, whether you qualified, and the
+     *  running "n of 2 events qualified" progress toward the tournament. Absent on a non-qualifier round. */
+    qualifier?: {
+      chapter: number;
+      place: number;
+      fieldSize: number;
+      need: number;
+      qualified: boolean;
+      qualifiedCount: number;
+      neededCount: number;
+      leaderboard: { name: string; gross: number; kind: 'ghost' | 'player' }[];
+    };
   };
   /** GS-story-tournament: the just-finished Galaxy Tournament recap (the `storyTournamentResult` screen). */
   lastStoryTournament?: {

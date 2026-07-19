@@ -313,6 +313,38 @@ describe('Story Pro Shop flow (GS-story-econ)', () => {
   });
 });
 
+describe('Story qualifying events (GS-story-qualifiers)', () => {
+  it('playing a chapter world (not the venue) resolves as a qualifier: a field, a placement, a record', () => {
+    const story = { ...defaultStoryState('feather-fade'), chapter: 1 };
+    const map = { ...initState('qual-seed', {}, undefined, story), screen: 'starTour' as const };
+    // verdant2-18 is a Chapter-1 world and NOT the Emerald venue (verdant-18) → a qualifying event.
+    const intro = reduce(map, { type: 'storyPlayWorld', courseId: 'verdant2-18' });
+    expect(intro.screen).toBe('intro'); // a plain world round, no lore beat (the Ch.1 omen is at the tournament)
+    const done = reduce(intro, { type: 'play' });
+    expect(done.screen).toBe('storyResult');
+    const q = done.lastStoryRound!.qualifier!;
+    expect(q).toBeTruthy();
+    expect(q.chapter).toBe(1);
+    expect(q.need).toBe(10);
+    expect(q.fieldSize).toBe(16);
+    expect(q.neededCount).toBe(2);
+    expect(q.place).toBeGreaterThanOrEqual(1);
+    expect(q.place).toBeLessThanOrEqual(q.fieldSize);
+    expect(q.leaderboard.length).toBe(16); // 15 ghosts + you
+    expect(q.leaderboard.filter((g) => g.kind === 'player')).toHaveLength(1);
+    // the finish is recorded on the campaign for the gate
+    expect(done.story!.qualifierResults['verdant2-18']!.place).toBe(q.place);
+    expect(q.qualified).toBe(q.place <= q.need);
+  });
+
+  it('the Sigil VENUE itself is NOT a qualifier (it is played as the major)', () => {
+    const story = { ...defaultStoryState('feather-fade'), chapter: 1 };
+    const map = { ...initState('venue-seed', {}, undefined, story), screen: 'starTour' as const };
+    const done = reduce(reduce(map, { type: 'storyPlayWorld', courseId: 'verdant-18' }), { type: 'play' });
+    expect(done.lastStoryRound!.qualifier).toBeUndefined();
+  });
+});
+
 describe('Story shop/vendor ACCESS — per-world, never a clubhouse buy-anything (GS-story-shop-access)', () => {
   // A campaign that just cleared a world, sitting on the world-clear recap.
   function afterClear(courseId: string, extraCleared: string[] = []) {
@@ -541,7 +573,9 @@ describe('Story tournament flow (GS-story-tournament)', () => {
     const story = {
       ...defaultStoryState('feather-fade'),
       chapter: 1,
-      clearedWorldIds: ['standrews-18', 'verdant-18', 'verdant2-18'],
+      clearedWorldIds: ['standrews-18', 'verdant-18', 'verdant2-18', 'desert-18'],
+      // GS-story-qualifiers: unlock the Emerald major by QUALIFYING (top-N) in the two Chapter-1 events.
+      qualifierResults: { 'verdant2-18': { place: 1, field: 16 }, 'desert-18': { place: 4, field: 16 } },
     };
     return { ...initState('seed', {}, undefined, story), screen: 'story' as const };
   }
@@ -554,7 +588,11 @@ describe('Story tournament flow (GS-story-tournament)', () => {
     const hub = tournamentReady();
     const lobby = reduce(hub, { type: 'openStoryTournament' });
     expect(lobby.screen).toBe('storyTournament');
-    const intro = reduce(lobby, { type: 'storyPlayTournament' });
+    // GS-story-ragnarok: the Emerald Sigil match opens with the Parrot's opening-stakes beat — dismiss it.
+    const beat = reduce(lobby, { type: 'storyPlayTournament' });
+    expect(beat.screen).toBe('lore');
+    expect(beat.pendingLoreId).toBe('story-omen-emerald');
+    const intro = reduce(beat, { type: 'dismissLore' });
     expect(intro.screen).toBe('intro');
     expect(intro.run.storyTournament).toBe(1);
     expect(intro.run.storyRound).toBe(true);
@@ -563,7 +601,8 @@ describe('Story tournament flow (GS-story-tournament)', () => {
 
   it('playing the tournament resolves vs the rival and, on a win, banks the Sigil + advances the chapter', () => {
     const lobby = reduce(tournamentReady(), { type: 'openStoryTournament' });
-    const intro = reduce(lobby, { type: 'storyPlayTournament' });
+    // GS-story-ragnarok: dismiss the Emerald opening beat before teeing off.
+    const intro = reduce(reduce(lobby, { type: 'storyPlayTournament' }), { type: 'dismissLore' });
     const done = reduce(intro, { type: 'play' });
     expect(done.screen).toBe('storyTournamentResult');
     const r = done.lastStoryTournament!;
@@ -592,13 +631,15 @@ describe('Story tournament flow (GS-story-tournament)', () => {
 
   it('a Story tournament never touches the main-save Star Tour boards', () => {
     const hub = tournamentReady();
-    const done = reduce(reduce(reduce(hub, { type: 'openStoryTournament' }), { type: 'storyPlayTournament' }), { type: 'play' });
+    const round = reduce(reduce(hub, { type: 'openStoryTournament' }), { type: 'storyPlayTournament' });
+    const done = reduce(reduce(round, { type: 'dismissLore' }), { type: 'play' });
     expect(done.strokePlayBest).toEqual(hub.strokePlayBest);
   });
 
   it('the interactive tournament pops the halftime rival beat after hole 9, then plays on (GS-story-tournament-midpop)', () => {
     const lobby = reduce(tournamentReady(), { type: 'openStoryTournament' });
-    const intro = reduce(lobby, { type: 'storyPlayTournament' });
+    // GS-story-ragnarok: dismiss the Emerald opening beat before teeing off.
+    const intro = reduce(reduce(lobby, { type: 'storyPlayTournament' }), { type: 'dismissLore' });
     let s = reduce(intro, { type: 'playInteractive' });
     expect(s.screen).toBe('playing');
     // play the front nine, hole by hole (the interactive path — where the pop lives).
@@ -652,8 +693,17 @@ describe('The Choice + alignment fork (GS-story-chapters)', () => {
     expect(herald.story!.alignment).toBe('herald');
     expect(herald.screen).toBe('story');
 
-    // Now cleared two Chapter-4 worlds → the tournament is the HERALD variant (The Drowning Rite / ocean).
-    const armed = { ...herald, story: { ...herald.story!, clearedWorldIds: [...herald.story!.clearedWorldIds, 'ocean-18', 'void2-18'] }, screen: 'story' as const };
+    // Now qualified in two Chapter-4 events → the tournament is the HERALD variant (The Drowning Rite / ocean).
+    // For Herald the venue is ocean-18, so the qualifiers are void2-18 + crystal2-18 (Ch.4 top is 4).
+    const armed = {
+      ...herald,
+      story: {
+        ...herald.story!,
+        clearedWorldIds: [...herald.story!.clearedWorldIds, 'void2-18', 'crystal2-18'],
+        qualifierResults: { 'void2-18': { place: 1, field: 12 }, 'crystal2-18': { place: 2, field: 12 } },
+      },
+      screen: 'story' as const,
+    };
     const lobby = reduce(armed, { type: 'openStoryTournament' });
     expect(lobby.screen).toBe('storyTournament');
     const intro = reduce(lobby, { type: 'storyPlayTournament' });
@@ -666,7 +716,9 @@ describe('The Choice + alignment fork (GS-story-chapters)', () => {
       chapter: 4,
       alignment: 'warden' as const,
       trophyIds: ['sigil-emerald', 'sigil-ember', 'sigil-storm'],
-      clearedWorldIds: ['standrews-18', 'ocean-18', 'void2-18'],
+      clearedWorldIds: ['standrews-18', 'ocean-18', 'crystal2-18'],
+      // GS-story-qualifiers: for Warden the venue is void2-18, so the qualifiers are ocean-18 + crystal2-18.
+      qualifierResults: { 'ocean-18': { place: 1, field: 12 }, 'crystal2-18': { place: 2, field: 12 } },
       // arm up so the Warden Ch4 rival (Venoma, edge 0.42) is beatable by the auto round
       ownedClubIds: [...defaultStoryState().ownedClubIds, 'club:solar:D', 'club:solar:3W', 'club:masters:2H'],
       equippedBagIds: defaultStoryState().equippedBagIds.map((id) => (id === 'D' ? 'club:solar:D' : id)),

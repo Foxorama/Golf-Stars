@@ -120,8 +120,8 @@ describe('GS-story-beats — story-round dialogue beats gate on the campaign', (
     expect(pickLoreEvent({ ...STORY, storyChapter: 2 }, {})?.id).toBe('story-coil-named');
     // Same chapter, but NOT a story round (a Voyage/Unending arrival) → never fires.
     expect(pickLoreEvent({ ...STORY, storyChapter: 2, storyRound: false }, {})).toBeUndefined();
-    // Wrong chapter → no misfire.
-    expect(pickLoreEvent({ ...STORY, storyChapter: 1 }, {})).toBeUndefined();
+    // Wrong chapter → the coil-named beat does not fire (Ch.1 now has its own opening-omen beat instead).
+    expect(pickLoreEvent({ ...STORY, storyChapter: 1 }, {})?.id).not.toBe('story-coil-named');
     // Once seen → gone.
     expect(pickLoreEvent({ ...STORY, storyChapter: 2 }, { 'story-coil-named': true })).toBeUndefined();
   });
@@ -168,10 +168,53 @@ describe('GS-story-beats — story-round dialogue beats gate on the campaign', (
   });
 
   it('every story beat names a portrait that lorePortraitSVG can paint', () => {
-    for (const id of ['story-coil-named', 'story-coilkeepers', 'story-apostate', 'story-venoma-warden', 'story-venoma-herald']) {
+    for (const id of [
+      'story-coil-named', 'story-coilkeepers', 'story-apostate', 'story-venoma-warden', 'story-venoma-herald',
+      'story-omen-emerald', 'story-omen-abyss-warden', 'story-omen-abyss-herald', 'story-ragnarok-warden', 'story-ragnarok-herald',
+    ]) {
       const beat = loreEventById(id)!;
       expect(lorePortraitSVG(beat.portrait)).toContain('<svg');
     }
+  });
+});
+
+describe('GS-story-ragnarok — the impending-Ragnarök escalation beats (one per Sigil chapter)', () => {
+  it('Chapter 1 opens with the first tremor at the Emerald Invitational — the World-Eater only dreams (fills Sigil 1)', () => {
+    // Fires at the SIGIL MATCH (a tournament tee-off), not the practice worlds.
+    expect(pickLoreEvent({ ...STORY, storyChapter: 1, storyTournament: true }, {})?.id).toBe('story-omen-emerald');
+    // A Ch.1 PRACTICE world round (no tournament flag) still tees off clean — the GS-story-pacing feel holds.
+    expect(pickLoreEvent({ ...STORY, storyChapter: 1 }, {})).toBeUndefined();
+    // Never off a story round, and never the wrong chapter.
+    expect(pickLoreEvent({ ...STORY, storyChapter: 1, storyTournament: true, storyRound: false }, {})).toBeUndefined();
+    expect(pickLoreEvent({ ...BASE, storyChapter: 1, storyTournament: true }, {})).toBeUndefined();
+    // Once seen → gone.
+    expect(pickLoreEvent({ ...STORY, storyChapter: 1, storyTournament: true }, { 'story-omen-emerald': true })).toBeUndefined();
+  });
+
+  it('Chapter 4 escalation lands AFTER the Venoma confrontation, branching by path', () => {
+    // Venoma leads Chapter 4; once her beat is seen, the eye-half-opens omen fires (route-specific).
+    const seenVenoma = { 'story-venoma-warden': true };
+    expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden' }, seenVenoma)?.id).toBe('story-omen-abyss-warden');
+    expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'herald' }, { 'story-venoma-herald': true })?.id).toBe('story-omen-abyss-herald');
+    // The Ch.4 omen is Ch.4-only — at Ch.5 the Ragnarök beat takes over instead of it leaking forward.
+    expect(pickLoreEvent({ ...STORY, storyChapter: 5, storyAlignment: 'warden' }, { 'story-venoma-warden': true, 'story-omen-abyss-warden': true })?.id).toBe('story-ragnarok-warden');
+  });
+
+  it('Chapter 5 brings Ragnarök to the door — four Sigils set, the finale looms (fills Sigil 5)', () => {
+    const seen = { 'story-venoma-warden': true, 'story-venoma-herald': true };
+    expect(pickLoreEvent({ ...STORY, storyChapter: 5, storyAlignment: 'warden' }, seen)?.id).toBe('story-ragnarok-warden');
+    expect(pickLoreEvent({ ...STORY, storyChapter: 5, storyAlignment: 'herald' }, seen)?.id).toBe('story-ragnarok-herald');
+    // Warden hears the Parrot; Herald hears the Crow — the portraits differ by path.
+    expect(loreEventById('story-ragnarok-warden')!.portrait).toBe('prognostic-parrot');
+    expect(loreEventById('story-ragnarok-herald')!.portrait).toBe('crow');
+    // Never off a story round.
+    expect(pickLoreEvent({ ...BASE, storyChapter: 5, storyAlignment: 'warden' }, seen)).toBeUndefined();
+  });
+
+  it('paints the Carrion Crow portrait for the Herald escalation beats', () => {
+    const svg = lorePortraitSVG('crow');
+    expect(svg).toContain('<svg');
+    expect(svg).toContain('Crow'); // aria-label "The Carrion Prophet — the Crow"
   });
 });
 

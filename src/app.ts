@@ -239,6 +239,13 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const intro = reduce(hub, { type: 'storyPlayWorld', courseId: 'standrews-18' });
       return reduce(intro, { type: 'play' });
     }
+    case 'storyqualresult': {
+      // GS-story-qualifiers: mount a QUALIFYING-EVENT recap the honest way — prologue → Chapter 1, then play a
+      // non-venue Chapter-1 world (a qualifier) and resolve it, so the smoke exercises the qualifier board.
+      const hub = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      const ch1 = reduce(reduce(reduce(hub, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' }), { type: 'storyRoundContinue' });
+      return reduce(reduce(ch1, { type: 'storyPlayWorld', courseId: 'verdant2-18' }), { type: 'play' });
+    }
     case 'storymap': {
       // GS-story-map: reach the galaxy star map in STORY mode the honest way — play the prologue to Chapter
       // 1, continue to the spaceport clubhouse, then open the chart (which reuses the Star Tour screen with
@@ -321,11 +328,24 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const playWorld = (s: UiState, courseId: string): UiState =>
         reduce(reduce(reduce(s, { type: 'storyPlayWorld', courseId }), { type: 'play' }), { type: 'storyRoundContinue' });
       const st1 = playWorld(st0, 'standrews-18'); // prologue → Chapter 1
-      const st2 = playWorld(st1, 'verdant-18'); // clear 1
-      const st3 = playWorld(st2, 'verdant2-18'); // clear 2 → tournament unlocks
+      // GS-story-qualifiers: the gate is now two top-N qualifying-event finishes (the auto-played round won't
+      // reliably place top-N), so seed two qualified Chapter-1 events directly to unlock the Emerald major.
+      const st3: UiState = st1.story
+        ? {
+            ...st1,
+            story: {
+              ...st1.story,
+              clearedWorldIds: [...st1.story.clearedWorldIds, 'verdant2-18', 'desert-18'],
+              qualifierResults: { ...st1.story.qualifierResults, 'verdant2-18': { place: 1, field: 16 }, 'desert-18': { place: 1, field: 16 } },
+            },
+          }
+        : st1;
       const lobby = reduce(st3, { type: 'openStoryTournament' });
       if (screen === 'storytournament') return lobby;
-      return reduce(reduce(lobby, { type: 'storyPlayTournament' }), { type: 'play' });
+      // GS-story-ragnarok: the Emerald Sigil match opens with the Parrot's stakes beat — dismiss it, then play.
+      const teed = reduce(lobby, { type: 'storyPlayTournament' });
+      const round = teed.screen === 'lore' ? reduce(teed, { type: 'dismissLore' }) : teed;
+      return reduce(round, { type: 'play' });
     }
     case 'storytournamentpop': {
       // GS-story-tournament-midpop: the halftime rival pop. The honest path is nine interactive holes; for

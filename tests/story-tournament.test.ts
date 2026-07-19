@@ -4,6 +4,7 @@ import {
   tournamentForChapter,
   chapterWorlds,
   worldsClearedInChapter,
+  chapterQualifierEvents,
   currentTournament,
   tournamentUnlocked,
   tournamentWon,
@@ -13,6 +14,7 @@ import {
   tournamentField,
   tournamentLeaderboard,
 } from '../src/sim/rpg/storyTournaments';
+import { recordQualifier } from '../src/sim/rpg/storyQualifiers';
 import { CHARACTERS } from '../src/sim/rpg/characters';
 import {
   defaultStoryState,
@@ -65,20 +67,31 @@ describe('Galaxy Tournaments (GS-story-tournament)', () => {
     expect(tournamentForChapter(4, 'herald')!.host).toBe('Sister Ecdysis');
   });
 
-  it('unlocks only once enough of the chapter’s worlds are cleared, and only while unwon', () => {
-    const ch1 = chapterWorlds(1).map((w) => w.courseId);
+  it('unlocks only once you QUALIFY (top-N) in two of the chapter’s events, and only while unwon (GS-story-qualifiers)', () => {
     const s0 = { ...defaultStoryState('feather-fade'), chapter: 1 };
-    expect(tournamentUnlocked(s0)).toBe(false); // nothing cleared
-    const one = clearWorlds(s0, [ch1[0]!]);
-    expect(worldsClearedInChapter(one, 1)).toBe(1);
-    expect(tournamentUnlocked(one)).toBe(false); // needs 2
-    const two = clearWorlds(s0, [ch1[0]!, ch1[1]!]);
+    const events = chapterQualifierEvents(1, undefined); // Ch.1 qualifiers (the two non-venue worlds)
+    expect(events.length).toBe(2);
+    expect(tournamentUnlocked(s0)).toBe(false); // nothing qualified
+
+    // Clearing BOTH events is no longer enough — you must actually place top-N.
+    const cleared = clearWorlds(s0, events);
+    expect(worldsClearedInChapter(cleared, 1)).toBeGreaterThanOrEqual(2);
+    expect(tournamentUnlocked(cleared)).toBe(false);
+
+    // One top-10 finish isn't enough; a finish outside the top-10 doesn't count.
+    const one = recordQualifier(s0, events[0]!, 3, 16);
+    expect(tournamentUnlocked(one)).toBe(false);
+    const missed = recordQualifier(one, events[1]!, 12, 16); // Ch.1 top is 10 → 12th misses
+    expect(tournamentUnlocked(missed)).toBe(false);
+
+    // Two top-N finishes unlock it.
+    const two = recordQualifier(one, events[1]!, 6, 16);
     expect(tournamentUnlocked(two)).toBe(true);
     expect(currentTournament(two)?.chapter).toBe(1);
-    // once the Sigil is won, it no longer offers (even with worlds cleared)
+
+    // once the Sigil is won, it no longer offers; winning advanced the chapter to 2
     const won = winTournament(two, tournamentForChapter(1)!);
     expect(tournamentWon(won, tournamentForChapter(1)!)).toBe(true);
-    // winning advanced the chapter to 2, so chapter 1's tournament is behind us
     expect(won.chapter).toBe(2);
   });
 

@@ -111,7 +111,7 @@ export function storyLockerScreen(): string {
   const sections =
     accordion('bag', '🎒', 'Your bag', `${bagIds.length} / ${MAX_STORY_BAG}`, `<div class="gs-lock-grid">${bagCards}</div>`) +
     accordion('crew', '🫂', 'Your crew', crewSummary, crewBodyHTML(story)) +
-    accordion('gear', '🧤', 'Gear', gearCount ? `${gearCount} equipped` : 'none', `<div class="gs-lock-gear">${gearRows}</div>`) +
+    accordion('gear', '🧤', 'Gear', gearCount ? `${gearCount} equipped` : 'none', `<div style="font-size:12px;color:#8fa0b8;line-height:1.4;margin:0 0 8px;">One item per slot — like your clubs, you carry a single glove, cap, shoes and ball. A higher-tier piece is strong enough to beat stacking, so chase the upgrade.</div><div class="gs-lock-gear">${gearRows}</div>`) +
     accordion('bench', '📦', 'Bench', benchIds.length ? `${benchIds.length} spare` : 'empty', `<div class="gs-lock-grid">${benchCards}</div>`);
 
   return `

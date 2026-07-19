@@ -20,8 +20,9 @@ import {
 import {
   currentTournament,
   tournamentForChapter,
-  worldsClearedInChapter,
+  chapterQualifiersMet,
 } from './storyTournaments';
+import { QUALIFY_EVENTS_NEEDED, qualifyTop } from './storyQualifiers';
 import { finaleUnlocked } from './storyFinale';
 
 export type StoryStage = 'prologue' | 'clear-worlds' | 'tournament' | 'finale' | 'complete';
@@ -91,14 +92,17 @@ export function storyObjective(story: StoryState): StoryObjective {
   // Otherwise: chart a course and clear more of this chapter's worlds to unlock its tournament.
   const t = tournamentForChapter(story.chapter, story.alignment);
   if (t) {
-    const need = Math.max(0, t.unlockAfterClears - worldsClearedInChapter(story, story.chapter));
-    const worlds = need === 1 ? 'world' : 'worlds';
+    // GS-story-qualifiers: the gate is two top-N qualifying-event finishes, not just clearing worlds.
+    const done = chapterQualifiersMet(story, story.chapter);
+    const need = Math.max(0, QUALIFY_EVENTS_NEEDED - done);
+    const top = qualifyTop(story.chapter);
+    const events = need === 1 ? 'event' : 'events';
     return {
       ...base,
       stage: 'clear-worlds',
       next:
         need > 0
-          ? `Chart a course and clear ${need} more ${worlds} this chapter to unlock ${t.name}.`
+          ? `Finish top ${top} in ${need} more qualifying ${events} on the star chart to earn a start in ${t.name}.`
           : `Enter ${t.name} — it's ready on the star chart.`,
       actionLabel: '🗺 Set course',
       action: { type: 'openStoryMap' } as { type: string },

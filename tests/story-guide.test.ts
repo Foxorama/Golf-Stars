@@ -24,22 +24,32 @@ describe('story objective guide (GS-story-objective)', () => {
     expect(o.action).toEqual({ type: 'storyPlayWorld', courseId: 'standrews-18' });
   });
 
-  it('after the prologue, with no chapter worlds cleared, it says clear 2 more', () => {
+  it('after the prologue, with nothing qualified, it says finish top 10 in 2 more events (GS-story-qualifiers)', () => {
     const s = { ...defaultStoryState(), chapter: 1, clearedWorldIds: ['standrews-18'] };
     const o = storyObjective(s);
     expect(o.stage).toBe('clear-worlds');
-    expect(o.next).toMatch(/clear 2 more worlds/);
+    expect(o.next).toMatch(/top 10 in 2 more qualifying events/);
     expect(o.next).toMatch(/Emerald Invitational/);
     expect(o.action).toEqual({ type: 'openStoryMap' });
   });
 
-  it('with one chapter world cleared it counts down to one more', () => {
-    const s = { ...defaultStoryState(), chapter: 1, clearedWorldIds: ['standrews-18', 'verdant-18'] };
-    expect(storyObjective(s).next).toMatch(/clear 1 more world\b/);
+  it('with one qualifying event passed it counts down to one more', () => {
+    const s = {
+      ...defaultStoryState(),
+      chapter: 1,
+      clearedWorldIds: ['standrews-18', 'verdant2-18'],
+      qualifierResults: { 'verdant2-18': { place: 4, field: 16 } },
+    };
+    expect(storyObjective(s).next).toMatch(/top 10 in 1 more qualifying event\b/);
   });
 
-  it('when enough worlds are cleared, the tournament is the next step', () => {
-    const s = { ...defaultStoryState(), chapter: 1, clearedWorldIds: ['standrews-18', 'verdant-18', 'verdant2-18'] };
+  it('when two events are qualified, the tournament is the next step', () => {
+    const s = {
+      ...defaultStoryState(),
+      chapter: 1,
+      clearedWorldIds: ['standrews-18', 'verdant2-18', 'desert-18'],
+      qualifierResults: { 'verdant2-18': { place: 2, field: 16 }, 'desert-18': { place: 8, field: 16 } },
+    };
     const o = storyObjective(s);
     expect(o.stage).toBe('tournament');
     expect(o.next).toMatch(/Emerald Invitational is open/);

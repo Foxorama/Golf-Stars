@@ -44,6 +44,7 @@ import {
   recordWorldClear,
   GEAR_SLOTS,
   STORY_WORLDS,
+  type StoryState,
 } from '../src/sim/rpg/story';
 import type { PlayerLoadout } from '../src/sim/rpg/economy';
 
@@ -368,5 +369,45 @@ describe('route relics (GS-story-route-rewards)', () => {
     expect(warden).not.toContain('gear:ball:venom');
     // ordinary (unaligned) gear still shows on either path
     expect(warden).toContain('gear:glove:vice');
+  });
+});
+
+describe('gear tiers + one-per-slot (GS-story-gear-tiers)', () => {
+  const unit = (): PlayerLoadout => ({
+    bag: [], handicap: 10, dispersionMult: 1, creditMult: 1, perks: [], shapeMod: {},
+    minCarryBoost: 0, wedgeWindow: 0, distanceClubBonus: 0, puttBoost: 0, birdieCredit: 0, eagleCredit: 0, comebackCredit: 0,
+  });
+
+  it('every slot has a clean rare→epic→legendary ladder that strictly improves', () => {
+    // glove: dispersion tightens (lower is better)
+    expect(storyGearById('gear:glove:master')!.rarity).toBe('legendary');
+    const gloveDisp = (id: string) => storyGearById(id)!.apply(unit()).dispersionMult;
+    expect(gloveDisp('gear:glove:vice')).toBeLessThan(gloveDisp('gear:glove:tacky'));
+    expect(gloveDisp('gear:glove:master')).toBeLessThan(gloveDisp('gear:glove:vice'));
+    // hat: putt window widens (higher is better)
+    expect(storyGearById('gear:hat:oracle')!.rarity).toBe('legendary');
+    const hatPutt = (id: string) => storyGearById(id)!.apply(unit()).puttBoost ?? 0;
+    expect(hatPutt('gear:hat:focus')).toBeGreaterThan(hatPutt('gear:hat:visor'));
+    expect(hatPutt('gear:hat:oracle')).toBeGreaterThan(hatPutt('gear:hat:focus'));
+    // shoes: lie relief deepens (higher is better)
+    expect(storyGearById('gear:shoes:anchor')!.rarity).toBe('legendary');
+    const shoeRelief = (id: string) => storyGearById(id)!.apply(unit()).lieRelief ?? 0;
+    expect(shoeRelief('gear:shoes:gravlock')).toBeGreaterThan(shoeRelief('gear:shoes:spikes'));
+    expect(shoeRelief('gear:shoes:anchor')).toBeGreaterThan(shoeRelief('gear:shoes:gravlock'));
+    // the apex clean tier is dearer than the epic it caps
+    expect(storyGearById('gear:glove:master')!.price).toBeGreaterThan(storyGearById('gear:glove:vice')!.price);
+  });
+
+  it('ONE item per slot: owning two gloves folds only the EQUIPPED one — effects never stack', () => {
+    const s0: StoryState = { ...defaultStoryState(), ownedGearIds: ['gear:glove:tacky', 'gear:glove:master'], equippedGear: { glove: 'gear:glove:tacky' } };
+    // only the equipped tacky glove (×0.93) applies — not ×0.93×0.72
+    expect(applyStoryGear(unit(), s0).dispersionMult).toBeCloseTo(0.93, 5);
+    // equipping the legendary REPLACES the epic in the slot (equipStoryGear is a per-slot set)
+    const eq = equipStoryGear(s0, 'gear:glove:master');
+    expect(eq.equippedGear.glove).toBe('gear:glove:master');
+    expect(applyStoryGear(unit(), eq).dispersionMult).toBeCloseTo(0.72, 5); // just the one glove, not both
+    // still only one glove owned-equipped: the ladder makes stacking unnecessary, not possible
+    expect(ownedGearForSlot(eq, 'glove')).toHaveLength(2); // both OWNED
+    expect(Object.values(eq.equippedGear).filter((id) => storyGearById(id!)?.slot === 'glove')).toHaveLength(1); // one EQUIPPED
   });
 });

@@ -54,6 +54,10 @@ export interface LoreContext {
   storyChapter?: number;
   /** GS-story-beats: the chosen path after The Choice (`'warden'`/`'herald'`), for alignment-branched beats. */
   storyAlignment?: 'warden' | 'herald';
+  /** GS-story-ragnarok: this story arrival is a GALAXY TOURNAMENT tee-off (a Sigil match), not a practice
+   *  world round. The Chapter-1 opening omen gates on this so it fires at the Emerald Invitational (the Sigil
+   *  moment) and leaves the early practice worlds teeing off clean (the GS-story-pacing feel). */
+  storyTournament?: boolean;
 }
 
 /**
@@ -266,6 +270,97 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
       { kind: 'say', text: 'I knew it. The first time you out-drove me, I knew you had the Coil in you. Everyone does. Most just never admit it.' },
       { kind: 'say', text: 'The Wardens will send your old friends to stop us. Dan. Penelope. Look them in the eye and swing anyway — that\'s the whole of it.' },
       { kind: 'action', text: 'She flicks a hissing ball into the air and catches it without looking.' },
+    ],
+  },
+
+  // ── GS-story-ragnarok: the impending-RAGNARÖK escalation thread — one beat per Sigil chapter so EVERY
+  // Sigil carries the stakes, not just Ch.3. It tracks the sigil-ceremony's waking serpent (chapter N = N−1
+  // Sigils set = `wakefulness`): Ch.1 it only DREAMS, Ch.4 the eye half-opens, Ch.5 Ragnarök is at the door.
+  // The back-half beats branch by path (Warden → the Prognostic Parrot; Herald → the Carrion Crow). Each
+  // fires ONCE on a story-round arrival, and is placed AFTER the chapter's character beats so those lead and
+  // the omen lands on a later arrival that chapter.
+  {
+    id: 'story-omen-emerald',
+    trigger: (c) => c.storyRound === true && c.storyChapter === 1 && c.storyTournament === true,
+    speaker: 'The Prognostic Parrot',
+    portrait: 'prognostic-parrot',
+    kicker: 'The first tremor',
+    title: 'Something Dreams Below',
+    accent: '#4fe08a',
+    cta: 'Keep the lights on →',
+    lines: [
+      { kind: 'action', text: 'The Parrot settles on your bag and stares off at the tree line, where a shadow sits that the twin suns cannot shift.' },
+      { kind: 'say', text: "Feel that? Play a course TRUE — clean line, honest strike, holed out — and the whole world breathes a little easier. That click when the ball drops is creation agreeing to last one more day." },
+      { kind: 'say', text: "There's a reason it matters NOW. Coiled at the root of the World-Tree sleeps the World-Eater — Jörmungandr. It has slept since the first tee-off. But it dreams, champion, and lately the dreams are getting loud." },
+      { kind: 'action', text: "The shadow at the tree line has not moved once. Not with the wind. Not at all." },
+      { kind: 'say', text: 'Win your Sigil here. Every one you take locks the root a little tighter. So let\'s keep the lights on, you and I.' },
+    ],
+  },
+  {
+    id: 'story-omen-abyss-warden',
+    trigger: (c) => c.storyRound === true && c.storyChapter === 4 && c.storyAlignment === 'warden',
+    speaker: 'The Prognostic Parrot',
+    portrait: 'prognostic-parrot',
+    kicker: 'Three Sigils set',
+    title: 'The Eye Half-Opens',
+    accent: '#4f8ae0',
+    cta: 'Two Sigils left →',
+    lines: [
+      { kind: 'action', text: "The Parrot's feathers are ruffled the wrong way, by a wind you cannot feel. Somewhere far below the star-map, in the dark under the roots, something enormous shifts its weight." },
+      { kind: 'say', text: "Three Sigils in the Keystone now — and every time one clicks home, the thing at the root wakes a little MORE. I've SEEN it, champion. Its great eye is half-open, and it is beginning to look back." },
+      { kind: 'say', text: "That's the Coil's whole trick: a champion collecting Sigils to LOCK the root looks an awful lot like one forging a key to OPEN it. They'll throw everything at you now to muddy which it is." },
+      { kind: 'action', text: 'The Parrot fixes you with one hard, prophetic eye.' },
+      { kind: 'say', text: "Two Sigils left. Take them clean — before the serpent's dream leaks all the way into the waking world. Before Ragnarök stops being a word in an old book." },
+    ],
+  },
+  {
+    id: 'story-omen-abyss-herald',
+    trigger: (c) => c.storyRound === true && c.storyChapter === 4 && c.storyAlignment === 'herald',
+    speaker: 'The Carrion Prophet',
+    portrait: 'crow',
+    kicker: 'Three Sigils set',
+    title: 'The Eye Half-Opens',
+    accent: '#b0e04f',
+    cta: 'Two Sigils left →',
+    lines: [
+      { kind: 'action', text: 'The Crow rides a wind that is not there, unbothered. Far below the roots, something vast turns its weight over, and the dark itself seems to lean toward you.' },
+      { kind: 'say', text: 'Three Sigils, Herald, and the great eye cracks open to watch its liberator work. It KNOWS you now. It is grateful — as grateful as a thing that size can be.' },
+      { kind: 'say', text: 'The Wardens still believe you are forging a key to lock the root. Let them believe it. Two more Sigils and the key is yours — and every lock is also a door, if you turn it the other way.' },
+      { kind: 'action', text: "The Crow's single burning eye never blinks." },
+      { kind: 'say', text: "Ragnarök is not coming for the galaxy, Herald. You are carrying it to them. Caw. Go and take the next Sigil." },
+    ],
+  },
+  {
+    id: 'story-ragnarok-warden',
+    trigger: (c) => c.storyRound === true && c.storyChapter === 5 && c.storyAlignment === 'warden',
+    speaker: 'The Prognostic Parrot',
+    portrait: 'prognostic-parrot',
+    kicker: 'The seal is failing',
+    title: 'Ragnarök at the Door',
+    accent: '#7fe0a0',
+    cta: 'One Sigil from the end →',
+    lines: [
+      { kind: 'action', text: 'The Parrot does not land on the bag this time. He hovers, eyes fixed on a sky that has begun to CRACK — thin dark seams spreading like a windscreen struck by a stone.' },
+      { kind: 'say', text: "Four Sigils set, and the Keystone is nearly whole. But look UP. The serpent's eye is open now, all the way — and I can feel it looking back down the roots at us." },
+      { kind: 'say', text: "This is it, champion. The old books have a word for what comes if it wakes fully: Ragnarök. Every ball, everywhere, coming to rest forever. The Coil calls it mercy. I call it the lights going out one star at a time." },
+      { kind: 'say', text: 'One more Sigil forges the key — and then we go DOWN, to the root, to the thing itself. Play this one like the whole galaxy is watching you. Because it is.' },
+    ],
+  },
+  {
+    id: 'story-ragnarok-herald',
+    trigger: (c) => c.storyRound === true && c.storyChapter === 5 && c.storyAlignment === 'herald',
+    speaker: 'The Carrion Prophet',
+    portrait: 'crow',
+    kicker: 'The Long Rest is near',
+    title: 'The Kindest Ending',
+    accent: '#b0e04f',
+    cta: 'One Sigil from the end →',
+    lines: [
+      { kind: 'action', text: 'The Crow watches you from a fencepost that was not there a moment ago, single eye burning, calm as a held breath.' },
+      { kind: 'say', text: "Caw. Four Sigils, Herald. Do you feel how QUIET it is getting? That is the serpent, exhaling. We are so close now." },
+      { kind: 'say', text: "They will tell you this is the end of everything. It is. But 'everything' has been so tired, for so long. One more Sigil forges the key — and you will open the root yourself, and let it all lie down." },
+      { kind: 'action', text: 'The Crow tilts its bone-pale beak, almost tender.' },
+      { kind: 'say', text: "Ragnarök. Such an ugly word for something so gentle. Come, Herald. Let us put the universe to bed." },
     ],
   },
 ];

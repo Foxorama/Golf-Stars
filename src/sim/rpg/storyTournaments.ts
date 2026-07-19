@@ -21,10 +21,12 @@ import {
   STORY_WORLDS,
   STORY_CHAPTER_COUNT,
   worldCleared,
+  storyWorldById,
   type StoryState,
   type StoryWorld,
   type StoryAlignment,
 } from './story';
+import { qualifierEventsForChapter, qualifiedCount, QUALIFY_EVENTS_NEEDED } from './storyQualifiers';
 
 /** A chapter's Galaxy Tournament (content-as-data). */
 export interface StoryTournament {
@@ -42,7 +44,9 @@ export interface StoryTournament {
   rivalName: string;
   /** How sharply the rival plays (per-hole stroke edge; scales up the deeper the chapter). */
   rivalEdge: number;
-  /** Clear this many of the chapter's worlds before the tournament opens. */
+  /** LEGACY (GS-story-qualifiers): the old "clear this many worlds" gate. The tournament now opens after
+   *  `QUALIFY_EVENTS_NEEDED` top-N qualifying-event finishes (`chapterQualifiersMet`); kept for save/row
+   *  shape stability but no longer the gate. */
   unlockAfterClears: number;
   /** The trophy id awarded on a win (a "Sigil of the Game"). */
   sigilId: string;
@@ -79,6 +83,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
         'pompous and kind and utterly ignorant of the Game beneath his tournament. A warm twin-sun, and a ' +
         'gallery that still thinks this is just golf. It isn’t — but today you can pretend.',
       'Beat the club’s champion, Birdie Bianchi, over eighteen and your first Sigil of the Game is yours.',
+      '🦜 "One Sigil in the Keystone, champion — one stone against the day the World-Eater wakes. It starts here. Play it true."',
     ],
   },
   {
@@ -101,6 +106,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
         'playing a ball that hisses as it flies.',
       '🦜 "That’s the Coil, champion — a cult that wants the serpent awake. Beat her. This is where it ' +
         'stops being a game."',
+      'Two Sigils would lock the root deeper. The Coil knows it too — which is why the Viper came to take this one from you.',
     ],
   },
   {
@@ -123,6 +129,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
         'you crash it to take the Sigil before they can corrupt it. The rough itself seems to move.',
       'And he is here — the Apostate, Malachai Voss, the champion who fell. He will not try to beat you. ' +
         'He will try to make you understand. Out-play him in the gale and the Storm Sigil is yours.',
+      'Three Sigils, and the Keystone is half-forged — but the sky is already fraying at the edges. When you walk off the eighteenth, the Coil will make you an offer. Win first. Choose after.',
     ],
   },
   // ── Chapter 4 — the routes diverge (The Choice was made after Chapter 3) ──
@@ -145,6 +152,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
         'the Wardens play the Sagittarius Core to hold it down. Venoma hunts you openly now — but her ' +
         'taunts have cracks; she is afraid of what she serves.',
       'Hold the vigil, beat the Viper, and take the Abyssal Sigil.',
+      'The eye at the root is half-open now. Every Sigil you set both locks the seal and forges the key that could break it — and only the fourth or fifth will tell which. Play like the dark is watching. It is.',
     ],
   },
   {
@@ -167,6 +175,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
         'Warden shrine to drown its wards — and the Warden sent to stop you is Penelope, who once read ' +
         'your putts. She does not recognise the golfer you have become.',
       'Play the rite, put your old friend to the sword, and take the Drowned Sigil.',
+      '🐦‍⬛ "Four Sigils, and the serpent exhales a little deeper. This is the drowning, Herald — the first world you take FOR the Long Rest instead of against it. It should feel like a sin. That feeling is how you know it is working."',
     ],
   },
   // ── Chapter 5 — the fifth Sigil, per route (both forge the key) ──
@@ -188,6 +197,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
         'the last seal — and Venoma waits, the doubt in her finally cracking. Beat her here and you may ' +
         'yet win her back from the Coil.',
       'Play the shrine true, redeem the Viper, and take the last Sigil.',
+      'Five Sigils forge the Green Key — and above the mire the sky is already cracking. Win here and Ragnarök stops at the door; the key becomes a lock you carry down to the root to seal it forever.',
     ],
   },
   {
@@ -208,6 +218,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
         'their stand. Driver Dan, your first caddy, stands on the tee against you with everything he has ' +
         'left. There is no going back from what you do here.',
       'Crush the old man, complete the rite, and be anointed the Coil’s Herald.',
+      '🐦‍⬛ "The fifth Sigil, Herald, and the Green Key is yours — not to lock the root, but to OPEN it. Ragnarök has a hand on the door now, and that hand is yours. Take it. Let the tired universe rest."',
     ],
   },
 ];
@@ -234,6 +245,28 @@ export function worldsClearedInChapter(story: StoryState, chapter: number): numb
   return chapterWorlds(chapter).filter((w) => worldCleared(story, w.courseId)).length;
 }
 
+/**
+ * GS-story-qualifiers: a chapter's QUALIFYING EVENTS — its worlds MINUS the Sigil venue (which is played as
+ * the major). The venue depends on the chosen path, so this resolves it via `tournamentForChapter`. Always
+ * two events (a chapter has three worlds).
+ */
+export function chapterQualifierEvents(chapter: number, alignment?: StoryAlignment): string[] {
+  return qualifierEventsForChapter(chapter, tournamentForChapter(chapter, alignment)?.venueId);
+}
+
+/** How many of THIS chapter's qualifying events the player has qualified in (top-N finish). */
+export function chapterQualifiersMet(story: StoryState, chapter: number): number {
+  return qualifiedCount(story, chapterQualifierEvents(chapter, story.alignment));
+}
+
+/** Is this world a QUALIFYING EVENT for the player's path (a chapter world that isn't its Sigil venue)?
+ *  Uses the world's OWN chapter, so it's stable regardless of the player's current chapter. */
+export function isStoryQualifier(courseId: string, alignment?: StoryAlignment): boolean {
+  const w = storyWorldById(courseId);
+  if (!w) return false;
+  return courseId !== tournamentForChapter(w.unlockChapter, alignment)?.venueId;
+}
+
 /** Has this tournament already been won (its Sigil banked)? */
 export function tournamentWon(story: StoryState, t: StoryTournament): boolean {
   return story.trophyIds.includes(t.sigilId);
@@ -244,7 +277,8 @@ export function tournamentWon(story: StoryState, t: StoryTournament): boolean {
 export function currentTournament(story: StoryState): StoryTournament | undefined {
   const t = tournamentForChapter(story.chapter, story.alignment);
   if (!t || tournamentWon(story, t)) return undefined;
-  return worldsClearedInChapter(story, story.chapter) >= t.unlockAfterClears ? t : undefined;
+  // GS-story-qualifiers: the gate is now two QUALIFYING-EVENT top-N finishes (not just clearing two worlds).
+  return chapterQualifiersMet(story, story.chapter) >= QUALIFY_EVENTS_NEEDED ? t : undefined;
 }
 
 /** Is a tournament ready to enter from the clubhouse? */
