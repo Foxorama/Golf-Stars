@@ -518,6 +518,16 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   a pure string builder: four hotspots + player always; one standee per recruited ally, the active one
   marked) + the `?screen=storyclub` smoke.
 
+- **GS-story-shop-arrival** — ✅ *shipped* (`render/shopArrival.ts`). A short, skippable "you've touched
+  down" beat the FIRST time (per session) you reach a world's Pro Shop: your ship descends onto the world on
+  a landing beam, an "APPROACHING · <World> · ⛳ Pro Shop" title forms, then it dissolves to reveal the shop
+  beneath. A self-contained DOM+CSS overlay (own `.gs-arr*` prefix, injected `<style>`) mounted from
+  `app.ts` over the just-rendered shop — NOT the sim/reducer, a pure feel layer; it removes itself so it
+  never blocks the shop. Tinted per world (`spaceLookFor`/`roughBaseFor(archetype)`), flies the player's own
+  ship (`shipCardSVG`). Once per world per session via a module `shopArrivalsSeen` Set (no save bump).
+  Reduced-motion resolves instantly (no overlay); every path is guarded so it can never strand the player.
+  Guarded by a `tests/build.test.ts` browser smoke (beat mounts over the shop, then clears itself).
+
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.
 - **"Gather your friends"** — single protagonist (per the design call); the other three golfers are
