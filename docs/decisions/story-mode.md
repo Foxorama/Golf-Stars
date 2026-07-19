@@ -619,6 +619,17 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   on" crew-card message for the waiting state. The accepted-quest banner now shows the ally's authored
   `offer` dialogue (previously unused) as a spoken send-off before you fly. Guarded by `story-quests.test.ts`
   (the beat gate holds then opens) + `story-flow.test.ts` (a quest round is 9 holes).
+- **GS-story-fullbody** — ✅ *shipped* (`render/storyStandee.ts`). The clubhouse crew stood as their portrait
+  BUST (head+chest, 320×340) feet-anchored, so the chest bottom sat on the floor ("heads/chests on the
+  ground"). `fullBodyStandeeSVG` wraps each character's existing bust as the head+TORSO of a proper standing
+  figure by drawing a per-character LOWER BODY beneath it so the FEET meet the floor: `human` (legs+shoes,
+  trouser colour mirroring the on-course `drawCaddy`), `robe` (a floor-length cult robe — the Herald agents),
+  `bird` (the Parrot's scaly legs+talons), `creature` (the Mole's dirt mound). Pure SVG (no new art per
+  character — reuses the bust identity), works for BOTH clubhouse variants (`CADDY_STANDEE` per caddy +
+  `HERALD_STANDEE` for the tinted cult agents), stays in the string-builder (testable, no canvas mount).
+  `.gs-sclub-cav` sizing dialled for the taller full-body aspect. Preview: `node scripts/storyclub-preview.mjs`.
+  Guarded by `tests/story-standee.test.ts` (the bust is preserved on top; the figure is taller than the bust;
+  every recruitable ally has an intentional standee look).
 
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.
