@@ -80,21 +80,31 @@ The defector gets a **corrupted Coil look** — a reusable `corruptedGolferLook(
 shown in the Ch.4/5 betrayal beats, the Ch.5 lobby, and the finale figure. On the Herald path YOU are
 the corrupted one; the former friends stay clean Warden.
 
-## Build order (one PR each, auto-merged) — see `IDEAS.md` for live status
+## Build order — SHIPPED (see `IDEAS.md` for the live one-liners)
 
-- **GS-story-cast** — the 3 golfers aboard ship + clubhouse, tappable, per-character talk adapting to
-  chapter/alignment/partnered/betrayer. A shared `otherGolfers(story)` seam replaces the 3 ad-hoc
-  computations (`interludeFriend`, `tournamentField`, competition mirror).
-- **GS-story-team-format** — pure engine: `StoryTournament.format`, reuse `match.ts`, the multi-pair
-  ghost field builder + resolution helpers. Fully tested, no UI yet.
-- **GS-story-partners** — `StoryState` v5 `sigil1Partner`/`sigil2Partner` + the lobby partner-picker;
-  wire Sigil 1 (scramble) and Sigil 2 (best-ball) with opposing pairs + a team recap.
-- **GS-story-stableford** — Sigil 3 single Stableford.
-- **GS-story-charquests** — per-character quests unlocked after partnering; signature reward.
-- **GS-story-betrayer** — pure `storyBetrayal.ts` (betrayer + finale team comps) + `corruptedGolferLook`.
-- **GS-story-betrayal-warden** — Warden Ch.4/5 beats + the 2v2 matchplay finale.
-- **GS-story-betrayal-herald** — Herald Ch.4 caddy-quest-keyed beats + the 2v2 matchplay finale.
-- **GS-story-betrayal-polish** — balance, dialogue depth, costume polish, docs.
+- **GS-story-cast** — ✅ (#508) the 3 golfers aboard ship + clubhouse, tappable, per-character talk adapting
+  to chapter/alignment. Shared `otherGolfers(story)` seam.
+- **GS-story-team-format** — ✅ (#509) pure engine `storyTeams.ts`: scramble/best-ball vs opposing ghost
+  pairs + the 2v2 matchplay resolver, reusing `match.ts`.
+- **GS-story-partners** — ✅ (#510) `StoryState` v5 `sigil1Partner`/`sigil2Partner` + lobby partner-picker;
+  Sigil 1 scramble / Sigil 2 best-ball vs opposing pairs (incl. the two you didn't pick).
+- **GS-story-stableford** — ✅ (#510) Sigil 3 single Stableford (points, higher wins).
+- **GS-story-betrayer + finale** — ✅ (#511) `storyBetrayal.ts` (odd-one-out betrayer, finale team comps,
+  `corruptedLookOpts`) + the Ch.5 2v2 best-ball matchplay finale (both paths), lobby matchup box + recap.
+- **GS-story-betrayal-beats** — ✅ (#512) the mid-chapter interlude reworked into the per-character defection
+  (Warden, corrupted portrait) / caddy-quest-keyed severing (Herald); four distinct `BETRAYAL_VOICE`s.
+- **GS-story-charquests** — ✅ each friend's signature quest, unlocked by partnering them; `charquest:<id>`
+  reward on their talk card (no save bump).
+- **GS-story-betrayal-polish** — balance re-tune (the finale + team-major edges), any dialogue-depth follow-up,
+  constitution/roadmap docs.
+
+### Notes / follow-ups for the polish pass
+- **Finale balance** (`FINALE_ALLY_EDGE`, opp `rivalEdge×0.5`) is a first fair cut (a −2 round wins >60%,
+  a blow-up isn't carried to a halve). Re-measure once eyes-on play confirms the human-round baseline.
+- **Team-major edges** (rival/rando pair `edge`s, `TEAM_PARTNER_EDGE`) use the interim values from
+  GS-story-partners — verify Sigils 1/2 are winnable-but-earned like the story-balance curve.
+- **Halftime pop** on the Stableford Ch.3 still compares thru-9 STROKES (approximate) — a points pop is a
+  polish nicety.
 
 ## Key reuse points (from the code map)
 
