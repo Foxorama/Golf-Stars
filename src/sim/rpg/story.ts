@@ -363,7 +363,7 @@ export const NAMED_STORY_CLUBS: Record<string, { base: string; name: string }> =
   // shared the round. Distinct base TYPES from the ally/major gifts so a signature never shoves another
   // reward out of the bag. Solar-tier for parity, named for the friend + their home.
   'charquest:feather-fade': { base: 'club:solar:6i', name: 'The Trade Wind — Feather’s Iron' },
-  'charquest:huang-woo-hook': { base: 'club:solar:4i', name: 'The Busan Scalpel — Huang-Woo’s Iron' },
+  'charquest:huang-woo-hook': { base: 'club:solar:8i', name: 'The Busan Scalpel — Huang-Woo’s Iron' },
   'charquest:longshot-larry': { base: 'club:solar:3i', name: 'The Perth Bomb — Larry’s Driving Iron' },
   'charquest:backspin-bo': { base: 'club:solar:GW', name: 'The Portland Check — Bo’s Wedge' },
 };
