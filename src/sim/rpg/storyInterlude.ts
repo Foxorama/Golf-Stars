@@ -12,8 +12,10 @@
  * real face you've seen. The only mechanical consequence is a credit outcome; the weight is the story.
  */
 
-import { CHARACTERS, type Character } from './characters';
+import { CHARACTERS, getCharacter, type Character } from './characters';
 import { otherGolfers } from './storyCast';
+import { betrayerId, betrayalDefection, betrayalFarewell } from './storyBetrayal';
+import { heraldQuestHook } from './storyQuests';
 import { addCredits, type StoryState, type StoryAlignment } from './story';
 
 export type InterludeSpeaker = 'friend' | 'you' | 'parrot' | 'coil';
@@ -22,17 +24,22 @@ export interface InterludeLine {
   text: string;
 }
 
+/** The STATIC per-path meta for the interlude (the dynamic per-character dialogue is `interludeScene`). */
 export interface InterludeBeat {
   id: string;
   alignment: StoryAlignment;
   title: string;
   kicker: string;
-  /** Credits awarded on dismiss (a friend's gift / the Coil's blood-money). */
+  /** Credits awarded on dismiss (the loyal ally's war-chest / the Coil's blood-money). */
   creditGift: number;
-  /** Build the dialogue for a named friend. */
-  lines: (friend: string) => InterludeLine[];
-  /** The closing outcome line shown under the dialogue. */
-  outcome: (friend: string) => string;
+}
+
+/** The DYNAMIC, per-character content of the interlude — built from the actual betrayer + (Herald) your
+ *  caddy-quest history. `corrupt` = draw the betrayer's portrait in Coil garb (Warden defection). */
+export interface InterludeScene {
+  lines: InterludeLine[];
+  outcome: string;
+  corrupt: boolean;
 }
 
 /** The beat id for a path (one-off key in `seenStoryBeats`). */
@@ -44,36 +51,22 @@ const BEATS: Record<StoryAlignment, InterludeBeat> = {
   warden: {
     id: 'interlude-warden',
     alignment: 'warden',
-    title: 'The Prism Accord',
-    kicker: 'Coronae Prism · a friend fell to the Coil, and you go to bring them home',
+    // GS-story-betrayal-warden: no longer "win a friend back" — the odd-one-out has DEFECTED and can't be
+    // talked home; you'll have to out-PLAY them at the Ch.5 shrine. The reveal beat that sets up the finale.
+    title: 'The Defection',
+    kicker: 'A friend has turned to the Coil — and there is no talking them home',
     creditGift: 300,
-    lines: (f) => [
-      { who: 'friend', text: `You shouldn’t have come. I’m not… I’m theirs now. The Coil showed me things.` },
-      { who: 'you', text: `${f}. Put the ball down. Play one hole with me. Like the old days — before any of this.` },
-      { who: 'friend', text: `…One hole. That’s all. I don’t remember how to want anything else.` },
-      { who: 'parrot', text: `Easy, champion. You’re not out-driving the Coil here. You’re just reminding them who they were.` },
-      { who: 'friend', text: `(a long silence, then a real swing) …I remember this. I remember you. Get me out of here.` },
-    ],
-    outcome: (f) => `${f} walks off the Prism at your side — won back from the Coil. They press a few credits into your hand: everything they have left, and gladly given.`,
   },
   herald: {
     id: 'interlude-herald',
     alignment: 'herald',
     title: 'The Severing',
-    kicker: 'The rite demands a price — and the price is a friend',
+    kicker: 'The rite demands you cut the last cord that ties you to who you were',
     creditGift: 600,
-    lines: (f) => [
-      { who: 'friend', text: `Please. Whatever they promised you — it isn’t worth this. It isn’t worth me. Look at me.` },
-      { who: 'coil', text: `The seal will not break while you hold on to who you were, Herald. ${f} is an anchor. Let it go.` },
-      { who: 'you', text: `(you don’t look up from the tee)` },
-      { who: 'friend', text: `…So that’s it. After everything. I hope it was worth it. I really do.` },
-      { who: 'coil', text: `It is done. The Coil rewards its Herald. There is no one left to slow you now.` },
-    ],
-    outcome: (f) => `You leave ${f} to the drowning world and do not look back. The Coil’s blood-money is heavy in the hold. Something in you is quieter now — you tell yourself that’s strength.`,
   },
 };
 
-/** The interlude beat for a path. */
+/** The interlude META for a path (title/kicker/creditGift). */
 export function interludeBeat(alignment: StoryAlignment): InterludeBeat {
   return BEATS[alignment];
 }
@@ -83,13 +76,61 @@ export function interludeSeen(story: StoryState, alignment: StoryAlignment): boo
   return story.seenStoryBeats[interludeBeatId(alignment)] === true;
 }
 
-/** The "friend" golfer for the mid-chapter interlude — the first of your three tour-mates (GS-story-cast's
- *  shared seam). The BETRAYAL rework reconciles this beat with the finale in the dedicated beats pass
- *  (GS-story-betrayal-warden/herald): the interlude becomes the DEFECTION reveal for the actual betrayer,
- *  rather than "win a friend back" (which would contradict them opposing you in the Ch.5 finale). Kept
- *  behaviour-identical here so the finale PR changes nothing about the interlude's meaning. */
+/** The "friend" of the interlude — the BETRAYER (the odd one out of your team-Sigil partner picks). Now
+ *  consistent with the finale (the beat is the DEFECTION reveal, not "win them back"). Falls back to your
+ *  first tour-mate when no team Sigil is on record. */
 export function interludeFriend(story: StoryState): Character {
-  return otherGolfers(story)[0] ?? CHARACTERS[0]!;
+  return getCharacter(betrayerId(story)) ?? otherGolfers(story)[0] ?? CHARACTERS[0]!;
+}
+
+/**
+ * Build the per-character interlude dialogue + outcome (GS-story-betrayal-warden/herald). WARDEN: the
+ * betrayer speaks their own DEFECTION (corrupted portrait); the Parrot tells you it ends at the shrine.
+ * HERALD: the Coil leans on your caddy-quest history (the club they gave you), the betrayer gives their
+ * FAREWELL, and you don't look up. Pure — reads the actual betrayer + `heraldQuestHook`.
+ */
+export function interludeScene(story: StoryState): InterludeScene {
+  const align: StoryAlignment = story.alignment === 'herald' ? 'herald' : 'warden';
+  const betrayer = interludeFriend(story);
+  const name = betrayer.shortName;
+  if (align === 'warden') {
+    const [d0, d1] = betrayalDefection(betrayer.id);
+    return {
+      corrupt: true,
+      lines: [
+        { who: 'friend', text: d0! },
+        { who: 'you', text: `${name}. Put the ball down. That isn’t your voice — the Coil is wearing your swing like a glove.` },
+        { who: 'friend', text: d1! },
+        {
+          who: 'parrot',
+          text: `Save your breath, champion — they’re too far gone to talk back from. You’ll have to PLAY them back, and not here. At the shrine, last Sigil, everything on the line. Take a friend who stayed true. Arm up.`,
+        },
+      ],
+      outcome: `${name} walks into the mire in shed-scale robes and does not look back. There is no reunion — only the Serpent’s Vigil, where you and a loyal friend must out-play ${name} and the Viper to break the whisper’s hold. It ends at the shrine.`,
+    };
+  }
+  // HERALD — the caddy-quest thread (the user's ask): the Coil pulls on the club a friend once gave you.
+  const hook = heraldQuestHook(story);
+  const [f0, f1] = betrayalFarewell(betrayer.id);
+  const coilOpen = hook
+    ? hook.stillUsing
+      ? `Cut it loose, Herald. You still swing ${hook.clubName} — ${hook.caddyName}’s gift, pressed into your hands when you were still someone they could be proud of. ${name} is the same kind of anchor. Let go of both.`
+      : `You benched ${hook.caddyName}’s gift long ago — ${hook.clubName} gathers dust in the locker. Good. ${name} is the last cord. Cut it too.`
+    : `The seal will not break while you hold on to who you were, Herald. ${name} is an anchor. Let it go.`;
+  return {
+    corrupt: false,
+    lines: [
+      { who: 'coil', text: coilOpen },
+      { who: 'friend', text: f0! },
+      { who: 'you', text: `(you don’t look up from the tee)` },
+      { who: 'friend', text: f1! },
+      { who: 'coil', text: `It is done. Only two old friends remain to slow you — at the Ghost Wreck — and they haven’t yet accepted that you’re gone.` },
+    ],
+    outcome:
+      hook && hook.stillUsing
+        ? `You leave ${name} behind. ${hook.clubName} is suddenly heavy in the bag — ${hook.caddyName}’s gift, swung now by a stranger. The Coil’s blood-money is heavier still. You tell yourself that’s strength.`
+        : `You leave ${name} behind and do not look back. The Coil’s blood-money is heavy in the hold. Something in you is quieter now — you tell yourself that’s strength.`,
+  };
 }
 
 /**

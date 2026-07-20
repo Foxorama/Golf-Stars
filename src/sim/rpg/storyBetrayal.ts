@@ -20,7 +20,7 @@
  * (storyTeams), and the clubhouse/finale costume (`corruptedLookOpts`). Reads only `StoryState`.
  */
 
-import { getCharacter, type Character } from './characters';
+import { CHARACTERS, getCharacter, type Character } from './characters';
 import { otherGolferIds } from './storyCast';
 import type { StoryState } from './story';
 
@@ -150,6 +150,77 @@ export function finaleMatchup(story: StoryState, activeGuideId?: string): Finale
     oppNames: [golferName(betrayer), coilChampionName(champ)],
     betrayerGolferId: betrayer,
   };
+}
+
+// ── Per-character betrayal VOICE (GS-story-betrayal-warden/herald) ─────────────────────────────────────
+//
+// The betrayal must land IN CHARACTER — a betrayal beat reads completely differently depending on WHO the
+// odd one out is. `defection` = their words when THEY turn to the Coil (the Warden path, you stayed true);
+// `farewell` = their words when YOU turn and cut them loose (the Herald path, they stay a Warden). Written
+// against each golfer's cast profile (storyCast) so the same beat has four distinct hearts.
+
+interface BetrayalVoice {
+  defection: readonly string[]; // Warden: they defect to the Coil
+  farewell: readonly string[]; // Herald: you betray them; they stay Warden, heartbroken
+}
+
+const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
+  'feather-fade': {
+    defection: [
+      'I spent my whole life aiming two yards right of the trouble. The Coil showed me a line with no trouble at all — just the long, still green at the end of everything. I took it.',
+      'Don’t come looking for the girl you knew. She reads the wind quieter now than she ever has. She reads nothing at all.',
+    ],
+    farewell: [
+      'I read the wind true my whole life, and I still didn’t see this coming off you. That’s the one that stings.',
+      'Go on, then. I hope the stillness you’re chasing is worth the friend you spent to reach it.',
+    ],
+  },
+  'huang-woo-hook': {
+    defection: [
+      'The gallery went QUIET, and quiet kills me — you know it does. The Coil is the only thing loud enough now. It ROARS. How could I not go where the noise is?',
+      'Come get noodles when it’s all over! …Ah. There won’t be an over. That’s rather the whole point, isn’t it. Ha. Ha.',
+    ],
+    farewell: [
+      'I was your HYPE MAN. I’d have followed you onto any tee in any sky — but not this one. Not for this.',
+      'I’m not clapping. For the first time in my life, I’ve got nothing to shout. Look what you did to me.',
+    ],
+  },
+  'longshot-larry': {
+    defection: [
+      'Reckon the void was always gonna win the long game, mate. I’ve lost that many balls into it — figured I’d stop fighting the tide and go stand in it.',
+      'Grip it and rip it, straight down the serpent’s gullet. Farthest send of me whole life. You’ll see.',
+    ],
+    farewell: [
+      'I’d have climbed into any bunker on any rock in the galaxy for you. Any but this one.',
+      'You went QUIET, and that’s how I knew — I lost me best mate a long way back, before we ever teed it up here.',
+    ],
+  },
+  'backspin-bo': {
+    defection: [
+      'The serpent offered me the quietest green in all creation. No wind. No break. A pin that never, ever moves. I’ve chased that stillness my whole life — I couldn’t say no to being handed it.',
+      'Don’t grieve me. I finally stopped chasing the read. The read was always the same: everything, everywhere, at rest.',
+    ],
+    farewell: [
+      'I read greens for a living, and I read the dark growing in you hole by hole. I kept waiting for the line to turn back toward the light.',
+      'It didn’t turn. I’m sorry — for you, not for me. Goodbye.',
+    ],
+  },
+};
+
+/** The betrayer's per-character DEFECTION lines (Warden path — they turn to the Coil). */
+export function betrayalDefection(charId: string): readonly string[] {
+  return BETRAYAL_VOICE[charId]?.defection ?? ['The Coil showed me the end of it all, and I chose the quiet. Don’t follow me.'];
+}
+/** The betrayer's per-character FAREWELL lines (Herald path — you cut them loose; they stay a Warden). */
+export function betrayalFarewell(charId: string): readonly string[] {
+  return BETRAYAL_VOICE[charId]?.farewell ?? ['After everything we played through — this is how it ends. I hope it was worth it.'];
+}
+/** Every playable golfer has a distinct betrayal voice (defection + farewell) — a coverage invariant. */
+export function everyGolferHasBetrayalVoice(): boolean {
+  return CHARACTERS.every((c) => {
+    const v = BETRAYAL_VOICE[c.id];
+    return !!v && v.defection.length >= 2 && v.farewell.length >= 2;
+  });
 }
 
 // ── The corrupted (Coil) costume for a defector (GS-story-betrayer) ────────────────────────────────────

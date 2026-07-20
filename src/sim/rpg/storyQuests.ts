@@ -18,6 +18,21 @@ import { storyCaddyHired } from './storyCaddies';
 
 /** One ally's side quest (content-as-data). The reward is a themed reward-club id (`club:<set>:<type>`),
  *  resolved through the shared club machinery so it plays + looks like the Voyage reward it is. */
+/** GS-story-betrayal-herald: the FIRST caddy quest you completed + whether you STILL wield its reward club
+ *  — the personal thread the Herald Ch.4 betrayal beat pulls on ("you still swing Dan's Long Haul, the club
+ *  he gave you when you were someone he could be proud of"). Undefined if you never finished an ally quest. */
+export function heraldQuestHook(story: StoryState): { caddyName: string; clubName: string; stillUsing: boolean } | undefined {
+  const firstId = story.completedQuestIds[0];
+  if (!firstId) return undefined;
+  const q = STORY_QUESTS.find((x) => x.id === firstId);
+  if (!q) return undefined;
+  return {
+    caddyName: allyName(q.caddyId),
+    clubName: q.rewardName,
+    stillUsing: story.equippedBagIds.includes(q.rewardClubId),
+  };
+}
+
 export interface StoryQuest {
   id: string;
   /** The ally who gives it (their shop-item / roster id). */

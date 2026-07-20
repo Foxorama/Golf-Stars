@@ -72,10 +72,11 @@ default). One focused, tested, auto-merged PR each:
   You + a loyal friend vs (the Betrayer in corrupted Coil garb + Venoma); HERALD = You + the Coil champion
   who isn't your guide vs your two former friends. Lobby matchup box (figures + costume), matchplay recap
   (scoreline + teams), seed-robust balance (a strong round wins, a blow-up can't be carried to a halve).
-- **GS-story-betrayal-warden** — Warden Ch.4/5 per-character betrayal BEATS (the defection reveal + the
-  pre-finale confrontation), each in the betrayer's own voice.
-- **GS-story-betrayal-herald** — Herald Ch.4 beats keyed to your first completed caddy quest (+ whether you
-  still wield its reward club) + per-character former-friend beats.
+- **GS-story-betrayal-beats** — ✅ *shipping*: the mid-chapter interlude reworked into the per-character
+  BETRAYAL beat. WARDEN "The Defection" — the betrayer speaks their own defection voice, portrait in
+  corrupted Coil garb, and it sets up the shrine finale (no more "win them back"). HERALD "The Severing" —
+  keyed to your FIRST completed caddy quest + whether you still wield its reward club (Dan's Long Haul feels
+  heavy), the friend's per-character farewell. Four distinct betrayal voices (`BETRAYAL_VOICE`).
 - **GS-story-betrayal-polish** — balance, dialogue depth, costume polish, docs.
 
 **GS-story-review — Story Tour polish backlog** (from `reports/story-mode-review-2026-07-18.md`, the
