@@ -99,7 +99,7 @@ export function shipInteriorScreen(): string {
     ? isOtherGolfer(story, state.storyAllyInspectId)
       ? friendInspectOverlayHTML(state.storyAllyInspectId, story, state.storyAllyTalk ?? 0)
       : isHeraldAgent(state.storyAllyInspectId)
-        ? heraldAgentOverlayHTML(state.storyAllyInspectId, state.storyAllyTalk ?? 0)
+        ? heraldAgentOverlayHTML(state.storyAllyInspectId, state.storyAllyTalk ?? 0, story)
         : allyInspectOverlayHTML(state.storyAllyInspectId, story, state.storyAllyTalk ?? 0)
     : state.storyItemInspectId
     ? shipInspectOverlay(state.storyItemInspectId)

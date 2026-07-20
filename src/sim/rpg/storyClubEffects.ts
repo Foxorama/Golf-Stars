@@ -47,6 +47,24 @@ export const STORY_CLUB_EFFECTS: Record<string, StoryClubEffect> = {
     label: 'Reads the break through any ground — green read + spin read',
     apply: (m) => ({ ...m, greenRead: true, spinReadBonus: (m.spinReadBonus ?? 0) + 12, backspinBoost: (m.backspinBoost ?? 0) + 0.06 }),
   },
+  // ── Coil inner-circle quest gifts (GS-story-herald-quests) — each plays like the Coil agent who gave it,
+  // mirroring their on-the-bag caddy effect (`HERALD_CADDY_EFFECTS`). ──
+  'quest:voss': {
+    label: 'Drives from ANY lie — and a raised distance floor',
+    apply: (m) => ({ ...m, driverAnywhere: true, minCarryBoost: m.minCarryBoost + 0.08 }),
+  },
+  'quest:venoma': {
+    label: 'Strikes dead straight — tighter dispersion + wind resistance',
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.82, windResist: (m.windResist ?? 0) + 0.15 }),
+  },
+  'quest:ouros': {
+    label: 'Hums the true break — putt boost + a longer confident read',
+    apply: (m) => ({ ...m, puttBoost: m.puttBoost + 0.22, puttReadBonus: (m.puttReadBonus ?? 0) + 12, greenRead: true }),
+  },
+  'quest:ecdysis': {
+    label: 'No lie can hold it — strong lie relief from anywhere',
+    apply: (m) => ({ ...m, lieRelief: Math.max(m.lieRelief ?? 0, 0.5) }),
+  },
   // ── Galaxy-Tournament (major) prize clubs ──
   'major:emerald': {
     label: 'Utterly reliable — tighter dispersion',

@@ -780,6 +780,26 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   `_gs*`/URL hook, no test-hub wiring). Guarded by `tests/story-caddies.test.ts` (record/idempotent/active-only),
   the rep gate in `tests/story-quests.test.ts`, the migrate in `tests/story-state.test.ts`, and the
   recruit→carry-a-round→quest-opens flow in `tests/story-flow.test.ts`.
+- **GS-story-herald-quests** — ✅ *shipped* (`storyQuests.ts` + `story.ts` + `storyClubEffects.ts` +
+  `storyHeraldOverlay.ts` + `storySpaceport.ts`). Player ask: "for the Heralds they get all the Coil figures
+  as potential caddies" — give those Coil caddies their own side quests too. The four Coil inner-circle
+  volunteers (Voss / Venoma / Ouros / Ecdysis, `HERALD_CADDY_IDS`) now each carry a quest, built on the same
+  machinery as the Warden ally quests. `StoryQuest` gains an optional `alignment` (a `'herald'` quest is
+  offerable ONLY on the dark path; a Warden quest ONLY on the light/undecided path — collapsed into one
+  `questMatchesPath` check that REPLACES the old blanket "no quests for a Herald" GAP2 rule) and an optional
+  `world` (the Coil volunteers have no recruit world, so each quest names its own thematic Herald world —
+  Voss→the Sagittarius Core abyss, Venoma→the Hydra Mire, Ouros→the Cetus deep, Ecdysis→the Eridanus
+  Drowning shrine; all verified to build fair 9-hole quest layouts). Each grants a NAMED, solar-tier reward
+  club (`quest:voss/venoma/ouros/ecdysis` in `NAMED_STORY_CLUBS` + a signature `STORY_CLUB_EFFECTS` fold
+  mirroring that agent's on-bag caddy effect — so the every-named-club-has-an-effect invariant holds). They
+  INHERIT the GS-story-caddy-rep gate for free (path-agnostic — carry the bag with the Coil agent a round
+  first). UI: the Coil agent talk card (`heraldAgentOverlayHTML`, now passed `story`) reuses the exported
+  `questSlotHTML` + a "🎒 Carry my bag" swap, and the sanctum standees float the ❗ quest marker. CRITICAL
+  isolation: `heraldQuestHook` (the Severing betrayal beat) now filters to `alignment !== 'herald'` quests, so
+  a completed Coil quest never becomes the "friend you betrayed" the beat pulls on. Content + data + UI
+  threading; no save bump, no `_gs*`/URL hook (no test-hub wiring). Guarded by the Coil-quest coverage +
+  path-gating + hook-isolation in `tests/story-quests.test.ts`, the reward-club effect coverage in
+  `tests/story-club-effects.test.ts`, and the Herald accept→tee-off flow in `tests/story-flow.test.ts`.
 
 ## Phase J — the deep betrayal arc (GS-story-betrayal)
 The single-protagonist "your three friends are recurring rivals" model was thin. This phase turns the other
