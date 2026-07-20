@@ -78,8 +78,9 @@ default). One focused, tested, auto-merged PR each:
 - **GS-story-betrayal-beats** — ✅ *shipping*: the mid-chapter interlude reworked into the per-character
   BETRAYAL beat. WARDEN "The Defection" — the betrayer speaks their own defection voice, portrait in
   corrupted Coil garb, and it sets up the shrine finale (no more "win them back"). HERALD "The Severing" —
-  keyed to your FIRST completed caddy quest + whether you still wield its reward club (Dan's Long Haul feels
-  heavy), the friend's per-character farewell. Four distinct betrayal voices (`BETRAYAL_VOICE`).
+  keyed to your FIRST completed caddy quest + whether you still wield its reward club (Sandy's Second feels
+  heavy) — realistically Sandy/Chipinski/Sam/Penelope, the caddies reachable before The Choice, never the
+  Ch.5-only Dan/Mole. The friend's per-character farewell. Four distinct betrayal voices (`BETRAYAL_VOICE`).
 - **GS-story-betrayal-polish** — balance, dialogue depth, costume polish, docs.
 
 **GS-story-review — Story Tour polish backlog** (from `reports/story-mode-review-2026-07-18.md`, the
