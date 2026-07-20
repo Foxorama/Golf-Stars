@@ -50,8 +50,8 @@ import {
 import { shipCreditMult, grantStoryAceShip, grantStoryShip } from '../sim/rpg/storyShips';
 import { recordCaddyRound } from '../sim/rpg/storyCaddies';
 import { upgradeCreditMult, grantShipUpgrade } from '../sim/rpg/storyShipUpgrades';
-import { tournamentForChapter, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS, isStoryQualifier, chapterQualifierEvents, isTeamTournament, teamFieldPairs, teamPartnerOrDefault, TEAM_PARTNER_EDGE, isStablefordTournament, rivalStablefordTotal, stablefordLeaderboard } from '../sim/rpg/storyTournaments';
-import { resolveStoryTeamStroke, resolveStory2v2Match } from '../sim/rpg/storyTeams';
+import { tournamentForChapter, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS, isStoryQualifier, chapterQualifierEvents, isTeamTournament, isSinglesMatchTournament, isTeamMatchTournament, teamFieldPairs, teamPartnerOrDefault, TEAM_PARTNER_EDGE } from '../sim/rpg/storyTournaments';
+import { resolveStoryTeamStroke, resolveStory2v2Match, resolveStorySinglesMatch } from '../sim/rpg/storyTeams';
 import { finaleMatchup } from '../sim/rpg/storyBetrayal';
 import { qualifierField, qualifierPlacement, recordQualifier, qualifiedCount, qualifyTop, QUALIFY_EVENTS_NEEDED } from '../sim/rpg/storyQualifiers';
 import { getCharacter } from '../sim/rpg/characters';
@@ -483,8 +483,9 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
   let rivalGross: number;
   let rivalName = t.rivalName;
   let playerGross = totals.gross;
-  let stablefordFlag = false;
-  let matchPayload: { scoreline: string; allyName: string; oppNames: [string, string]; thru: number; holesUp: number; herald: boolean } | undefined;
+  let matchPayload:
+    | { kind: 'singles' | 'team'; scoreline: string; thru: number; holesUp: number; allyName?: string; oppNames?: [string, string]; herald?: boolean }
+    | undefined;
   let leaderboard: { name: string; gross: number; kind: 'rival' | 'friend' | 'player' }[];
   let teamPayload: { partnerName: string; format: 'scramble' | 'bestball'; playerSolo: number; partnerCountedHoles: number } | undefined;
 
@@ -514,26 +515,25 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
     teamPayload = { partnerName, format: fmt, playerSolo: totals.gross, partnerCountedHoles: res.partnerCountedHoles };
     playerGross = res.playerTeamTotal;
     base = setSigilPartner(base, t.chapter, partnerId);
-  } else if (isStablefordTournament(t)) {
-    // GS-story-stableford: the Ch.3 Storm Championship is a single-person STABLEFORD — POINTS, higher wins
-    // (attack every flag; a blow-up hole only costs that hole). The rival's points ride the same strokes
-    // stream as `rivalTotal` (difficulty tracks `rivalEdge`), converted per hole. Deterministic.
-    const rivalPts = rivalStablefordTotal(t, String(run.seed), pars);
-    const playerPts = totals.stableford;
-    won = playerPts >= rivalPts; // higher points win, ties → you
-    rivalGross = rivalPts;
-    playerGross = playerPts;
-    stablefordFlag = true;
-    leaderboard = stablefordLeaderboard(t, String(run.seed), pars, base.characterId, 'You', playerPts);
-  } else if (t.format === 'bestball-match') {
-    // GS-story-betrayer: the Ch.5 2v2 best-ball MATCHPLAY finale. Teams derive from your partner picks +
+  } else if (isSinglesMatchTournament(t)) {
+    // GS-story-sigil-formats: the Ch.3 Storm Championship is a 1v1 SINGLES MATCHPLAY — just you vs the
+    // Apostate, hole by hole, the lower score takes the hole (win OR halve the match → the Sigil). The
+    // rival's per-hole cards ride the SAME strokes stream as `rivalTotal` (difficulty tracks `rivalEdge`).
+    const res = resolveStorySinglesMatch(played.map((p) => p.record.strokes), t.rivalId, t.rivalEdge, String(run.seed), pars);
+    won = res.playerAdvances; // win OR halve advances (the campaign's matchplay convention)
+    playerGross = res.holesUp; // the match payload carries the real result; keep a number for the type
+    rivalGross = 0;
+    matchPayload = { kind: 'singles', scoreline: res.scoreline, thru: res.thru, holesUp: res.holesUp };
+    leaderboard = []; // no stroke leaderboard for matchplay (the recap shows the scoreline)
+  } else if (isTeamMatchTournament(t)) {
+    // GS-story-sigil-formats: the Ch.5 2v2 SCRAMBLE MATCHPLAY finale. Teams derive from your partner picks +
     // path (finaleMatchup): WARDEN = you + a loyal friend vs (the betrayer + Venoma); HERALD = you + the
-    // Coil champion who isn't your guide vs your two former friends. Fewer TEAM strokes wins each hole.
+    // Coil champion who isn't your guide vs your two former friends. Both sides SCRAMBLE (share a ball, best
+    // of every bite); fewer TEAM strokes wins each hole.
     const m = finaleMatchup(base, base.activeCaddyId);
-    // The opponents play as a best-ball PAIR (two ghosts, lower ball each hole) — far stronger than a lone
-    // rival — so their per-golfer edge is scaled DOWN from `rivalEdge`. Your ally plays ~PAR (a modest help
-    // edge, NOT the team-major helper) so YOUR round decides the finale: a strong round carries the team,
-    // a blow-up isn't rescued to a halve. (Final tuning is GS-story-betrayal-polish.)
+    // The opponents play as a scramble PAIR — far stronger than a lone rival — so their per-golfer edge is
+    // scaled DOWN from `rivalEdge`. Your ally plays ~PAR (a modest help edge) so YOUR round still leads the
+    // team. (Final tuning is GS-story-betrayal-polish.)
     const res = resolveStory2v2Match(
       played.map((p) => p.record.strokes),
       m.allyId,
@@ -542,12 +542,13 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
       t.rivalEdge * 0.5,
       String(run.seed),
       pars,
+      'scramble',
     );
     won = res.playerAdvances; // win OR halve advances (the campaign's matchplay convention)
     playerGross = res.holesUp; // the match payload carries the real result; keep a number for the type
     rivalGross = 0;
     rivalName = m.oppNames.join(' & ');
-    matchPayload = { scoreline: res.scoreline, allyName: m.allyName, oppNames: m.oppNames, thru: res.thru, holesUp: res.holesUp, herald: m.herald };
+    matchPayload = { kind: 'team', scoreline: res.scoreline, allyName: m.allyName, oppNames: m.oppNames, thru: res.thru, holesUp: res.holesUp, herald: m.herald };
     leaderboard = []; // no stroke leaderboard for matchplay (the recap shows the scoreline + teams)
   } else {
     rivalGross = rivalTotal(t, String(run.seed), pars);
@@ -628,7 +629,6 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
       par: totals.totalPar,
       leaderboard,
       ...(teamPayload ? { team: teamPayload } : {}),
-      ...(stablefordFlag ? { stableford: true } : {}),
       ...(matchPayload ? { match: matchPayload } : {}),
     },
   };

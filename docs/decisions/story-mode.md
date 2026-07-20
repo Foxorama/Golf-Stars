@@ -812,11 +812,21 @@ Full design + rationale in `docs/decisions/story-betrayal-arc.md`. Shipped as fo
   team stroke vs opposing PAIRS + the 2v2 best-ball matchplay resolver, reusing `match.ts`.
 - **GS-story-partners + stableford** — ✅ (#510) **the Sigils get distinct FORMATS**: Sigil 1 = 2-ball SCRAMBLE,
   Sigil 2 = BEST-BALL (pick a friend partner, opposing pairs include the two you *didn't* pick), Sigil 3 =
-  single STABLEFORD. `StoryState` v5 `sigil1Partner`/`sigil2Partner` lock the picks that decide the betrayer.
+  single-person (Stableford at ship; **now singles MATCHPLAY** per GS-story-sigil-formats). `StoryState` v5
+  `sigil1Partner`/`sigil2Partner` lock the picks that decide the betrayer.
 - **GS-story-betrayer + finale** — ✅ (#511) the **odd-one-out** rule (two different partners → the unpicked
-  friend defects; the same partner twice → that trusted friend does), and the Ch.5 Sigil is a **2v2 best-ball
-  MATCHPLAY**: WARDEN = You + a loyal friend vs (the Betrayer, in corrupted Coil garb, + Venoma); HERALD = You +
-  the Coil champion who isn't your guide vs the two friends who partnered you.
+  friend defects; the same partner twice → that trusted friend does), and the Ch.5 Sigil is a **2v2 MATCHPLAY**:
+  WARDEN = You + a loyal friend vs (the Betrayer, in corrupted Coil garb, + Venoma); HERALD = You + the Coil
+  champion who isn't your guide vs the two friends who partnered you.
+- **GS-story-sigil-formats** — ✅ (2026-07-20) the **format-correctness** pass so each Sigil PLAYS what its copy
+  promises: Sigil 3 Stableford → **1v1 SINGLES MATCHPLAY** vs the Apostate (`resolveStorySinglesMatch`, hole-by-
+  hole, lower score takes the hole, win-or-halve → the Sigil); Sigil 5 best-ball → **2v2 SCRAMBLE MATCHPLAY**
+  (both sides share a ball — `resolveStory2v2Match(..., 'scramble')`, best-of-3 bites). The retired Stableford
+  scoring path (`rivalStableford*`/`stablefordLeaderboard`/the `stableford` recap flag) is gone; the lobby +
+  recap read matchplay scorelines, the partner-picker copy names the format, and the recap leaderboard's serpent
+  🐍 glyph is gated to **Ch.3+** (Ch.1/2 opposing pairs show a neutral 🚩 — the "everyone's a snake in the
+  Emerald leaderboard" bug). Pure resolver + reducer/screen wiring; no save bump, no sim-rng/`GENERATOR_VERSION`
+  change (the story ghost model is separate from the seeded golf stream).
 - **GS-story-betrayal-beats** — ✅ (#512) the mid-chapter interlude reworked into the **per-character** betrayal:
   Warden "The Defection" (the betrayer's own voice, corrupted portrait, sets up the shrine) and Herald "The
   Severing" (keyed to your first completed caddy quest + whether you still wield its reward club). Four

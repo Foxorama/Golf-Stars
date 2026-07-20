@@ -31,9 +31,18 @@ chosen partner characters, alignment, and each character's own dialogue. Specifi
 |---|---|---|---|---|
 | 1 | Ch.1 | **Scramble** (2-ball team; share one ball, best of the two shots each stroke) | pick one of the 3 others | rival PAIR (Ch.1 rival + a rando) + two low-tier RANDO pairs + the two NON-chosen golfers as a pair |
 | 2 | Ch.2 | **Best-ball** (2-ball team; each plays own ball, team keeps the lower per hole) | pick again (may switch) | same shape; rival pair includes **Venoma** |
-| 3 | Ch.3 | **Stableford** (single person) | — | ghost field, points scoring. **The Choice fires after this win.** |
-| 4 | Ch.4 | **Strokeplay** (per path, unchanged shape) | — | Warden: Venoma. Herald: a former friend. Betrayal beats land here. |
-| 5 | Ch.5 | **2v2 best-ball MATCHPLAY** | your loyal ally / Coil champion | the betrayer + a champion (see below) |
+| 3 | Ch.3 | **Singles MATCHPLAY** (1v1 vs the rival, hole-by-hole, lower score takes the hole) | — | just you vs the Apostate. **The Choice fires after this win.** |
+| 4 | Ch.4 | **Strokeplay** (single person, per path) | — | Warden: Venoma. Herald: a former friend. Betrayal beats land here. |
+| 5 | Ch.5 | **2v2 SCRAMBLE MATCHPLAY** (both sides share a ball) | your loyal ally / Coil champion | the betrayer + a champion (see below) |
+
+> **GS-story-sigil-formats (2026-07-20)** — the Sigil formats were corrected to the intended spine:
+> Sigil 3 was a single-person *Stableford*, now **singles matchplay** (`format:'matchplay'`,
+> `resolveStorySinglesMatch`); Sigil 5 was *2v2 best-ball matchplay*, now **2v2 scramble matchplay**
+> (`format:'scramble-match'`, `resolveStory2v2Match(..., 'scramble')` — both teams take a best-of-3 bite).
+> Best-ball stays the resolver's back-compat default. The Stableford scoring path (`rivalStableford*`,
+> `stablefordLeaderboard`, the `stableford` recap flag) was retired. The lobby/recap read matchplay
+> scorelines; the leaderboard's serpent 🐍 glyph is gated to **Chapter 3+** (early team majors show a
+> neutral 🚩 for opposing pairs — the "everyone's a snake in the Emerald leaderboard" fix).
 
 Format is **content-as-data**: a new optional `StoryTournament.format` field (mirrors `BossSpec.mode`/
 `team`). Absent ⇒ the classic ghost strokeplay (byte-identical). Team resolution reuses `match.ts`
@@ -88,9 +97,14 @@ the corrupted one; the former friends stay clean Warden.
   pairs + the 2v2 matchplay resolver, reusing `match.ts`.
 - **GS-story-partners** — ✅ (#510) `StoryState` v5 `sigil1Partner`/`sigil2Partner` + lobby partner-picker;
   Sigil 1 scramble / Sigil 2 best-ball vs opposing pairs (incl. the two you didn't pick).
-- **GS-story-stableford** — ✅ (#510) Sigil 3 single Stableford (points, higher wins).
+- **GS-story-stableford** — ✅ (#510) Sigil 3 single Stableford (points, higher wins). *(Superseded by
+  GS-story-sigil-formats: Sigil 3 is now singles MATCHPLAY.)*
 - **GS-story-betrayer + finale** — ✅ (#511) `storyBetrayal.ts` (odd-one-out betrayer, finale team comps,
-  `corruptedLookOpts`) + the Ch.5 2v2 best-ball matchplay finale (both paths), lobby matchup box + recap.
+  `corruptedLookOpts`) + the Ch.5 2v2 matchplay finale (both paths), lobby matchup box + recap. *(Format
+  corrected to 2v2 SCRAMBLE matchplay by GS-story-sigil-formats.)*
+- **GS-story-sigil-formats** — ✅ (2026-07-20) the Sigil-format correctness pass: Sigil 3 Stableford →
+  **singles matchplay**, Sigil 5 best-ball → **2v2 scramble matchplay**; matchplay lobby/recap copy; the
+  leaderboard serpent glyph gated to Ch.3+ (early majors show 🚩, not 🐍, for opposing pairs).
 - **GS-story-betrayal-beats** — ✅ (#512) the mid-chapter interlude reworked into the per-character defection
   (Warden, corrupted portrait) / caddy-quest-keyed severing (Herald); four distinct `BETRAYAL_VOICE`s.
 - **GS-story-charquests** — ✅ each friend's signature quest, unlocked by partnering them; `charquest:<id>`
