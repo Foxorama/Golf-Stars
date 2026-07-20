@@ -122,10 +122,16 @@ export function itemArtKind(id: string): ItemArtKind {
   // a ball, a cap. The variant + rarity tint tell them apart; a new slot maps to a new/existing drawing.
   if (id.startsWith('gear:')) {
     const slot = id.split(':')[1];
-    if (slot === 'glove') return 'glove';
+    const variant = id.split(':')[2];
+    // A few gear ids draw a more specific kit than their slot's default (GS-story-shop-depth): the Power
+    // Glove gets the NES powerglove art, the rangefinder visor the rangefinder, a distance/economy shaft
+    // its own shaft/coin drawing — so a distinct item reads distinct on the rack.
+    if (slot === 'glove') return variant === 'power' ? 'powerglove' : 'glove';
     if (slot === 'shoes') return 'shoes';
     if (slot === 'ball') return 'ball';
-    if (slot === 'hat') return 'hat';
+    if (slot === 'hat') return variant === 'range' ? 'rangefinder' : 'hat';
+    if (slot === 'shaft') return 'shaft';
+    if (slot === 'bag') return 'coin'; // the economy slot → a credit-coin emblem
   }
   // Story-Tour ship upgrades (`upg:<category>:<variant>`, GS-story-ship-upgrades): a weapon turret, an
   // engine (reuses the thruster art), a deflector shield.
@@ -530,8 +536,14 @@ function drawShaft(col: string, seed: string, family: ClubFamily = 'driver'): st
   return frame(`${sparkles(seed, col, 5)}${clubShaft(col)}${clubHead(family, col)}`, col);
 }
 
+/** Story gear ball ids (`gear:ball:<variant>`) map to the same flavours as the Voyage balls, so a floater
+ *  draws water, a magma-skimmer draws lava, a void-walker draws the void, etc. (GS-story-shop-depth). */
+const STORY_BALL_FLAVOUR: Record<string, string> = {
+  range: 'distance', wind: 'wind', floater: 'water', magma: 'lava', void: 'void', venom: 'lava',
+};
 function drawBall(id: string, col: string, seed: string): string {
-  const flav = BALL_FLAVOUR[id] ?? 'distance';
+  const storyVariant = id.startsWith('gear:ball:') ? id.split(':')[2] : undefined;
+  const flav = (storyVariant ? STORY_BALL_FLAVOUR[storyVariant] : undefined) ?? BALL_FLAVOUR[id] ?? 'distance';
   const cx = 80;
   const cy = 50;
   const r = 26;

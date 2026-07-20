@@ -16,7 +16,16 @@
 
 import type { Rarity } from '../course/contract';
 import type { PlayerLoadout } from './economy';
+import { boostDistanceClubs, addFamilyMinCarry } from './economy';
+import { combineShapeMods } from '../shot';
 import { addCredits, type GearSlot, type StoryState, type StoryAlignment } from './story';
+
+/** Add penalty kind(s) to a hazard-immunity list (the shopItems `addImmune` twin), de-duplicated. Pure. */
+function addImmune(cur: string[] | undefined, ...kinds: string[]): string[] {
+  const set = new Set(cur ?? []);
+  for (const k of kinds) set.add(k);
+  return [...set];
+}
 
 /** A purchasable, equippable piece of Story gear. `apply` folds its effect onto a round loadout. */
 export interface StoryGearItem {
@@ -256,6 +265,497 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     apply: (m) => ({ ...m, lieRelief: Math.max(m.lieRelief ?? 0, 0.7) }),
   },
 
+  // ════════════════════════════════════════════════════════════════════════════════════════════════
+  // GS-story-shop-depth — the DEEP catalogue. The Pro Shops were thin: one effect per slot, each just
+  // "the same thing but a higher tier". This pours in the Voyage economy's proven, VARIED `PlayerLoadout`
+  // levers (distance, wind, hazard-skip, spray-shaping, power, reading, credits) so every slot is a real
+  // CHOICE of BUILD, not a straight ladder — and there are green/blue staples to buy from stop one, purple
+  // upgrades mid-campaign, and fun unique legendaries deep in. Each folds a no-op-default field (Story-only,
+  // auto ≡ interactive), and each is placed at a THEMATIC world (the hazard balls at their own hazard, the
+  // wind gear on the gale-worlds, …) so travel is collection. All obey the item-authoring rule (art via the
+  // slot + rarity, mechanical detail, bespoke lore).
+
+  // ── GLOVE — the hands. Beyond the accuracy ladder (tacky→vice→master): a green starter, a green
+  // slice-fixer, a blue sweet-spot, and the legendary POWER GLOVE (a different axis entirely — pure power).
+  {
+    id: 'gear:glove:worn',
+    slot: 'glove',
+    name: 'Broken-In Tour Glove',
+    rarity: 'common',
+    price: 70,
+    blurb: 'A cheap, honest glove — a touch tighter.',
+    detail: ['Dispersion ×0.97 — a modest, reliable tightening.'],
+    lore: [
+      'Every rookie leaving their home star is handed one of these off the Warden quartermaster’s cart: ' +
+        'plain hide, double-stitched, already worn soft by someone else’s round. It won’t win you a major, ' +
+        'but it will stop the club turning in a sweaty grip — and that is where good golf starts.',
+      'Cheap, cheerful, and better than a bare hand every single time.',
+    ],
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.97 }),
+  },
+  {
+    id: 'gear:glove:antislice',
+    slot: 'glove',
+    name: 'Square-Face Glove',
+    rarity: 'common',
+    price: 90,
+    blurb: 'Kills the block-right — tames the slice.',
+    detail: ['Trims the SLICE miss (right) — that weak fade straightens up.'],
+    lore: [
+      'A glove padded along the heel so the lead hand can’t cup at the top — the one fault behind nine in ' +
+        'ten slices. Wear it a while and the correction sinks into muscle memory; take it off and the ball ' +
+        'still flies straighter for an hour or two, like the glove left a note.',
+      'It only fixes the slice. Everything else is still on you.',
+    ],
+    apply: (m) => ({ ...m, shapeMod: combineShapeMods(m.shapeMod, { sliceR: -0.08 }) }),
+  },
+  {
+    id: 'gear:glove:sweet',
+    slot: 'glove',
+    name: 'Sweet-Spot Mitt',
+    rarity: 'rare',
+    price: 160,
+    blurb: 'Find the centre more often — more great shots.',
+    detail: ['Trims EVERY miss zone — more flush centre-strikes across the board.'],
+    lore: [
+      'The palm is printed with a pressure map that quietly nudges the hands toward the exact grip that ' +
+        'squares the face — so contact drifts to the middle of the club without you thinking about it. The ' +
+        'gallery just sees a golfer who keeps flushing it.',
+      'It doesn’t erase a miss. It makes the good swing your default one.',
+    ],
+    apply: (m) => ({
+      ...m,
+      shapeMod: combineShapeMods(m.shapeMod, { hookL: -0.02, sliceR: -0.02, duckHookL: -0.01, shankR: -0.01 }),
+      dispersionMult: m.dispersionMult * 0.95,
+    }),
+  },
+  {
+    id: 'gear:glove:power',
+    slot: 'glove',
+    name: 'The Power Glove',
+    rarity: 'legendary',
+    price: 420,
+    blurb: 'It’s so bad. Crank the pull to MAX.',
+    detail: ['Pull the power gesture to +40% — the biggest bomb in the galaxy (no accuracy help — pure power).'],
+    lore: [
+      'A relic dug out of the Ghost Wreck’s cargo hold, stamped with the logo of a toy empire that fell ' +
+        'before the first Warden ever teed off. Slip it on, wire it to the shaft, and the pull-to-power ' +
+        'gesture stops caring about "a full swing" — you can wind it up past anything sane and launch the ' +
+        'ball into the next time zone. It gives you nothing but distance, and distance is a lot.',
+      'It’s so bad. It’s so good.',
+    ],
+    apply: (m) => ({ ...m, overpower: Math.max(m.overpower ?? 0, 0.4) }),
+  },
+
+  // ── HAT — the eyes. Beyond the putt-window ladder (visor→focus→oracle): green reading aids, a blue
+  // spin-line read, a purple full spin computer, and a legendary that reads the BREAK for you.
+  {
+    id: 'gear:hat:reader',
+    slot: 'hat',
+    name: 'Green-Reader’s Cap',
+    rarity: 'common',
+    price: 70,
+    blurb: 'Reads the break further — a few more putts.',
+    detail: ['Confident putt-read line stretches ~5y further, and the make-window widens a touch (+4%).'],
+    lore: [
+      'The bill is embroidered with a fading galaxy of little fall-line arrows — an old caddy’s cheat-sheet, ' +
+        'stitched over a lifetime of missed reads. Pull it low and the greens stop hiding their slope; the ' +
+        'break line in your mind’s eye simply reaches a little further toward the cup.',
+      'Every stroke you save on the greens is a stroke you didn’t have to strike pure.',
+    ],
+    apply: (m) => ({
+      ...m,
+      puttReadBonus: (m.puttReadBonus ?? 0) + 5,
+      puttBoost: (m.puttBoost ?? 0) + 0.04,
+    }),
+  },
+  {
+    id: 'gear:hat:range',
+    slot: 'hat',
+    name: 'Rangefinder Visor',
+    rarity: 'common',
+    price: 90,
+    blurb: 'Yardages on tap — a suggested club.',
+    detail: ['A heads-up rangefinder — shows a suggested club and the green front/middle/back read.'],
+    lore: [
+      'A tour visor with a laser pipped into the brim: sight the flag, blink, and the exact carry paints ' +
+        'itself across your vision along with the club that flies it. Purists mutter that a real golfer ' +
+        'knows their yardages — then squint at the pin and quietly wish they had one.',
+      'It tells you the number. Hitting the number is still the hard part.',
+    ],
+    apply: (m) => ({ ...m, clubSuggest: true }),
+  },
+  {
+    id: 'gear:hat:spin',
+    slot: 'hat',
+    name: 'Spin-Read Cap',
+    rarity: 'rare',
+    price: 140,
+    blurb: 'See the check — approaches read truer.',
+    detail: ['Extends the approach roll/check line further, and rips a touch more backspin (+4%).'],
+    lore: [
+      'A cap woven with a filament that traces a struck ball’s spin and prints its predicted skid-and-check ' +
+        'right onto the turf ahead — so you can see where a biting wedge will actually stop before you swing ' +
+        'it. On a firm, tilted green that little grey line is the difference between a tap-in and a three-putt.',
+      'Fly it to the number and trust the line.',
+    ],
+    apply: (m) => ({
+      ...m,
+      spinReadBonus: (m.spinReadBonus ?? 0) + 6,
+      backspinBoost: (m.backspinBoost ?? 0) + 0.04,
+    }),
+  },
+  {
+    id: 'gear:hat:computer',
+    slot: 'hat',
+    name: 'Trajectory Crown',
+    rarity: 'epic',
+    price: 220,
+    blurb: 'The WHOLE roll, read — check and curl.',
+    detail: ['Computes the FULL approach roll — every yard of check and contour curl to where it settles — and +5% backspin.'],
+    lore: [
+      'A circlet of quiet computation the Wardens issue to their green-reading corps: it doesn’t just read ' +
+        'the check, it solves the entire roll — the skid, the grab, the long curl down the contour to the ' +
+        'exact blade of grass the ball will die on. Wearing it, a wild tiered green becomes a solved puzzle.',
+      'The line reaches all the way home now. You just have to send it.',
+    ],
+    apply: (m) => ({
+      ...m,
+      spinReadFull: true,
+      backspinBoost: (m.backspinBoost ?? 0) + 0.05,
+    }),
+  },
+  {
+    id: 'gear:hat:seer',
+    slot: 'hat',
+    name: 'The Seer’s Circlet',
+    rarity: 'legendary',
+    price: 700,
+    blurb: 'The break, read FOR you — just judge the pace.',
+    detail: ['Reads the BREAK for you — the putt aims itself on the perfect slope-compensated line, +12% make-window and a longer read.'],
+    lore: [
+      'A band of starlight that does on every green what only the Mystic Mole could: it takes the read out ' +
+        'of your hands entirely, snapping your aim to the one true line the slope demands, so all that is left ' +
+        'is pace. Champions who wear it say putting stops being a guess and becomes a conversation — you and ' +
+        'the green agreeing on where the ball will go.',
+      'It reads the line. Judging the speed is the last art it leaves you.',
+    ],
+    apply: (m) => ({
+      ...m,
+      greenRead: true,
+      puttBoost: (m.puttBoost ?? 0) + 0.12,
+      puttReadBonus: (m.puttReadBonus ?? 0) + 10,
+    }),
+  },
+
+  // ── SHOES — the stance. Beyond the lie-relief ladder (spikes→gravlock→anchor): a green starter and a
+  // blue "planted base" that steadies your DISTANCES (a repeatable strike off a solid stance).
+  {
+    id: 'gear:shoes:turf',
+    slot: 'shoes',
+    name: 'Turf-Gripper Cleats',
+    rarity: 'common',
+    price: 70,
+    blurb: 'A steadier base — a little help from bad lies.',
+    detail: ['Light lie relief — rough, sand and awkward stances sting a bit less.'],
+    lore: [
+      'Moulded soles studded with stubby ceramic cleats that bite most turf you’ll meet in the near stars. ' +
+        'They won’t save you off a lava shelf, but out of the first cut and the fairway bunkers they keep ' +
+        'your feet under you, and a stance you can trust is half a recovery shot for free.',
+      'You’ll still find the rough. You just won’t fall over in it.',
+    ],
+    apply: (m) => ({ ...m, lieRelief: Math.max(m.lieRelief ?? 0, 0.18) }),
+  },
+  {
+    id: 'gear:shoes:balance',
+    slot: 'shoes',
+    name: 'Balance-Plate Shoes',
+    rarity: 'rare',
+    price: 140,
+    blurb: 'A rooted strike — your distances tighten up.',
+    detail: ['Raises the MIN carry on driver / woods / irons — a solid base makes your distances repeat.'],
+    lore: [
+      'Weighted carbon plates in the sole drop your centre of gravity and lock the lower body through ' +
+        'impact, so you deliver the same speed to the same spot swing after swing. The ball stops coming up ' +
+        'those maddening ten yards short — it flies the number, because your body finally does the same thing twice.',
+      'Distance you can trust beats distance you sometimes have.',
+    ],
+    apply: (m) => ({ ...m, minCarryBoost: m.minCarryBoost + 0.1 }),
+  },
+
+  // ── BALL — flight character. Beyond the backspin ladder (soft→zip→comet): a green DISTANCE ball, a blue
+  // wind-cheater, and the HAZARD-SKIP balls — each keyed to its own hazard world (floater→ocean,
+  // magma→inferno, void→the abyss), a thrilling, world-thematic reason to fly out there and buy it.
+  {
+    id: 'gear:ball:range',
+    slot: 'ball',
+    name: 'Hot Distance Balls',
+    rarity: 'common',
+    price: 90,
+    blurb: 'Longer off the tee — +10y, straighter.',
+    detail: ['+10 yds on your distance clubs, and a touch straighter (×0.97 dispersion).'],
+    lore: [
+      'A low-spin two-piece ball with a hot ionised core that comes off the driver like it’s been shoved. ' +
+        'You give up a hair of greenside check for real, free yardage off the tee — and on a long par-5 in a ' +
+        'headwind, yardage is exactly what you were praying for.',
+      'A box of a dozen. You’ll lose a few chasing the extra distance. Worth it.',
+    ],
+    apply: (m) => ({
+      ...m,
+      bag: boostDistanceClubs(m.bag, 10),
+      distanceClubBonus: (m.distanceClubBonus ?? 0) + 10,
+      dispersionMult: m.dispersionMult * 0.97,
+    }),
+  },
+  {
+    id: 'gear:ball:wind',
+    slot: 'ball',
+    name: 'Wind-Cheater Balls',
+    rarity: 'rare',
+    price: 140,
+    blurb: 'Bores through the breeze — 45% less wind.',
+    detail: ['45% less wind impact — a low, boring flight the gale can’t push around.'],
+    lore: [
+      'A dimple pattern computed on the gale-worlds themselves: the ball flies low and mean, refusing to ' +
+        'balloon into the wind that eats an ordinary shot. On the storm links where the breeze is the whole ' +
+        'defence, a sleeve of these turns a two-club gale into a one-club nuisance.',
+      'The wind still reads true off your line — it just bites you half as hard.',
+    ],
+    apply: (m) => ({ ...m, windResist: Math.min(0.6, (m.windResist ?? 0) + 0.45) }),
+  },
+  {
+    id: 'gear:ball:floater',
+    slot: 'ball',
+    name: 'Floater Balls',
+    rarity: 'epic',
+    price: 230,
+    blurb: 'Skips clean across water — no penalty.',
+    detail: ['Water hazards & creeks cost you NO stroke — the ball skims across and settles on the nearest dry ground.'],
+    lore: [
+      'Buoyant, sealed, and lighter than they have any right to be, these balls hit a water hazard and simply ' +
+        '*skip* — three, four, five bounces across the surface to dry land, like a stone flung by a child. The ' +
+        'drowned atolls of the ocean worlds hold no fear for a golfer carrying a sleeve.',
+      'Clear the water and it’s a free carry; come up short and you drop at the near bank — never a lost ball.',
+    ],
+    apply: (m) => ({ ...m, hazardImmune: addImmune(m.hazardImmune, 'water') }),
+  },
+  {
+    id: 'gear:ball:magma',
+    slot: 'ball',
+    name: 'Magma-Skimmer Balls',
+    rarity: 'epic',
+    price: 230,
+    blurb: 'Skips across lava — no penalty.',
+    detail: ['Lava hazards & molten rivers cost you NO stroke — the ball skims the surface to safe ground.'],
+    lore: [
+      'A ceramic-shelled ball fired in the same forges that temper the Phoenix clubs — it can kiss molten ' +
+        'rock and skip off it glowing, unbothered, to settle on the far bank. On the fire-worlds where a lava ' +
+        'river guards every green, it turns a forced lay-up into a heroic carry.',
+      'Handle with the glove on. It comes back warm.',
+    ],
+    apply: (m) => ({ ...m, hazardImmune: addImmune(m.hazardImmune, 'lava') }),
+  },
+  {
+    id: 'gear:ball:void',
+    slot: 'ball',
+    name: 'Void-Walker Balls',
+    rarity: 'legendary',
+    price: 340,
+    blurb: 'Drifts across the abyss — the void spares it.',
+    detail: ['The VOID no longer swallows your ball — an anti-grav core drifts it across the abyss to solid ground.'],
+    lore: [
+      'The core is a caged sliver of the same anti-gravity the Wardens’ ships run on: fly the ball out over ' +
+        'the star-gap and it simply *refuses to fall*, drifting across the abyss on a whisper of nothing to ' +
+        'land safe on the far platform. On the void worlds and the drifting wrecks, where one miss into the ' +
+        'dark is gone forever, it is the difference between a birdie and a heartbreak.',
+      'Only sold in the deep, to golfers who have already stared into the abyss and stayed on their feet.',
+    ],
+    apply: (m) => ({ ...m, hazardImmune: addImmune(m.hazardImmune, 'void', 'voidlost') }),
+  },
+
+  // ── SHAFT (the new distance/power slot) — the whole distance axis, so it doesn't crowd the ball slot.
+  // A green min-carry, blue power + matched woods, purple blueprint irons + overdrive, legendary nova bomb.
+  {
+    id: 'gear:shaft:stiff',
+    slot: 'shaft',
+    name: 'Stiff Tour Shaft',
+    rarity: 'common',
+    price: 80,
+    blurb: 'Tighter distances — no more coming up short.',
+    detail: ['Raises the MIN carry on driver / woods / irons — your bad strikes fly closer to your good ones.'],
+    lore: [
+      'A stiff, low-torque calibrated shaft that refuses to load up on a lazy swing — so your mishits stop ' +
+        'falling out of the sky ten yards short. You lose a little of the whippy "sometimes I catch one" magic ' +
+        'and gain a lot of "it goes where I expect", which is the trade every scoring golfer makes.',
+      'The first upgrade a serious campaign buys.',
+    ],
+    apply: (m) => ({ ...m, minCarryBoost: m.minCarryBoost + 0.08 }),
+  },
+  {
+    id: 'gear:shaft:power',
+    slot: 'shaft',
+    name: 'Graphite Power Shaft',
+    rarity: 'rare',
+    price: 160,
+    blurb: 'Real free yards — +12 and steadier.',
+    detail: ['+12 yds carry on your distance clubs, and a steadier tempo (×0.95 dispersion).'],
+    lore: [
+      'A feather-light graphite shaft with a kick-point tuned to fling the head through impact — twelve honest ' +
+        'yards on every distance club, for nothing but the price of it. The counter-weighted tip even smooths ' +
+        'your tempo, so the extra length doesn’t cost you the fairway. A pure, satisfying upgrade.',
+      'Everything downrange begins with the shaft that gets it there.',
+    ],
+    apply: (m) => ({
+      ...m,
+      bag: boostDistanceClubs(m.bag, 12),
+      distanceClubBonus: (m.distanceClubBonus ?? 0) + 12,
+      dispersionMult: m.dispersionMult * 0.95,
+    }),
+  },
+  {
+    id: 'gear:shaft:woods',
+    slot: 'shaft',
+    name: 'Matched Fairway Woods',
+    rarity: 'rare',
+    price: 140,
+    blurb: 'Long woods that land where you aim.',
+    detail: ['Raises the MIN carry of your WOODS only — long fairway woods stop coming up short, no trade-off.'],
+    lore: [
+      'A length-matched set of woods, each frequency-tuned to the last, so your 3-wood and 5-wood fly ' +
+        'predictable, stackable distances instead of two random guesses. On a long par-5 the layup wood ' +
+        'finally lands on the number you picked — and the reachable green stops being a gamble.',
+      'Precision where the lean bag needed it most.',
+    ],
+    apply: (m) => ({ ...m, minCarryBoostByClass: addFamilyMinCarry(m.minCarryBoostByClass, 'wood', 0.13) }),
+  },
+  {
+    id: 'gear:shaft:irons',
+    slot: 'shaft',
+    name: 'Blueprint Iron Set',
+    rarity: 'epic',
+    price: 210,
+    blurb: 'Approaches that hold their number.',
+    detail: ['Raises the MIN carry of your IRONS, and a touch tighter (×0.95) — approaches hold their yardage.'],
+    lore: [
+      'Precision-forged blueprint irons, milled to a thousandth on the Warden benches: every one flies its ' +
+        'stamped number and stops there. No more flighting a 7-iron and watching it flutter down five short of ' +
+        'the flag — you pick the club, you hit the club, the ball obeys the club. That is what "tour" means.',
+      'The approach game is where scores are made. These make it.',
+    ],
+    apply: (m) => ({
+      ...m,
+      minCarryBoostByClass: addFamilyMinCarry(m.minCarryBoostByClass, 'iron', 0.16),
+      dispersionMult: m.dispersionMult * 0.95,
+    }),
+  },
+  {
+    id: 'gear:shaft:overdrive',
+    slot: 'shaft',
+    name: 'Speed-Whip Shaft',
+    rarity: 'epic',
+    price: 200,
+    blurb: 'Swing PAST 100% — +20% carry.',
+    detail: ['Pull the power gesture past a full swing — up to +20% max carry (at the club’s full spray).'],
+    lore: [
+      'A whippy, over-flexing speed shaft the long-drive circuit smuggles between systems: wind the pull ' +
+        'gesture past what a "full swing" should allow and the shaft stores the extra load, then dumps it all ' +
+        'into the ball. You spray a little wider at the ragged edge of it — but the carry you unlock is worth ' +
+        'the risk when there’s a par-5 you could reach.',
+      'When in doubt, whip it out.',
+    ],
+    apply: (m) => ({ ...m, overpower: (m.overpower ?? 0) + 0.2 }),
+  },
+  {
+    id: 'gear:shaft:nova',
+    slot: 'shaft',
+    name: 'Nova Long Shaft',
+    rarity: 'legendary',
+    price: 400,
+    blurb: 'A straight bomb — +24 and tighter.',
+    detail: ['+24 yds on your distance clubs AND 10% tighter dispersion. The longest, straightest stick in the galaxy.'],
+    lore: [
+      'A shaft grown as a single crystal in zero-g, so light and so stiff it should not exist — it launches the ' +
+        'ball on a rope, twenty-four yards past anything else you own, and it flies dead straight while it does ' +
+        'it. The Wardens forge a handful a year, for champions who have earned the right to out-drive the field ' +
+        'and hit the fairway anyway.',
+      'The apex of distance. There is no wind it respects and no par-5 it fears.',
+    ],
+    apply: (m) => ({
+      ...m,
+      bag: boostDistanceClubs(m.bag, 24),
+      distanceClubBonus: (m.distanceClubBonus ?? 0) + 24,
+      dispersionMult: m.dispersionMult * 0.9,
+    }),
+  },
+
+  // ── BAG (the economy slot — was long empty) — a credit-earning ENGINE. A bigger, better-sponsored bag
+  // banks more per world clear (GS-story-shop-depth wires `storyGearCreditMult` into the pay). One clean
+  // ladder (an economy engine is meant to ramp): a green satchel → a legendary cosmic bag. Buy early, snowball.
+  {
+    id: 'gear:bag:sponsor',
+    slot: 'bag',
+    name: 'Sponsor’s Satchel',
+    rarity: 'common',
+    price: 90,
+    blurb: 'A first sponsor — +15% credits earned.',
+    detail: ['+15% credits from every world clear and major — an early economy engine.'],
+    lore: [
+      'A modest carry bag stitched with the badge of a single hopeful sponsor — a fuel-depot chain three ' +
+        'systems back who’ll pay for their logo on a rising champion. It’s not much, but it’s the first crack ' +
+        'in the credit ceiling, and every credit it earns is one you can put toward a real upgrade.',
+      'The road to the finale arsenal is paved with sponsors. Start signing them.',
+    ],
+    apply: (m) => ({ ...m, creditMult: m.creditMult * 1.15 }),
+  },
+  {
+    id: 'gear:bag:lucky',
+    slot: 'bag',
+    name: 'Fortune Cartel Bag',
+    rarity: 'rare',
+    price: 160,
+    blurb: 'Ride the Cartel’s luck — +25% credits.',
+    detail: ['+25% credits from every world clear and major.'],
+    lore: [
+      'The Fortune Cartel bankroll golfers they like the odds on, and their staff bag comes stuffed with lucky ' +
+        'ball-markers, marked cards, and a contract you should probably read more carefully. Wear their colours ' +
+        'and the purses swell — the galaxy’s luck bending, quietly, toward the golfer they’ve bet on.',
+      'Fortune favours the well-funded.',
+    ],
+    apply: (m) => ({ ...m, creditMult: m.creditMult * 1.25 }),
+  },
+  {
+    id: 'gear:bag:tour',
+    slot: 'bag',
+    name: 'Tour Pro’s Staff Bag',
+    rarity: 'epic',
+    price: 280,
+    blurb: 'A full sponsor roster — +40% credits.',
+    detail: ['+40% credits from every world clear and major — the roster of a real headline act.'],
+    lore: [
+      'A towering leather staff bag plastered stem to stern with the marks of a dozen syndicates — the kind a ' +
+        'headline golfer carries when every system in the sector wants their logo on the winner. It weighs a ' +
+        'ton and pays for itself twice a round. Your caddy will complain. Let them.',
+      'When you’re the draw, everyone pays to stand near you.',
+    ],
+    apply: (m) => ({ ...m, creditMult: m.creditMult * 1.4 }),
+  },
+  {
+    id: 'gear:bag:cosmic',
+    slot: 'bag',
+    name: 'Cosmic Sponsor’s Bag',
+    rarity: 'legendary',
+    price: 440,
+    blurb: 'The galaxy backs you — +60% credits.',
+    detail: ['+60% credits from every world clear and major — the whole galaxy is your sponsor now.'],
+    lore: [
+      'When you’ve saved enough worlds, the sponsors stop being companies and start being *civilisations*: this ' +
+        'bag carries the sigils of entire systems who owe you their skies, and every one of them pays to be seen ' +
+        'beside the golfer who kept the World-Eater from their door. The purses it draws could fund a small fleet.',
+      'The galaxy is grateful. The galaxy is also very good for it.',
+    ],
+    apply: (m) => ({ ...m, creditMult: m.creditMult * 1.6 }),
+  },
+
   // ── HERALD cursed sheddings (GS-story-route-rewards) — big power, a real curse; only on the Coil path.
   // Forged by Sister Ecdysis from what a broken thing sheds. Stronger AND cheaper than Warden grace, but
   // each takes something back. A shedding must be a CHOICE, never a strict upgrade.
@@ -420,30 +920,41 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
 /** Per-world gear stock (content-as-data) — a curated 1–2 items per world, tiered by chapter, so travel
  *  fills out the locker. Filtered to hide what you own (see `storyGearStock`). */
 export const STORY_GEAR_STOCK: Record<string, readonly string[]> = {
-  // GS-story-quality: EARLY worlds lean on gear (the shops trimmed a club slot for it) — gear is the spend
-  // the quest/tournament CLUB rewards never make redundant, so early credits go somewhere that lasts.
-  // Chapter 1 — the rare Warden basics.
-  'verdant-18': ['gear:glove:tacky', 'gear:ball:soft'],
-  'verdant2-18': ['gear:hat:visor', 'gear:glove:tacky'],
-  'desert-18': ['gear:shoes:spikes', 'gear:ball:soft'],
-  // Chapter 2 — a first epic appears.
-  'inferno-18': ['gear:glove:vice', 'gear:hat:visor'],
-  'inferno2-18': ['gear:ball:soft', 'gear:shoes:spikes'],
-  'frost-18': ['gear:hat:visor', 'gear:shoes:spikes'],
-  // Chapter 3 — the epic line fills in.
-  'tempest-18': ['gear:glove:vice', 'gear:hat:focus'],
-  'crystal-18': ['gear:hat:focus'],
-  'fungal-18': ['gear:ball:zip'],
-  // Chapter 4 — epics everywhere + the first ROUTE RELICS (alignment-gated: only your path sees its own).
-  'ocean-18': ['gear:shoes:gravlock', 'gear:ball:zip', 'gear:glove:shed', 'gear:glove:grace'],
-  'void2-18': ['gear:shoes:gravlock', 'gear:glove:master'],
-  // GS-story-gear-tiers: the legendary apex gloves/hats/shoes join the legendary ball in the deep worlds —
-  // placed on worlds BOTH paths visit (Ch.4 crystal2-18 is a qualifier for both; every Ch.5 world is too).
-  'crystal2-18': ['gear:glove:vice', 'gear:hat:oracle', 'gear:ball:venom', 'gear:ball:blessed'],
-  // Chapter 5 — the legendary apex gear + the last route relics in the serpent's reaches.
+  // GS-story-shop-depth: a DEEP, THEMED, tiered distribution. Green/blue staples to buy from stop one, purple
+  // upgrades mid-campaign, fun legendaries deep in. Each world's rack leans into its OWN identity (the hazard
+  // balls at their hazard, the wind balls on the gale-worlds, the sand stance in the dunes) so travel is
+  // collection — you fly out to a world FOR the thing it sells. Route relics (alignment-tagged) still show
+  // only on your path (`storyGearStock`); already-owned items drop out.
+
+  // ── Chapter 1 — GREENS & BLUES, the staples (home parkland + the dunes). Start the economy engine + the
+  // distance/reading basics here so an early credit has an exciting, lasting home.
+  'verdant-18': ['gear:glove:worn', 'gear:shaft:stiff', 'gear:ball:range', 'gear:bag:sponsor'],
+  'verdant2-18': ['gear:hat:reader', 'gear:hat:visor', 'gear:glove:antislice', 'gear:shoes:turf'],
+  'desert-18': ['gear:shoes:spikes', 'gear:shoes:balance', 'gear:hat:range', 'gear:shaft:power'],
+
+  // ── Chapter 2 — BLUES + the first PURPLES (the fire-worlds + the frozen links). Themed: MAGMA balls at
+  // the lava, the whippy power shaft where you need to bomb it, the WIND ball on the exposed frost links.
+  'inferno-18': ['gear:ball:magma', 'gear:glove:tacky', 'gear:shaft:woods'],
+  'inferno2-18': ['gear:shaft:overdrive', 'gear:ball:soft', 'gear:bag:lucky'],
+  'frost-18': ['gear:ball:wind', 'gear:hat:spin', 'gear:glove:sweet'],
+
+  // ── Chapter 3 — the PURPLE line fills in (the gale, the crystal precision greens, the spore-jungle rough).
+  'tempest-18': ['gear:ball:wind', 'gear:glove:vice', 'gear:shaft:irons'],
+  'crystal-18': ['gear:hat:computer', 'gear:glove:vice', 'gear:bag:tour'],
+  'fungal-18': ['gear:shoes:gravlock', 'gear:hat:focus', 'gear:ball:zip'],
+
+  // ── Chapter 4 — PURPLES everywhere, the ROUTE RELICS (alignment-gated), and the first LEGENDARIES. Themed:
+  // FLOATER balls on the drowned atolls, VOID-WALKER balls + the Nova bomb at the abyss, the Power Glove +
+  // the Oracle where precision is everything.
+  'ocean-18': ['gear:ball:floater', 'gear:shoes:gravlock', 'gear:glove:shed', 'gear:glove:grace'],
+  'void2-18': ['gear:ball:void', 'gear:shaft:nova', 'gear:glove:master'],
+  'crystal2-18': ['gear:hat:oracle', 'gear:glove:power', 'gear:ball:venom', 'gear:ball:blessed'],
+
+  // ── Chapter 5 — the LEGENDARY apex + the last route relics, in the serpent's reaches. The Comet ball, the
+  // Void-Anchor boots, the Seer's Circlet, the Cosmic bag — the grail rack of the campaign.
   'swamp-18': ['gear:ball:comet', 'gear:shoes:anchor', 'gear:shoes:coil', 'gear:shoes:hallowed'],
-  'derelict-18': ['gear:shoes:gravlock', 'gear:ball:comet', 'gear:hat:oracle'],
-  'cetus-18': ['gear:ball:comet', 'gear:glove:master'],
+  'derelict-18': ['gear:hat:seer', 'gear:ball:void', 'gear:bag:cosmic'],
+  'cetus-18': ['gear:ball:comet', 'gear:shaft:nova', 'gear:glove:power'],
 };
 
 /** Look up a gear item by id. */
@@ -534,4 +1045,29 @@ export function applyStoryGear(loadout: PlayerLoadout, story: StoryState): Playe
     if (item) out = item.apply(out);
   }
   return out;
+}
+
+/**
+ * GS-story-shop-depth: the equipped ECONOMY (bag-slot) gear's credit multiplier — the factor to multiply a
+ * Story round's credit payout by (the `shipCreditMult`/`upgradeCreditMult` sibling). Folds every equipped
+ * gear item onto a unit loadout and reads back its `creditMult`, so a golfer with no economy bag returns
+ * exactly 1 (byte-for-byte the old pay) and only an equipped credit bag lifts it. Pure.
+ */
+export function storyGearCreditMult(story: StoryState): number {
+  const unit = {
+    bag: [],
+    handicap: 0,
+    dispersionMult: 1,
+    creditMult: 1,
+    perks: [],
+    shapeMod: {},
+    minCarryBoost: 0,
+    wedgeWindow: 0,
+    distanceClubBonus: 0,
+    puttBoost: 0,
+    birdieCredit: 0,
+    eagleCredit: 0,
+    comebackCredit: 0,
+  } as PlayerLoadout;
+  return applyStoryGear(unit, story).creditMult;
 }

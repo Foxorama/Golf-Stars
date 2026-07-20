@@ -30,6 +30,7 @@ import {
   equipStoryGear,
   unequipStoryGear,
   ownedGearForSlot,
+  storyGearCreditMult,
 } from '../src/sim/rpg/storyGear';
 import {
   defaultStoryState,
@@ -368,7 +369,56 @@ describe('route relics (GS-story-route-rewards)', () => {
     expect(warden).toContain('gear:ball:blessed');
     expect(warden).not.toContain('gear:ball:venom');
     // ordinary (unaligned) gear still shows on either path
-    expect(warden).toContain('gear:glove:vice');
+    expect(warden).toContain('gear:hat:oracle');
+  });
+});
+
+describe('the deep catalogue (GS-story-shop-depth)', () => {
+  const unit = (): PlayerLoadout => ({
+    bag: [], handicap: 10, dispersionMult: 1, creditMult: 1, perks: [], shapeMod: {},
+    minCarryBoost: 0, wedgeWindow: 0, distanceClubBonus: 0, puttBoost: 0, birdieCredit: 0, eagleCredit: 0, comebackCredit: 0,
+  });
+
+  it('every purchasable gear item is stocked at some world (no dead content)', () => {
+    const stocked = new Set(Object.values(STORY_GEAR_STOCK).flat());
+    for (const g of STORY_GEAR) {
+      if (g.acquire === 'reward') continue; // quest-granted, deliberately never sold
+      expect(stocked.has(g.id), `${g.id} is sold somewhere`).toBe(true);
+    }
+  });
+
+  it('the catalogue spans all six slots and a green→legendary rarity ladder', () => {
+    const slots = new Set(STORY_GEAR.map((g) => g.slot));
+    for (const s of ['glove', 'hat', 'shoes', 'ball', 'shaft', 'bag'] as const) expect(slots.has(s), `${s} has gear`).toBe(true);
+    const rarities = new Set(STORY_GEAR.map((g) => g.rarity));
+    for (const r of ['common', 'rare', 'epic', 'legendary'] as const) expect(rarities.has(r), `${r} gear exists`).toBe(true);
+    // green + blue variety exists EARLY (a common item sits on a Chapter-1 world)
+    const ch1 = ['verdant-18', 'verdant2-18', 'desert-18'].flatMap((w) => STORY_GEAR_STOCK[w] ?? []);
+    expect(ch1.some((id) => storyGearById(id)?.rarity === 'common')).toBe(true);
+  });
+
+  it('the new distance/power gear folds real distance levers', () => {
+    // Graphite Power Shaft adds carry to distance clubs
+    const powerShaft = storyGearById('gear:shaft:power')!;
+    const base = { ...unit(), bag: [{ id: 'D', name: 'Driver', carry: 250, loft: 10 } as never] };
+    expect(powerShaft.apply(base).distanceClubBonus).toBe(12);
+    expect((powerShaft.apply(base).bag[0] as { carry: number }).carry).toBe(262);
+    // Speed-Whip shaft lets you pull past 100%
+    expect(storyGearById('gear:shaft:overdrive')!.apply(unit()).overpower).toBeCloseTo(0.2, 5);
+    // hazard balls skip their hazard
+    expect(storyGearById('gear:ball:floater')!.apply(unit()).hazardImmune).toContain('water');
+    expect(storyGearById('gear:ball:void')!.apply(unit()).hazardImmune).toEqual(expect.arrayContaining(['void', 'voidlost']));
+  });
+
+  it('economy bag gear lifts storyGearCreditMult (default 1 → unchanged)', () => {
+    expect(storyGearCreditMult(defaultStoryState())).toBeCloseTo(1, 5); // no bag → byte-for-byte the old pay
+    let s = addCredits(defaultStoryState(), 3000);
+    s = buyStoryGear(s, storyGearById('gear:bag:sponsor')!); // ×1.15
+    expect(storyGearCreditMult(s)).toBeCloseTo(1.15, 5);
+    s = equipStoryGear(s, 'gear:bag:cosmic'); // not owned → no-op (still sponsor)
+    expect(storyGearCreditMult(s)).toBeCloseTo(1.15, 5);
+    s = buyStoryGear(addCredits(s, 3000), storyGearById('gear:bag:cosmic')!); // ×1.6, replaces the slot
+    expect(storyGearCreditMult(s)).toBeCloseTo(1.6, 5);
   });
 });
 
