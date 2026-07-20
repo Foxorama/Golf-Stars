@@ -9,6 +9,8 @@ import {
   hireStoryCaddy,
   setActiveStoryCaddy,
   applyStoryCaddy,
+  caddiedWith,
+  recordCaddyRound,
 } from '../src/sim/rpg/storyCaddies';
 import { defaultStoryState, STORY_WORLDS } from '../src/sim/rpg/story';
 import { applyHeraldCaddies, HERALD_CADDY_IDS, HERALD_DEFAULT_CADDY } from '../src/sim/rpg/storyHeraldCrew';
@@ -93,6 +95,25 @@ describe('Story caddy roster — gather your friends (GS-story-caddies)', () => 
     expect((applyStoryCaddy(base, s2).lieRelief ?? 0)).toBeGreaterThan(0);
     // Idempotent — re-applying doesn't churn the roster.
     expect(applyHeraldCaddies(herald)).toBe(herald);
+  });
+
+  it('recordCaddyRound builds reputation with the ACTIVE caddy only, idempotently (GS-story-caddy-rep)', () => {
+    const dan = worldCaddy('derelict-18')!;
+    const sandy = worldCaddy('desert-18')!;
+    let s = hireStoryCaddy(hireStoryCaddy({ ...defaultStoryState(), credits: 2000 }, dan), sandy);
+    expect(caddiedWith(s, dan)).toBe(false); // hiring alone earns nothing
+    // Dan is active (first hire) → a round records Dan, not Sandy.
+    s = recordCaddyRound(s);
+    expect(caddiedWith(s, dan)).toBe(true);
+    expect(caddiedWith(s, sandy)).toBe(false);
+    // Idempotent — a second round with Dan doesn't duplicate.
+    expect(recordCaddyRound(s).caddiedRoundIds).toEqual([dan]);
+    // Switch to Sandy and play → now both have reputation.
+    s = recordCaddyRound(setActiveStoryCaddy(s, sandy));
+    expect(caddiedWith(s, sandy)).toBe(true);
+    // With nobody on the bag, a round records nothing (a no-op).
+    const benched = setActiveStoryCaddy(s, undefined);
+    expect(recordCaddyRound(benched)).toBe(benched);
   });
 
   it('the active caddy folds its real effect + perk into a round loadout; no active is a no-op', () => {

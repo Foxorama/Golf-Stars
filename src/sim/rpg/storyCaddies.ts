@@ -48,6 +48,27 @@ export function activeStoryCaddy(story: StoryState): string | undefined {
 }
 
 /**
+ * GS-story-caddy-rep: has the player completed a Story round with this caddy on the bag? The lightweight
+ * REPUTATION gate the ally side quests read — a friend opens up about their personal quest only after
+ * you've actually carried the bag together, never the instant you recruit. Path-agnostic (a Warden caddy or
+ * a Herald Coil volunteer alike).
+ */
+export function caddiedWith(story: StoryState, caddyId: string): boolean {
+  return story.caddiedRoundIds.includes(caddyId);
+}
+
+/**
+ * GS-story-caddy-rep: record that a Story round was just played with the ACTIVE caddy on the bag (pure,
+ * idempotent) — a no-op when no caddy is active. Called from every Story-round resolution (world clear /
+ * qualifier / quest / tournament), so a caddy earns their quest by carrying the bag, not by being hired.
+ */
+export function recordCaddyRound(story: StoryState): StoryState {
+  const id = activeStoryCaddy(story);
+  if (!id || story.caddiedRoundIds.includes(id)) return story;
+  return { ...story, caddiedRoundIds: [...story.caddiedRoundIds, id] };
+}
+
+/**
  * Recruit a caddy (pure): spend `STORY_CADDY_PRICE`, add to the kept roster, and — if this is your FIRST
  * friend — make them active by default. No-op if already hired, unaffordable, or not a real named caddy.
  */

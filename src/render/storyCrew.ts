@@ -17,7 +17,7 @@ import {
   allyFactionName,
   allyFactionBlurb,
 } from '../sim/rpg/storyAllies';
-import { activeStoryCaddy } from '../sim/rpg/storyCaddies';
+import { activeStoryCaddy, caddiedWith } from '../sim/rpg/storyCaddies';
 import { questForCaddy, questOfferable, questDone, questBeatPending } from '../sim/rpg/storyQuests';
 import type { StoryState } from '../sim/rpg/story';
 
@@ -105,9 +105,13 @@ function questSlotHTML(caddyId: string, story: StoryState): string {
   }
   // has a quest, but not yet available (chapter too early, or another quest is active)
   if (story.activeQuestId) return '';
-  // GS-story-quest-beat: recruited + chapter-ready, but holding a beat until you've played on elsewhere.
+  // GS-story-caddy-rep / GS-story-quest-beat: recruited + chapter-ready, but holding a beat. The FIRST thing
+  // an ally waits for is to carry the bag together (reputation); after that it's the "play on elsewhere" beat.
   if (questBeatPending(story, caddyId)) {
-    return `<div class="gs-crew-quest gs-crew-quest--soon">🗺 <b>${q.title}</b> — give it a beat. Play on, and they’ll have a quest for you when you’re back aboard.</div>`;
+    const msg = caddiedWith(story, caddyId)
+      ? 'give it a beat. Play on, and they’ll have a quest for you when you’re back aboard.'
+      : 'put them on the bag for a round first — carry the bag together, and they’ll open up with a quest.';
+    return `<div class="gs-crew-quest gs-crew-quest--soon">🗺 <b>${q.title}</b> — ${msg}</div>`;
   }
   return `<div class="gs-crew-quest gs-crew-quest--soon">🗺 <b>${q.title}</b> — they’ll have something for you deeper into the journey.</div>`;
 }

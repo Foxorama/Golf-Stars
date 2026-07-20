@@ -23,7 +23,7 @@ import { DEFAULT_CHARACTER_ID } from './characters';
 import { DEFAULT_SHIP_ID } from './ships';
 
 /** Current Story-Mode save version. Bump + add a `migrateStory` step when persisting a new field. */
-export const STORY_VERSION = 5;
+export const STORY_VERSION = 6;
 
 /** The player's PATH (GS-story-chapters) — chosen at The Choice after Chapter 3. `warden` re-consecrates
  *  and protects (redeem Venoma); `herald` desecrates and serves the Coil (crush your former allies). Absent
@@ -254,6 +254,12 @@ export interface StoryState {
   /** GS-story-quests: ally side quests already completed (their rewards granted). */
   completedQuestIds: string[];
 
+  /** GS-story-caddy-rep: caddies you've completed a Story round with as your ACTIVE caddy — a lightweight
+   *  reputation gate. An ally offers their personal SIDE QUEST only after you've carried the bag with them at
+   *  least once (you build rapport on the course first), so a quest never unlocks the instant you recruit.
+   *  Recorded on every Story-round resolution; empty = you've caddied a full round with nobody yet. */
+  caddiedRoundIds: string[];
+
   /** GS-story-qualifiers: the player's BEST finish (place + field size) in each qualifying event, keyed by
    *  the event's world/course id. Qualifying (top-N) in two of a chapter's events unlocks its Galaxy
    *  Tournament. Empty = nothing qualified yet. */
@@ -282,6 +288,7 @@ export function defaultStoryState(characterId: string = DEFAULT_CHARACTER_ID): S
     seenStoryBeats: {},
     completed: false,
     completedQuestIds: [],
+    caddiedRoundIds: [],
     qualifierResults: {},
   };
 }
@@ -322,6 +329,7 @@ export function migrateStory(raw: unknown): StoryState {
     ...(typeof s.sigil2Partner === 'string' ? { sigil2Partner: s.sigil2Partner } : {}),
     ...(typeof s.activeQuestId === 'string' ? { activeQuestId: s.activeQuestId } : {}),
     completedQuestIds: strList(s.completedQuestIds),
+    caddiedRoundIds: strList(s.caddiedRoundIds),
     qualifierResults: qualifierMap(s.qualifierResults),
   };
 }

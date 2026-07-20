@@ -15,9 +15,18 @@ import { defaultStoryState, resolveStoryClub } from '../src/sim/rpg/story';
 import { staticCourseSpec, regenerateStaticCourse } from '../src/sim/course/staticCourseSpecs';
 
 function withCaddy(caddyId: string, over: Record<string, unknown> = {}) {
-  // A world cleared ELSEWHERE (past the GS-story-quest-beat gate) so the quest is offerable by default;
-  // the beat test overrides clearedWorldIds to exercise the "just recruited" hold.
-  return { ...defaultStoryState('feather-fade'), hiredCaddyIds: [caddyId], chapter: 5, clearedWorldIds: ['standrews-18'], ...over };
+  // A world cleared ELSEWHERE (past the GS-story-quest-beat gate) AND a round carried with this caddy (past
+  // the GS-story-caddy-rep gate) so the quest is offerable by default; the beat/rep tests override those to
+  // exercise the "just recruited" holds.
+  return {
+    ...defaultStoryState('feather-fade'),
+    hiredCaddyIds: [caddyId],
+    activeCaddyId: caddyId,
+    caddiedRoundIds: [caddyId],
+    chapter: 5,
+    clearedWorldIds: ['standrews-18'],
+    ...over,
+  };
 }
 
 describe('Story ally side quests (GS-story-quests)', () => {
@@ -96,6 +105,21 @@ describe('Story ally side quests (GS-story-quests)', () => {
       const c = regenerateStaticCourse({ ...spec, seed: `${spec.seed}:quest`, opts: { ...spec.opts, holes: 9 } });
       expect(c.holes.length, `${world} quest holes`).toBe(9);
     }
+  });
+
+  it('GS-story-caddy-rep: holds the offer until you have carried the bag with this ally at least once', () => {
+    // Recruited + chapter reached + cleared elsewhere, but NEVER caddied a round with Dan → no offer yet.
+    const notYet = withCaddy('driver-dan', { chapter: 3, caddiedRoundIds: [] });
+    expect(questOfferable(notYet, 'driver-dan')).toBe(false);
+    expect(questBeatPending(notYet, 'driver-dan')).toBe(true); // "put them on the bag for a round first"
+    expect(acceptQuest(notYet, 'quest-dan')).toBe(notYet); // can't accept before the reputation round
+    // Carry the bag with Dan for a round → the reputation gate clears and the quest opens.
+    const rapport = { ...notYet, caddiedRoundIds: ['driver-dan'] };
+    expect(questOfferable(rapport, 'driver-dan')).toBe(true);
+    expect(questBeatPending(rapport, 'driver-dan')).toBe(false);
+    // A round carried with a DIFFERENT caddy does not build Dan's reputation.
+    const someoneElse = { ...notYet, caddiedRoundIds: ['sandy-sandsaver'] };
+    expect(questOfferable(someoneElse, 'driver-dan')).toBe(false);
   });
 
   it('GS-story-quest-beat: holds the offer until you have played on elsewhere', () => {

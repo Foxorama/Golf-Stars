@@ -14,7 +14,7 @@
 import { equipStoryClub, NAMED_STORY_CLUBS, type StoryState } from './story';
 import { allyHomeWorld, allyName } from './storyAllies';
 import { factionForCaddy, factionById } from './factions';
-import { storyCaddyHired } from './storyCaddies';
+import { storyCaddyHired, caddiedWith } from './storyCaddies';
 
 /** One ally's side quest (content-as-data). The reward is a themed reward-club id (`club:<set>:<type>`),
  *  resolved through the shared club machinery so it plays + looks like the Voyage reward it is. */
@@ -230,6 +230,9 @@ export function questOfferable(story: StoryState, caddyId: string): boolean {
   if (questDone(story, q.id)) return false;
   if (story.activeQuestId) return false; // one quest at a time
   if (story.chapter < q.minChapter) return false;
+  // GS-story-caddy-rep: an ally opens up about their personal quest only after you've carried the bag with
+  // them at least once — a lightweight REPUTATION gate, so a quest never unlocks the instant you recruit.
+  if (!caddiedWith(story, caddyId)) return false;
   const world = questWorld(q);
   if (!world) return false;
   // GS-story-quest-beat: don't shove the quest at the player the instant they recruit the ally on that
@@ -245,15 +248,17 @@ function clearedElsewhere(story: StoryState, world: string): boolean {
 }
 
 /**
- * The ally is recruited + chapter-ready, but their quest is holding a BEAT until the player has played on
- * elsewhere (GS-story-quest-beat). Distinguishes the "wait a beat" state from "the chapter's too early" so
- * the crew card can say the right thing.
+ * The ally is recruited + chapter-ready, but their quest is holding a BEAT — either you haven't carried the
+ * bag with them yet (GS-story-caddy-rep) or you haven't played on elsewhere (GS-story-quest-beat).
+ * Distinguishes the "wait a beat" state from "the chapter's too early" so the crew card can say the right
+ * thing (put them on the bag for a round, then fly on).
  */
 export function questBeatPending(story: StoryState, caddyId: string): boolean {
   const q = questForCaddy(caddyId);
   if (!q || !storyCaddyHired(story, caddyId) || questDone(story, q.id)) return false;
   if (story.activeQuestId) return false;
   if (story.chapter < q.minChapter) return false;
+  if (!caddiedWith(story, caddyId)) return true; // recruited + ready, but not yet carried a round together
   const world = questWorld(q);
   return !!world && !clearedElsewhere(story, world);
 }
