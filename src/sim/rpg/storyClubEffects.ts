@@ -22,18 +22,11 @@ export interface StoryClubEffect {
 }
 
 export const STORY_CLUB_EFFECTS: Record<string, StoryClubEffect> = {
-  // ── Ally side-quest gifts ──
-  'quest:dan': {
-    label: 'Drives from ANY lie — and a raised distance floor',
-    apply: (m) => ({ ...m, driverAnywhere: true, minCarryBoost: m.minCarryBoost + 0.08 }),
-  },
+  // ── Ally side-quest CLUB gifts (GS-story-reward-variety: the ally quests that reward a club; Dan/Chipinski/
+  //    Mole/Ouros/Ecdysis now give a ship part or gear, whose effect lives in their own catalogue). ──
   'quest:sandy': {
     label: 'No unplayable lie — strong lie relief from anywhere',
     apply: (m) => ({ ...m, lieRelief: Math.max(m.lieRelief ?? 0, 0.5) }),
-  },
-  'quest:chipinski': {
-    label: 'Every chip finds a pulse — big chip-in chance',
-    apply: (m) => ({ ...m, chipInBoost: (m.chipInBoost ?? 0) + 0.2 }),
   },
   'quest:penelope': {
     label: 'Reads honest and long — putt boost + a longer confident read',
@@ -43,12 +36,7 @@ export const STORY_CLUB_EFFECTS: Record<string, StoryClubEffect> = {
     label: 'Flies dead straight — tighter dispersion',
     apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.82, windResist: (m.windResist ?? 0) + 0.15 }),
   },
-  'quest:mole': {
-    label: 'Reads the break through any ground — green read + spin read',
-    apply: (m) => ({ ...m, greenRead: true, spinReadBonus: (m.spinReadBonus ?? 0) + 12, backspinBoost: (m.backspinBoost ?? 0) + 0.06 }),
-  },
-  // ── Coil inner-circle quest gifts (GS-story-herald-quests) — each plays like the Coil agent who gave it,
-  // mirroring their on-the-bag caddy effect (`HERALD_CADDY_EFFECTS`). ──
+  // ── Coil inner-circle CLUB gifts (GS-story-herald-quests) — each plays like the Coil agent who gave it. ──
   'quest:voss': {
     label: 'Drives from ANY lie — and a raised distance floor',
     apply: (m) => ({ ...m, driverAnywhere: true, minCarryBoost: m.minCarryBoost + 0.08 }),
@@ -56,14 +44,6 @@ export const STORY_CLUB_EFFECTS: Record<string, StoryClubEffect> = {
   'quest:venoma': {
     label: 'Strikes dead straight — tighter dispersion + wind resistance',
     apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.82, windResist: (m.windResist ?? 0) + 0.15 }),
-  },
-  'quest:ouros': {
-    label: 'Hums the true break — putt boost + a longer confident read',
-    apply: (m) => ({ ...m, puttBoost: m.puttBoost + 0.22, puttReadBonus: (m.puttReadBonus ?? 0) + 12, greenRead: true }),
-  },
-  'quest:ecdysis': {
-    label: 'No lie can hold it — strong lie relief from anywhere',
-    apply: (m) => ({ ...m, lieRelief: Math.max(m.lieRelief ?? 0, 0.5) }),
   },
   // ── Galaxy-Tournament (major) prize clubs ──
   'major:emerald': {

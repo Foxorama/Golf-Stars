@@ -24,8 +24,8 @@ import { worldCaddy, storyCaddyHired, activeStoryCaddy, STORY_CADDY_PRICE } from
 import { shopItem } from '../sim/rpg/economy';
 import { staticCourseSpec } from '../sim/course/staticCourses';
 import { allyInspectOverlayHTML } from '../render/storyCrew';
-import { activeQuest, questWorld, questById, questGiverName } from '../sim/rpg/storyQuests';
-import { storyClubEffectLabel } from '../sim/rpg/storyClubEffects';
+import { activeQuest, questWorld, questById, questGiverName, questRewardEffectLabel } from '../sim/rpg/storyQuests';
+import { rewardKindIcon, rewardKindLabel } from '../sim/rpg/storyRewards';
 import { storyObjective } from '../sim/rpg/storyGuide';
 import { isHeraldAgent } from '../sim/rpg/storyHeraldCrew';
 import { heraldAgentOverlayHTML } from '../render/storyHeraldOverlay';
@@ -246,11 +246,21 @@ function questBannerHTML(story: StoryState): string {
   // dialogue, otherwise unused) before you fly — a story beat, not an instant drop into another round —
   // and it's a shorter NINE-hole round (GS-story-quest-9), not a repeat 18 on the world you just cleared.
   const offer = q.offer.map((l) => `<p style="margin:0 0 6px;color:#e6ddf0;font-size:13px;line-height:1.5;">${l}</p>`).join('');
+  // GS-story-reward-variety: tease the PRIZE on the offer, so the pull to fly out and play is concrete — a
+  // ship part / equipment / club, named, with its "why you want it" line.
+  const effect = questRewardEffectLabel(q);
+  const rewardTeaser = `
+    <div style="margin:0 0 10px;background:#181322;border:1px solid #3a2f4a;border-left:3px solid #a97b25;border-radius:10px;padding:8px 12px;">
+      <div style="font-size:10.5px;font-weight:800;color:#a98adf;letter-spacing:.06em;text-transform:uppercase;">${rewardKindIcon(q.reward)} Reward · ${rewardKindLabel(q.reward)}</div>
+      <div style="font-size:12.5px;font-weight:800;color:#f0c874;margin-top:2px;">${q.rewardName}</div>
+      ${effect ? `<div style="font-size:11.5px;font-weight:700;color:#7fe0a0;margin-top:3px;">✦ ${effect}</div>` : ''}
+    </div>`;
   return `
     <section style="max-width:520px;margin:12px auto 0;">
       <div style="background:linear-gradient(180deg,#1e1630,#140e1e);border:1px solid #5a3f8a;border-radius:12px;padding:14px 16px;">
         <div style="font-size:15px;font-weight:800;color:#d6c2ff;">🗺 ${q.title} — with ${questGiverName(q).split(' ')[0]}</div>
         <div style="margin:8px 0 10px;">${offer}</div>
+        ${rewardTeaser}
         <button class="gs-btn" style="background:linear-gradient(180deg,#2a1e44,#1a1230);border-color:#7a5ab0;color:#e2d4ff;width:100%;text-align:left;padding:11px 14px;"
           data-action='${JSON.stringify({ type: 'playStoryQuest' })}'>
           <div style="font-size:13.5px;font-weight:800;">Fly to ${worldName} and play it together — 9 holes ›</div>
@@ -439,11 +449,12 @@ export function storyResultScreen(): string {
         quest
           ? `${quest.complete.map((l) => `<p style="color:#e6ddf0;">${l}</p>`).join('')}
              <div style="margin:10px auto 0;max-width:460px;background:#181322;border:1px solid #3a2f4a;border-left:3px solid #a97b25;border-radius:10px;padding:10px 14px;text-align:left;">
-               <div style="font-size:13px;font-weight:800;color:#f0c874;">🎁 ${quest.rewardName}</div>
+               <div style="font-size:11px;font-weight:800;color:#a98adf;letter-spacing:.06em;text-transform:uppercase;">${rewardKindIcon(quest.reward)} ${rewardKindLabel(quest.reward)}</div>
+               <div style="font-size:13px;font-weight:800;color:#f0c874;margin-top:2px;">${quest.rewardName}</div>
                <div style="font-size:12.5px;color:#c6bcd6;margin-top:2px;">${quest.rewardBlurb}</div>
                ${
-                 storyClubEffectLabel(quest.rewardClubId)
-                   ? `<div style="font-size:12px;font-weight:700;color:#7fe0a0;margin-top:6px;">✦ Special: ${storyClubEffectLabel(quest.rewardClubId)}</div>`
+                 questRewardEffectLabel(quest)
+                   ? `<div style="font-size:12px;font-weight:700;color:#7fe0a0;margin-top:6px;">✦ Special: ${questRewardEffectLabel(quest)}</div>`
                    : ''
                }
              </div>`

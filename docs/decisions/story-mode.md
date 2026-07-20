@@ -823,6 +823,30 @@ Full design + rationale in `docs/decisions/story-betrayal-arc.md`. Shipped as fo
   distinct `BETRAYAL_VOICE`s.
 - **GS-story-charquests** — ✅ each friend carries a SIGNATURE quest that opens once you partner them in a team
   Sigil; claim their signature club (`charquest:<id>`) on their talk card. No save bump.
+- **GS-story-reward-variety** — ✅ *shipped* (`sim/rpg/storyRewards.ts` + `storyQuests.ts` + `storyGear.ts` +
+  `storyShipUpgrades.ts` + `storyTournaments.ts`). The player ask: quest loot was 100% clubs — "space them
+  out so it's some equipment, spaceship parts etc". A quest reward is now a `StoryReward` union
+  (`{kind:'club'|'gear'|'upgrade'|'ship', id}`) granted through ONE idempotent channel (`grantStoryReward`:
+  club→bag, gear→locker slot, upgrade→fleet, ship→hangar), so a caddy quest hands over whatever fits the
+  friend's story — the gold standard being Suggestible Sam's *Conviction* (the reward IS the character beat),
+  which is **deliberately untouched** as the exemplar. The spread, per giver's story:
+  - **Warden caddy quests:** Dan the old trucker → his rig's salvaged **engine** (`upg:engine:longhaul`, a
+    ship part — Combat Rating + credits); Dr Chipinski the medic → a healing **Phoenix Core Ball** (gear);
+    the Mystic Mole → a green-reading **Dowser's Circlet** (gear); Sandy → her **wedge** (club); Penelope →
+    her **putter** (club); **Sam → Conviction (club, untouched)**.
+  - **Coil (Herald) caddy quests:** Voss → the Apostate's **driver** (club); Venoma → the **Viper's Fang**
+    (club); Brother Ouros → the **Whisperer's Cowl** (gear); Sister Ecdysis the smith → serpent-scale hull
+    **Carapace** (`upg:shield:carapace`, a ship part).
+  - **Majors:** Ch.1–3 clubs · Ch.4 **ships** (warden-cruiser / wyrm-ship, GS-story-route-rewards) · the two
+    Ch.5 climax majors — which used to grant NOTHING tangible — now forge a capital **ship part** each
+    (`upg:weapon:starlance` / `upg:weapon:wyrmfang`, `rewardUpgradeId`), so the fifth Sigil literally forges
+    a weapon for the finale space battle. A `reward`-acquire ship upgrade is revealed only once owned + never
+    racked (the reward-ship pattern); reward gear is priced but kept out of every shop rack. Quest offer +
+    recap cards tease the reward's kind + effect, so seeking out an NPC is a concrete, finale-relevant pull.
+    The five converted quests' old `quest:<key>` CLUB rows were retired from `NAMED_STORY_CLUBS`/
+    `STORY_CLUB_EFFECTS`; `heraldQuestHook` now reads the first completed Warden quest whose reward is still a
+    club (the "you still swing the club she gave you" betrayal beat). Guarded by the story-quests/
+    club-effects/ships/ship-upgrades/flow suites. No save bump (all ids ride existing owned-lists).
 - **GS-story-betrayal-polish** — balance re-tune of the new formats + docs (this phase's tail).
 
 All of it holds the constitution: deterministic ghost model (auto ≡ interactive), Story-save only (the one v5

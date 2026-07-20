@@ -892,13 +892,14 @@ describe('Ally side quests (GS-story-quests)', () => {
     expect(done.screen).toBe('storyResult');
     expect(done.lastStoryRound?.questId).toBe('quest-dan');
 
-    // claim → the reward club is owned + equipped, the quest is done, back to the clubhouse
+    // claim → the reward is granted, the quest is done, back to the clubhouse
     const claimed = reduce(done, { type: 'completeStoryQuest' });
     expect(claimed.screen).toBe('story');
     expect(claimed.story?.completedQuestIds).toContain('quest-dan');
     expect(claimed.story?.activeQuestId).toBeUndefined();
-    // GS-story-quest-club: the reward is the NAMED ally-gift club (its own name in the bag), not the generic set club
-    expect(claimed.story?.equippedBagIds).toContain('quest:dan');
+    // GS-story-reward-variety: Dan the old trucker gifts his rig's salvaged ENGINE (a ship part), granted
+    // into the fleet, not a club into the bag.
+    expect(claimed.story?.ownedShipUpgradeIds).toContain('upg:engine:longhaul');
   });
 
   it('GS-story-herald-quests: a Coil caddy offers a quest on the dark path, accepted + teed off at its world', () => {

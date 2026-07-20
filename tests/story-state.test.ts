@@ -326,10 +326,12 @@ describe('named quest-reward clubs (GS-story-quest-club)', () => {
     }
   });
 
-  it("Sandy's and Dr Chipinski's rewards are now equal tier (the reported parity bug)", () => {
-    expect(resolveStoryClub('quest:sandy')!.rarity).toBe(resolveStoryClub('quest:chipinski')!.rarity);
+  it("the ally CLUB gifts are all equal tier (the reported parity bug)", () => {
+    // GS-story-reward-variety: Dr Chipinski now gifts a healing BALL (gear), not a club, so parity is
+    // checked across the caddy quests whose reward is still a club (Sandy's wedge vs Penelope's putter).
+    expect(resolveStoryClub('quest:sandy')!.rarity).toBe(resolveStoryClub('quest:penelope')!.rarity);
     expect(resolveStoryClub('quest:sandy')!.name).toBe("Sand-Saver's Second");
-    expect(resolveStoryClub('quest:chipinski')!.name).toBe('The Phoenix Scalpel');
+    expect(resolveStoryClub('quest:penelope')!.name).toBe('The Star-Reader');
   });
 
   it('the Galewarden Irons is a matched SET of three irons (GS-story-quality) — single clubs grant just one', () => {
@@ -341,6 +343,6 @@ describe('named quest-reward clubs (GS-story-quest-club)', () => {
     for (const id of set) expect(resolveStoryClub(id)!.rarity).toBe('legendary');
     // a non-set reward grants only itself
     expect(storyRewardSetIds('major:emerald')).toEqual(['major:emerald']);
-    expect(storyRewardSetIds('quest:dan')).toEqual(['quest:dan']);
+    expect(storyRewardSetIds('quest:sandy')).toEqual(['quest:sandy']);
   });
 });

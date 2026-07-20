@@ -38,6 +38,9 @@ export interface StoryGearItem {
   alignment?: StoryAlignment;
   /** The downside line shown on the lore card for a CURSED shedding (power with a price). Absent = clean. */
   curse?: string;
+  /** GS-story-reward-variety: `reward` = GRANTED by an ally quest, never stocked in a shop. Absent = an
+   *  ordinary purchasable item. (Kept out of `STORY_GEAR_STOCK`, so it's simply never offered for sale.) */
+  acquire?: 'reward';
 }
 
 // The gear catalogue. Effects mirror the Voyage gear economy's proven levers so they're balanced +
@@ -353,6 +356,65 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     ],
     apply: (m) => ({ ...m, lieRelief: Math.max(m.lieRelief ?? 0, 0.5) }),
   },
+
+  // ── REWARD RELICS (GS-story-reward-variety) — never sold, GRANTED by an ally quest. Each is a legendary
+  // piece of EQUIPMENT that embodies the friend who gives it, so a caddy quest hands over kit, not just
+  // another club — the gold-standard "the reward IS the character" (Suggestible Sam's Conviction) applied to
+  // gear. Priced (the lore card shows a value) but kept out of every shop rack, so they only ever arrive as
+  // a gift. `acquire:'reward'`.
+  {
+    id: 'gear:ball:phoenix',
+    slot: 'ball',
+    name: 'The Phoenix Core Ball',
+    rarity: 'legendary',
+    price: 640,
+    acquire: 'reward',
+    blurb: "Dr Chipinski's ball — every chip finds a pulse.",
+    detail: ['Backspin +18% — approaches land soft and hold, and a chip always finds a pulse by the pin.'],
+    lore: [
+      'A ball wound around a mote of the same phoenix-fire Dr Chipinski uses to restart a stopped heart. It ' +
+        'lands, checks, and settles like a patient coming round — never dead, never past the flag. The Doctor ' +
+        'milled a sleeve of them on the sidelines while a golfer’s pulse came back under his hands.',
+      '“It won’t let a ball flatline any more than I will. Doctor’s orders.”',
+    ],
+    apply: (m) => ({ ...m, backspinBoost: (m.backspinBoost ?? 0) + 0.18, chipInBoost: (m.chipInBoost ?? 0) + 0.2 }),
+  },
+  {
+    id: 'gear:hat:dowser',
+    slot: 'hat',
+    name: "The Dowser's Circlet",
+    rarity: 'legendary',
+    price: 720,
+    acquire: 'reward',
+    blurb: "Mystic Mole's band — read the break through any ground.",
+    detail: ['Putt make-window +22% AND a longer confident read — the break reads true, even blind.'],
+    lore: [
+      'A band of mire-iron the Mystic Mole dowsed from the deepest seam of the Hydra Mire, humming faintly ' +
+        'against the temple. Wear it and the break comes up through the ground into your bones, the way it ' +
+        'always did for the Mole — no eyes required. He never surfaced to hand you a club; he handed you his ' +
+        'own way of seeing.',
+      '“Trust the soil. Now you carry a little of the deep with you, champion.”',
+    ],
+    apply: (m) => ({ ...m, puttBoost: (m.puttBoost ?? 0) + 0.22, puttReadBonus: (m.puttReadBonus ?? 0) + 12 }),
+  },
+  {
+    id: 'gear:hat:cowl',
+    slot: 'hat',
+    name: "The Whisperer's Cowl",
+    rarity: 'legendary',
+    price: 720,
+    acquire: 'reward',
+    alignment: 'herald',
+    blurb: "Brother Ouros's cowl — the deep whispers the line.",
+    detail: ['Putt make-window +22% AND a longer confident read — the line comes on a whisper, and never lies.'],
+    lore: [
+      'The grey cowl Brother Ouros has worn since before your grandfather ever teed off, threaded with a ' +
+        'listening the Coil calls the Long Rest. Draw the hood up on a green and the deep hums the true break ' +
+        'straight into your ear — read nothing, doubt nothing, hole out on faith. It has never once lied.',
+      '“Let the world choose your line for you. That quiet is the whole of the Long Rest.”',
+    ],
+    apply: (m) => ({ ...m, puttBoost: (m.puttBoost ?? 0) + 0.22, puttReadBonus: (m.puttReadBonus ?? 0) + 12 }),
+  },
 ];
 
 /** Per-world gear stock (content-as-data) — a curated 1–2 items per world, tiered by chapter, so travel
@@ -424,6 +486,16 @@ export function buyStoryGear(story: StoryState, item: StoryGearItem): StoryState
   let next = addCredits(story, -item.price);
   if (!next.ownedGearIds.includes(item.id)) next = { ...next, ownedGearIds: [...next.ownedGearIds, item.id] };
   return { ...next, equippedGear: { ...next.equippedGear, [item.slot]: item.id } };
+}
+
+/** GS-story-reward-variety: GRANT a gear item (pure) — own it AND equip it in its slot, no cost. For a
+ *  `reward` relic handed over by an ally quest. Idempotent on ownership (a replay can't re-grant), and it
+ *  equips into the slot so the gift is felt on the very next round. */
+export function grantStoryGear(story: StoryState, id: string): StoryState {
+  const item = storyGearById(id);
+  if (!item) return story;
+  const ownedGearIds = story.ownedGearIds.includes(id) ? story.ownedGearIds : [...story.ownedGearIds, id];
+  return { ...story, ownedGearIds, equippedGear: { ...story.equippedGear, [item.slot]: id } };
 }
 
 /** Equip an OWNED gear item in its slot (pure, GS-story-locker) — for switching among owned gear in the

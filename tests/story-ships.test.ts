@@ -72,14 +72,20 @@ describe('story ships catalogue (GS-story-ships)', () => {
     for (const r of STORY_SHIPS.filter((r) => r.acquire === 'ace' || r.acquire === 'reward')) {
       expect(allVendorShips.includes(r.shipId), `${r.shipId} not sold`).toBe(false);
     }
-    // Every upgrade is stocked at exactly one vendor (the finale arsenal is fully reachable by travel).
+    // Every SELLABLE upgrade is stocked at exactly one vendor (the finale arsenal is fully reachable by
+    // travel). GS-story-reward-variety: a granted `reward` part (a quest / Ch.5-major prize) is NEVER racked.
     const allVendorUpgrades = vendorWorlds.flatMap((w) => [...SHIP_VENDOR_STOCK[w]!.upgrades]);
-    for (const u of STORY_SHIP_UPGRADES) {
+    const sellableUpgrades = STORY_SHIP_UPGRADES.filter((u) => u.acquire !== 'reward');
+    for (const u of sellableUpgrades) {
       expect(allVendorUpgrades.filter((id) => id === u.id).length, `${u.id} sold once`).toBe(1);
     }
-    // The finale-critical arsenal clears BOTH gates when fully assembled from the vendors.
-    const weaponTotal = STORY_SHIP_UPGRADES.filter((u) => u.category === 'weapon').reduce((s, u) => s + u.battle, 0);
-    const defenceTotal = STORY_SHIP_UPGRADES.filter((u) => u.category !== 'weapon').reduce((s, u) => s + u.battle, 0);
+    for (const u of STORY_SHIP_UPGRADES.filter((u) => u.acquire === 'reward')) {
+      expect(allVendorUpgrades.includes(u.id), `${u.id} not racked`).toBe(false);
+    }
+    // The finale-critical arsenal clears BOTH gates when fully assembled from the VENDORS (reward parts are
+    // a bonus on top, never part of the reachable-by-travel guarantee).
+    const weaponTotal = sellableUpgrades.filter((u) => u.category === 'weapon').reduce((s, u) => s + u.battle, 0);
+    const defenceTotal = sellableUpgrades.filter((u) => u.category !== 'weapon').reduce((s, u) => s + u.battle, 0);
     expect(weaponTotal).toBeGreaterThanOrEqual(FINALE_BREACH_NEED);
     expect(defenceTotal).toBeGreaterThanOrEqual(FINALE_SURVIVE_NEED);
   });

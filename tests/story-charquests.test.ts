@@ -84,10 +84,12 @@ describe('GS-story-charquests — reducer + card', () => {
 
 describe('GS-story-charquests — heraldQuestHook ignores charquest markers', () => {
   it('finds the first CADDY quest even when a charquest marker is earlier in the list', () => {
+    // GS-story-reward-variety: the hook reads the first CLUB-reward Warden quest (Dan now gives a ship
+    // part, so it skips his marker) — Sandy's wedge is a club still swung in the bag.
     const s = base({
       alignment: 'herald',
-      completedQuestIds: ['charquest:longshot-larry', 'quest-dan'],
-      equippedBagIds: ['quest:dan'],
+      completedQuestIds: ['charquest:longshot-larry', 'quest-sandy'],
+      equippedBagIds: ['quest:sandy'],
     });
     const hook = heraldQuestHook(s);
     expect(hook).toBeTruthy();
