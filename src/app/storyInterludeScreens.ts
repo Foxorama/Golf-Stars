@@ -8,7 +8,8 @@
 
 import { state } from './ctx';
 import { golferPreviewSVG } from '../render/apparelArt';
-import { interludeBeat, interludeFriend, type InterludeSpeaker } from '../sim/rpg/storyInterlude';
+import { interludeBeat, interludeScene, interludeFriend, type InterludeSpeaker } from '../sim/rpg/storyInterlude';
+import { corruptedLookOpts, COIL_FIGURE_TINT } from '../sim/rpg/storyBetrayal';
 
 const SPEAKER: Record<InterludeSpeaker, { label: (friend: string, you: string) => string; col: string }> = {
   friend: { label: (f) => f, col: '#7fd8ff' },
@@ -27,21 +28,18 @@ export function storyInterludeScreen(): string {
       </div>`;
   }
   const beat = interludeBeat(story.alignment);
+  const scene = interludeScene(story);
   const friend = interludeFriend(story);
   const you = 'You';
-  const portrait = golferPreviewSVG(undefined, undefined, undefined, {
-    skin: friend.style.skin,
-    shirtBase: friend.style.shirt,
-    capColor: friend.style.cap,
-    hair: friend.style.hair,
-    uid: `inter${friend.id.replace(/[^a-z0-9]/gi, '')}`,
-    w: 120,
-    h: 210,
-  });
+  // GS-story-betrayal-warden: on the Warden defection the betrayer's portrait is drawn in corrupted Coil
+  // garb (shed-scale + venom tint); on the Herald severing the friend stays a clean Warden.
+  const look = scene.corrupt
+    ? { ...corruptedLookOpts(friend), uid: `inter${friend.id.replace(/[^a-z0-9]/gi, '')}`, w: 120, h: 210 }
+    : { skin: friend.style.skin, shirtBase: friend.style.shirt, capColor: friend.style.cap, hair: friend.style.hair, uid: `inter${friend.id.replace(/[^a-z0-9]/gi, '')}`, w: 120, h: 210 };
+  const portrait = golferPreviewSVG(undefined, undefined, undefined, look);
   const herald = story.alignment === 'herald';
   const accent = herald ? '#b060c0' : '#54c8ff';
-  const dialogue = beat
-    .lines(friend.name)
+  const dialogue = scene.lines
     .map((l) => {
       const sp = SPEAKER[l.who];
       const stage = l.who === 'you' && l.text.startsWith('(');
@@ -58,12 +56,12 @@ export function storyInterludeScreen(): string {
       <p class="gs-hero-tag">${beat.kicker}</p>
     </header>
     <section class="gs-inter-wrap" style="--ac:${accent};">
-      <div class="gs-inter-portrait" aria-hidden="true">${portrait}</div>
+      <div class="gs-inter-portrait" aria-hidden="true"${scene.corrupt ? ` style="filter:${COIL_FIGURE_TINT};"` : ''}>${portrait}</div>
       <div class="gs-inter-dialogue">${dialogue}</div>
     </section>
-    <p class="gs-inter-outcome" style="--ac:${accent};">${beat.outcome(friend.name)}</p>
+    <p class="gs-inter-outcome" style="--ac:${accent};">${scene.outcome}</p>
     <div style="max-width:420px;margin:16px auto 0;">
-      <button class="gs-btn" data-action='${JSON.stringify({ type: 'storyInterludeContinue' })}'>${herald ? 'Walk away ›' : 'Take them home ›'}</button>
+      <button class="gs-btn" data-action='${JSON.stringify({ type: 'storyInterludeContinue' })}'>${herald ? 'Walk away ›' : 'To the shrine ›'}</button>
     </div>
     <style>
       .gs-inter-wrap{display:flex;gap:16px;max-width:600px;margin:6px auto 0;align-items:flex-start;}
