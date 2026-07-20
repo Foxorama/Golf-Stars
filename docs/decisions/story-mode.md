@@ -745,6 +745,33 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   differentiator for finding where to arm up), 🛒 on any PRO SHOP world — so you can read where to shop
   straight off the chart. All render/data + a reducer guard; no save/rng/`_gs*` hooks.
 
+## Phase J — the deep betrayal arc (GS-story-betrayal)
+The single-protagonist "your three friends are recurring rivals" model was thin. This phase turns the other
+three playable golfers into a real, partnerable CAST whose choices DRIVE the back-half betrayal — huge
+replay value (the arc differs by caddie, quest, chosen partners, alignment, and each character's own voice).
+Full design + rationale in `docs/decisions/story-betrayal-arc.md`. Shipped as focused auto-merged PRs:
+- **GS-story-cast** — ✅ (#508) the 3 friends travel aboard + stand in the clubhouse/lounge, tappable like the
+  Parrot; per-character voices that go warm (Warden) / wary (Herald) after The Choice.
+- **GS-story-team-format** — ✅ (#509) `storyTeams.ts`: a pure, deterministic ghost engine — scramble/best-ball
+  team stroke vs opposing PAIRS + the 2v2 best-ball matchplay resolver, reusing `match.ts`.
+- **GS-story-partners + stableford** — ✅ (#510) **the Sigils get distinct FORMATS**: Sigil 1 = 2-ball SCRAMBLE,
+  Sigil 2 = BEST-BALL (pick a friend partner, opposing pairs include the two you *didn't* pick), Sigil 3 =
+  single STABLEFORD. `StoryState` v5 `sigil1Partner`/`sigil2Partner` lock the picks that decide the betrayer.
+- **GS-story-betrayer + finale** — ✅ (#511) the **odd-one-out** rule (two different partners → the unpicked
+  friend defects; the same partner twice → that trusted friend does), and the Ch.5 Sigil is a **2v2 best-ball
+  MATCHPLAY**: WARDEN = You + a loyal friend vs (the Betrayer, in corrupted Coil garb, + Venoma); HERALD = You +
+  the Coil champion who isn't your guide vs the two friends who partnered you.
+- **GS-story-betrayal-beats** — ✅ (#512) the mid-chapter interlude reworked into the **per-character** betrayal:
+  Warden "The Defection" (the betrayer's own voice, corrupted portrait, sets up the shrine) and Herald "The
+  Severing" (keyed to your first completed caddy quest + whether you still wield its reward club). Four
+  distinct `BETRAYAL_VOICE`s.
+- **GS-story-charquests** — ✅ each friend carries a SIGNATURE quest that opens once you partner them in a team
+  Sigil; claim their signature club (`charquest:<id>`) on their talk card. No save bump.
+- **GS-story-betrayal-polish** — balance re-tune of the new formats + docs (this phase's tail).
+
+All of it holds the constitution: deterministic ghost model (auto ≡ interactive), Story-save only (the one v5
+bump is the partner fields), Voyage/Unending byte-identical (every new lever no-ops by default).
+
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.
 - **"Gather your friends"** — single protagonist (per the design call); the other three golfers are

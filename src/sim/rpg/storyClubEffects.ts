@@ -71,6 +71,23 @@ export const STORY_CLUB_EFFECTS: Record<string, StoryClubEffect> = {
     label: 'A matched Galewarden iron — a little extra control',
     apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.95 }),
   },
+  // ── Friend SIGNATURE clubs (GS-story-charquests) — each plays like the golfer who gave it. ──
+  'charquest:feather-fade': {
+    label: 'Rides the crosswind — tighter dispersion + wind resistance',
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.88, windResist: (m.windResist ?? 0) + 0.2 }),
+  },
+  'charquest:huang-woo-hook': {
+    label: 'A surgeon’s iron — dead straight to the flag',
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.8 }),
+  },
+  'charquest:longshot-larry': {
+    label: 'Sends it low and forever — a raised distance floor',
+    apply: (m) => ({ ...m, minCarryBoost: m.minCarryBoost + 0.1 }),
+  },
+  'charquest:backspin-bo': {
+    label: 'Lands soft and checks — backspin + a longer spin read',
+    apply: (m) => ({ ...m, backspinBoost: (m.backspinBoost ?? 0) + 0.1, spinReadBonus: (m.spinReadBonus ?? 0) + 10 }),
+  },
 };
 
 /** The signature-effect label for a reward club id, or undefined if it has none. */

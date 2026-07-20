@@ -12,10 +12,33 @@
 
 import { golferPreviewSVG } from './apparelArt';
 import { castCharacter, castTagline, castLineAt } from '../sim/rpg/storyCast';
+import { characterQuest, characterQuestOfferable, characterQuestClaimed, partneredCharacter } from '../sim/rpg/characterQuests';
 import type { StoryState } from '../sim/rpg/story';
 
+/** GS-story-charquests: the friend card's quest row — an OFFER to claim their signature club (once you've
+ *  partnered them), a CLAIMED badge, or a "partner me first" nudge. Empty for the protagonist. */
+function charQuestSlotHTML(charId: string, story: StoryState): string {
+  const q = characterQuest(charId);
+  if (!q || charId === story.characterId) return '';
+  if (characterQuestClaimed(story, charId)) {
+    return `<div class="gs-friend-quest gs-friend-quest--done">✓ <b>${q.title}</b> — <span>${q.rewardName} is in your bag.</span></div>`;
+  }
+  if (characterQuestOfferable(story, charId)) {
+    return `<div class="gs-friend-quest">
+      <div class="gs-friend-questtitle">🎁 ${q.title}</div>
+      <div class="gs-friend-questhook">${q.bond[0] ?? q.hook}</div>
+      <button class="gs-btn" style="margin-top:8px;" data-action='${JSON.stringify({ type: 'claimCharacterQuest', charId })}'>Take ${q.rewardName.split('—')[0]!.trim()} ›</button>
+    </div>`;
+  }
+  // has a quest, but you haven't partnered them yet
+  if (!partneredCharacter(story, charId)) {
+    return `<div class="gs-friend-quest gs-friend-quest--soon">🎁 <b>${q.title}</b> — pick ${castCharacter(charId)?.shortName ?? 'them'} as your partner in a team Sigil, and they’ll have something for you.</div>`;
+  }
+  return '';
+}
+
 /** The friend talk card. `talkCount` selects the banter line; the backdrop/✕ closes it. `slot` is optional
- *  extra HTML injected under the speech (the partner-pick / character-quest row later chunks add). */
+ *  extra HTML injected under the speech (e.g. a partner-pick row). The character-quest row is always shown. */
 export function friendInspectOverlayHTML(charId: string, story: StoryState, talkCount: number, slot = ''): string {
   const ch = castCharacter(charId);
   if (!ch) return '';
@@ -45,6 +68,7 @@ export function friendInspectOverlayHTML(charId: string, story: StoryState, talk
           </div>
         </div>
         <div class="gs-friend-speech">${line}</div>
+        ${charQuestSlotHTML(charId, story)}
         ${slot}
         <div class="gs-friend-actions">
           <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'storyAllyTalk', caddyId: charId })}'>💬 Another ›</button>
@@ -76,4 +100,11 @@ const FRIEND_STYLE = `<style>
     font-size:14px;line-height:1.5;color:#e4ecf6;min-height:2.6em;}
   .gs-friend-actions{display:flex;gap:10px;margin-top:14px;}
   .gs-friend-actions .gs-btn{flex:1 1 auto;}
+  .gs-friend-quest{margin:12px 0 0;padding:10px 12px;border-radius:10px;background:#12201a;border:1px solid #2f4a3a;
+    border-left:3px solid #7fe0a0;font-size:12.5px;line-height:1.5;color:#dff3ea;}
+  .gs-friend-questtitle{font-weight:800;color:#9dffce;}
+  .gs-friend-questhook{margin-top:3px;color:#bfe4cf;font-style:italic;}
+  .gs-friend-quest--done{border-left-color:#4fe08a;color:#9dffce;}
+  .gs-friend-quest--done span{color:#9aa8bc;font-style:italic;}
+  .gs-friend-quest--soon{border-left-color:#4a5566;color:#9aa2b4;background:#141926;}
 </style>`;
