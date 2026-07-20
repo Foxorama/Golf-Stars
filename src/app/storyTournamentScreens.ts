@@ -9,7 +9,7 @@
 import { state } from './ctx';
 import { getCharacter } from '../sim/rpg/characters';
 import { STORY_CHAPTER_COUNT, type StoryState } from '../sim/rpg/story';
-import { currentTournament, sigilCount, tournamentCompetitors, isTeamTournament, teamPartnerPool, type StoryTournament } from '../sim/rpg/storyTournaments';
+import { currentTournament, sigilCount, tournamentCompetitors, isTeamTournament, isSinglesMatchTournament, isTeamMatchTournament, teamPartnerPool, type StoryTournament } from '../sim/rpg/storyTournaments';
 import { finaleMatchup, corruptedLookOpts, COIL_FIGURE_TINT } from '../sim/rpg/storyBetrayal';
 import { golferPreviewSVG } from '../render/apparelArt';
 import { storyClubEffectLabel } from '../sim/rpg/storyClubEffects';
@@ -20,6 +20,15 @@ import { penelopePortraitSVG } from '../render/caddyPortraits';
 /** The rival's glyph for the field/lobby (a portrait shows when one exists; else this reads them). */
 function rivalGlyph(rivalId: string): string {
   return rivalId === 'venoma' ? '🐍' : rivalId === 'voss' ? '🖤' : rivalId === 'driver-dan' ? '🎒' : rivalId === 'penelope' ? '⛳' : '🏌';
+}
+
+/** The rival's glyph from their DISPLAY NAME (the recap payload carries the name, not the id). */
+function rivalGlyphByName(rivalName: string): string {
+  if (/Venoma|Viper/.test(rivalName)) return '🐍';
+  if (/Voss|Sable/.test(rivalName)) return '🖤';
+  if (/Driver Dan/.test(rivalName)) return '🎒';
+  if (/Penelope/.test(rivalName)) return '⛳';
+  return '🏌';
 }
 
 /** A bespoke portrait bust for the rivals that have one (the cult champions + the two former-ally rivals);
@@ -198,20 +207,33 @@ export function storyTournamentScreen(): string {
     ),
     `<span class="gs-tourn-fc gs-tourn-fc--you">🏌 ${whoShort}</span>`,
   ].join('');
-  const isMatch = t.format === 'bestball-match';
-  const fieldOrPicker = isMatch
+  const isTeamMatch = isTeamMatchTournament(t); // Ch.5 — 2v2 scramble matchplay (the betrayal finale)
+  const isSinglesMatch = isSinglesMatchTournament(t); // Ch.3 — 1v1 singles matchplay vs the rival
+  const rivalFirst = t.rivalName.split(' ')[0];
+  // A singles-match / solo strokeplay major both show the friendly-rival field; the 2v2 shows the matchup
+  // box; a team-stroke major shows the partner picker.
+  const fieldOrPicker = isTeamMatch
     ? finaleMatchupBox(story)
     : team
     ? partnerPickerHTML(t, story)
     : `<div class="gs-tourn-fieldbox gs-tourn-in gs-tourn-in3">
-        <div class="gs-tourn-fieldlabel">The field</div>
+        <div class="gs-tourn-fieldlabel">${isSinglesMatch ? `Singles matchplay · you vs ${rivalFirst}` : 'The field'}</div>
         <div class="gs-tourn-field">${fieldChips}</div>
       </div>`;
-  const teeLabel = isMatch
+  const teeLabel = isTeamMatch
     ? '⛳ Tee off — the match for the last Sigil'
+    : isSinglesMatch
+    ? `⛳ Tee off — the match against ${rivalFirst}`
     : team
     ? `⛳ Tee off with ${partnerName} — play for the Sigil`
     : '⛳ Tee off — play for the Sigil';
+  // The one-line stakes: a matchplay Sigil is won by taking the MATCH; a stroke/team Sigil by beating a round.
+  const stakesLine =
+    isTeamMatch || isSinglesMatch
+      ? `Win the match${isSinglesMatch ? ` against ${rivalFirst}` : ''}, ${who}, and the ${t.sigilName} is yours.`
+      : team
+      ? `Out-play the field with ${partnerName} over 18 holes, ${who}, and the ${t.sigilName} is yours.`
+      : `Beat ${rivalFirst}’s round over 18 holes, ${who}, and the ${t.sigilName} is yours.`;
   return `
     <header class="gs-hero gs-storyhub">
       <h1 class="gs-hero-title gs-tourn-in gs-tourn-in1">🏆 ${t.name}</h1>
@@ -240,7 +262,7 @@ export function storyTournamentScreen(): string {
         const fx = clubFx ?? (upg ? upgradeDetail(upg)[0] : undefined);
         return fx ? ` <span style="color:#7fe0a0;font-weight:700;">✦ ${fx}</span>` : '';
       })()}</div>
-      <div class="gs-tourn-stakes gs-tourn-in gs-tourn-in4">Beat ${t.rivalName.split(' ')[0]}’s round over 18 holes, ${who}, and the ${t.sigilName} is yours.</div>
+      <div class="gs-tourn-stakes gs-tourn-in gs-tourn-in4">${stakesLine}</div>
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:420px;margin:16px auto 0;">
       <button class="gs-btn gs-tourn-in gs-tourn-in5" data-action='${JSON.stringify({ type: 'storyPlayTournament' })}'>${teeLabel}</button>
@@ -302,25 +324,28 @@ export function storyTournamentResultScreen(): string {
         <button class="gs-btn" data-action='${JSON.stringify({ type: 'storyTournamentContinue' })}'>Continue ›</button>
       </div>`;
   }
-  // GS-story-stableford: on the Ch.3 Storm the values are POINTS (higher wins); the margin is the magnitude
-  // either way, with a "points"/"tied" wording for Stableford vs strokes.
   const diff = r.playerGross - r.rivalGross;
   const lead = Math.abs(diff);
-  const margin = diff === 0
-    ? (r.stableford ? 'level, and the tie goes to you' : 'tied, and the tie goes to you')
-    : `by ${lead}${r.stableford ? ' points' : ''}`;
-  // GS-story-betrayer: the Ch.5 finale is a 2v2 best-ball MATCHPLAY — the recap reads the scoreline + teams.
+  const margin = diff === 0 ? 'tied, and the tie goes to you' : `by ${lead}`;
+  // GS-story-sigil-formats: a MATCHPLAY Sigil reads the scoreline. `kind:'singles'` = Ch.3 (you vs the
+  // rival); `kind:'team'` = the Ch.5 2v2 scramble matchplay (you & an ally vs an opposing pair).
   const mp = r.match;
+  const rivalFirst = r.rivalName.split(' ')[0];
+  const oppShort = mp?.oppNames ? mp.oppNames.map((n) => n.split(' ')[0]).join(' & ') : rivalFirst;
   const title = r.won ? (r.finalSigil ? '🗝 The final Sigil!' : `🏅 ${r.sigilName} won!`) : '💔 So close';
   const kicker = mp
-    ? r.won
-      ? `You & ${mp.allyName.split(' ')[0]} took the match ${mp.scoreline} against ${mp.oppNames.map((n) => n.split(' ')[0]).join(' & ')}.${r.finalSigil ? ' The fifth Sigil is yours.' : ' The chapter turns.'}`
-      : `${mp.oppNames.map((n) => n.split(' ')[0]).join(' & ')} took the match ${mp.scoreline}. Regroup and challenge again.`
+    ? mp.kind === 'team'
+      ? r.won
+        ? `You & ${(mp.allyName ?? '').split(' ')[0]} took the match ${mp.scoreline} against ${oppShort}.${r.finalSigil ? ' The fifth Sigil is yours.' : ' The chapter turns.'}`
+        : `${oppShort} took the match ${mp.scoreline}. Regroup and challenge again.`
+      : r.won
+        ? `You took the match ${mp.scoreline} against ${rivalFirst}. The chapter turns.`
+        : `${rivalFirst} took the match ${mp.scoreline}. Regroup and challenge again.`
     : r.won
       ? r.finalSigil
         ? 'All five Sigils are yours — they forge the key to the serpent’s root.'
-        : `You beat ${r.rivalName.split(' ')[0]} ${margin}. The chapter turns.`
-      : `${r.rivalName.split(' ')[0]} edged you ${margin}. Regroup and challenge again.`;
+        : `You beat ${rivalFirst} ${margin}. The chapter turns.`
+      : `${rivalFirst} edged you ${margin}. Regroup and challenge again.`;
   const body = r.won
     ? r.finalSigil
       ? `<p>The Sigils rise and lock together into a single burning key. Somewhere far below Yggdrasil, something vast stirs — and now you can reach it.</p>
@@ -337,9 +362,12 @@ export function storyTournamentResultScreen(): string {
       <div class="gs-hero-chips">
         <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-ink);font-size:14px;">${r.name}</span>
         ${mp
-          ? `<span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:14px;" title="the 2v2 best-ball matchplay result">🏌 You &amp; ${mp.allyName.split(' ')[0]} — ${mp.scoreline}</span>
-             <span class="gs-chip" style="border-color:#5a2f56;color:#e6a6d6;font-size:13px;" title="the opposing pair">🐍 ${mp.oppNames.map((n) => n.split(' ')[0]).join(' & ')}</span>`
-          : `<span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:14px;" title="${r.stableford ? 'your Stableford points vs the rival (higher wins)' : r.team ? 'your team vs the leading pair' : 'your gross vs the rival'}">${r.team ? 'Team' : 'You'} ${r.playerGross} · ${r.rivalName.split(' ')[0]} ${r.rivalGross}${r.stableford ? ' pts' : ''}</span>
+          ? mp.kind === 'team'
+            ? `<span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:14px;" title="the 2v2 scramble matchplay result">🏌 You &amp; ${(mp.allyName ?? '').split(' ')[0]} — ${mp.scoreline}</span>
+               <span class="gs-chip" style="border-color:#5a2f56;color:#e6a6d6;font-size:13px;" title="the opposing pair">${r.chapter >= 3 ? '🐍' : '🤝'} ${oppShort}</span>`
+            : `<span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:14px;" title="the singles matchplay result">🏌 You — ${mp.scoreline}</span>
+               <span class="gs-chip" style="border-color:#5a2f56;color:#e6a6d6;font-size:13px;" title="your rival">${rivalGlyphByName(r.rivalName)} ${rivalFirst}</span>`
+          : `<span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:14px;" title="${r.team ? 'your team vs the leading pair' : 'your gross vs the rival'}">${r.team ? 'Team' : 'You'} ${r.playerGross} · ${rivalFirst} ${r.rivalGross}</span>
              ${r.team ? `<span class="gs-chip" style="border-color:#2f6a44;color:#9dffce;font-size:13px;" title="your partner for this Sigil">🤝 You &amp; ${r.team.partnerName} · ${r.team.format}${r.team.partnerCountedHoles > 0 ? ` · their ball counted on ${r.team.partnerCountedHoles}` : ''}</span>` : ''}`}
       </div>
     </header>
@@ -365,13 +393,16 @@ export function storyTournamentResultScreen(): string {
 function scoreboardHTML(r: NonNullable<typeof state.lastStoryTournament>): string {
   const board = r.leaderboard;
   if (!board || board.length === 0) return '';
-  const sf = r.stableford === true; // GS-story-stableford: gross values are POINTS (higher wins), no to-par
   const par = r.par ?? 0;
+  // GS-story-sigil-icons: the serpent 🐍 glyph is a CULT tell — it only reads for the deep-game villains, so
+  // it's gated to Chapter 3+. Early team majors (Ch.1/2), whose "opposing pairs" are mostly friends + randos
+  // marked `kind:'rival'` for the field, show a neutral 🚩 opponent flag instead of a snake for everyone.
+  const rivalGlyph = r.chapter >= 3 ? '🐍' : '🚩';
   const rows = board
     .map((g, i) => {
-      const toPar = !sf && par ? g.gross - par : undefined;
+      const toPar = par ? g.gross - par : undefined;
       const toParStr = toPar === undefined ? '' : toPar === 0 ? 'E' : toPar > 0 ? `+${toPar}` : `${toPar}`;
-      const glyph = g.kind === 'rival' ? '🐍' : g.kind === 'player' ? '🏌' : '🤝';
+      const glyph = g.kind === 'rival' ? rivalGlyph : g.kind === 'player' ? '🏌' : '🤝';
       return `<tr class="gs-tsb-row${g.kind === 'player' ? ' gs-tsb-row--you' : ''}${g.kind === 'rival' ? ' gs-tsb-row--rival' : ''}">
         <td class="gs-tsb-pos">${i + 1}</td>
         <td class="gs-tsb-name">${glyph} ${g.name}</td>
@@ -384,7 +415,7 @@ function scoreboardHTML(r: NonNullable<typeof state.lastStoryTournament>): strin
     <section style="max-width:520px;margin:14px auto 0;">
       <h2 class="gs-tsb-title">Final leaderboard</h2>
       <table class="gs-tsb">
-        <thead><tr><th></th><th style="text-align:left;">Competitor</th><th>${sf ? '' : 'To par'}</th><th>${sf ? 'Points' : 'Gross'}</th></tr></thead>
+        <thead><tr><th></th><th style="text-align:left;">Competitor</th><th>To par</th><th>Gross</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </section>`;

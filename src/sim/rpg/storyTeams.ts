@@ -11,9 +11,12 @@
  *                            best-of-3 cards per hole (the two members + one "assist" bite).
  *   • Sigil 2 — BEST-BALL  : same field, each golfer plays their own ball, the team keeps the lower hole
  *                            score → best-of-2 cards per hole.
- *   • Sigil 5 — 2v2 BEST-BALL MATCHPLAY : you + an ally vs a pair of opponents, hole-by-hole matchplay
- *                            (each side's best ball, fewer strokes wins the hole) → reuses `match.ts`'s
- *                            `matchState`/`matchScoreline`.
+ *   • Sigil 3 — SINGLES MATCHPLAY : just you vs the rival, hole-by-hole (the lower score takes the hole) →
+ *                            reuses `match.ts`'s `matchState`/`matchScoreline` (`resolveStorySinglesMatch`).
+ *   • Sigil 5 — 2v2 SCRAMBLE MATCHPLAY : you + an ally SHARE a ball vs a pair of opponents sharing theirs,
+ *                            hole-by-hole matchplay (each side's scramble best, fewer strokes wins the hole)
+ *                            → reuses `match.ts`'s `matchState`/`matchScoreline`. Best-ball (best-of-2) is
+ *                            the `format:'bestball'` variant of the same resolver (kept for back-compat).
  *
  * The PLAYER's side folds in their REAL round (the interactive hole strokes) as one card; the partner and
  * every opponent are ghosts. This keeps the tournament an ordinary golf round for the player (no scramble
@@ -170,7 +173,57 @@ export function resolveStoryTeamStroke(
   };
 }
 
-/** The result of the 2v2 best-ball MATCHPLAY finale (Sigil 5). */
+/** The result of a 1v1 SINGLES matchplay major (Sigil 3 — just you vs the rival, hole by hole). */
+export interface StorySinglesMatchResult {
+  playerWon: boolean;
+  halved: boolean;
+  /** Win OR halve — you pass (the campaign's matchplay convention). */
+  playerAdvances: boolean;
+  scoreline: string;
+  holesUp: number;
+  thru: number;
+  state: MatchState;
+  duels: HoleDuel[];
+}
+
+/**
+ * Resolve a 1v1 SINGLES matchplay major (pure, deterministic). Your REAL per-hole strokes vs the rival's
+ * ghost card, hole by hole — the lower score takes the hole, the match closes out the moment it's decided
+ * (up by more than remain). The rival's per-hole stream is the SAME one `rivalTotal`/`rivalTotalThrough`
+ * draw (`golferForm(seed:form)` + `ghostHoleStrokes(seed:i)`), so the halftime standing stays consistent
+ * with the finish. Reuses `match.ts`'s `matchState`/`matchScoreline`.
+ */
+export function resolveStorySinglesMatch(
+  playerHoleStrokes: readonly number[],
+  rivalId: string,
+  rivalEdge: number,
+  seed: string,
+  pars: readonly number[],
+): StorySinglesMatchResult {
+  const form = golferForm(rivalId, `${seed}:form`);
+  const n = Math.min(playerHoleStrokes.length, pars.length);
+  const duels: HoleDuel[] = [];
+  for (let i = 0; i < n; i++) {
+    const par = pars[i]!;
+    const rival = ghostHoleStrokes(rivalId, `${seed}:${i}`, par, form, rivalEdge);
+    const player = playerHoleStrokes[i]!;
+    duels.push({ holeIndex: i, par, playerStrokes: player, bossStrokes: rival, winner: duelWinner(player, rival) });
+    if (matchState(duels, pars.length).decided) break;
+  }
+  const state = matchState(duels, pars.length);
+  return {
+    playerWon: state.playerWon,
+    halved: state.halved,
+    playerAdvances: state.playerAdvances,
+    scoreline: matchScoreline(state),
+    holesUp: state.holesUp,
+    thru: state.thru,
+    state,
+    duels,
+  };
+}
+
+/** The result of the 2v2 MATCHPLAY finale (Sigil 5 — scramble; or best-ball for back-compat). */
 export interface StoryMatchResult {
   playerWon: boolean;
   halved: boolean;
@@ -184,9 +237,11 @@ export interface StoryMatchResult {
 }
 
 /**
- * Resolve the 2v2 best-ball MATCHPLAY finale (pure, deterministic). Your side = your real round best-balled
- * with an ally ghost; the opposing side = two opponent ghosts best-balled. Fewer TEAM strokes wins the hole;
- * the match closes out the moment it's decided (up by more than remain). Reuses `match.ts`'s `matchState`.
+ * Resolve the 2v2 MATCHPLAY finale (pure, deterministic). Your side = your real round teamed with an ally
+ * ghost; the opposing side = two opponent ghosts. `format` sets how each side's team hole score is taken:
+ * `scramble` (Sigil 5 — the two share a ball, best of three bites incl. an "assist") or `bestball` (best of
+ * two). Fewer TEAM strokes wins the hole; the match closes out the moment it's decided (up by more than
+ * remain). Reuses `match.ts`'s `matchState`. Default `bestball` keeps the pre-scramble callers byte-identical.
  */
 export function resolveStory2v2Match(
   playerHoleStrokes: readonly number[],
@@ -196,6 +251,7 @@ export function resolveStory2v2Match(
   oppEdge: number,
   seed: string,
   pars: readonly number[],
+  format: StoryTeamFormat = 'bestball',
 ): StoryMatchResult {
   const allyForm = golferForm(allyId, `${seed}:ally:${allyId}`);
   const oppForm0 = golferForm(oppIds[0], `${seed}:opp:${oppIds[0]}`);
@@ -204,14 +260,19 @@ export function resolveStory2v2Match(
   const duels: HoleDuel[] = [];
   for (let i = 0; i < n; i++) {
     const par = pars[i]!;
-    const playerTeam = Math.min(
-      playerHoleStrokes[i]!,
-      ghostCard(allyId, `${seed}:ally`, i, par, allyEdge, allyForm),
-    );
-    const oppTeam = Math.min(
+    // Your team: your real strokes + the ally ghost (+ a scramble "assist" bite off the ally). The opposing
+    // team: the two opponent ghosts (+ a scramble assist off the first). teamHoleScore = the best of them.
+    const playerCards = [playerHoleStrokes[i]!, ghostCard(allyId, `${seed}:ally`, i, par, allyEdge, allyForm)];
+    const oppCards = [
       ghostCard(oppIds[0], `${seed}:opp`, i, par, oppEdge, oppForm0),
       ghostCard(oppIds[1], `${seed}:opp`, i, par, oppEdge, oppForm1),
-    );
+    ];
+    if (format === 'scramble') {
+      playerCards.push(ghostCard(allyId, `${seed}:ally`, i, par, allyEdge, allyForm, 'assist:'));
+      oppCards.push(ghostCard(oppIds[0], `${seed}:opp`, i, par, oppEdge, oppForm0, 'assist:'));
+    }
+    const playerTeam = teamHoleScore(playerCards);
+    const oppTeam = teamHoleScore(oppCards);
     duels.push({ holeIndex: i, par, playerStrokes: playerTeam, bossStrokes: oppTeam, winner: duelWinner(playerTeam, oppTeam) });
     if (matchState(duels, pars.length).decided) break;
   }

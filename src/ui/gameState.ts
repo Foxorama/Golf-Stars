@@ -299,13 +299,19 @@ export interface UiState {
     /** GS-story-partners: on a TEAM Sigil (Scramble/Best-ball), the partner + format for the recap copy —
      *  "You & Feather · scramble" and how many holes the partner's ball counted. Absent = a solo major. */
     team?: { partnerName: string; format: 'scramble' | 'bestball'; playerSolo: number; partnerCountedHoles: number };
-    /** GS-story-stableford: the Ch.3 Storm Championship is STABLEFORD — `playerGross`/`rivalGross` are
-     *  POINTS (higher wins), and the recap/scoreboard read them as points, not strokes. Absent = strokes. */
-    stableford?: boolean;
-    /** GS-story-betrayer: the Ch.5 finale is a 2v2 best-ball MATCHPLAY — the recap reads the scoreline +
-     *  the two teams (You & <ally> vs <betrayer/friends> & <champion>), not a stroke total. Absent = not
-     *  a matchplay major. */
-    match?: { scoreline: string; allyName: string; oppNames: [string, string]; thru: number; holesUp: number; herald: boolean };
+    /** GS-story-sigil-formats: a MATCHPLAY Sigil — the recap reads the scoreline, not a stroke total.
+     *  `kind:'singles'` = Ch.3 (just you vs the rival); `kind:'team'` = the Ch.5 2v2 scramble matchplay
+     *  (You & <ally> vs <betrayer/friends> & <champion>). Absent = a stroke/team-stroke major. */
+    match?: {
+      kind: 'singles' | 'team';
+      scoreline: string;
+      thru: number;
+      holesUp: number;
+      /** team (Ch.5) only: your partner + the opposing pair + path. */
+      allyName?: string;
+      oppNames?: [string, string];
+      herald?: boolean;
+    };
   };
   /** GS-story-tournament-midpop: the halftime (after hole 9) rival pop payload — the rival BRAGS when
    *  ahead / CURSES you when behind, over the standings through nine. Transient (the `storyTournamentPop`

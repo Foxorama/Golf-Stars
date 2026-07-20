@@ -16,7 +16,6 @@
  */
 
 import { ghostHoleStrokes, golferForm } from './competition';
-import { stablefordPoints } from '../score';
 import { CHARACTERS, getCharacter } from './characters';
 import { otherGolferIds } from './storyCast';
 import type { OpposingPair } from './storyTeams';
@@ -31,11 +30,11 @@ import {
 } from './story';
 import { qualifierEventsForChapter, qualifiedCount, QUALIFY_EVENTS_NEEDED } from './storyQualifiers';
 
-/** The FORMAT a Sigil is played in (GS-story-team-format). Absent/`strokeplay` = the classic ghost
- *  stroke-play major (byte-identical to before the betrayal rework). The team + Stableford + matchplay
- *  variants are the betrayal arc's distinct Sigils (Scramble → Best-ball → Stableford → strokeplay →
- *  2v2 best-ball matchplay). Resolution branches on this in `resolveStoryTournament`. */
-export type StoryTournamentFormat = 'strokeplay' | 'scramble' | 'bestball' | 'stableford' | 'bestball-match';
+/** The FORMAT a Sigil is played in (GS-story-team-format / GS-story-sigil-formats). Absent/`strokeplay` =
+ *  the classic ghost stroke-play major. The five Sigils are DISTINCT formats, in chapter order:
+ *  Scramble → Best-ball → Singles matchplay → (singles) Strokeplay → 2v2 Scramble matchplay. Resolution
+ *  branches on this in `resolveStoryTournament`. */
+export type StoryTournamentFormat = 'strokeplay' | 'scramble' | 'bestball' | 'matchplay' | 'scramble-match';
 
 /** A chapter's Galaxy Tournament (content-as-data). */
 export interface StoryTournament {
@@ -131,7 +130,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
   },
   {
     chapter: 3,
-    format: 'stableford',
+    format: 'matchplay',
     venueId: 'tempest-18',
     name: 'The Storm Championship',
     host: 'A shadow tournament — the Coil',
@@ -149,8 +148,9 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
       'The tour "postponed" it; the Coil runs a shadow tournament in the eye of the Dragon’s storm, and ' +
         'you crash it to take the Sigil before they can corrupt it. The rough itself seems to move.',
       'And he is here — the Apostate, Malachai Voss, the champion who fell. He will not try to beat you. ' +
-        'He will try to make you understand. It’s STABLEFORD now — points, not strokes: attack every flag, ' +
-        'because a blow-up hole only costs that hole. Out-score him in the gale and the Storm Sigil is yours.',
+        'He will try to make you understand. This one is just the two of you — SINGLES MATCHPLAY, hole by ' +
+        'hole, the lower score takes the hole. Win more holes than he does across the gale and the Storm ' +
+        'Sigil is yours.',
       'Three Sigils, and the Keystone is half-forged — but the sky is already fraying at the edges. When you walk off the eighteenth, the Coil will make you an offer. Win first. Choose after.',
     ],
   },
@@ -204,7 +204,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
   {
     chapter: 5,
     alignment: 'warden',
-    format: 'bestball-match',
+    format: 'scramble-match',
     venueId: 'swamp-18',
     name: 'The Serpent’s Vigil',
     host: 'The Fairway Wardens',
@@ -220,16 +220,16 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
       'The acid shrine of Hydra Mire, where the Coil means to complete their rite — and the friend who ' +
         'turned on you stands with them now, in shed-scale robes, unrecognisable and grinning. Venoma is at ' +
         'their shoulder.',
-      'It’s a 2-vs-2 BEST-BALL MATCHPLAY: you and a loyal friend against the traitor and the Viper, hole by ' +
-        'hole, lowest ball takes it. Win the match and the last Sigil is yours — and you may yet break the ' +
-        'whisper’s hold on the one who fell.',
+      'It’s a 2-vs-2 SCRAMBLE MATCHPLAY: you and a loyal friend SHARE a ball — the best of your every shot — ' +
+        'against the traitor and the Viper sharing theirs, hole by hole, the lower team score takes it. Win ' +
+        'the match and the last Sigil is yours — and you may yet break the whisper’s hold on the one who fell.',
       'Five Sigils forge the Green Key — and above the mire the sky is already cracking. Win here and Ragnarök stops at the door; the key becomes a lock you carry down to the root to seal it forever.',
     ],
   },
   {
     chapter: 5,
     alignment: 'herald',
-    format: 'bestball-match',
+    format: 'scramble-match',
     venueId: 'derelict-18',
     name: 'The Ghost Harvest',
     host: 'The Coil',
@@ -245,8 +245,9 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
       'The Ghost Wreck, where the Coil harvests the dead — and the friends who once played beside you have ' +
         'come together to stop you, heartbroken and unyielding. A Coil champion takes your side; the old ' +
         'bonds line up across the tee.',
-      'It’s a 2-vs-2 BEST-BALL MATCHPLAY: you and a Coil champion against the two friends who trusted you, ' +
-        'hole by hole, lowest ball takes it. Break them and the last Sigil is yours; the rite is complete.',
+      'It’s a 2-vs-2 SCRAMBLE MATCHPLAY: you and a Coil champion SHARE a ball — the best of your every shot — ' +
+        'against the two friends who trusted you sharing theirs, hole by hole, the lower team score takes it. ' +
+        'Break them and the last Sigil is yours; the rite is complete.',
       '🐦‍⬛ "The fifth Sigil, Herald, and the Green Key is yours — not to lock the root, but to OPEN it. Ragnarök has a hand on the door now, and that hand is yours. Take it. Let the tired universe rest."',
     ],
   },
@@ -385,26 +386,14 @@ export function isTeamTournament(t: StoryTournament): boolean {
   return t.format === 'scramble' || t.format === 'bestball';
 }
 
-/** Is this Sigil a single-person STABLEFORD (Ch.3 — points, higher wins; attack every flag)? */
-export function isStablefordTournament(t: StoryTournament): boolean {
-  return t.format === 'stableford';
+/** Is this Sigil a 1v1 SINGLES MATCHPLAY (Ch.3 — just you vs the rival, hole by hole, lower score wins)? */
+export function isSinglesMatchTournament(t: StoryTournament): boolean {
+  return t.format === 'matchplay';
 }
 
-/** The rival's ghost STABLEFORD points over the venue (GS-story-stableford): the SAME deterministic strokes
- *  stream as `rivalTotal` (so difficulty tracks `rivalEdge`), converted per hole to Stableford points —
- *  higher is better. Used by the Ch.3 Storm Championship resolution + the halftime standing. */
-export function rivalStablefordThrough(t: StoryTournament, seed: string, pars: readonly number[], upto: number): number {
-  const form = golferForm(t.rivalId, `${seed}:form`);
-  const n = Math.max(0, Math.min(pars.length, upto));
-  let pts = 0;
-  for (let i = 0; i < n; i++) {
-    const strokes = ghostHoleStrokes(t.rivalId, `${seed}:${i}`, pars[i]!, form, t.rivalEdge);
-    pts += stablefordPoints(pars[i]!, strokes);
-  }
-  return pts;
-}
-export function rivalStablefordTotal(t: StoryTournament, seed: string, pars: readonly number[]): number {
-  return rivalStablefordThrough(t, seed, pars, pars.length);
+/** Is this Sigil a 2v2 SCRAMBLE MATCHPLAY (Ch.5 finale — you + an ally share a ball vs an opposing pair)? */
+export function isTeamMatchTournament(t: StoryTournament): boolean {
+  return t.format === 'scramble-match';
 }
 
 /** The partners you may pick for a team Sigil — your three friend golfers (id + short name). */
@@ -478,30 +467,6 @@ export function tournamentLeaderboard(
 ): FieldGolfer[] {
   const rows: FieldGolfer[] = [...field, { id: '__player__', name: playerName, gross: playerGross, kind: 'player' }];
   return rows.sort((a, b) => a.gross - b.gross || (a.kind === 'player' ? -1 : b.kind === 'player' ? 1 : 0));
-}
-
-/** GS-story-stableford: the Ch.3 Storm Championship's finished POINTS leaderboard (higher wins) — you, the
- *  rival, and your three friends, each on their Stableford points, sorted HIGH→low (you break ties). */
-export function stablefordLeaderboard(
-  t: StoryTournament,
-  seed: string,
-  pars: readonly number[],
-  protagonistId: string,
-  playerName: string,
-  playerPts: number,
-): { name: string; gross: number; kind: 'rival' | 'friend' | 'player' }[] {
-  const rows: { name: string; gross: number; kind: 'rival' | 'friend' | 'player' }[] = [
-    { name: playerName, gross: playerPts, kind: 'player' },
-    { name: t.rivalName, gross: rivalStablefordTotal(t, seed, pars), kind: 'rival' },
-  ];
-  for (const c of CHARACTERS) {
-    if (c.id === protagonistId || c.id === t.rivalId) continue;
-    const form = golferForm(c.id, `${seed}:friend:${c.id}`);
-    let pts = 0;
-    for (let i = 0; i < pars.length; i++) pts += stablefordPoints(pars[i]!, ghostHoleStrokes(c.id, `${seed}:friend:${c.id}:${i}`, pars[i]!, form, FRIEND_FIELD_EDGE));
-    rows.push({ name: c.shortName, gross: pts, kind: 'friend' });
-  }
-  return rows.sort((a, b) => b.gross - a.gross || (a.kind === 'player' ? -1 : b.kind === 'player' ? 1 : 0));
 }
 
 /**

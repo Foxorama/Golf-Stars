@@ -1,8 +1,8 @@
 /**
- * GS-story-betrayer — the Ch.5 2v2 best-ball MATCHPLAY finale: the MECHANISM (teams derived from the
- * partner picks + path, resolved through the reducer) and the BALANCE (seed-robust win rates — a strong
- * round wins the match, a blow-up doesn't, and the ally can't carry you). Balance is measured statistically
- * (the opponents play best-ball, so a single seed is noisy — mirrors story-balance.test.ts).
+ * GS-story-sigil-formats / GS-story-betrayer — the Ch.5 2v2 SCRAMBLE MATCHPLAY finale: the MECHANISM (teams
+ * derived from the partner picks + path, resolved through the reducer, both sides scramble) and the BALANCE
+ * (seed-robust win rates — a strong round wins the match, a blow-up doesn't reliably). Balance is measured
+ * statistically (both sides scramble, so a single seed is noisy — mirrors story-balance.test.ts).
  */
 import { describe, it, expect } from 'vitest';
 import { tournamentForChapter } from '../src/sim/rpg/storyTournaments';
@@ -13,9 +13,9 @@ import { resolveStoryTournament } from '../src/ui/gameUpdates';
 import { buildStaticCourse } from '../src/sim/course/staticCourses';
 import type { PlayedHole } from '../src/sim/round';
 
-// The finale edges the reducer uses (kept in sync with resolveStoryTournament's bestball-match branch).
+// The finale edges the reducer uses (kept in sync with resolveStoryTournament's scramble-match branch).
 const ALLY_EDGE = -0.1;
-const OPP_EDGE = 0.24 * 0.5; // t.rivalEdge (0.24 at Ch.5) × 0.5
+const OPP_EDGE = 0.29 * 0.5; // t.rivalEdge (0.29 at Ch.5) × 0.5
 
 function resolveCh5(alignment: 'warden' | 'herald', delta: number, over: Partial<StoryState> = {}) {
   const t = tournamentForChapter(5, alignment)!;
@@ -28,31 +28,32 @@ function resolveCh5(alignment: 'warden' | 'herald', delta: number, over: Partial
   return resolveStoryTournament(s, round);
 }
 
-/** Win rate of a flat player round (delta/hole) vs the opposing pair, over many seeds. */
+/** Win rate of a flat player round (delta/hole) vs the opposing pair, over many seeds. Both sides scramble. */
 function winRate(delta: number, allyId: string, oppIds: [string, string], allyEdge = ALLY_EDGE): number {
   const pars = Array.from({ length: 18 }, () => 4);
   const round = pars.map((p) => p + delta);
   let wins = 0;
   const N = 60;
   for (let k = 0; k < N; k++) {
-    const r = resolveStory2v2Match(round, allyId, allyEdge, oppIds, OPP_EDGE, `fin-${k}`, pars);
+    const r = resolveStory2v2Match(round, allyId, allyEdge, oppIds, OPP_EDGE, `fin-${k}`, pars, 'scramble');
     if (r.playerAdvances) wins++;
   }
   return wins / N;
 }
 
-describe('GS-story-betrayer — the finale MECHANISM (through the reducer)', () => {
-  it('both Ch.5 Sigils are best-ball matchplay', () => {
-    expect(tournamentForChapter(5, 'warden')!.format).toBe('bestball-match');
-    expect(tournamentForChapter(5, 'herald')!.format).toBe('bestball-match');
+describe('GS-story-sigil-formats — the finale MECHANISM (through the reducer)', () => {
+  it('both Ch.5 Sigils are 2v2 scramble matchplay', () => {
+    expect(tournamentForChapter(5, 'warden')!.format).toBe('scramble-match');
+    expect(tournamentForChapter(5, 'herald')!.format).toBe('scramble-match');
   });
 
   it('WARDEN recap: the opponents are the betrayer + Venoma; you have a loyal ally', () => {
     const r = resolveCh5('warden', -1).lastStoryTournament!;
     expect(r.match).toBeTruthy();
+    expect(r.match!.kind).toBe('team');
     expect(r.match!.herald).toBe(false);
     expect(r.match!.scoreline.length).toBeGreaterThan(0);
-    expect(r.match!.oppNames.join(' ')).toMatch(/Venoma|Viper/);
+    expect(r.match!.oppNames!.join(' ')).toMatch(/Venoma|Viper/);
     expect(r.match!.allyName).toBeTruthy();
   });
 

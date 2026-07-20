@@ -74,11 +74,18 @@ describe('GS-story-team-format — team STROKE majors (Sigils 1 & 2)', () => {
   });
 });
 
-describe('GS-story-team-format — 2v2 best-ball matchplay finale (Sigil 5)', () => {
+describe('GS-story-team-format — 2v2 matchplay finale (Sigil 5 scrambles; best-ball is the back-compat variant)', () => {
   it('is deterministic from the seed', () => {
     const a = resolveStory2v2Match(evenRound, 'feather-fade', 0.05, ['venoma', 'backspin-bo'], 0.2, 'm-1', PARS);
     const b = resolveStory2v2Match(evenRound, 'feather-fade', 0.05, ['venoma', 'backspin-bo'], 0.2, 'm-1', PARS);
     expect(a).toEqual(b);
+  });
+
+  it('a scramble finale is deterministic and reads win-or-halve advances', () => {
+    const a = resolveStory2v2Match(evenRound, 'feather-fade', 0.05, ['venoma', 'backspin-bo'], 0.12, 'm-sc', PARS, 'scramble');
+    const b = resolveStory2v2Match(evenRound, 'feather-fade', 0.05, ['venoma', 'backspin-bo'], 0.12, 'm-sc', PARS, 'scramble');
+    expect(a).toEqual(b);
+    expect(a.playerAdvances).toBe(a.playerWon || a.halved);
   });
 
   it('a birdie-a-hole round beats a modest opposing pair; win-or-halve advances', () => {
