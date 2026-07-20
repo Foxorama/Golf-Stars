@@ -50,6 +50,7 @@ import {
 import { shipCreditMult, grantStoryAceShip, grantStoryShip } from '../sim/rpg/storyShips';
 import { recordCaddyRound } from '../sim/rpg/storyCaddies';
 import { upgradeCreditMult, grantShipUpgrade } from '../sim/rpg/storyShipUpgrades';
+import { storyGearCreditMult } from '../sim/rpg/storyGear';
 import { tournamentForChapter, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS, isStoryQualifier, chapterQualifierEvents, isTeamTournament, isSinglesMatchTournament, isTeamMatchTournament, teamFieldPairs, teamPartnerOrDefault, TEAM_PARTNER_EDGE } from '../sim/rpg/storyTournaments';
 import { resolveStoryTeamStroke, resolveStory2v2Match, resolveStorySinglesMatch, opposingField } from '../sim/rpg/storyTeams';
 import { finaleMatchup } from '../sim/rpg/storyBetrayal';
@@ -378,7 +379,9 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
   const credits = Math.round(
     storyRoundCredits(totals.toPar, { chapter: storyWorldChapter(courseId), revisit }) *
       shipCreditMult(base) *
-      upgradeCreditMult(base),
+      upgradeCreditMult(base) *
+      // GS-story-shop-depth: an equipped ECONOMY (bag-slot) gear item lifts the purse (default 1 → unchanged).
+      storyGearCreditMult(base),
   );
   const { story: cleared, advancedChapter, wasPrologue } = completeStoryRound(
     base,
@@ -589,7 +592,8 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
     Math.round(
       storyRoundCredits(totals.toPar, { chapter: storyWorldChapter(t.venueId) }) *
         shipCreditMult(base) *
-        upgradeCreditMult(base),
+        upgradeCreditMult(base) *
+        storyGearCreditMult(base),
     ) + winBonus;
   let story = recordWorldClear(
     base,

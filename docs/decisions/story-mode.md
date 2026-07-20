@@ -862,6 +862,34 @@ Full design + rationale in `docs/decisions/story-betrayal-arc.md`. Shipped as fo
 All of it holds the constitution: deterministic ghost model (auto ≡ interactive), Story-save only (the one v5
 bump is the partner fields), Voyage/Unending byte-identical (every new lever no-ops by default).
 
+## Phase K — the Pro Shop overhaul (GS-story-shop-depth)
+Player feedback: the per-world Pro Shops were "a total bust" — hardly any non-club items, and the gear that
+existed was "all the same thing for the same slots except better at higher tiers" (a glove that tightens, a
+hat that putts, shoes for lie, a ball that spins — one effect per slot, a straight tier ladder). No distance
+items, no interesting balls/hats, nothing to be excited about; you couldn't see what you had equipped or
+whether an item was an upgrade; the shop couldn't reach the caddy/shipyard at the same world. This phase makes
+each shop a place you're *excited* to reach. Shipped as focused, auto-merged PRs:
+- **GS-story-shop-depth** — ✅ *shipped* (`sim/rpg/storyGear.ts`). The gear catalogue goes DEEP + VARIED,
+  pouring in the Voyage economy's proven, no-op-default `PlayerLoadout` levers so every slot is a real CHOICE
+  of BUILD, not a ladder. Two new build slots: **`shaft`** (the whole distance/power axis — a green min-carry,
+  a blue Graphite Power Shaft / Matched Woods, a purple Blueprint Irons / Speed-Whip overdrive, the legendary
+  Nova bomb) and the long-empty **`bag`** slot repurposed as the **economy** slot (a credit-earning ENGINE:
+  Sponsor's Satchel ×1.15 → Cosmic Sponsor's Bag ×1.6, wired into the world-clear + tournament pay via
+  `storyGearCreditMult`, default 1 → byte-for-byte the old pay). The existing four slots gained VARIETY within
+  the slot: the GLOVE adds a green slice-fixer, a blue sweet-spot, and the legendary POWER GLOVE (pure
+  `overpower` — a different axis from the accuracy ladder); the HAT adds green reading aids, a rangefinder
+  (`clubSuggest`), a spin-line read, and a legendary Seer's Circlet that reads the BREAK for you (`greenRead`);
+  the BALL adds a green DISTANCE ball, a blue wind-cheater (`windResist`), and the HAZARD-SKIP balls
+  (`hazardImmune` — a Floater at the ocean, a Magma-Skimmer at the fire-worlds, a Void-Walker at the abyss).
+  `STORY_GEAR_STOCK` re-themed world-by-world: green/blue staples from stop one, purple upgrades mid-campaign,
+  fun legendaries deep in, each rack leaning into its world's identity (the hazard balls at their own hazard,
+  the wind balls on the gale-worlds) so travel is collection. Every item obeys the item-authoring rule (art via
+  the slot+rarity — the Power Glove draws the NES glove, the rangefinder its scope, hazard balls their water/
+  lava/void tint; a mechanical detail; bespoke lore). Save shape unchanged (new slots are additive to
+  `equippedGear`'s partial record; no `STORY_VERSION` bump). Guarded by the deep-catalogue coverage in
+  `tests/story-shop.test.ts` (every purchasable item is stocked; six slots + a green→legendary ladder; the
+  distance/power/hazard levers fold; the economy multiplier). Voyage/Unending untouched (Story-only fold).
+
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.
 - **"Gather your friends"** — single protagonist (per the design call); the other three golfers are

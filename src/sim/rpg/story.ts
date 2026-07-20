@@ -189,9 +189,11 @@ export const DEFAULT_STORY_BAG: readonly string[] = [
  *  already carry UPGRADES it in place (no size cost); a NEW type appends until the bag is full. */
 export const MAX_STORY_BAG = 14;
 
-/** Effect-bearing equipment slots (GS-story-gear): one item per slot, each folds a `PlayerLoadout` field. */
-export type GearSlot = 'glove' | 'hat' | 'shoes' | 'ball' | 'bag';
-export const GEAR_SLOTS: readonly GearSlot[] = ['glove', 'hat', 'shoes', 'ball', 'bag'];
+/** Effect-bearing equipment slots (GS-story-gear): one item per slot, each folds a `PlayerLoadout` field.
+ *  GS-story-shop-depth added `shaft` (distance/power) — a sixth build slot so the deep Pro Shop has a home
+ *  for the distance/carry gear; the long-empty `bag` slot became the ECONOMY slot (credit-earning gear). */
+export type GearSlot = 'glove' | 'hat' | 'shoes' | 'ball' | 'shaft' | 'bag';
+export const GEAR_SLOTS: readonly GearSlot[] = ['glove', 'hat', 'shoes', 'ball', 'shaft', 'bag'];
 
 /** A per-world best score, for the revisit "play again" chase (records fold into revisit, no global board). */
 export interface StoryWorldBest {
