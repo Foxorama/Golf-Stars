@@ -1899,18 +1899,24 @@ export function forcedCarry(hole: Hole, from: Vec, target: Vec): { carry: number
 /**
  * The club to SUGGEST to an interactive player aiming at the green (GS-mechanics #6). Unlike
  * the auto `aiClub` (shortest club that just reaches — tuned for the headless balance), this
- * reasons about green COVERAGE:
+ * reasons about green COVERAGE *and the pin*:
  *   - green unreachable → the longest usable club (give it your best go);
- *   - green reachable   → the LONGEST club whose EXPECTED carry still lands on the green
- *     (`expectedCarry ≤ distToBack`), so you take the most club you can without flying the
- *     green on a normal strike — overshooting the front is fine, but the typical shot won't
- *     sail the back.
+ *   - reachable, a full club holds the green → the LONGEST club whose EXPECTED carry both REACHES
+ *     THE PIN and still stops by the back edge (`distToPin ≤ expectedCarry ≤ distToBack`), so you
+ *     take the most club you can without flying the green AND never come up short of the flag;
+ *   - too close for any full club to hold the green → the SHORTEST club that can still carry to
+ *     the pin, to be DIALED DOWN to it (a partial pitch — the at-rest power seed scales the shot
+ *     to the pin), rather than the shortest club in the bag.
  *
  * The earlier rule gated on `carryLow ≤ distToFront` (the club's WORST-case carry). That let
  * the driver in for any approach long enough that the driver's worst miss could still come up
- * short of the front — even though the driver's MEAN carry flew 60+ yards past the green. The
- * symptom was "the suggestion keeps handing me the driver": it was clubbing off the minimum
- * carry instead of the expected one. Gating on the expected carry fixes it.
+ * short of the front — the "the suggestion keeps handing me the driver" bug — so it was retuned
+ * to gate on the EXPECTED carry `≤ back`. But that left a near-green failure: with no pin term,
+ * whenever the next club up would fly the back edge the rule fell to the shortest club in the bag
+ * — the 20-yд Chipper — leaving any pin past its range well short (brutal in the sparse Story bag
+ * where the drop below the Sand Wedge is the Chipper). Adding the pin floor fixes both: a club is
+ * never chosen if it can't carry to the flag, and the Chipper is picked only when the pin is
+ * genuinely within its ~20-yд range.
  *
  * Pure; uses the same `shotSpread` the cone draws so the suggestion reads true. Does NOT touch
  * the auto sim.
@@ -1927,6 +1933,7 @@ export function suggestPlayerClub(
   const cand = bag.filter((c) => c.id !== 'putter');
   if (cand.length === 0) return bag[0]!;
   const { front, back } = greenDepth(hole, ball);
+  const distToPin = dist(ball, pinOf(hole));
   const target = hole.green;
   const spreadOf = (c: Club) =>
     shotSpread(hole, ball, lie, target, c, {
@@ -1939,15 +1946,25 @@ export function suggestPlayerClub(
   // Unreachable: even the longest club's best carry can't get to the front → swing the longest.
   if (spreadOf(longest).carryHigh < front) return longest;
 
-  // Reachable: the LONGEST club whose EXPECTED carry still stops on the green (≤ the back edge).
-  // Walk shortest→longest and keep the last qualifier; if even the shortest club's expected carry
-  // flies the back (the ball is right next to the green), fall back to the shortest (a chip).
   const byCarryAsc = [...cand].sort((a, b) => clubDist(a, opts.stats) - clubDist(b, opts.stats));
-  let pick: Club | undefined;
+  const EPS = 1e-6;
+  // The honest approach: the LONGEST club whose EXPECTED carry reaches the PIN yet still stops by the
+  // back edge. Walk shortest→longest, keep the last qualifier — never short of the flag, never over the
+  // back on a normal strike.
+  let onGreen: Club | undefined;
   for (const c of byCarryAsc) {
-    if (spreadOf(c).expectedCarry <= back) pick = c;
+    const ec = spreadOf(c).expectedCarry;
+    if (ec >= distToPin - EPS && ec <= back) onGreen = c;
   }
-  return pick ?? byCarryAsc[0]!;
+  if (onGreen) return onGreen;
+  // Too close for any full club to hold the green (every full carry flies the back): the SHORTEST club
+  // that can still carry to the pin, dialed DOWN to it (a partial pitch). NOT the shortest club in the
+  // bag — that under-clubbed to the Chipper and left mid pins short (the near-green bug).
+  for (const c of byCarryAsc) {
+    if (spreadOf(c).expectedCarry >= distToPin - EPS) return c;
+  }
+  // Nothing reaches the pin (a forced lay-up short) → the longest club, best go.
+  return longest;
 }
 
 /**
