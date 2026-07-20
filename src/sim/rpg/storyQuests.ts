@@ -3,21 +3,26 @@
  * recruitable ally. Once you've recruited a friend AND the campaign has reached their chapter, they offer
  * you a quest in the Clubhouse (on their talk card, GS-story-allies): travel with them to the world that
  * MEANS something to them — Driver Dan's old long-haul rig (the derelict), Sandy's home dunes, the Mole's
- * deep mire — play it, and they hand you a UNIQUE club as thanks (a themed reward club, its own art + carry/
- * putt bonus). The quest is their story: why they left, what they lost, what they'll give to get it back.
+ * deep mire — play it, and they hand you a UNIQUE prize as thanks. GS-story-reward-variety: that prize is
+ * whatever fits the friend's story, not always a club — Dan the old trucker gifts his rig's salvaged ENGINE
+ * (a ship part), the Doctor a healing tour BALL, the Mole/Whisperer a green-reading CIRCLET/COWL, the
+ * Shedmaker serpent-scale hull ARMOUR, the sand-saver still her WEDGE — a real mix of clubs, equipment, and
+ * spaceship parts. The quest is their story: why they left, what they lost, what they'll give to get it back.
  *
  * PURE + DOM-free, content-as-data — a new quest is a ROW, never an engine edit. The quest lifecycle lives
  * on `StoryState` (`activeQuestId` + `completedQuestIds`, save-versioned); this module is the table + the
  * pure transitions (offer → accept → play → complete-with-reward). Screens/round wiring live in app/ui.
  */
 
-import { equipStoryClub, NAMED_STORY_CLUBS, type StoryState, type StoryAlignment } from './story';
+import { NAMED_STORY_CLUBS, type StoryState, type StoryAlignment } from './story';
 import { allyHomeWorld, allyName } from './storyAllies';
 import { factionForCaddy, factionById } from './factions';
 import { storyCaddyHired, caddiedWith } from './storyCaddies';
+import { grantStoryReward, rewardClubId, rewardEffectLabel, type StoryReward } from './storyRewards';
 
-/** One ally's side quest (content-as-data). The reward is a themed reward-club id (`club:<set>:<type>`),
- *  resolved through the shared club machinery so it plays + looks like the Voyage reward it is. */
+/** One ally's side quest (content-as-data). The reward is a `StoryReward` (club / gear / ship part / ship,
+ *  GS-story-reward-variety), granted through the shared reward channel so each plays + looks like the loot
+ *  it is. */
 /** GS-story-betrayal-herald: the FIRST caddy quest you completed + whether you STILL wield its reward club
  *  — the personal thread the Herald Ch.4 betrayal beat pulls on ("you still swing Sandy's Second, the club
  *  she gave you when you were someone she could be proud of"). Undefined if you never finished an ally quest.
@@ -27,19 +32,22 @@ import { storyCaddyHired, caddiedWith } from './storyCaddies';
  *  Ch.4 (GS-story-gather-early — post-Choice), where recruiting is Warden-only and questing is off for a
  *  Herald, so a completed Dan/Mole quest is a Warden-path, post-Choice thing this hook never reads. */
 export function heraldQuestHook(story: StoryState): { caddyName: string; clubName: string; stillUsing: boolean } | undefined {
-  // The first WARDEN caddy quest completed — skip `charquest:` markers AND the Coil (`alignment:'herald'`)
-  // quests (GS-story-herald-quests) that also live in `completedQuestIds`: the Severing beat is about a
-  // friend you BETRAYED, so it only ever reads a Warden ally's quest, never a Coil inner-circle one.
+  // The first WARDEN caddy quest completed whose reward was a bag CLUB (GS-story-reward-variety) — the beat
+  // is "you still swing the club she gave you", so it only ever reads a club-gift quest, skipping the ones
+  // that hand over gear / a ship part (no club to still be swinging). It also skips `charquest:` markers AND
+  // the Coil (`alignment:'herald'`) quests that share `completedQuestIds`: the Severing beat is about a
+  // friend you BETRAYED, so it reads a Warden ally's gift, never a Coil inner-circle one.
   const firstCaddyId = story.completedQuestIds.find((id) =>
-    STORY_QUESTS.some((x) => x.id === id && x.alignment !== 'herald'),
+    STORY_QUESTS.some((x) => x.id === id && x.alignment !== 'herald' && x.reward.kind === 'club'),
   );
   if (!firstCaddyId) return undefined;
   const q = STORY_QUESTS.find((x) => x.id === firstCaddyId);
   if (!q) return undefined;
+  const clubId = rewardClubId(q.reward);
   return {
     caddyName: allyName(q.caddyId),
     clubName: q.rewardName,
-    stillUsing: story.equippedBagIds.includes(q.rewardClubId),
+    stillUsing: !!clubId && story.equippedBagIds.includes(clubId),
   };
 }
 
@@ -64,10 +72,19 @@ export interface StoryQuest {
   offer: readonly string[];
   /** What plays / what's said on the quest round's completion recap, then the reward. */
   complete: readonly string[];
-  /** The reward club id (`club:<set>:<type>`) + a bespoke quest name for it. */
-  rewardClubId: string;
+  /** GS-story-reward-variety: the reward this quest hands over — a club, a piece of gear, a ship part, or a
+   *  ship, whichever fits the friend's story. `rewardName`/`rewardBlurb` are its display; the `reward` tag
+   *  says which system grants it. (A `{kind:'club'}` reward keeps the old ally-gift-club behaviour.) */
+  reward: StoryReward;
   rewardName: string;
   rewardBlurb: string;
+}
+
+/** GS-story-reward-variety: the "why you want it" line for a quest's reward, whatever its kind (the club
+ *  signature effect, a gear detail, a ship-part combat/credit line, a ship's bonus). Used by the recap +
+ *  offer card. */
+export function questRewardEffectLabel(quest: StoryQuest): string | undefined {
+  return rewardEffectLabel(quest.reward);
 }
 
 /**
@@ -90,12 +107,14 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
     ],
     complete: [
       '🎒 "There she is. Rustier than I remember. …We hauled half this galaxy in that hold, the Long Haul and me."',
-      '"Behind the seat, kid — reach in. That’s my old driver. Solar-forged, drove a ball clean across a ring ' +
-        'system once. I want you swinging it now. Somebody oughta. Go save the universe with it."',
+      '"Down in the engine bay, kid — that’s her drive core. Solar-fusion, hauled a full load clean across a ' +
+        'ring system once. Bolt it into your ship. She’s got one more haul left in her, and I want it to be ' +
+        'yours. Go save the universe — and come home riding low on winnings."',
     ],
-    rewardClubId: 'quest:dan',
-    rewardName: NAMED_STORY_CLUBS['quest:dan']!.name,
-    rewardBlurb: 'A solar-forged long-haul driver, drop-hitched from the wreck of the Long Haul. Enormous carry.',
+    reward: { kind: 'upgrade', id: 'upg:engine:longhaul' },
+    rewardName: "The Long Haul's Drive Core",
+    rewardBlurb:
+      "Driver Dan's solar-fusion drive core, pulled from the wreck of his old rig — the fleet's biggest hold-and-earn engine, and Combat Rating toward the finale.",
   },
   {
     id: 'quest-sandy',
@@ -114,7 +133,7 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
       '"Take the wedge, champion. Sand-Saver’s Second — solar-forged, opens like a dream. From now on there’s ' +
         'no such thing as an unplayable lie. Sandy’s orders."',
     ],
-    rewardClubId: 'quest:sandy',
+    reward: { kind: 'club', id: 'quest:sandy' },
     rewardName: NAMED_STORY_CLUBS['quest:sandy']!.name,
     rewardBlurb: 'The wedge that finally beat the buried lie. Escapes anything, from anywhere.',
   },
@@ -132,12 +151,14 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
     ],
     complete: [
       '🎒 "Patient’s stable. Colour’s back. Ha — you rang, I answered, everybody lives. That’s the practice."',
-      '"Here — the Phoenix Scalpel. Solar-forged, precise as a suture. Chip with it and the ball always finds ' +
-        'a pulse near the pin. Doctor’s orders."',
+      '"Here — a sleeve of Phoenix Core balls, milled on the sidelines while I worked. Each one wound around ' +
+        'the same fire I use to restart a heart. Chip with one and it always finds a pulse near the pin — it ' +
+        'won’t let a ball flatline any more than I will. Doctor’s orders."',
     ],
-    rewardClubId: 'quest:chipinski',
-    rewardName: NAMED_STORY_CLUBS['quest:chipinski']!.name,
-    rewardBlurb: 'A surgeon’s pitching wedge, solar-forged for precision. Every chip finds a pulse by the pin.',
+    reward: { kind: 'gear', id: 'gear:ball:phoenix' },
+    rewardName: 'The Phoenix Core Ball',
+    rewardBlurb:
+      "Dr Chipinski's own tour ball, wound around phoenix-fire — it lands soft, holds, and every chip finds a pulse by the pin.",
   },
   {
     id: 'quest-penelope',
@@ -157,7 +178,7 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
       '"The Star-Reader — solar-true, weighted for surrender, not for effort. Every read it gives you is honest. ' +
         'Putt as if the ball has already stopped. It nearly has."',
     ],
-    rewardClubId: 'quest:penelope',
+    reward: { kind: 'club', id: 'quest:penelope' },
     rewardName: NAMED_STORY_CLUBS['quest:penelope']!.name,
     rewardBlurb: 'The Putters’ Guild trial putter — solar-true, weighted for surrender. Reads run honest and long.',
   },
@@ -178,7 +199,7 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
       '"This is Conviction — I forged it myself, on the Links, and I’m not asking if you like it. It’s ' +
         'solar-forged and it’s YOURS and it flies dead straight because for once I was sure. Take it. …You like it?"',
     ],
-    rewardClubId: 'quest:sam',
+    reward: { kind: 'club', id: 'quest:sam' },
     rewardName: NAMED_STORY_CLUBS['quest:sam']!.name,
     rewardBlurb: 'The wood Sam forged the day he finally trusted his own read. Flies dead straight.',
   },
@@ -196,12 +217,13 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
     ],
     complete: [
       '🎒 "You holed it. In the dark, by feel alone, you holed it. Even the serpent paused to listen."',
-      '"From the deepest seam I dug this: the Dowser, a solar iron that hums toward the hole through any ground. ' +
-        'It reads the break with its own bones. Now you carry a little of the deep with you, champion."',
+      '"From the deepest seam I dug this band of mire-iron — the Dowser’s Circlet. Wear it, and the break ' +
+        'comes up through the ground into your bones, the way it always did for me. No eyes required. Now you ' +
+        'carry a little of the deep with you, champion."',
     ],
-    rewardClubId: 'quest:mole',
-    rewardName: NAMED_STORY_CLUBS['quest:mole']!.name,
-    rewardBlurb: 'A solar iron dowsed from beneath the mire — it hums toward the hole through any ground.',
+    reward: { kind: 'gear', id: 'gear:hat:dowser' },
+    rewardName: "The Dowser's Circlet",
+    rewardBlurb: 'A band of mire-iron dowsed from the deep — it reads the break through any ground, straight into your bones.',
   },
   // ── The Coil inner circle (GS-story-herald-quests) — the Herald path's caddy quests. The Coil volunteers
   // have no recruit world, so each names its own thematic Herald world; offerable ONLY on the dark path, and
@@ -226,7 +248,7 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
       '"Take my driver. Sable-black, solar-forged, and it does not care where the ball lies — no lie is ' +
         'unplayable to one who has stopped fearing the rest. Swing it, and swing it certain."',
     ],
-    rewardClubId: 'quest:voss',
+    reward: { kind: 'club', id: 'quest:voss' },
     rewardName: NAMED_STORY_CLUBS['quest:voss']!.name,
     rewardBlurb: "The Apostate's own black driver, carried down the day he fell. Hits from any lie, enormous carry.",
   },
@@ -250,7 +272,7 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
       '"The Viper\'s Fang — solar-forged, weighted to strike dead straight, and it bends the wind to its line. ' +
         'It does not waver. Neither do we, you and I. Not any more."',
     ],
-    rewardClubId: 'quest:venoma',
+    reward: { kind: 'club', id: 'quest:venoma' },
     rewardName: NAMED_STORY_CLUBS['quest:venoma']!.name,
     rewardBlurb: 'A blade forged from the Viper\'s own fang — solar-true, flies dead straight and cuts the wind.',
   },
@@ -271,12 +293,13 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
     complete: [
       '🖤 "You holed it on a whisper. No read, no doubt — only trust. That is the whole of the Long Rest: to ' +
         'stop striving, and let the world choose your line for you."',
-      '"The Whisperer\'s Read — solar-true, and it hums the break into your hands like a confession. Every ' +
-        'line it gives you is honest. It has never once lied. Nor have I, to you."',
+      '"Take my cowl — the Whisperer\'s Cowl, worn since before your grandfather teed off. Draw the hood up on ' +
+        'a green and the deep hums the true break straight into your ear. Every line it gives is honest. It ' +
+        'has never once lied. Nor have I, to you."',
     ],
-    rewardClubId: 'quest:ouros',
-    rewardName: NAMED_STORY_CLUBS['quest:ouros']!.name,
-    rewardBlurb: 'The Whisperer\'s ancient putter — it hums the true break to your hands. Reads run honest and long.',
+    reward: { kind: 'gear', id: 'gear:hat:cowl' },
+    rewardName: "The Whisperer's Cowl",
+    rewardBlurb: "The Whisperer's ancient listening-cowl — the deep hums the true break into your ear. Reads run honest and long.",
   },
   {
     id: 'quest-coil-ecdysis',
@@ -295,12 +318,14 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
     complete: [
       '🖤 "The wards are drowned; the sea kept its bargain, and so will I. You did not flinch when the old ' +
         'shrine went under. Good. Flinching is for those who still hope."',
-      '"The Shedmaker\'s Scale — a wedge of serpent-plate, and no lie on any world can hold it. It lifts the ' +
-        'ball from anywhere, the way the Long Rest lifts the weary from everything. Wear it well."',
+      '"Then hold still while I fit your hull. The Shedmaker\'s Carapace — sheet upon sheet of the ' +
+        'World-Eater\'s own cast scale, annealed and laid over your ship like a second skin. It turns a strike ' +
+        'the way the serpent turns a blade. Power, and its price. Wear it into the last fight."',
     ],
-    rewardClubId: 'quest:ecdysis',
-    rewardName: NAMED_STORY_CLUBS['quest:ecdysis']!.name,
-    rewardBlurb: 'A wedge of cast serpent-scale — no lie on any world can hold it. Escapes anything, from anywhere.',
+    reward: { kind: 'upgrade', id: 'upg:shield:carapace' },
+    rewardName: "The Shedmaker's Carapace",
+    rewardBlurb:
+      "Serpent-scale hull armour shed and re-grown by Sister Ecdysis — the heaviest ship defence a Coil smith has made, and Combat Rating toward the finale.",
   },
 ];
 
@@ -396,12 +421,11 @@ export function acceptQuest(story: StoryState, questId: string): StoryState {
 export function completeQuest(story: StoryState, questId: string): StoryState {
   const q = questById(questId);
   if (!q || story.activeQuestId !== questId || questDone(story, questId)) return story;
-  const ownedClubIds = story.ownedClubIds.includes(q.rewardClubId)
-    ? story.ownedClubIds
-    : [...story.ownedClubIds, q.rewardClubId];
-  const withClub = equipStoryClub({ ...story, ownedClubIds }, q.rewardClubId);
+  // GS-story-reward-variety: grant whatever the quest gives (club → bag, gear → locker, part → fleet, ship →
+  // hangar) through the shared, idempotent reward channel, then record it done + clear the active slot.
+  const granted = grantStoryReward(story, q.reward);
   return {
-    ...withClub,
+    ...granted,
     activeQuestId: undefined,
     completedQuestIds: [...story.completedQuestIds, questId],
   };

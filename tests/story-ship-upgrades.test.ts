@@ -26,7 +26,9 @@ describe('story ship upgrades (GS-story-ship-upgrades)', () => {
     for (const u of STORY_SHIP_UPGRADES) {
       expect(u.id.startsWith('upg:')).toBe(true);
       expect(isShipUpgradeId(u.id)).toBe(true);
-      expect(u.price).toBeGreaterThan(0);
+      // GS-story-reward-variety: sellable parts have a price; a granted `reward` part is free (price 0).
+      if (u.acquire === 'reward') expect(u.price).toBe(0);
+      else expect(u.price).toBeGreaterThan(0);
       expect(u.battle).toBeGreaterThan(0);
       expect(u.lore.length).toBeGreaterThan(0);
       expect(upgradeDetail(u).length).toBeGreaterThan(0);

@@ -13,6 +13,7 @@ import { currentTournament, sigilCount, tournamentCompetitors, isTeamTournament,
 import { finaleMatchup, corruptedLookOpts, COIL_FIGURE_TINT } from '../sim/rpg/storyBetrayal';
 import { golferPreviewSVG } from '../render/apparelArt';
 import { storyClubEffectLabel } from '../sim/rpg/storyClubEffects';
+import { shipUpgradeById, upgradeDetail } from '../sim/rpg/storyShipUpgrades';
 import { venomaPortraitSVG, vossPortraitSVG, driverDanPortraitSVG } from '../render/loreArt';
 import { penelopePortraitSVG } from '../render/caddyPortraits';
 
@@ -231,11 +232,14 @@ export function storyTournamentScreen(): string {
       </div>
       ${fieldOrPicker}
       <div class="gs-tourn-in gs-tourn-in3">${intro}</div>
-      <div class="gs-tourn-prize gs-tourn-in gs-tourn-in4"><b>🎁 Prize:</b> ${t.prize}${
-        t.rewardClubId && storyClubEffectLabel(t.rewardClubId)
-          ? ` <span style="color:#7fe0a0;font-weight:700;">✦ ${storyClubEffectLabel(t.rewardClubId)}</span>`
-          : ''
-      }</div>
+      <div class="gs-tourn-prize gs-tourn-in gs-tourn-in4"><b>🎁 Prize:</b> ${t.prize}${(() => {
+        // GS-story-reward-variety: show the reward's "why you want it" line — a club effect, or a Ch.5
+        // capital ship part's Combat Rating (the finale is a space battle, so the part matters).
+        const clubFx = t.rewardClubId ? storyClubEffectLabel(t.rewardClubId) : undefined;
+        const upg = t.rewardUpgradeId ? shipUpgradeById(t.rewardUpgradeId) : undefined;
+        const fx = clubFx ?? (upg ? upgradeDetail(upg)[0] : undefined);
+        return fx ? ` <span style="color:#7fe0a0;font-weight:700;">✦ ${fx}</span>` : '';
+      })()}</div>
       <div class="gs-tourn-stakes gs-tourn-in gs-tourn-in4">Beat ${t.rivalName.split(' ')[0]}’s round over 18 holes, ${who}, and the ${t.sigilName} is yours.</div>
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:420px;margin:16px auto 0;">

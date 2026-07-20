@@ -65,9 +65,10 @@ describe('emotional mid-chapters (GS-story-midchapter / betrayal rework)', () =>
     // Even if a Dan/Mole quest id somehow appeared, a real Herald run can't have completed one pre-Choice;
     // and the FIRST completed CADDY quest is what the hook reads (skipping charquest markers).
     const base = { ...defaultStoryState('feather-fade'), alignment: 'herald' as const };
-    // a charquest marker first, then a real caddy quest → the hook skips the marker to the caddy quest
-    const s = interludeScene({ ...base, completedQuestIds: ['charquest:huang-woo-hook', 'quest-chipinski'], equippedBagIds: ['quest:chipinski'] });
-    expect(s.lines.some((l) => l.who === 'coil' && /Chip/i.test(l.text))).toBe(true);
+    // a charquest marker first, then a real CLUB-reward caddy quest → the hook skips the marker to the caddy
+    // quest (GS-story-reward-variety: it reads a club gift you still swing — Sandy's wedge).
+    const s = interludeScene({ ...base, completedQuestIds: ['charquest:huang-woo-hook', 'quest-sandy'], equippedBagIds: ['quest:sandy'] });
+    expect(s.lines.some((l) => l.who === 'coil' && /Sand/i.test(l.text))).toBe(true);
   });
 
   it('every playable golfer has a distinct betrayal voice', () => {

@@ -49,7 +49,7 @@ import {
 } from '../sim/rpg/story';
 import { shipCreditMult, grantStoryAceShip, grantStoryShip } from '../sim/rpg/storyShips';
 import { recordCaddyRound } from '../sim/rpg/storyCaddies';
-import { upgradeCreditMult } from '../sim/rpg/storyShipUpgrades';
+import { upgradeCreditMult, grantShipUpgrade } from '../sim/rpg/storyShipUpgrades';
 import { tournamentForChapter, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS, isStoryQualifier, chapterQualifierEvents, isTeamTournament, teamFieldPairs, teamPartnerOrDefault, TEAM_PARTNER_EDGE, isStablefordTournament, rivalStablefordTotal, stablefordLeaderboard } from '../sim/rpg/storyTournaments';
 import { resolveStoryTeamStroke, resolveStory2v2Match } from '../sim/rpg/storyTeams';
 import { finaleMatchup } from '../sim/rpg/storyBetrayal';
@@ -595,6 +595,9 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
     }
     // GS-story-route-rewards: a route major grants its signature ship (own + fly it).
     if (t.rewardShipId) story = grantStoryShip(story, t.rewardShipId);
+    // GS-story-reward-variety: a Ch.5 climax major forges a capital SHIP PART for the finale (own it;
+    // grantShipUpgrade is idempotent so a replay can't re-grant).
+    if (t.rewardUpgradeId) story = grantShipUpgrade(story, t.rewardUpgradeId);
   }
   // GS-story-caddy-rep: a major is a round carried by the active caddy too — count it toward their quest.
   story = recordCaddyRound(story);

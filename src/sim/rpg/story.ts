@@ -360,19 +360,18 @@ export function storyBarName(herald: boolean): string {
  * from there).
  */
 export const NAMED_STORY_CLUBS: Record<string, { base: string; name: string }> = {
-  // Ally side-quest gifts (GS-story-quest-club).
-  'quest:dan': { base: 'club:solar:D', name: "The Long Haul — Dan's Driver" },
+  // Ally side-quest CLUB gifts (GS-story-quest-club). GS-story-reward-variety: not every ally quest gives a
+  // club any more — Dan (his rig's engine), Chipinski (a healing ball) + the Mole (a green-reading circlet)
+  // now hand over a ship part / gear instead, so their entries live in `storyGear`/`storyShipUpgrades`, not
+  // here. What remains are the caddy quests whose signature reward IS a club.
   'quest:sandy': { base: 'club:solar:SW', name: "Sand-Saver's Second" },
-  'quest:chipinski': { base: 'club:solar:PW', name: 'The Phoenix Scalpel' },
   'quest:penelope': { base: 'club:solar:putter', name: 'The Star-Reader' },
   'quest:sam': { base: 'club:solar:3W', name: 'Conviction' },
-  'quest:mole': { base: 'club:solar:7i', name: 'The Dowser' },
-  // Coil inner-circle side-quest gifts (GS-story-herald-quests) — the dark-path caddy quests. Distinct base
-  // TYPES so they slot into the bag beside the earlier gifts, not on top of them.
+  // Coil inner-circle side-quest CLUB gifts (GS-story-herald-quests) — the dark-path caddy quests whose
+  // reward is a club (Ouros → a cowl, Ecdysis → hull armour, so they're no longer here). Distinct base TYPES
+  // so they slot into the bag beside the earlier gifts, not on top of them.
   'quest:voss': { base: 'club:solar:D', name: "The Apostate's Driver" },
   'quest:venoma': { base: 'club:solar:5i', name: "The Viper's Fang" },
-  'quest:ouros': { base: 'club:solar:putter', name: "The Whisperer's Read" },
-  'quest:ecdysis': { base: 'club:solar:SW', name: "The Shedmaker's Scale" },
   // Galaxy-Tournament (major) prize clubs (GS-story-tournament-reward): the promised prize is a NAMED,
   // solar-tier club that lands in the bag with its own name (the majors used to announce a club and never
   // hand it over — the Emerald Invitational bug). Distinct base TYPES from the quest gifts so they don't

@@ -13,7 +13,8 @@ import {
 } from '../src/sim/rpg/storyQuests';
 import { STORY_CADDY_STOCK } from '../src/sim/rpg/storyCaddies';
 import { HERALD_CADDY_IDS } from '../src/sim/rpg/storyHeraldCrew';
-import { defaultStoryState, resolveStoryClub } from '../src/sim/rpg/story';
+import { defaultStoryState } from '../src/sim/rpg/story';
+import { grantStoryReward, rewardOwned } from '../src/sim/rpg/storyRewards';
 import { staticCourseSpec, regenerateStaticCourse } from '../src/sim/course/staticCourseSpecs';
 
 function withCaddy(caddyId: string, over: Record<string, unknown> = {}) {
@@ -42,18 +43,21 @@ describe('Story ally side quests (GS-story-quests)', () => {
       );
       expect(q!.offer.length).toBeGreaterThan(0);
       expect(q!.complete.length).toBeGreaterThan(0);
-      // the reward is a real, resolvable club
-      expect(resolveStoryClub(q!.rewardClubId), `${q!.id} reward resolves`).toBeDefined();
+      // GS-story-reward-variety: the reward (club / gear / ship part / ship) grants cleanly onto a fresh state
+      const granted = grantStoryReward(defaultStoryState(), q!.reward);
+      expect(rewardOwned(granted, q!.reward), `${q!.id} reward grants`).toBe(true);
+      expect(q!.rewardName.length, `${q!.id} reward named`).toBeGreaterThan(0);
     }
     // exactly one quest per ally, ids unique
     expect(new Set(STORY_QUESTS.map((q) => q.id)).size).toBe(STORY_QUESTS.length);
   });
 
-  it('Driver Dan’s quest is the derelict, gated to chapter 3, granting his driver', () => {
+  it('Driver Dan’s quest is the derelict, gated to chapter 3, granting his rig’s salvaged engine (a ship part)', () => {
     const dan = questForCaddy('driver-dan')!;
     expect(dan.minChapter).toBe(3);
     expect(questWorld(dan)).toBe('derelict-18'); // his old rig
-    expect(dan.rewardClubId).toBe('quest:dan'); // GS-story-quest-club: a NAMED ally-gift club
+    // GS-story-reward-variety: Dan the old trucker hands over his rig's drive core, not a golf club
+    expect(dan.reward).toEqual({ kind: 'upgrade', id: 'upg:engine:longhaul' });
   });
 
   it('offerable only when recruited, chapter reached, none active, and not already done', () => {
@@ -76,7 +80,8 @@ describe('Story ally side quests (GS-story-quests)', () => {
     expect(questOfferable(herald, 'driver-dan')).toBe(false);
   });
 
-  it('accept → active; complete → grants + equips the reward, records done, clears active', () => {
+  it('accept → active; complete → grants the reward, records done, clears active', () => {
+    // Dan's reward is a SHIP PART (GS-story-reward-variety): it lands in the fleet, not the bag.
     const ready = withCaddy('driver-dan', { chapter: 3 });
     const accepted = acceptQuest(ready, 'quest-dan');
     expect(accepted.activeQuestId).toBe('quest-dan');
@@ -85,12 +90,27 @@ describe('Story ally side quests (GS-story-quests)', () => {
     const done = completeQuest(accepted, 'quest-dan');
     expect(done.activeQuestId).toBeUndefined();
     expect(questDone(done, 'quest-dan')).toBe(true);
-    // the reward club is owned AND in the equipped bag (the NAMED ally-gift id)
-    expect(done.ownedClubIds).toContain('quest:dan');
-    expect(done.equippedBagIds).toContain('quest:dan');
+    // the ship part is owned into the fleet
+    expect(done.ownedShipUpgradeIds).toContain('upg:engine:longhaul');
 
     // completing a non-active quest is a no-op
     expect(completeQuest(done, 'quest-dan')).toBe(done);
+  });
+
+  it('a CLUB-reward quest owns + equips its gift into the bag (Sandy → Sand-Saver’s Second)', () => {
+    const ready = withCaddy('sandy-sandsaver', { chapter: 2 });
+    const done = completeQuest(acceptQuest(ready, 'quest-sandy'), 'quest-sandy');
+    expect(questDone(done, 'quest-sandy')).toBe(true);
+    expect(done.ownedClubIds).toContain('quest:sandy');
+    expect(done.equippedBagIds).toContain('quest:sandy');
+  });
+
+  it('a GEAR-reward quest owns + equips its relic into the locker slot (Mole → the Dowser’s Circlet)', () => {
+    const ready = withCaddy('mystic-mole', { chapter: 4 });
+    const done = completeQuest(acceptQuest(ready, 'quest-mole'), 'quest-mole');
+    expect(questDone(done, 'quest-mole')).toBe(true);
+    expect(done.ownedGearIds).toContain('gear:hat:dowser');
+    expect(done.equippedGear.hat).toBe('gear:hat:dowser');
   });
 
   it('accept is a no-op when not offerable (wrong chapter, not recruited)', () => {
@@ -117,7 +137,8 @@ describe('Story ally side quests (GS-story-quests)', () => {
       expect(questWorld(q!), `${coilId} quest names its own world`).toBeTruthy();
       expect(q!.offer.length).toBeGreaterThan(0);
       expect(q!.complete.length).toBeGreaterThan(0);
-      expect(resolveStoryClub(q!.rewardClubId), `${q!.id} reward resolves`).toBeDefined();
+      const granted = grantStoryReward(defaultStoryState(), q!.reward);
+      expect(rewardOwned(granted, q!.reward), `${q!.id} reward grants`).toBe(true);
     }
     // ids stay unique across the whole (Warden + Coil) quest table
     expect(new Set(STORY_QUESTS.map((q) => q.id)).size).toBe(STORY_QUESTS.length);
@@ -157,9 +178,11 @@ describe('Story ally side quests (GS-story-quests)', () => {
     // A Herald who completed a Warden caddy quest pre-Choice → the hook names that ally + club.
     const hook = heraldQuestHook({ ...base, completedQuestIds: ['quest-sandy'] });
     expect(hook?.clubName).toBe(questForCaddy('sandy-sandsaver')!.rewardName);
-    // A completed Coil quest listed FIRST is skipped in favour of the Warden one.
-    const mixed = heraldQuestHook({ ...base, completedQuestIds: ['quest-coil-voss', 'quest-chipinski'] });
-    expect(mixed?.clubName).toBe(questForCaddy('dr-chipinski')!.rewardName);
+    // A completed Coil quest listed FIRST is skipped in favour of the Warden CLUB one (GS-story-reward-
+    // variety: the hook reads a club gift you still swing, so a gear/ship-part quest is skipped too — Sam's
+    // Conviction is a club).
+    const mixed = heraldQuestHook({ ...base, completedQuestIds: ['quest-coil-voss', 'quest-sam'] });
+    expect(mixed?.clubName).toBe(questForCaddy('suggestible-sam')!.rewardName);
   });
 
   it('GS-story-caddy-rep: holds the offer until you have carried the bag with this ally at least once', () => {

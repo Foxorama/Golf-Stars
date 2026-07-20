@@ -70,6 +70,10 @@ export interface StoryTournament {
   rewardClubId?: string;
   /** GS-story-route-rewards: a ship GRANTED on winning this major (the route's signature ride). Absent = none. */
   rewardShipId?: string;
+  /** GS-story-reward-variety: a SHIP PART (`upg:<cat>:<var>`) GRANTED on winning this major — the Ch.5
+   *  climax majors forge a capital weapon for the finale battle (the fifth Sigil literally forges the key).
+   *  Absent = none. */
+  rewardUpgradeId?: string;
   /** Host/rival flavour for the tournament lobby (lore-card style). */
   intro: string[];
 }
@@ -210,7 +214,8 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     unlockAfterClears: 2,
     sigilId: 'sigil-vigil',
     sigilName: 'The Serpent’s Seal',
-    prize: 'The Star-Blessed Ball — clean and true. The fifth Sigil forges the key to the finale.',
+    prize: 'The Star-Blessed Lance — clean starfire slung under your hull, forged for the last fight. The fifth Sigil forges the key to the finale.',
+    rewardUpgradeId: 'upg:weapon:starlance',
     intro: [
       'The acid shrine of Hydra Mire, where the Coil means to complete their rite — and the friend who ' +
         'turned on you stands with them now, in shed-scale robes, unrecognisable and grinning. Venoma is at ' +
@@ -234,7 +239,8 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     unlockAfterClears: 2,
     sigilId: 'sigil-ascension',
     sigilName: 'The Serpent’s Fang',
-    prize: 'The Coil anoints you its Herald. The fifth Sigil forges the key to the finale.',
+    prize: 'The Coil anoints you its Herald — and slings the Wyrm-Fang Cannon under your hull. The fifth Sigil forges the key to the finale.',
+    rewardUpgradeId: 'upg:weapon:wyrmfang',
     intro: [
       'The Ghost Wreck, where the Coil harvests the dead — and the friends who once played beside you have ' +
         'come together to stop you, heartbroken and unyielding. A Coil champion takes your side; the old ' +
