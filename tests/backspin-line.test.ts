@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   backspinRoll,
-  clubRollFraction,
+  rollFractionFor,
   hasBackspin,
   rollOut,
   shotSpread,
@@ -85,7 +85,7 @@ describe('backspinRoll — the predicted roll/check (GS-backspin-line)', () => {
     expect(hasBackspin(spray.nominalCarry)).toBe(true); // a wedge-loft club
     // Baseline no longer spins back — it checks to a soft stop (fraction ≥ 0), so a plain wedge draws no
     // off-green check line at all; only a spin BUILD (backspinBoost / Bo) pulls it back.
-    expect(clubRollFraction(spray.nominalCarry)).toBeGreaterThanOrEqual(0);
+    expect(rollFractionFor(spray.flight, spray.nominalCarry)).toBeGreaterThanOrEqual(0);
     expect(backspinRoll(hole, spray)).toBeNull(); // plain wedge off the green: no check
     const roll = backspinRoll(hole, spray, { backspinBoost: 0.15 }); // a spin build supplies the check
     expect(roll).not.toBeNull();
@@ -112,7 +112,7 @@ describe('backspinRoll — the predicted roll/check (GS-backspin-line)', () => {
       spray.origin[0] + dir[0] * spray.expectedCarry,
       spray.origin[1] + dir[1] * spray.expectedCarry,
     ];
-    const K = spray.expectedCarry * (clubRollFraction(spray.nominalCarry) - 0.15); // mean energy, no rng
+    const K = spray.expectedCarry * (rollFractionFor(spray.flight, spray.nominalCarry) - 0.15); // mean energy, no rng
     const truth = rollOut(hole, landing, dir, K, lieAt(hole, landing));
     const roll = backspinRoll(hole, spray, { backspinBoost: 0.15 })!;
     expect(roll.rollYd).toBeCloseTo(truth.roll, 6);

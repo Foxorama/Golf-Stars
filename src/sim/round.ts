@@ -35,7 +35,7 @@ import type { HoleRecord } from './score';
 import type { HoleStat } from './stats';
 import type { Rng } from './rng';
 import { usableBag } from './rpg/economy';
-import { arcApex, ARC_FEEL, flightBlockedBy, flightClassOf, flightKnockdown, flightObstacles, flightProfileOf, type FlightClass, type FlightProfile } from './flight';
+import { arcApex, ARC_FEEL, flightBlockedBy, flightCarryScale, flightClassOf, flightKnockdown, flightObstacles, flightProfileOf, flightScaleFor, rollFractionFor, type FlightClass, type FlightProfile } from './flight';
 import { insideTent, tentFlightHit, tradeTents, TENT_BOUNCE_MIN, type TentHit, type TentEffectId, type TradeTent } from './tents';
 import { wallFlightHit, wallRollBounce, wallReflect, WALL_BOUNCE_MIN, WALL_ROLL_RESTITUTION, type WallHit } from './walls';
 import type { ShipWall } from './course/contract';
@@ -163,9 +163,19 @@ export const SURFACE_FIRMNESS: Record<string, number> = {
 export function surfaceFirmness(lie: FeatureKind): number {
   return SURFACE_FIRMNESS[lie] ?? 0.5;
 }
-/** Clamp on the run-out (yards): forward roll caps high, backspin checks modestly back. */
+/** Clamp on the run-out (yards): forward roll caps high, backspin checks modestly back. `MAX_ROLL` is
+ *  the AUTO-AI's roll ALLOWANCE cap (how much run it plans for when clubbing); `ROLL_ENERGY_CAP` is the
+ *  PHYSICS cap on the run a shot can actually release. The split (GS-carry-rollout-split) hands the long
+ *  clubs a bigger run (a driver ~53yd off its reduced flight vs the old ~40), so the physics cap sits
+ *  above the allowance so a full drive's run isn't clipped and its TOTAL is preserved. */
 const MAX_ROLL = 42;
+const ROLL_ENERGY_CAP = 60;
 const MAX_CHECK = 18;
+/** Short-grass touchdowns where the run-out HELPER LINE (`backspinRoll`, GS-carry-rollout-split) draws a
+ *  forward run — the ball genuinely releases here (a drive onto the fairway, an approach onto the green),
+ *  so the player reads land-and-run. Off these (rough/sand/trees) the run is small and a line into the
+ *  hay is clutter, so no forward line is drawn (a backspin CHECK still draws anywhere). */
+const RUNOUT_LIES: ReadonlySet<FeatureKind> = new Set(['fairway', 'green', 'tee']);
 /** Per-yard run a hazard-skip ball (GS-proshop-2) keeps while skimming across an IMMUNE penalty —
  *  fast (like firm ice) so a floater/magma/void ball carries on to dry ground instead of dying in it. */
 const SKIM_ROLL = 2.2;
@@ -198,27 +208,13 @@ const CREEP_MAX = 5; // total creep budget (yards) — a settle, not a second ro
 
 /** Carry of the pitching wedge — at/below this, clubs start adding backspin. */
 export const BACKSPIN_CARRY = 106;
-const SHORTEST_CARRY = 38;
-const DRIVER_CARRY = 250;
-const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
 
-/**
- * Loft-based roll fraction of carry, by a club's nominal carry — the NEUTRAL run-out every player
- * gets, with NO backspin baked in (GS-backspin-optin). Long clubs run out a lot (driver ~+18%); it
- * tapers down through the irons; PW (+5%) and the lofted wedges below it check to a soft STOP (down to
- * 0% on the shortest — they land and hold, they don't spin back). Backspin — a NEGATIVE roll that pulls
- * the ball back toward the player — is no longer universal: it comes ONLY from a backspin BUILD (the
- * Backspin Bo golfer's `rollFracDelta`, or spin gear's `backspinBoost`), added on top of this neutral
- * base. So a plain wedge lands and stops predictably; only a deliberate spin build zips it back. Pure &
- * data-driven. */
-export function clubRollFraction(nominalCarry: number): number {
-  if (nominalCarry >= BACKSPIN_CARRY) {
-    const t = clamp01((nominalCarry - BACKSPIN_CARRY) / (DRIVER_CARRY - BACKSPIN_CARRY));
-    return 0.05 + (0.18 - 0.05) * t; // PW +5% → driver +18%
-  }
-  const t = clamp01((BACKSPIN_CARRY - nominalCarry) / (BACKSPIN_CARRY - SHORTEST_CARRY));
-  return 0.05 * (1 - t); // PW +5% → shortest wedge 0% (checks to a stop, never spins back)
-}
+// The neutral roll fraction is now a per-FAMILY carry/roll SPLIT (GS-carry-rollout-split) — a club's
+// number is its TOTAL and the ball flies `carryFrac` of it, releasing the rest (driver 80/20, hybrid
+// 85/15, iron 90/10; wedge/putter land-and-hold). The model lives in `flight.ts` (`clubRollFraction` /
+// `rollFractionFor` / `flightScaleFor`), keyed off the club's `FlightProfile`, and is re-exported here
+// for the app + sim consumers.
+export { clubRollFraction, rollFractionFor } from './flight';
 
 /** True if a club's loft is in the wedge/short-iron range (PW and below) — the clubs whose roll a
  *  spin build can turn into a real BACKSPIN check. (No longer implies backspin on its own: baseline
@@ -229,14 +225,15 @@ export function hasBackspin(nominalCarry: number): boolean {
 
 /**
  * The ball's reference run-out ENERGY (signed yards) — how far it would roll on a flat, true (mult 1,
- * fairway) surface. + runs forward, − is backspin checking it back. Loft (`clubRollFraction`) + a
- * character's `rollFracDelta` + a little variance. This is surface-FREE; the surface is applied along
- * the path by `rollOut`. Consumes EXACTLY one rng draw (same as the old `rollYards`), so a 0-delta
- * shot keeps the same rng budget and auto≡interactive holds. */
-function rollPotential(nominalCarry: number, carry: number, rng: Rng, rollFracDelta = 0): number {
-  const frac = clubRollFraction(nominalCarry) + rollFracDelta;
+ * fairway) surface. + runs forward, − is backspin checking it back. The family carry/roll SPLIT
+ * (`rollFractionFor` on the club's `FlightProfile`, GS-carry-rollout-split) + a character's
+ * `rollFracDelta` + a little variance. This is surface-FREE; the surface is applied along the path by
+ * `rollOut`. Consumes EXACTLY one rng draw (same as the old `rollYards`), so a 0-delta shot keeps the
+ * same rng budget and auto≡interactive holds. */
+function rollPotential(profile: FlightProfile, nominalCarry: number, carry: number, rng: Rng, rollFracDelta = 0): number {
+  const frac = rollFractionFor(profile, nominalCarry) + rollFracDelta;
   const raw = carry * frac * rng.range(0.85, 1.15);
-  return Math.max(-MAX_CHECK, Math.min(MAX_ROLL, raw));
+  return Math.max(-MAX_CHECK, Math.min(ROLL_ENERGY_CAP, raw));
 }
 
 /**
@@ -264,7 +261,7 @@ export function rollOut(
   walls?: readonly ShipWall[],
 ): { roll: number; rest: Vec; path?: Vec[] } {
   const sign = K < 0 ? -1 : 1;
-  const cap = sign < 0 ? MAX_CHECK : MAX_ROLL;
+  const cap = sign < 0 ? MAX_CHECK : ROLL_ENERGY_CAP;
   const STEP = 1.5; // yards per integration step
   // Trade-camp tents (GS-tents): a ball ROLLING into a tent footprint stops against it (like sand /
   // the woods). A tent the ball is ALREADY on (a fresh aerial-bounce ricochet starts at the roof it
@@ -1043,7 +1040,10 @@ export function executeShot(
   // no floor, so byte-for-byte unchanged). `resolveShot` below re-derives it from the RAW power, so
   // the floor is applied exactly once on each side.
   const aimPower = driverPowerFloorRemap(power, opts.driverPowerFloor, flightClassOf(club.id) === 'driver');
-  const aim = aimWithWind(from, target, hole.wind, shotBearing, club.carry * carryMult * aimPower, opts.windResist);
+  // The wind-compensation carry is the FLIGHT carry (GS-carry-rollout-split) — the ball drifts while
+  // it's in the air, so the aim reads the reduced flight, matching `resolveShot`'s scaled `intended`.
+  const aimCarry = club.carry * flightScaleFor(flightProfileOf(club.id), club.carry) * carryMult * aimPower;
+  const aim = aimWithWind(from, target, hole.wind, shotBearing, aimCarry, opts.windResist);
   // Character per-club shape: keyed by the club's nominal carry (a hooky driver, striped irons,
   // back-spun wedges). `dispMult === 1` passes the original dispersionMult through UNTOUCHED so a
   // characterless shot stays byte-for-byte (undefined stays undefined, never `undefined * 1`).
@@ -1209,7 +1209,7 @@ export function executeShot(
   if (!tdPen || (immune && immune.has(tdPen))) {
     // Increased backspin (GS-proshop-2): subtract from the roll fraction (more check, less run) — same
     // single rng draw, so backspinBoost 0/undefined is byte-for-byte the old energy.
-    const energy = rollPotential(nominalCarry, result.carry, rng, mods.rollFracDelta - (opts.backspinBoost ?? 0));
+    const energy = rollPotential(flight, nominalCarry, result.carry, rng, mods.rollFracDelta - (opts.backspinBoost ?? 0));
     // Tent ricochet (GS-tents): the run-out goes along the REFLECTED direction with a lively floor of
     // energy (a real bounce, not a dead drop). Otherwise the roll runs along the flight direction. The
     // rng draw above is unchanged either way, so the stream is stable. tents are passed so a roll that
@@ -1450,7 +1450,10 @@ export function shotSpread(
   const relief = reliedLie(li, opts.lieRelief);
   const shotBearing = bearingDeg(from, target);
   const nominal = clubDist(club, opts.stats);
-  const intended = nominal * relief.carryMult * carryMult * power;
+  // Carry/roll SPLIT (GS-carry-rollout-split): the previewed cone reads the reduced FLIGHT landing
+  // (`flightScaleFor` — the run-out line draws the run past it), matching `resolveShot` exactly so the
+  // cone stays honest. Wedge/putter → 1 (byte-for-byte).
+  const intended = nominal * flightScaleFor(flightProfileOf(club.id), nominal) * relief.carryMult * carryMult * power;
   const w = hole.wind ? playWind(hole.wind, shotBearing) : { along: 0, cross: 0 };
   // The character's per-club shape (GS-18): its dispersion folds into the cone's width and its
   // shot-shape bias ROTATES the cone's centre line, so a fade/hook is visible in the preview and
@@ -1555,17 +1558,20 @@ export function backspinRoll(
   const br = (spray.bearing * Math.PI) / 180;
   const dir: Vec = [Math.sin(br), Math.cos(br)];
   const landing: Vec = [spray.origin[0] + dir[0] * carry, spray.origin[1] + dir[1] * carry];
-  // The MEAN roll energy: rollPotential's `carry · frac` at the rng.range(0.85,1.15) midpoint 1.0.
-  const frac = clubRollFraction(nominal) + (opts.rollFracDelta ?? 0) - (opts.backspinBoost ?? 0);
-  const K = Math.max(-MAX_CHECK, Math.min(MAX_ROLL, carry * frac));
+  // The MEAN roll energy: rollPotential's `carry · frac` at the rng.range(0.85,1.15) midpoint 1.0 — the
+  // family carry/roll SPLIT (GS-carry-rollout-split) off the club's flight profile, so the drawn line IS
+  // the physics the sim releases.
+  const frac = rollFractionFor(spray.flight, nominal) + (opts.rollFracDelta ?? 0) - (opts.backspinBoost ?? 0);
+  const K = Math.max(-MAX_CHECK, Math.min(ROLL_ENERGY_CAP, carry * frac));
   if (Math.abs(K) < SPIN_LINE_MIN) return null;
   const tdLie = lieAt(hole, landing);
-  // A shot that actually checks BACK (K < 0 — a backspin BUILD's wedge, GS-backspin-optin) always draws
-  // its check/curl, even off the green. A FORWARD-rolling shot (any club with no backspin build — now
-  // every plain wedge too) draws its RUN-OUT only when it lands on the GREEN — the "the arc lands on the
-  // green but the ball runs well past it" case the player is surprised by (GS-runout-line). Ordinary
-  // tee/fairway shots that don't land on the putting surface show no line.
-  if (K >= 0 && tdLie !== 'green') return null;
+  // The line draws the ball's LAND-and-RUN: a forward RUN-OUT (driver/wood/hybrid/iron flying its
+  // reduced carry then releasing to the total, GS-carry-rollout-split) so the player SEES the total
+  // includes the run and can read "carry short of a hazard, run to the pin". A backspin BUILD's wedge
+  // (K < 0) always draws its check/curl. A forward run only draws when it lands on SHORT GRASS
+  // (fairway/green/tee) where the ball genuinely releases — a ball dropping into rough/sand/trees
+  // stops in the stuff (little run, and a line into the hay reads as clutter, not info).
+  if (K >= 0 && !RUNOUT_LIES.has(tdLie)) return null;
   const tdPen = lieInfo(tdLie).penalty;
   if (tdPen && !(opts.immune && opts.immune.has(tdPen))) return null; // plugs in a hazard — nothing to roll
   const out = rollOut(hole, landing, dir, K, tdLie, opts.immune, opts.tents, hole.walls);
@@ -1957,27 +1963,39 @@ export function suggestPlayerClub(
       dispersionMult: opts.dispersionMult,
       stats: opts.stats,
     });
+  // Green COVERAGE reasons about where the ball RESTS, not where it lands — so fold the run-out back in
+  // (GS-carry-rollout-split): the club flies its reduced carry then releases to the total, and it's the
+  // total that has to reach the flag and stop by the back. `expectedTotal`/`highTotal` add the family
+  // run to the flight cone so the suggestion reads true (wedge/putter run 0 → unchanged).
+  const expectedTotal = (c: Club) => {
+    const sp = spreadOf(c);
+    return sp.expectedCarry * (1 + rollFractionFor(sp.flight, sp.nominalCarry));
+  };
+  const highTotal = (c: Club) => {
+    const sp = spreadOf(c);
+    return sp.carryHigh * (1 + rollFractionFor(sp.flight, sp.nominalCarry));
+  };
   const longest = cand.reduce((a, b) => (clubDist(b, opts.stats) > clubDist(a, opts.stats) ? b : a));
 
-  // Unreachable: even the longest club's best carry can't get to the front → swing the longest.
-  if (spreadOf(longest).carryHigh < front) return longest;
+  // Unreachable: even the longest club's best TOTAL can't get to the front → swing the longest.
+  if (highTotal(longest) < front) return longest;
 
   const byCarryAsc = [...cand].sort((a, b) => clubDist(a, opts.stats) - clubDist(b, opts.stats));
   const EPS = 1e-6;
-  // The honest approach: the LONGEST club whose EXPECTED carry reaches the PIN yet still stops by the
+  // The honest approach: the LONGEST club whose EXPECTED total reaches the PIN yet still stops by the
   // back edge. Walk shortest→longest, keep the last qualifier — never short of the flag, never over the
   // back on a normal strike.
   let onGreen: Club | undefined;
   for (const c of byCarryAsc) {
-    const ec = spreadOf(c).expectedCarry;
-    if (ec >= distToPin - EPS && ec <= back) onGreen = c;
+    const et = expectedTotal(c);
+    if (et >= distToPin - EPS && et <= back) onGreen = c;
   }
   if (onGreen) return onGreen;
-  // Too close for any full club to hold the green (every full carry flies the back): the SHORTEST club
-  // that can still carry to the pin, dialed DOWN to it (a partial pitch). NOT the shortest club in the
+  // Too close for any full club to hold the green (every full total flies the back): the SHORTEST club
+  // that can still reach the pin, dialed DOWN to it (a partial pitch). NOT the shortest club in the
   // bag — that under-clubbed to the Chipper and left mid pins short (the near-green bug).
   for (const c of byCarryAsc) {
-    if (spreadOf(c).expectedCarry >= distToPin - EPS) return c;
+    if (expectedTotal(c) >= distToPin - EPS) return c;
   }
   // Nothing reaches the pin (a forced lay-up short) → the longest club, best go.
   return longest;
@@ -2035,17 +2053,35 @@ export function layupTarget(
   // derived deterministically from (bag, lie, carryMult) so a forced-carry decision (lava
   // rivers) is identical on both the auto and interactive paths.
   const maxReach = maxReachOf(bag, carryMult, lie);
+  const maxFlightReach = maxFlightReachOf(bag, carryMult, lie);
   // From trees / deep rough, punch OUT to the fairway first (positional golf, not a forest bomb).
   const escape = recoveryTarget(hole, ball, lie, maxReach);
   if (escape) return escape;
-  return safeTarget(hole, ball, hole.green, maxReach);
+  return safeTarget(hole, ball, hole.green, maxReach, maxFlightReach);
 }
 
-/** Effective max carry (yards) the bag can fly from this lie — the reach a forced carry needs. */
+/** Effective max TOTAL reach (yards) the bag can finish at from this lie — where the ball ends
+ *  (carry + run). This is the number a green/position REACH decision keys off; the carry/roll split
+ *  preserves the total, so it is unchanged. */
 function maxReachOf(bag: readonly Club[], carryMult: number, lie: FeatureKind): number {
   let max = 0;
   for (const c of bag) if (c.id !== 'putter') max = Math.max(max, c.carry);
   return max * carryMult * lieInfo(lie).carryMult;
+}
+
+/** Effective max FLIGHT reach (yards) the bag can CARRY from this lie — where the ball first LANDS,
+ *  the number a forced-carry decision needs (GS-carry-rollout-split). The split lands the ball at
+ *  `flightCarryScale` of its total, so a carry over water must be cleared in the AIR, not by the run —
+ *  this is what tells the AI to lay up when its reduced flight can't span the hazard. Wedge/putter
+ *  (scale 1) are unchanged; the longest club (driver, ~0.94×) drives this. */
+function maxFlightReachOf(bag: readonly Club[], carryMult: number, lie: FeatureKind): number {
+  let max = 0;
+  const lieM = lieInfo(lie).carryMult;
+  for (const c of bag) {
+    if (c.id === 'putter') continue;
+    max = Math.max(max, c.carry * flightCarryScale(c.id, c.carry) * carryMult * lieM);
+  }
+  return max;
 }
 
 /**
@@ -2083,7 +2119,7 @@ export function autoAimTarget(
   // but never aim a positioning shot PAST a drive (the fractional side-hazard advance can overshoot on a
   // wandering corridor), so fall back to the reachable station if the safe line runs long.
   if (clearLine(hole, ball, aimPt)) return aimPt;
-  const safe = safeTarget(hole, ball, pin, maxReach);
+  const safe = safeTarget(hole, ball, pin, maxReach, maxFlightReachOf(bag, carryMult, lie));
   return dist(ball, safe) <= maxReach + 1e-6 ? safe : aimPt;
 }
 
@@ -2156,7 +2192,10 @@ function longestCarryClub(
   const lieM = lieInfo(lie).carryMult;
   const byLong = [...cand].sort((a, b) => clubDist(b) - clubDist(a));
   for (const c of byLong) {
-    const carry = clubDist(c) * carryMult * lieM;
+    // FLIGHT carry (GS-carry-rollout-split): the ball must fly past the far bank in the AIR, so scale
+    // the reach by the club's flight fraction — a club whose TOTAL clears but whose landing drops into
+    // the hazard is not a carry club.
+    const carry = clubDist(c) * flightCarryScale(c.id, clubDist(c)) * carryMult * lieM;
     if (carry < fc.carry) continue; // doesn't reach past the far bank → would drop into the hazard
     const land: Vec = [ball[0] + ux * carry, ball[1] + uy * carry];
     if (lieInfo(lieAt(hole, land)).penalty) continue; // overshoots into another penalty → try shorter
@@ -2494,12 +2533,14 @@ function firstCentrelineCrossing(hole: Hole, fromT: number): { nearT: number; fa
  * reach — flying over a hazard is fair) or, if it's too far to clear in one, lay up SHORT of the
  * near bank; otherwise (a side hazard clipping the chord) lay up onto the penalty-free centreline.
  */
-function safeTarget(hole: Hole, ball: Vec, pinPt: Vec, maxReach: number): Vec {
+function safeTarget(hole: Hole, ball: Vec, pinPt: Vec, maxReach: number, maxFlightReach: number = maxReach): Vec {
   if (clearLine(hole, ball, pinPt)) return widthLayupTarget(hole, ball, pinPt, maxReach) ?? pinPt;
   const t0 = nearestCentrelineT(hole, ball);
   const cross = firstCentrelineCrossing(hole, t0);
   if (cross) {
-    const carry = carryTarget(hole, ball, pinPt, cross, maxReach);
+    // A forced CARRY must clear the hazard in the AIR — key it off the bag's FLIGHT reach (the split
+    // lands the ball short of its total, so the run can't be counted on to span water/lava/void).
+    const carry = carryTarget(hole, ball, pinPt, cross, maxFlightReach);
     if (carry) return carry;
     return layupShortTarget(hole, cross, t0);
   }
@@ -2647,9 +2688,11 @@ function carryTarget(
   ball: Vec,
   pinPt: Vec,
   cross: { nearT: number; farT: number },
-  maxReach: number,
+  maxFlightReach: number,
 ): Vec | null {
-  const reach = maxReach * 0.97; // small safety so the MEAN shot clears, not just the max
+  // `maxFlightReach` is the bag's FLIGHT reach (GS-carry-rollout-split) — the ball must fly PAST the
+  // far bank, the run can't be counted on to span the hazard. Small safety so the MEAN shot clears.
+  const reach = maxFlightReach * 0.97;
   // The nearest safe landing past the far bank (a margin clear of the lava).
   const landT = advanceAlong(hole, cross.farT, 10);
   const mustReach = pointAlong(hole.centreline, landT);

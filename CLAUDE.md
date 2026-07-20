@@ -908,14 +908,35 @@ these systems** — each bullet is the tip of a documented iceberg.
     bars stay green. `hasBackspin(carry)` now means only "a wedge-loft club" (a club a spin build CAN
     check), not "this backspins". The scorecard's Backspin row + the off-green check line gate on the
     roll actually going negative (`roll < 0` / `K < 0`), so they show only for an actual spin build.
-  - The ROLL/CHECK helper line (GS-backspin-line + GS-runout-line) is the full-shot twin of the putt
-    read: on the shot screen it draws a short cyan line from the aim-line touchdown to where the ball
-    settles. A shot that actually CHECKS BACK (a backspin build's wedge, `K < 0`) always draws its "fly
-    past, spin BACK" check/curl even off the green; every FORWARD-rolling shot (mid/long iron, hybrid,
-    wood — and now a plain wedge too) draws its forward RUN-OUT **only when the ball
-    lands ON THE GREEN** — the fix for "the ball goes long of the aim arc": the cone shows CARRY, but an
-    approach releases forward, so the graphic now shows where it actually settles (ordinary tee/fairway
-    shots that don't land on the green are unchanged — no line). `backspinRoll` (round.ts) is PURE: the
+  - CARRY / ROLL SPLIT (GS-carry-rollout-split): a club's number is its **TOTAL** distance (carry + run),
+    not its carry. The ball FLIES a family fraction of the total — driver **0.80**, wood 0.82, hybrid
+    **0.85**, iron **0.90** (wedge/putter 1.0, land-and-hold — byte-for-byte the backspin-optin behaviour)
+    — and RUNS the rest, so the player reads "land short, run to the flag" and knows the number includes
+    the run (fixes "clubs just sit and stop"; the hook for future carry-boost shop items — buy carry to
+    clear a hazard vs. total to go further). The split is **total-PRESERVING** and lives in `flight.ts`,
+    keyed off `FlightProfile.carryFrac`: `flightScaleFor` (= `carryFrac·(1+legacyRollFraction)`) scales the
+    FLIGHT `intended` down in `resolveShot`/`shotSpread`, and `rollFractionFor` (= `(1−carryFrac)/carryFrac`)
+    is the run `rollPotential` releases — anchored on the pre-split roll curve so `carry + run` finishes
+    exactly where the ball used to (endpoint preserved ⇒ death-spiral neutral; the main balance bars stay
+    green, only forced-carry worlds get modestly harder ON PURPOSE — the ice-ring frost fence is relaxed
+    with a `TODO(GS-carry-rollout-split)`). The physics roll cap is `ROLL_ENERGY_CAP` (60, above the AI's
+    `MAX_ROLL` 42 allowance) so a driver's bigger run isn't clipped. The ONE fairness-critical coupling:
+    a forced carry must be cleared in the AIR, so the carry-aware AI keys off **flight** reach
+    (`maxFlightReachOf`/`flightCarryScale` in `carryTarget`/`longestCarryClub`), never total — it lays up
+    when its reduced flight can't span the hazard (Stableford can only rise, contract 4). REACH decisions
+    (green/position) still key off TOTAL (unchanged). `clubRollFraction(clubId, nominal)` is now
+    family-keyed (re-exported from round.ts). Guarded by the whole suite (byte-shifts re-pinned; wedge/
+    putter carryFrac 1 ⇒ backspin/putting paths byte-for-byte). No `_gs*`/URL hook (physics + a HUD
+    readout), so no test-hub wiring.
+  - The ROLL/CHECK helper line (GS-backspin-line + GS-runout-line + GS-carry-rollout-split) is the
+    full-shot twin of the putt read: on the shot screen it draws a short cyan line from the aim-line
+    touchdown to where the ball settles. A shot that actually CHECKS BACK (a backspin build's wedge,
+    `K < 0`) always draws its "fly past, spin BACK" check/curl even off the green; every FORWARD-rolling
+    shot draws its RUN-OUT when it lands on **short grass** (`RUNOUT_LIES` = fairway/green/tee) — so a
+    drive shows its run down the fairway and an approach its release onto the green (the player SEES the
+    total includes run), while a ball dropping into rough/sand/trees draws no line (little run there, and a
+    line into the hay is clutter). The HUD legend shows `carry X–Yy → Zy total` so the number carries the
+    run. `backspinRoll` (round.ts) is PURE: the
     MEAN roll energy (no rng draw) through the SAME `rollOut` the sim resolves, so the drawn run + curl IS
     the physics (contract 5). `previewBackspin` (play.ts) reads the character `rollFracDelta` +
     `loadout.backspinBoost` + `spinReadOf` for the read reach; it lives in the shot-cone overlay group

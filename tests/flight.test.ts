@@ -193,7 +193,7 @@ describe('executeShot integration (knockdown + hazard-aware roll)', () => {
         [0, 240],
       ],
       features: [{ kind: 'fairway', poly: [[-40, 0], [40, 0], [40, 240], [-40, 240]] }],
-      hazards: [{ kind: 'trees', poly: blob([0, 30], 9) }], // a big tree right off the tee
+      hazards: [{ kind: 'trees', poly: blob([0, 28], 14) }], // a big, tall tree right off the tee
     };
     const ex = executeShot(hole, [0, 0], 'tee', [0, 240], driver, { carryMult: 1 }, new Rng('kd'));
     expect(ex.log.knockedDown).toBe(true);

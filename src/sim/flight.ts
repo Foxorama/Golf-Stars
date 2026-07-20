@@ -80,6 +80,16 @@ export interface FlightProfile {
   /** Multiplier on the loft-interpolated peak fraction (`arcApex`): >1 flies higher for the same
    *  carry (hybrid/wedge), <1 bores (driver). */
   peakMult: number;
+  /**
+   * CARRY as a fraction of the club's TOTAL distance (GS-carry-rollout-split). A club's nominal
+   * number is its TOTAL (carry + roll): the ball FLIES this fraction of it and RUNS the rest, so a
+   * driver (0.80) lands ~80% of the way and releases the last ~20%, a hybrid 0.85, an iron 0.90.
+   * The total is UNCHANGED (the flight is pulled back and the roll makes it up to the same spot) —
+   * so where the ball ends is preserved, only the split between flight and run changes. Wedges and
+   * the putter keep 1.0 (land and hold — the backspin-optin behaviour, byte-for-byte). Consumed by
+   * `flightScaleFor` (the flight-reduction factor) and `rollFractionFor` (the run it releases).
+   */
+  carryFrac: number;
 }
 
 /**
@@ -90,18 +100,72 @@ export interface FlightProfile {
  * putter row keeps the legacy neutral arc (its "flights" are tap-length chips).
  */
 export const FLIGHT_PROFILES: Record<FlightClass, FlightProfile> = {
-  driver: { apexAt: 0.6, peakMult: 0.85 },
-  wood: { apexAt: 0.61, peakMult: 0.95 },
-  hybrid: { apexAt: 0.64, peakMult: 1.12 },
-  iron: { apexAt: 0.66, peakMult: 1.0 },
-  wedge: { apexAt: 0.7, peakMult: 1.12 },
-  putter: { apexAt: 0.75, peakMult: 1.0 },
+  driver: { apexAt: 0.6, peakMult: 0.85, carryFrac: 0.8 },
+  wood: { apexAt: 0.61, peakMult: 0.95, carryFrac: 0.82 },
+  hybrid: { apexAt: 0.64, peakMult: 1.12, carryFrac: 0.85 },
+  iron: { apexAt: 0.66, peakMult: 1.0, carryFrac: 0.9 },
+  wedge: { apexAt: 0.7, peakMult: 1.12, carryFrac: 1.0 },
+  putter: { apexAt: 0.75, peakMult: 1.0, carryFrac: 1.0 },
 };
 
 /** The flight profile a club id flies with — the ONE lookup every consumer (sim resolve, knockdown
  *  walks, aim-overlay probe, play-view animation) shares, so they can never disagree. Pure. */
 export function flightProfileOf(clubId?: string): FlightProfile {
   return FLIGHT_PROFILES[flightClassOf(clubId)];
+}
+
+// --- Carry / roll split (GS-carry-rollout-split) -----------------------------
+/** Anchors for the PRE-SPLIT neutral roll curve (the loft-based run every club used to add on top of
+ *  its carry). Kept so the split can be tuned to preserve the club's TOTAL distance. Mirror of the
+ *  legacy `clubRollFraction` thresholds. */
+const SPLIT_BACKSPIN_CARRY = 106;
+const SPLIT_DRIVER_CARRY = 250;
+const SPLIT_SHORTEST_CARRY = 38;
+const clamp01f = (x: number): number => Math.max(0, Math.min(1, x));
+
+/**
+ * The PRE-SPLIT neutral roll fraction (of carry) a club of the given nominal used to release: long
+ * clubs ran out a lot (driver +18%), tapering through the irons to a soft stop at the wedges (PW +5%
+ * → 0). Retained (GS-carry-rollout-split) purely as the ANCHOR that keeps the new split's TOTAL equal
+ * to the old total: the flight is scaled by `carryFrac·(1+legacy)` and the run is `(1−carryFrac)/carryFrac`
+ * of that reduced flight, so carry+roll lands exactly where the ball used to finish. Pure. */
+export function legacyRollFraction(nominalCarry: number): number {
+  if (nominalCarry >= SPLIT_BACKSPIN_CARRY) {
+    const t = clamp01f((nominalCarry - SPLIT_BACKSPIN_CARRY) / (SPLIT_DRIVER_CARRY - SPLIT_BACKSPIN_CARRY));
+    return 0.05 + (0.18 - 0.05) * t; // PW +5% → driver +18%
+  }
+  const t = clamp01f((SPLIT_BACKSPIN_CARRY - nominalCarry) / (SPLIT_BACKSPIN_CARRY - SPLIT_SHORTEST_CARRY));
+  return 0.05 * (1 - t); // PW +5% → shortest wedge 0% (checks to a stop)
+}
+
+/**
+ * Factor to scale a shot's intended FLIGHT (carry) by so it lands at `carryFrac` of the club's TOTAL
+ * (GS-carry-rollout-split). Anchored on the legacy roll so the flight pulls back by exactly the run it
+ * now releases — total distance preserved. Wedge/putter (carryFrac 1) return 1 (byte-for-byte flight).
+ * Pure. */
+export function flightScaleFor(profile: FlightProfile, nominalCarry: number): number {
+  if (profile.carryFrac >= 1) return 1;
+  return profile.carryFrac * (1 + legacyRollFraction(nominalCarry));
+}
+
+/** `flightScaleFor` keyed by club id. Pure. */
+export function flightCarryScale(clubId: string | undefined, nominalCarry: number): number {
+  return flightScaleFor(flightProfileOf(clubId), nominalCarry);
+}
+
+/**
+ * The RUN a club releases as a fraction of its (reduced) flight carry (GS-carry-rollout-split) —
+ * `(1−carryFrac)/carryFrac`, so flight + run = the club's total (driver flight 0.80 → run 0.25 of
+ * flight = 0.20 of total; hybrid 0.176 ≈ 0.15 of total; iron 0.111 ≈ 0.10 of total). Wedge/putter keep
+ * the legacy neutral roll (land-and-hold), so a spin build's backspin still layers on unchanged. Pure. */
+export function rollFractionFor(profile: FlightProfile, nominalCarry: number): number {
+  if (profile.carryFrac >= 1) return legacyRollFraction(nominalCarry);
+  return (1 - profile.carryFrac) / profile.carryFrac;
+}
+
+/** `rollFractionFor` keyed by club id. Pure. */
+export function clubRollFraction(clubId: string | undefined, nominalCarry: number): number {
+  return rollFractionFor(flightProfileOf(clubId), nominalCarry);
 }
 
 /**

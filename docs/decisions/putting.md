@@ -422,6 +422,79 @@ re-shot (all ten worlds keep identity at map zoom; putt zoom shows the value ram
 Linux-only). No new `_gs*` hook — all tuning is module constants.
 
 
+## GS-carry-rollout-split — a club's number is its TOTAL: fly, land, run (2026-07-20)
+
+**The ask.** "We did a bug fix with clubs going long and the result is that the ball just sits and
+stops now. For driver, woods, hybrids and irons, the total distance should be the same but as part of
+that total distance the ball should land and run. Flight is the Carry and run is the Roll-out. Driver
+should carry 80% and roll-out 20%; hybrid 85/15; irons 90/10. For it to feel like a golf game the ball
+needs to fly, land and run, but the player needs to know total distance includes run so they don't keep
+hitting it long or into hazards. We can then add shop items that improve the carry distance — so the
+player has a choice of improving their carry to clear hazards or improving total distance but still
+maybe landing in a hazard."
+
+**The model shift.** Before this, a club's nominal `carry` WAS the flight/landing distance, and the
+run-out (`clubRollFraction`, driver +18% → wedge 0) was ADDED on top — so the total finished *beyond*
+the club's number, and the aim cone (which reads carry) told the player where the ball *landed*, not
+where it *ended*. The player's mental model — "my driver is a 250 club" — is the TOTAL, so we invert:
+the nominal number is the total, the ball flies a family fraction of it, and the run makes up the rest.
+
+**Total-preserving by construction (why the balance held).** The naïve reading — "make the club number
+the total and reduce flight to 80%" — would cut effective reach ~10-18% (today's total sits ~1.1× the
+club number), a big nerf that would blow the death-spiral bars on the thin-headroom worlds. Instead we
+anchor on the *pre-split* roll so where the ball FINISHES is unchanged and only the split moves:
+
+- `flight.ts` grows a per-family `FlightProfile.carryFrac` (driver 0.80 / wood 0.82 / hybrid 0.85 /
+  iron 0.90 / wedge 1.0 / putter 1.0).
+- `flightScaleFor(profile, nominal) = carryFrac · (1 + legacyRollFraction(nominal))` scales the FLIGHT
+  `intended` down in `resolveShot` + `shotSpread` (so the cone reads the reduced landing).
+- `rollFractionFor(profile, nominal) = (1 − carryFrac) / carryFrac` is the run `rollPotential`
+  releases (of the reduced carry).
+- Because `flightScale · (1 + rollFrac) = 1 + legacyRollFraction` exactly, `carry + run` = the OLD
+  total, mean-for-mean, on uniform ground. Endpoint preserved ⇒ GIR/Stableford preserved ⇒ the main
+  death-spiral bars (characters/compose/biomes) stayed green with NO AI reach change. Flight drops only
+  ~2% (iron) to ~6% (driver); the run becomes a clean 20/15/10% of the *unchanged* total. Wedge/putter
+  (`carryFrac` 1) are byte-for-byte the backspin-optin land-and-hold behaviour — `rollFractionFor`
+  falls back to `legacyRollFraction` there, and `flightScaleFor` returns 1.
+
+**The physics roll cap.** The driver's bigger run (~53yd off its reduced flight vs the old ~40)
+exceeded the old `MAX_ROLL` 42 clamp, which would have re-shortened the total. Split the constant: the
+AUTO-AI's roll ALLOWANCE keeps `MAX_ROLL` 42 (unchanged targeting), the PHYSICS run cap becomes
+`ROLL_ENERGY_CAP` 60 so a full drive's release isn't clipped.
+
+**The one fairness-critical coupling.** REACH decisions (can I reach the green / this position) key off
+TOTAL, which is preserved, so `maxReachOf`/`suggestClub`/`aiClub`/`attackTarget` are untouched. But a
+forced CARRY must be cleared in the AIR — the run can't span water/lava/void. So the carry-aware AI now
+keys those off FLIGHT reach: `maxFlightReachOf` (`clubDist · flightCarryScale`) feeds `carryTarget`, and
+`longestCarryClub` scales each candidate's carry by `flightCarryScale`. The AI lays up when its reduced
+flight can't span a hazard — a strictly safer decision (Stableford can only rise, contract 4).
+`validateCrossings`/`validateFairness` are geometric and untouched (still green). `suggestPlayerClub`
+(interactive green-coverage) now reasons about TOTAL (`expectedTotal`/`highTotal`) so it doesn't club up
+into an overshoot off the reduced flight. Wind-compensation carry also reads the reduced flight.
+
+**Deliberate difficulty (the one relaxed fence).** Shorter flight makes forced water/lava carries
+genuinely harder — exactly the "you need enough CARRY to clear it" the ask wants, and the hook for
+carry-boost shop items. The main bars absorbed it, but max-wildness **ice-ring** (frost, the hardest
+forced-carry world) nudged from ~0.99 → ~1.06 toPar/hole. Per the GS-rough-gradient / GS-biome-variety
+precedent, its death-spiral FENCE is relaxed (`< 1.12`) with a `TODO(GS-carry-rollout-split)` — never
+the structural fairness contract, and never by softening the ponds. Re-tighten with a short-game /
+carry-boost pass.
+
+**Player-facing.** The run-out helper line (GS-runout-line) now draws the forward run whenever the ball
+lands on SHORT GRASS (`RUNOUT_LIES` = fairway/green/tee), not only greens — so a drive shows its run
+down the fairway and an approach its release onto the green (a ball into rough/sand draws no line — it
+stops in the stuff, and a line into the hay is clutter). The shot HUD legend reads `carry X–Yy → Zy
+total` so the number carries the run. The at-rest default-power seed already aims the carry short so
+`carry + run ≈ pin` (now via the family-keyed `clubRollFraction(clubId, nominal)`).
+
+**Contracts.** Determinism: byte-shifts (flight/roll changed for non-wedge clubs) are re-pinned — the
+ace-ship fixture (seed 42 → 101), the flight-knockdown + spray-block grove fixtures (re-tuned for the
+reduced arc), the two off-green driver run-out tests (now gated on `RUNOUT_LIES`). auto ≡ interactive:
+`resolveShot`/`executeShot`/the AI carry helpers are the single shared path. Graphic IS the physics:
+`backspinRoll` runs the SAME `rollOut` at the mean split energy. No `_gs*`/URL hook (a physics change +
+a HUD readout), so no test-hub wiring. `clubRollFraction` gains a `clubId` arg (family-keyed) and is
+re-exported from `round.ts`.
+
 ## GS-backspin-optin — backspin is a build, not every wedge (2026-07-20)
 
 **The ask.** "Rework backspin across the whole game — either remove it completely or keep it only to
