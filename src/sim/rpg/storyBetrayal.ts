@@ -99,6 +99,59 @@ export function coilChampionName(id: CoilChampionId): string {
   return id === 'venoma' ? 'Venoma "the Viper" Krait' : 'Malachai "Sable" Voss';
 }
 
+/** A golfer's short name (for finale pair labels), or the raw id. */
+function golferName(id: string): string {
+  return getCharacter(id)?.shortName ?? id;
+}
+
+/** The 2v2 best-ball MATCHPLAY finale team make-up (GS-story-betrayer), derived from the partner picks +
+ *  alignment. One source for the finale lobby, the resolution, and the recap. */
+export interface FinaleMatchup {
+  herald: boolean;
+  /** Your PARTNER's ghost id (a loyal friend on Warden; a Coil champion on Herald). */
+  allyId: string;
+  allyName: string;
+  /** True when your partner is a Coil champion (Herald), false when a friend (Warden). */
+  allyIsChampion: boolean;
+  /** The two opponent ghost ids you face. */
+  oppIds: [string, string];
+  oppNames: [string, string];
+  /** On the Warden path, the DEFECTOR golfer id (for the corrupted costume); absent on Herald. */
+  betrayerGolferId?: string;
+}
+
+/**
+ * Resolve the Ch.5 2v2 finale teams (pure). WARDEN: You + a loyal friend vs (the Betrayer + Venoma the
+ * Coil champion). HERALD: You + the top Coil champion who isn't your guide vs the two friends who partnered
+ * you. `activeGuideId` is your active caddy/guide (a Coil agent on Herald) — the champion excludes them.
+ */
+export function finaleMatchup(story: StoryState, activeGuideId?: string): FinaleMatchup {
+  if (story.alignment === 'herald') {
+    const champ = coilChampionExcluding(activeGuideId ?? story.activeCaddyId);
+    const opp = heraldOpponentIds(story);
+    return {
+      herald: true,
+      allyId: champ,
+      allyName: coilChampionName(champ),
+      allyIsChampion: true,
+      oppIds: opp,
+      oppNames: [golferName(opp[0]), golferName(opp[1])],
+    };
+  }
+  const ally = loyalAllyId(story);
+  const betrayer = betrayerId(story);
+  const champ: CoilChampionId = 'venoma'; // the Warden climax champion (the Viper, at the traitor's shoulder)
+  return {
+    herald: false,
+    allyId: ally,
+    allyName: golferName(ally),
+    allyIsChampion: false,
+    oppIds: [betrayer, champ],
+    oppNames: [golferName(betrayer), coilChampionName(champ)],
+    betrayerGolferId: betrayer,
+  };
+}
+
 // ── The corrupted (Coil) costume for a defector (GS-story-betrayer) ────────────────────────────────────
 
 /** Deep Coil-violet garb + an acid-green accent — the shed-scale look a defector wears. Keeps the golfer's

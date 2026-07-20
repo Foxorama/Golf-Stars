@@ -302,6 +302,10 @@ export interface UiState {
     /** GS-story-stableford: the Ch.3 Storm Championship is STABLEFORD — `playerGross`/`rivalGross` are
      *  POINTS (higher wins), and the recap/scoreboard read them as points, not strokes. Absent = strokes. */
     stableford?: boolean;
+    /** GS-story-betrayer: the Ch.5 finale is a 2v2 best-ball MATCHPLAY — the recap reads the scoreline +
+     *  the two teams (You & <ally> vs <betrayer/friends> & <champion>), not a stroke total. Absent = not
+     *  a matchplay major. */
+    match?: { scoreline: string; allyName: string; oppNames: [string, string]; thru: number; holesUp: number; herald: boolean };
   };
   /** GS-story-tournament-midpop: the halftime (after hole 9) rival pop payload — the rival BRAGS when
    *  ahead / CURSES you when behind, over the standings through nine. Transient (the `storyTournamentPop`

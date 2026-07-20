@@ -10,6 +10,7 @@ import { state } from './ctx';
 import { getCharacter } from '../sim/rpg/characters';
 import { STORY_CHAPTER_COUNT, type StoryState } from '../sim/rpg/story';
 import { currentTournament, sigilCount, tournamentCompetitors, isTeamTournament, teamPartnerPool, type StoryTournament } from '../sim/rpg/storyTournaments';
+import { finaleMatchup, corruptedLookOpts, COIL_FIGURE_TINT } from '../sim/rpg/storyBetrayal';
 import { golferPreviewSVG } from '../render/apparelArt';
 import { storyClubEffectLabel } from '../sim/rpg/storyClubEffects';
 import { venomaPortraitSVG, vossPortraitSVG, driverDanPortraitSVG } from '../render/loreArt';
@@ -125,6 +126,50 @@ function partnerPickerHTML(t: StoryTournament, story: StoryState): string {
     </div>`;
 }
 
+/** A small golfer figure (their signature look, or corrupted Coil garb) for the finale matchup box. */
+function matchFigure(charId: string, corrupt: boolean, uid: string): string {
+  const ch = getCharacter(charId);
+  if (!ch) return `<div class="gs-tourn-mfglyph">🐍</div>`;
+  const opts = corrupt
+    ? { ...corruptedLookOpts(ch), uid, w: 52, h: 140 }
+    : { skin: ch.style.skin, shirtBase: ch.style.shirt, capColor: ch.style.cap, hair: ch.style.hair, uid, w: 52, h: 140 };
+  const fig = golferPreviewSVG(undefined, undefined, undefined, opts);
+  return `<span class="gs-tourn-mfig"${corrupt ? ` style="filter:${COIL_FIGURE_TINT};"` : ''}>${fig}</span>`;
+}
+
+/** GS-story-betrayer: the Ch.5 2v2 best-ball MATCHPLAY matchup box — YOUR team (you + a loyal friend /
+ *  a Coil champion) across from THE OPPOSING pair (the betrayer in corrupted garb + Venoma, or your two
+ *  former friends). Shows who turned, and who stands with you, before you tee off. */
+function finaleMatchupBox(story: StoryState): string {
+  const m = finaleMatchup(story, story.activeCaddyId);
+  const you = getCharacter(story.characterId);
+  const youFig = you ? matchFigure(you.id, false, 'mfyou') : '';
+  // your partner: a friend (Warden) drawn as a figure, or a Coil champion (Herald) drawn as a glyph/portrait
+  const allyFig = m.allyIsChampion
+    ? `<div class="gs-tourn-mfglyph">${m.allyId === 'venoma' ? '🐍' : '🖤'}</div>`
+    : matchFigure(m.allyId, false, 'mfally');
+  // opponents: on the Warden path the first is the DEFECTOR (corrupted); a champion opponent is a glyph
+  const oppFig = (id: string, i: number) => {
+    const isChampion = id === 'venoma' || id === 'voss';
+    if (isChampion) return `<div class="gs-tourn-mfglyph">${id === 'venoma' ? '🐍' : '🖤'}</div>`;
+    const corrupt = !m.herald && id === m.betrayerGolferId; // the Warden-path defector wears Coil garb
+    return matchFigure(id, corrupt, `mfopp${i}`);
+  };
+  return `<div class="gs-tourn-matchbox gs-tourn-in gs-tourn-in3">
+      <div class="gs-tourn-mteam gs-tourn-mteam--you">
+        <div class="gs-tourn-mlabel">Your team</div>
+        <div class="gs-tourn-mfigs">${youFig}${allyFig}</div>
+        <div class="gs-tourn-mnames">You &amp; ${m.allyName.split(' ')[0]}</div>
+      </div>
+      <div class="gs-tourn-mvs">vs</div>
+      <div class="gs-tourn-mteam gs-tourn-mteam--them">
+        <div class="gs-tourn-mlabel">${m.herald ? 'Your former friends' : 'The traitor & the Viper'}</div>
+        <div class="gs-tourn-mfigs">${oppFig(m.oppIds[0], 0)}${oppFig(m.oppIds[1], 1)}</div>
+        <div class="gs-tourn-mnames">${m.oppNames.map((n) => n.split(' ')[0]).join(' & ')}</div>
+      </div>
+    </div>`;
+}
+
 export function storyTournamentScreen(): string {
   const story = state.story;
   const t = story ? currentTournament(story) : undefined;
@@ -152,13 +197,20 @@ export function storyTournamentScreen(): string {
     ),
     `<span class="gs-tourn-fc gs-tourn-fc--you">🏌 ${whoShort}</span>`,
   ].join('');
-  const fieldOrPicker = team
+  const isMatch = t.format === 'bestball-match';
+  const fieldOrPicker = isMatch
+    ? finaleMatchupBox(story)
+    : team
     ? partnerPickerHTML(t, story)
     : `<div class="gs-tourn-fieldbox gs-tourn-in gs-tourn-in3">
         <div class="gs-tourn-fieldlabel">The field</div>
         <div class="gs-tourn-field">${fieldChips}</div>
       </div>`;
-  const teeLabel = team ? `⛳ Tee off with ${partnerName} — play for the Sigil` : '⛳ Tee off — play for the Sigil';
+  const teeLabel = isMatch
+    ? '⛳ Tee off — the match for the last Sigil'
+    : team
+    ? `⛳ Tee off with ${partnerName} — play for the Sigil`
+    : '⛳ Tee off — play for the Sigil';
   return `
     <header class="gs-hero gs-storyhub">
       <h1 class="gs-hero-title gs-tourn-in gs-tourn-in1">🏆 ${t.name}</h1>
@@ -253,12 +305,18 @@ export function storyTournamentResultScreen(): string {
   const margin = diff === 0
     ? (r.stableford ? 'level, and the tie goes to you' : 'tied, and the tie goes to you')
     : `by ${lead}${r.stableford ? ' points' : ''}`;
+  // GS-story-betrayer: the Ch.5 finale is a 2v2 best-ball MATCHPLAY — the recap reads the scoreline + teams.
+  const mp = r.match;
   const title = r.won ? (r.finalSigil ? '🗝 The final Sigil!' : `🏅 ${r.sigilName} won!`) : '💔 So close';
-  const kicker = r.won
-    ? r.finalSigil
-      ? 'All five Sigils are yours — they forge the key to the serpent’s root.'
-      : `You beat ${r.rivalName.split(' ')[0]} ${margin}. The chapter turns.`
-    : `${r.rivalName.split(' ')[0]} edged you ${margin}. Regroup and challenge again.`;
+  const kicker = mp
+    ? r.won
+      ? `You & ${mp.allyName.split(' ')[0]} took the match ${mp.scoreline} against ${mp.oppNames.map((n) => n.split(' ')[0]).join(' & ')}.${r.finalSigil ? ' The fifth Sigil is yours.' : ' The chapter turns.'}`
+      : `${mp.oppNames.map((n) => n.split(' ')[0]).join(' & ')} took the match ${mp.scoreline}. Regroup and challenge again.`
+    : r.won
+      ? r.finalSigil
+        ? 'All five Sigils are yours — they forge the key to the serpent’s root.'
+        : `You beat ${r.rivalName.split(' ')[0]} ${margin}. The chapter turns.`
+      : `${r.rivalName.split(' ')[0]} edged you ${margin}. Regroup and challenge again.`;
   const body = r.won
     ? r.finalSigil
       ? `<p>The Sigils rise and lock together into a single burning key. Somewhere far below Yggdrasil, something vast stirs — and now you can reach it.</p>
@@ -274,8 +332,11 @@ export function storyTournamentResultScreen(): string {
       <p class="gs-hero-tag">${kicker}</p>
       <div class="gs-hero-chips">
         <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-ink);font-size:14px;">${r.name}</span>
-        <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:14px;" title="${r.stableford ? 'your Stableford points vs the rival (higher wins)' : r.team ? 'your team vs the leading pair' : 'your gross vs the rival'}">${r.team ? 'Team' : 'You'} ${r.playerGross} · ${r.rivalName.split(' ')[0]} ${r.rivalGross}${r.stableford ? ' pts' : ''}</span>
-        ${r.team ? `<span class="gs-chip" style="border-color:#2f6a44;color:#9dffce;font-size:13px;" title="your partner for this Sigil">🤝 You &amp; ${r.team.partnerName} · ${r.team.format}${r.team.partnerCountedHoles > 0 ? ` · their ball counted on ${r.team.partnerCountedHoles}` : ''}</span>` : ''}
+        ${mp
+          ? `<span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:14px;" title="the 2v2 best-ball matchplay result">🏌 You &amp; ${mp.allyName.split(' ')[0]} — ${mp.scoreline}</span>
+             <span class="gs-chip" style="border-color:#5a2f56;color:#e6a6d6;font-size:13px;" title="the opposing pair">🐍 ${mp.oppNames.map((n) => n.split(' ')[0]).join(' & ')}</span>`
+          : `<span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:14px;" title="${r.stableford ? 'your Stableford points vs the rival (higher wins)' : r.team ? 'your team vs the leading pair' : 'your gross vs the rival'}">${r.team ? 'Team' : 'You'} ${r.playerGross} · ${r.rivalName.split(' ')[0]} ${r.rivalGross}${r.stableford ? ' pts' : ''}</span>
+             ${r.team ? `<span class="gs-chip" style="border-color:#2f6a44;color:#9dffce;font-size:13px;" title="your partner for this Sigil">🤝 You &amp; ${r.team.partnerName} · ${r.team.format}${r.team.partnerCountedHoles > 0 ? ` · their ball counted on ${r.team.partnerCountedHoles}` : ''}</span>` : ''}`}
       </div>
     </header>
     <section style="max-width:520px;margin:14px auto 0;text-align:center;color:var(--gs-dim);font-size:14px;line-height:1.55;">
@@ -371,6 +432,21 @@ const TOURN_STYLE = `
     .gs-tourn-ppfig svg{width:100%;height:auto;display:block;}
     .gs-tourn-ppname{font-size:12px;font-weight:800;color:#c7d2e2;white-space:nowrap;}
     .gs-tourn-pp--on .gs-tourn-ppname{color:#9dffce;}
+    /* GS-story-betrayer: the 2v2 finale matchup box (your team vs the traitor's) */
+    .gs-tourn-matchbox{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:6px;
+      background:#0b0f18;border:1px solid #232b3b;border-radius:12px;padding:10px;margin-bottom:12px;}
+    .gs-tourn-mteam{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 4px;border-radius:10px;}
+    .gs-tourn-mteam--you{background:#122018;border:1px solid #2f6a44;}
+    .gs-tourn-mteam--them{background:#1c1224;border:1px solid #5a2f56;}
+    .gs-tourn-mlabel{font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#8a97a8;text-align:center;}
+    .gs-tourn-mteam--you .gs-tourn-mlabel{color:#7fe0a0;}
+    .gs-tourn-mteam--them .gs-tourn-mlabel{color:#e6a6d6;}
+    .gs-tourn-mfigs{display:flex;gap:2px;align-items:flex-end;justify-content:center;min-height:80px;}
+    .gs-tourn-mfig{width:52px;filter:drop-shadow(0 4px 5px #0009);}
+    .gs-tourn-mfig svg{width:100%;height:auto;display:block;}
+    .gs-tourn-mfglyph{width:44px;height:80px;display:flex;align-items:center;justify-content:center;font-size:34px;filter:drop-shadow(0 3px 5px #000a);}
+    .gs-tourn-mnames{font-size:12.5px;font-weight:800;color:#dbe4f0;white-space:nowrap;}
+    .gs-tourn-mvs{font-size:13px;font-weight:900;color:#7c8aa0;font-style:italic;padding:0 2px;}
     /* staggered entrance — the tournament "walks out" */
     .gs-tourn-in{opacity:0;transform:translateY(10px);animation:gs-tourn-rise .5s cubic-bezier(.2,.8,.2,1) forwards;}
     .gs-tourn-in1{animation-delay:.02s;} .gs-tourn-in2{animation-delay:.14s;} .gs-tourn-in3{animation-delay:.26s;}
