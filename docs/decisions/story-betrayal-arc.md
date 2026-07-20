@@ -105,6 +105,21 @@ the corrupted one; the former friends stay clean Warden.
 - **GS-story-sigil-formats** — ✅ (2026-07-20) the Sigil-format correctness pass: Sigil 3 Stableford →
   **singles matchplay**, Sigil 5 best-ball → **2v2 scramble matchplay**; matchplay lobby/recap copy; the
   leaderboard serpent glyph gated to Ch.3+ (early majors show 🚩, not 🐍, for opposing pairs).
+- **GS-story-sigil-play** — ✅ (2026-07-20) the team Sigils now PLAY interactively as team formats (they used
+  to fold the partner as a stat-ghost only at resolution, so a real player never picked a scramble ball or
+  saw a best-ball comparison). Reuses the proven team-duel machinery. **Sigil 1 SCRAMBLE:** `run.storyTeamFormat`
+  arms `scrambleOptsFor` (so the AUTO path plays best-of-two too — auto ≡ interactive) and the reducer's
+  `'shot'` handler raises the pick-your-ball choice card (`resolveScrambleShot` → `scrambleChoice` →
+  `chooseScrambleBall`, the same card the parrot/team-duel use, now naming your chosen partner); the played
+  round IS the team's scramble gross, so `resolveStoryTournament`'s scramble branch scores that real gross vs
+  the opposing pairs (not a re-folded ghost). **Sigil 2 BEST-BALL:** the play-done screen reveals the
+  partner's ball each hole (`bestBallRevealHTML` + a `synthGhostHole` from `storyPartnerBestBallScore` — the
+  SAME per-hole ghost the resolution folds, so the reveal + running team total match the finished recap to the
+  stroke); resolution stays the deterministic ghost fold (the player plays their own ball), so `stopPlayed` is
+  untouched and auto ≡ interactive holds. Contracts kept: the scramble partner draw is gated on the armed
+  Sigil (contract 1 — other rounds byte-identical), the player draw is first (contract 2). Guarded by
+  `tests/story-team-play.test.ts` (opts arming, the pick card, the reveal-vs-resolution consistency) + the
+  existing story-flow/partners suites. No save bump.
 - **GS-story-betrayal-beats** — ✅ (#512) the mid-chapter interlude reworked into the per-character defection
   (Warden, corrupted portrait) / caddy-quest-keyed severing (Herald); four distinct `BETRAYAL_VOICE`s.
 - **GS-story-charquests** — ✅ each friend's signature quest, unlocked by partnering them; `charquest:<id>`

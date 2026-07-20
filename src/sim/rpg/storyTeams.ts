@@ -56,6 +56,17 @@ export function teamHoleScore(cards: readonly number[]): number {
   return Math.min(...cards);
 }
 
+/**
+ * The partner's BEST-BALL ghost score for ONE hole (GS-story-sigil-play) — the EXACT per-hole card
+ * `resolveStoryTeamStroke` folds for a best-ball Sigil (same `:partner` form + stream), so a per-hole
+ * REVEAL (your ball vs the partner's, the lower counts) matches the finished resolution to the stroke.
+ * Pure + deterministic (a keyed hash, no sequential rng), so it's safe to read on the render side.
+ */
+export function storyPartnerBestBallScore(partnerId: string, partnerEdge: number, seed: string, holeIndex: number, par: number): number {
+  const form = golferForm(partnerId, `${seed}:partner:${partnerId}`);
+  return ghostCard(partnerId, `${seed}:partner`, holeIndex, par, partnerEdge, form);
+}
+
 /** A ghost PAIR's cards for one hole (2 for best-ball, 3 for scramble — the extra bite off member A). */
 function pairHoleCards(
   pair: OpposingPair,

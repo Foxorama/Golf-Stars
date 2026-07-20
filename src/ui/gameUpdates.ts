@@ -51,7 +51,7 @@ import { shipCreditMult, grantStoryAceShip, grantStoryShip } from '../sim/rpg/st
 import { recordCaddyRound } from '../sim/rpg/storyCaddies';
 import { upgradeCreditMult, grantShipUpgrade } from '../sim/rpg/storyShipUpgrades';
 import { tournamentForChapter, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS, isStoryQualifier, chapterQualifierEvents, isTeamTournament, isSinglesMatchTournament, isTeamMatchTournament, teamFieldPairs, teamPartnerOrDefault, TEAM_PARTNER_EDGE } from '../sim/rpg/storyTournaments';
-import { resolveStoryTeamStroke, resolveStory2v2Match, resolveStorySinglesMatch } from '../sim/rpg/storyTeams';
+import { resolveStoryTeamStroke, resolveStory2v2Match, resolveStorySinglesMatch, opposingField } from '../sim/rpg/storyTeams';
 import { finaleMatchup } from '../sim/rpg/storyBetrayal';
 import { qualifierField, qualifierPlacement, recordQualifier, qualifiedCount, qualifyTop, QUALIFY_EVENTS_NEEDED } from '../sim/rpg/storyQualifiers';
 import { getCharacter } from '../sim/rpg/characters';
@@ -490,30 +490,46 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
   let teamPayload: { partnerName: string; format: 'scramble' | 'bestball'; playerSolo: number; partnerCountedHoles: number } | undefined;
 
   if (isTeamTournament(t)) {
-    // GS-story-partners: a TEAM Sigil (Scramble/Best-ball) — your REAL round + a chosen partner ghost make
-    // your team; you beat a field of opposing PAIRS (the rival's pair + randos + the two non-chosen
-    // friends). Deterministic (storyTeams). The pick is LOCKED into the campaign here (drives the betrayal).
+    // GS-story-partners / GS-story-sigil-play: a TEAM Sigil — you + a chosen partner vs a field of opposing
+    // PAIRS (the rival's pair + randos + the two non-chosen friends). The pick is LOCKED here (drives the
+    // betrayal). SCRAMBLE plays interactively — the partner ball was actually hit + the better kept, so the
+    // PLAYED round IS the team's scramble gross. BEST-BALL uses the deterministic partner-ghost fold (the
+    // player plays their own ball; the lower per-hole counts) — the reveal is presentation from that model.
     const partnerId = teamPartnerOrDefault(base, run.storyTournamentPartner);
-    const fmt = (t.format === 'scramble' ? 'scramble' : 'bestball') as 'scramble' | 'bestball';
-    const res = resolveStoryTeamStroke(
-      played.map((p) => p.record.strokes),
-      partnerId,
-      TEAM_PARTNER_EDGE,
-      teamFieldPairs(t, base, partnerId),
-      String(run.seed),
-      pars,
-      fmt,
-    );
-    won = res.won;
-    rivalGross = res.bestOpponentTotal;
-    rivalName = res.field[0]?.name ?? t.rivalName;
     const partnerName = getCharacter(partnerId)?.shortName ?? 'Partner';
-    leaderboard = [
-      { name: `You & ${partnerName}`, gross: res.playerTeamTotal, kind: 'player' as const },
-      ...res.field.map((p) => ({ name: p.name, gross: p.total, kind: 'rival' as const })),
-    ].sort((a, b) => a.gross - b.gross || (a.kind === 'player' ? -1 : b.kind === 'player' ? 1 : 0));
-    teamPayload = { partnerName, format: fmt, playerSolo: totals.gross, partnerCountedHoles: res.partnerCountedHoles };
-    playerGross = res.playerTeamTotal;
+    const pairs = teamFieldPairs(t, base, partnerId);
+    if (t.format === 'scramble') {
+      const field = opposingField(pairs, String(run.seed), pars, 'scramble');
+      const best = field.length ? field[0]!.total : Number.POSITIVE_INFINITY;
+      won = totals.gross <= best; // your real scramble team gross vs the leading pair (ties → you)
+      rivalGross = best;
+      rivalName = field[0]?.name ?? t.rivalName;
+      playerGross = totals.gross;
+      leaderboard = [
+        { name: `You & ${partnerName}`, gross: totals.gross, kind: 'player' as const },
+        ...field.map((p) => ({ name: p.name, gross: p.total, kind: 'rival' as const })),
+      ].sort((a, b) => a.gross - b.gross || (a.kind === 'player' ? -1 : b.kind === 'player' ? 1 : 0));
+      teamPayload = { partnerName, format: 'scramble', playerSolo: totals.gross, partnerCountedHoles: 0 };
+    } else {
+      const res = resolveStoryTeamStroke(
+        played.map((p) => p.record.strokes),
+        partnerId,
+        TEAM_PARTNER_EDGE,
+        pairs,
+        String(run.seed),
+        pars,
+        'bestball',
+      );
+      won = res.won;
+      rivalGross = res.bestOpponentTotal;
+      rivalName = res.field[0]?.name ?? t.rivalName;
+      playerGross = res.playerTeamTotal;
+      leaderboard = [
+        { name: `You & ${partnerName}`, gross: res.playerTeamTotal, kind: 'player' as const },
+        ...res.field.map((p) => ({ name: p.name, gross: p.total, kind: 'rival' as const })),
+      ].sort((a, b) => a.gross - b.gross || (a.kind === 'player' ? -1 : b.kind === 'player' ? 1 : 0));
+      teamPayload = { partnerName, format: 'bestball', playerSolo: totals.gross, partnerCountedHoles: res.partnerCountedHoles };
+    }
     base = setSigilPartner(base, t.chapter, partnerId);
   } else if (isSinglesMatchTournament(t)) {
     // GS-story-sigil-formats: the Ch.3 Storm Championship is a 1v1 SINGLES MATCHPLAY — just you vs the

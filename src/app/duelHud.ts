@@ -190,7 +190,12 @@ export function teamPartnerChar(setup: TeamDuelSetup): Character | undefined {
  */
 export function bestBallRevealHTML(raw: PlayedHole, partnerHole: PlayedHole, par: number): string {
   const duel = teamDuel();
-  const partner = duel ? teamPartnerChar(duel) : undefined;
+  // The partner: a team-duel partner (boss stop), else the Story Sigil's chosen partner (GS-story-sigil-play).
+  const partner = duel
+    ? teamPartnerChar(duel)
+    : state.run.storyTournamentPartner
+    ? getCharacter(state.run.storyTournamentPartner)
+    : undefined;
   const youChar = getCharacter(state.run.loadout.characterId ?? '');
   const partnerKept = partnerHole.record.strokes < raw.record.strokes;
   const card = (label: string, h: PlayedHole, kept: boolean, accent: string): string => {

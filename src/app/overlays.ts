@@ -7,6 +7,7 @@
 
 import { state } from './ctx';
 import { teamDuel, teamPartnerChar } from './duelHud';
+import { getCharacter } from '../sim/rpg/characters';
 import {
   holeBiome,
   holeThemeId,
@@ -148,7 +149,13 @@ export function priceNoticeOverlay(): string {
 export function scrambleChoiceOverlay(): string {
   const sc = state.scrambleChoice!;
   const duel = teamDuel();
-  const partner = duel ? teamPartnerChar(duel) : undefined;
+  // The partner: a team-duel partner (boss stop), else the Story Sigil's chosen partner (GS-story-sigil-play),
+  // so the card names your actual friend instead of a generic "partner".
+  const partner = duel
+    ? teamPartnerChar(duel)
+    : state.run.storyTournamentPartner
+    ? getCharacter(state.run.storyTournamentPartner)
+    : undefined;
   const hole = sc.base.hole;
   // Both balls from the SAME spot: the player's line solid, the partner's muted (ghost) beneath.
   const map = renderHoleSVG(hole, {
