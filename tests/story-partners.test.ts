@@ -73,11 +73,10 @@ describe('GS-story-partners — StoryState partner fields (v5)', () => {
     expect(setSigilPartner(s, 3, 'x')).toBe(s);
   });
 
-  it('the version is 5 and the partner fields survive a migrate round-trip', () => {
-    expect(STORY_VERSION).toBe(5);
+  it('the partner fields survive a migrate round-trip (bumped to the current STORY_VERSION)', () => {
     const blob = { ...story({ sigil1Partner: 'longshot-larry', sigil2Partner: 'backspin-bo' }), version: 4 };
     const migrated = migrateStory(JSON.parse(JSON.stringify(blob)));
-    expect(migrated.version).toBe(5);
+    expect(migrated.version).toBe(STORY_VERSION);
     expect(migrated.sigil1Partner).toBe('longshot-larry');
     expect(migrated.sigil2Partner).toBe('backspin-bo');
     // an old blob with no partner fields upgrades cleanly (fields absent)

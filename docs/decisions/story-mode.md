@@ -764,6 +764,22 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   `storyWorldUnlocked` (the map's only reachability consumer) reads `chartChapter`. Pure model + one reducer
   guard; no save bump, no `_gs*`/URL hook (no test-hub wiring). Guarded by `tests/story-state.test.ts` (the
   chart-vs-tier decoupling) + the Ch.4 gather-early flow in `tests/story-flow.test.ts`.
+- **GS-story-caddy-rep** — ✅ *shipped* (`story.ts` + `storyCaddies.ts` + `storyQuests.ts` + `gameUpdates.ts`).
+  Player ask: an ally caddy's personal SIDE QUEST used to unlock the moment you'd recruited them + flown on
+  once — "establish a reputation-style system without implementing one": a caddy should offer their quest only
+  after you've **played a round with them on the bag**. New persisted `StoryState.caddiedRoundIds` (STORY_VERSION
+  5→6, additive migrate → `[]`) records every caddy you've completed a Story round with as your ACTIVE caddy;
+  `recordCaddyRound(story)` is folded into BOTH round-resolution sites (`resolveStoryRound` — world clears /
+  qualifiers / quest rounds — and `resolveStoryTournament` — the majors), a no-op when no caddy is active.
+  `questOfferable` gains a `caddiedWith(story, caddyId)` gate (on TOP of the existing chapter + "played on
+  elsewhere" beat), so a quest never unlocks the instant you hire; `questBeatPending` now distinguishes the
+  "put them on the bag for a round first" hold (no reputation yet) from the "play on elsewhere" beat, and the
+  crew card says the right thing. Path-AGNOSTIC by construction — it reads the active caddy, so a Herald's Coil
+  volunteer earns their quest the same way (this is the seam GS-story-herald-quests builds the Coil caddy
+  quests on). Pure model + two reducer record-calls + one render string; the only new hook is a save field (no
+  `_gs*`/URL hook, no test-hub wiring). Guarded by `tests/story-caddies.test.ts` (record/idempotent/active-only),
+  the rep gate in `tests/story-quests.test.ts`, the migrate in `tests/story-state.test.ts`, and the
+  recruit→carry-a-round→quest-opens flow in `tests/story-flow.test.ts`.
 
 ## Phase J — the deep betrayal arc (GS-story-betrayal)
 The single-protagonist "your three friends are recurring rivals" model was thin. This phase turns the other

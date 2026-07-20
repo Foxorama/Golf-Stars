@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { initState, reduce } from '../src/ui/game';
 import { DEFAULT_CHARACTER_ID } from '../src/sim/rpg/characters';
 import { defaultStoryState, REVISIT_CREDIT_MULT } from '../src/sim/rpg/story';
+import { questOfferable, questBeatPending } from '../src/sim/rpg/storyQuests';
 import { hasStory, loadStory, writeStory, clearStory, exportStory, importStory } from '../src/save/storyStore';
 
 describe('Story Mode entry flow (GS-story-save wiring)', () => {
@@ -867,9 +868,9 @@ describe('storyStore persistence (GS-story-save wiring)', () => {
 
 describe('Ally side quests (GS-story-quests)', () => {
   it('accept → play the quest world → recap → claim the unique reward into the bag', () => {
-    // Driver Dan recruited, chapter 3, and a world cleared ELSEWHERE (past the beat gate) → his quest
-    // (the derelict) is offerable.
-    const story = { ...defaultStoryState('feather-fade'), chapter: 3, hiredCaddyIds: ['driver-dan'], activeCaddyId: 'driver-dan', clearedWorldIds: ['standrews-18'] };
+    // Driver Dan recruited, chapter 3, a round already carried WITH him (past the GS-story-caddy-rep gate),
+    // and a world cleared ELSEWHERE (past the beat gate) → his quest (the derelict) is offerable.
+    const story = { ...defaultStoryState('feather-fade'), chapter: 3, hiredCaddyIds: ['driver-dan'], activeCaddyId: 'driver-dan', caddiedRoundIds: ['driver-dan'], clearedWorldIds: ['standrews-18'] };
     const hub = { ...initState('quest-seed', {}, undefined, story), screen: 'story' as const };
 
     // accept it from the ally card → active
@@ -903,5 +904,27 @@ describe('Ally side quests (GS-story-quests)', () => {
   it('a quest cannot be accepted before its chapter, and only one runs at a time', () => {
     const early = { ...initState('s', {}, undefined, { ...defaultStoryState('feather-fade'), chapter: 1, hiredCaddyIds: ['driver-dan'] }), screen: 'story' as const };
     expect(reduce(early, { type: 'acceptStoryQuest', questId: 'quest-dan' }).story?.activeQuestId).toBeUndefined();
+  });
+
+  it('GS-story-caddy-rep: a quest opens only AFTER a round is carried with that caddy on the bag', () => {
+    // Sandy recruited + active, chapter 2, and a world cleared elsewhere — but no round carried with her yet.
+    const story = {
+      ...defaultStoryState('feather-fade'),
+      chapter: 2,
+      hiredCaddyIds: ['sandy-sandsaver'],
+      activeCaddyId: 'sandy-sandsaver',
+      clearedWorldIds: ['standrews-18'],
+    };
+    expect(questOfferable(story, 'sandy-sandsaver')).toBe(false); // reputation not yet earned
+    expect(questBeatPending(story, 'sandy-sandsaver')).toBe(true); // "put them on the bag for a round first"
+
+    // Play a world round with Sandy on the bag → the reducer records the caddy round…
+    const map = { ...initState('rep-seed', {}, undefined, story), screen: 'starTour' as const };
+    let intro = reduce(map, { type: 'storyPlayWorld', courseId: 'verdant-18' });
+    if (intro.screen === 'lore') intro = reduce(intro, { type: 'dismissLore' }); // an arrival beat may fire
+    const played = reduce(intro, { type: 'play' });
+    expect(played.story!.caddiedRoundIds).toContain('sandy-sandsaver');
+    // …and now her quest opens up.
+    expect(questOfferable(played.story!, 'sandy-sandsaver')).toBe(true);
   });
 });

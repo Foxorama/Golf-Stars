@@ -129,6 +129,15 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
   post-Choice) so a Warden gathers them across Ch.4–5 while the worlds stay Ch.5 tournaments (venue/qualifier/
   difficulty/payout + the quest narrative unchanged). Early visits are plain clears, not out-of-chapter
   qualifiers. Pure model + one reducer guard; no save bump.
+- **GS-story-caddy-rep** — ✅ *shipped*: a caddy's side quest unlocks only AFTER you've played a round with
+  them on the bag (a lightweight reputation gate, no rep system needed). New persisted `caddiedRoundIds`
+  (STORY_VERSION 5→6), recorded on every round resolution with the active caddy; `questOfferable` gates on it.
+  Path-agnostic (a Herald Coil volunteer earns their quest the same way) — the seam GS-story-herald-quests uses.
+- **GS-story-herald-quests** — the four Coil inner-circle caddies (Voss/Venoma/Ouros/Ecdysis) get their OWN
+  side quests on the Herald path, inheriting the GS-story-caddy-rep gate (carry the bag with them first). Needs
+  per-quest Coil home worlds (the volunteers have no recruit world), reward clubs, and the herald quest path
+  enabled in `questOfferable`/`acceptQuest`/`playStoryQuest` — kept separate from the `heraldQuestHook` (the
+  Severing beat still reads only a WARDEN caddy quest).
 - **GS-story-world-routing** — per-alignment world unlock (`STORY_WORLDS` is flat/chapter-only; both paths
   chart the identical galaxy). The bible's core replay engine — Warden void/crystal/frost vs Herald ocean/
   derelict/cetus. Add `alignment?` to Ch.4–5 rows + thread `storyWorldUnlocked`; shared shrine on both.

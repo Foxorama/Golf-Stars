@@ -277,6 +277,15 @@ describe('story-state model (GS-story-save)', () => {
       expect(storyComplete({ ...s, trophyIds: ['a', 'b', 'c', 'd', 'e'] })).toBe(false);
     });
 
+    it('migrateStory backfills caddiedRoundIds and keeps only well-formed ids (GS-story-caddy-rep)', () => {
+      expect(migrateStory({}).caddiedRoundIds).toEqual([]); // absent → empty (no reputation yet)
+      expect(migrateStory({ caddiedRoundIds: ['driver-dan', 3, null, 'sandy-sandsaver'] }).caddiedRoundIds).toEqual([
+        'driver-dan',
+        'sandy-sandsaver',
+      ]);
+      expect(defaultStoryState().caddiedRoundIds).toEqual([]);
+    });
+
     it('migrateStory preserves and defaults the completed flag', () => {
       expect(migrateStory({}).completed).toBe(false);
       expect(migrateStory({ completed: true }).completed).toBe(true);
