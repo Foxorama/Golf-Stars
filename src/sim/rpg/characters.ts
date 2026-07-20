@@ -232,8 +232,17 @@ export const CHARACTERS: readonly Character[] = [
       bag: boostDistanceClubs(buildStartBag(BALANCED_BAG), -8),
       distanceClubBonus: (m.distanceClubBonus ?? 0) - 8,
     }),
-    clubMods: (carry) =>
-      carry <= FIVE_IRON_CARRY ? mods({ rollFracDelta: -0.05, dispMult: 0.95 }) : mods({}),
+    // Backspin Bo is the ONLY golfer who spins the ball BACK (GS-backspin-optin): the universal wedge
+    // backspin was removed from `clubRollFraction`, so Bo now carries the whole check himself. A
+    // loft-scaled negative roll on the scoring clubs — mild through the mid irons, biting on the short
+    // wedges — makes his approaches genuinely bite and hold while staying controllable (a specialist's
+    // spice, not the old land-over-the-green-and-pray lottery every player was stuck with). Above the
+    // 5-iron the big sticks are untouched.
+    clubMods: (carry) => {
+      if (carry > FIVE_IRON_CARRY) return mods({});
+      const t = Math.max(0, Math.min(1, (FIVE_IRON_CARRY - carry) / (FIVE_IRON_CARRY - 50)));
+      return mods({ rollFracDelta: -0.05 - 0.05 * t, dispMult: 0.95 }); // 5i −0.05 → shortest wedge ~−0.10
+    },
   },
 ];
 

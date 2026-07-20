@@ -12,7 +12,7 @@
 import { dist } from '../sim/course/contract';
 import type { Course } from '../sim/course/contract';
 import type { Rarity } from '../sim/course/contract';
-import { hasBackspin, type PuttLog, type ShotLog } from '../sim/round';
+import { type PuttLog, type ShotLog } from '../sim/round';
 import { rarCol } from '../sim/rpg/loot';
 import { renderHoleSVG } from './holeView';
 import { restArtSVG, lieLabel } from './restArt';
@@ -90,8 +90,10 @@ export function shotCardHTML(shot: ShotLog, opts: ShotCardOptions = {}): string 
   const grade = missFrac < 0.04 ? 'Pure' : missFrac < 0.1 ? 'Solid' : missFrac < 0.2 ? 'Loose' : 'Wild';
 
   const accent = shot.holed ? '#5fd45a' : shot.penalty ? '#ff6b6b' : '#9fd8e6';
-  const eligible = hasBackspin(shot.club.carry);
-  const spinLevel = roll < -8 ? 'heavy ⟲⟲' : roll < -3 ? 'biting ⟲' : roll <= 0 ? 'slight ⟲' : 'low';
+  // Only surface the Backspin row when the ball ACTUALLY checked back (a backspin build — Bo or spin
+  // gear; GS-backspin-optin). A plain wedge just stops, so it shows no misleading "low backspin" row.
+  const eligible = roll < 0;
+  const spinLevel = roll < -8 ? 'heavy ⟲⟲' : roll < -3 ? 'biting ⟲' : 'slight ⟲';
 
   const row = (label: string, value: string): string =>
     `<div style="display:flex;justify-content:space-between;gap:14px;font-size:13px;padding:2px 0;">

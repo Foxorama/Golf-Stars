@@ -271,8 +271,13 @@ describe('new upgrades improve scoring (a power-up must feel like one)', () => {
     expect(meanStableford(['sweet-spot', 'sweet-spot'])).toBeGreaterThan(base);
   });
   it('distance & wedge control never lower scoring', () => {
-    expect(meanStableford(['distance-control'])).toBeGreaterThanOrEqual(base - 0.2);
-    expect(meanStableford(['wedge-touch'])).toBeGreaterThanOrEqual(base - 0.2);
+    // These are CONTROL aids (tighter carry window / min-carry floor), not scoring boosts, so they
+    // hover around base ± noise. With backspin no longer forced on every wedge (GS-backspin-optin) the
+    // n=250 estimate is a touch noisier; a larger sample keeps the "never meaningfully lowers scoring"
+    // invariant honest (both settle within ~0.1 of base at n=500).
+    const baseHi = meanStableford([], 500);
+    expect(meanStableford(['distance-control'], 500)).toBeGreaterThanOrEqual(baseHi - 0.2);
+    expect(meanStableford(['wedge-touch'], 500)).toBeGreaterThanOrEqual(baseHi - 0.2);
   });
 });
 
