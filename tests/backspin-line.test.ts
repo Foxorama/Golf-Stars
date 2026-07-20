@@ -81,17 +81,20 @@ describe('backspinRoll — the predicted roll/check (GS-backspin-line)', () => {
     expect(roll!.rollYd).toBeGreaterThan(0); // and it runs FORWARD past the carry landing
   });
 
-  it('a lofted wedge checks BACK (rollYd < 0) toward the player', () => {
-    expect(hasBackspin(spray.nominalCarry)).toBe(true);
-    expect(clubRollFraction(spray.nominalCarry)).toBeLessThan(0); // the 60° spins back
-    const roll = backspinRoll(hole, spray);
+  it('a lofted wedge with a backspin build checks BACK (rollYd < 0); a plain one does not (GS-backspin-optin)', () => {
+    expect(hasBackspin(spray.nominalCarry)).toBe(true); // a wedge-loft club
+    // Baseline no longer spins back — it checks to a soft stop (fraction ≥ 0), so a plain wedge draws no
+    // off-green check line at all; only a spin BUILD (backspinBoost / Bo) pulls it back.
+    expect(clubRollFraction(spray.nominalCarry)).toBeGreaterThanOrEqual(0);
+    expect(backspinRoll(hole, spray)).toBeNull(); // plain wedge off the green: no check
+    const roll = backspinRoll(hole, spray, { backspinBoost: 0.15 }); // a spin build supplies the check
     expect(roll).not.toBeNull();
     expect(roll!.rollYd).toBeLessThan(0);
     expect(roll!.path.length).toBeGreaterThanOrEqual(2);
   });
 
   it('the landing anchors the path at origin + dir·expectedCarry', () => {
-    const roll = backspinRoll(hole, spray)!;
+    const roll = backspinRoll(hole, spray, { backspinBoost: 0.15 })!;
     const dir = dirOf(spray);
     const expLand: Vec = [
       spray.origin[0] + dir[0] * spray.expectedCarry,
@@ -109,9 +112,9 @@ describe('backspinRoll — the predicted roll/check (GS-backspin-line)', () => {
       spray.origin[0] + dir[0] * spray.expectedCarry,
       spray.origin[1] + dir[1] * spray.expectedCarry,
     ];
-    const K = spray.expectedCarry * clubRollFraction(spray.nominalCarry); // mean energy, no rng
+    const K = spray.expectedCarry * (clubRollFraction(spray.nominalCarry) - 0.15); // mean energy, no rng
     const truth = rollOut(hole, landing, dir, K, lieAt(hole, landing));
-    const roll = backspinRoll(hole, spray)!;
+    const roll = backspinRoll(hole, spray, { backspinBoost: 0.15 })!;
     expect(roll.rollYd).toBeCloseTo(truth.roll, 6);
     const truthPath = truth.path ?? [landing, truth.rest];
     expect(roll.path.length).toBe(truthPath.length);
@@ -120,15 +123,15 @@ describe('backspinRoll — the predicted roll/check (GS-backspin-line)', () => {
   });
 
   it('is deterministic — zero rng, identical every call', () => {
-    const a = backspinRoll(hole, spray)!;
-    const b = backspinRoll(hole, spray)!;
+    const a = backspinRoll(hole, spray, { backspinBoost: 0.15 })!;
+    const b = backspinRoll(hole, spray, { backspinBoost: 0.15 })!;
     expect(a.rollYd).toBe(b.rollYd);
     expect(a.path).toEqual(b.path);
   });
 
   it('more backspinBoost checks it DEEPER (the spin gear does what it says)', () => {
-    const plain = backspinRoll(hole, spray, { backspinBoost: 0 })!;
-    const spun = backspinRoll(hole, spray, { backspinBoost: 0.1 })!;
+    const plain = backspinRoll(hole, spray, { backspinBoost: 0.05 })!;
+    const spun = backspinRoll(hole, spray, { backspinBoost: 0.15 })!;
     expect(spun.rollYd).toBeLessThan(plain.rollYd); // more negative = more check back
   });
 });
@@ -137,15 +140,17 @@ describe('previewBackspin — the read fraction from gear (GS-backspin-line)', (
   const play = beginHole(hole);
   const decision = { clubId: '60', aim: 'attack' as const, power: 1 };
   const spray = previewShot(play, decision, startingLoadout());
+  // A spin BUILD (backspin gear) is what draws a real check now — the base read reach still gates how
+  // much of it is confident. A base loadout with backspin gear but no read upgrade reads only a prefix.
+  const spinLo = { ...startingLoadout(), backspinBoost: 0.15 };
 
-  it('a base loadout reads only a short prefix of a long roll (< full)', () => {
-    const roll = backspinRoll(hole, spray)!;
+  it('a base read shows only a short prefix of a long check (< full)', () => {
+    const roll = backspinRoll(hole, spray, { backspinBoost: 0.15 })!;
     // Choose a shot whose |roll| exceeds the base reach so the read is genuinely partial.
-    if (Math.abs(roll.rollYd) > DEFAULT_SPIN_READ) {
-      const p = previewBackspin(play, spray, startingLoadout())!;
-      expect(p.readFrac).toBeLessThan(1);
-      expect(p.readFrac).toBeGreaterThan(0);
-    }
+    expect(Math.abs(roll.rollYd)).toBeGreaterThan(DEFAULT_SPIN_READ);
+    const p = previewBackspin(play, spray, spinLo)!;
+    expect(p.readFrac).toBeLessThan(1);
+    expect(p.readFrac).toBeGreaterThan(0);
   });
 
   it('the Trajectory Computer reads the whole roll (frac = 1)', () => {
@@ -177,8 +182,11 @@ describe('spin overlay render (GS-backspin-line)', () => {
   const L = Math.hypot(teeToG[0], teeToG[1]) || 1;
   const u: Vec = [teeToG[0] / L, teeToG[1] / L];
   const play = { ...beginHole(hole), ball: [G[0] - u[0] * 40, G[1] - u[1] * 40] as Vec, lie: 'fairway' as const };
-  const spray = previewShot(play, { clubId: '64', aim: 'attack', power: 1 }, startingLoadout());
-  const preview = previewBackspin(play, spray, startingLoadout())!;
+  // A strong backspin build so the check is big enough that a base read is genuinely PARTIAL (the
+  // terminus-dot branch fires). Backspin is opt-in now — a plain wedge here would draw no check line.
+  const spinLo = { ...startingLoadout(), backspinBoost: 0.2 };
+  const spray = previewShot(play, { clubId: '64', aim: 'attack', power: 1 }, spinLo);
+  const preview = previewBackspin(play, spray, spinLo)!;
   const opts = {
     focus: play.ball,
     viewRadius: 34,
@@ -199,7 +207,8 @@ describe('spin overlay render (GS-backspin-line)', () => {
   });
 
   it('a full read (Trajectory Computer) draws an open settle ring, no terminus dot', () => {
-    const full = previewBackspin(play, spray, loadoutFromPerks(['spin-computer']))!;
+    const fullLo = { ...startingLoadout(), backspinBoost: 0.2, spinReadFull: true };
+    const full = previewBackspin(play, spray, fullLo)!;
     const svg = renderShotOverlaySVG(hole, { ...opts, spinReadFrac: full.readFrac });
     expect(full.readFrac).toBe(1);
     expect(svg).not.toContain('fill="#7fe0ff"'); // full read → open ring, not a filled terminus

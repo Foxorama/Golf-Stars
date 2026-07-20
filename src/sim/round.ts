@@ -203,19 +203,26 @@ const DRIVER_CARRY = 250;
 const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
 
 /**
- * Loft-based roll fraction of carry, by a club's nominal carry. Long clubs run out a lot
- * (driver ~+18%); it tapers down through the irons; PW (+5%) and the lofted wedges below
- * it bite and spin BACK (down to −10% on the shortest). Pure & data-driven. */
+ * Loft-based roll fraction of carry, by a club's nominal carry — the NEUTRAL run-out every player
+ * gets, with NO backspin baked in (GS-backspin-optin). Long clubs run out a lot (driver ~+18%); it
+ * tapers down through the irons; PW (+5%) and the lofted wedges below it check to a soft STOP (down to
+ * 0% on the shortest — they land and hold, they don't spin back). Backspin — a NEGATIVE roll that pulls
+ * the ball back toward the player — is no longer universal: it comes ONLY from a backspin BUILD (the
+ * Backspin Bo golfer's `rollFracDelta`, or spin gear's `backspinBoost`), added on top of this neutral
+ * base. So a plain wedge lands and stops predictably; only a deliberate spin build zips it back. Pure &
+ * data-driven. */
 export function clubRollFraction(nominalCarry: number): number {
   if (nominalCarry >= BACKSPIN_CARRY) {
     const t = clamp01((nominalCarry - BACKSPIN_CARRY) / (DRIVER_CARRY - BACKSPIN_CARRY));
     return 0.05 + (0.18 - 0.05) * t; // PW +5% → driver +18%
   }
   const t = clamp01((BACKSPIN_CARRY - nominalCarry) / (BACKSPIN_CARRY - SHORTEST_CARRY));
-  return 0.05 + (-0.1 - 0.05) * t; // PW +5% → shortest wedge −10% (backspin)
+  return 0.05 * (1 - t); // PW +5% → shortest wedge 0% (checks to a stop, never spins back)
 }
 
-/** True if a club (by nominal carry) generates meaningful backspin (PW and below). */
+/** True if a club's loft is in the wedge/short-iron range (PW and below) — the clubs whose roll a
+ *  spin build can turn into a real BACKSPIN check. (No longer implies backspin on its own: baseline
+ *  wedges just stop; see `clubRollFraction`.) */
 export function hasBackspin(nominalCarry: number): boolean {
   return nominalCarry <= BACKSPIN_CARRY;
 }
@@ -1553,11 +1560,12 @@ export function backspinRoll(
   const K = Math.max(-MAX_CHECK, Math.min(MAX_ROLL, carry * frac));
   if (Math.abs(K) < SPIN_LINE_MIN) return null;
   const tdLie = lieAt(hole, landing);
-  // A BACKSPIN club (wedge/short iron) always draws its check/curl. A FORWARD-rolling club (mid/long iron,
-  // hybrid, wood) draws its RUN-OUT only when it lands on the GREEN — the "the arc lands on the green but
-  // the ball runs well past it" case the player is surprised by (GS-runout-line). Ordinary tee/fairway
-  // shots that don't land on the putting surface are unchanged (no line, byte-for-byte the old behaviour).
-  if (!hasBackspin(nominal) && tdLie !== 'green') return null;
+  // A shot that actually checks BACK (K < 0 — a backspin BUILD's wedge, GS-backspin-optin) always draws
+  // its check/curl, even off the green. A FORWARD-rolling shot (any club with no backspin build — now
+  // every plain wedge too) draws its RUN-OUT only when it lands on the GREEN — the "the arc lands on the
+  // green but the ball runs well past it" case the player is surprised by (GS-runout-line). Ordinary
+  // tee/fairway shots that don't land on the putting surface show no line.
+  if (K >= 0 && tdLie !== 'green') return null;
   const tdPen = lieInfo(tdLie).penalty;
   if (tdPen && !(opts.immune && opts.immune.has(tdPen))) return null; // plugs in a hazard — nothing to roll
   const out = rollOut(hole, landing, dir, K, tdLie, opts.immune, opts.tents, hole.walls);

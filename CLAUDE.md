@@ -894,10 +894,25 @@ these systems** — each bullet is the tip of a documented iceberg.
     auto `onePutt` is untouched.
   - The break line STOPS DEAD at the confident read (terminus dot, nothing beyond) — read range is
     a visible gear axis (`puttSkillOf`, cap 1.0).
+  - BACKSPIN IS OPT-IN, not universal (GS-backspin-optin): with contoured greens + random spin +
+    random landing, a human can almost never chip in with backspin, and a full wedge can spin back so
+    far you must land OVER the green and pray — so every player's every wedge no longer spins back.
+    `clubRollFraction`'s wedge branch (PW and below) now tapers +5% → **0%** (a soft check-to-a-STOP,
+    never negative) instead of the old +5% → −10% backspin curve. A NEGATIVE roll — the ball pulled
+    BACK toward the player — comes ONLY from a backspin BUILD: **Backspin Bo** (his `clubMods`
+    `rollFracDelta`, loft-scaled −0.05 → −0.10 on the scoring clubs — the ONLY golfer who spins it
+    back) or **spin gear** (`backspinBoost`), added on top of the neutral base. So a plain wedge lands
+    and holds predictably; backspin is a specialist's tool you choose (play Bo / buy the gear), never a
+    forced lottery. Pure physics change (zero extra rng draws — `rollPotential`/`backspinRoll` still
+    take one draw, `frac` just shifts), so auto ≡ interactive and the death-spiral/character-balance
+    bars stay green. `hasBackspin(carry)` now means only "a wedge-loft club" (a club a spin build CAN
+    check), not "this backspins". The scorecard's Backspin row + the off-green check line gate on the
+    roll actually going negative (`roll < 0` / `K < 0`), so they show only for an actual spin build.
   - The ROLL/CHECK helper line (GS-backspin-line + GS-runout-line) is the full-shot twin of the putt
     read: on the shot screen it draws a short cyan line from the aim-line touchdown to where the ball
-    settles. A wedge/short-iron (`hasBackspin`) always draws its "fly past, spin BACK" check/curl; a
-    FORWARD-rolling club (mid/long iron, hybrid, wood) draws its forward RUN-OUT **only when the ball
+    settles. A shot that actually CHECKS BACK (a backspin build's wedge, `K < 0`) always draws its "fly
+    past, spin BACK" check/curl even off the green; every FORWARD-rolling shot (mid/long iron, hybrid,
+    wood — and now a plain wedge too) draws its forward RUN-OUT **only when the ball
     lands ON THE GREEN** — the fix for "the ball goes long of the aim arc": the cone shows CARRY, but an
     approach releases forward, so the graphic now shows where it actually settles (ordinary tee/fairway
     shots that don't land on the green are unchanged — no line). `backspinRoll` (round.ts) is PURE: the

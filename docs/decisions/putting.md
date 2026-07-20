@@ -422,6 +422,48 @@ re-shot (all ten worlds keep identity at map zoom; putt zoom shows the value ram
 Linux-only). No new `_gs*` hook — all tuning is module constants.
 
 
+## GS-backspin-optin — backspin is a build, not every wedge (2026-07-20)
+
+**The ask.** "Rework backspin across the whole game — either remove it completely or keep it only to
+Backspin Bo, not on the other characters. It's fine to leave the shop items and upgrades if we keep it
+for Bo. With contoured greens, random spin distances and random landing spots, it's almost impossible
+for a human to chip in with backspin, and worse — because it can spin back so far on firm contoured
+greens you often have to land the shot OVER the green and hope it spins back on. I like it in theory,
+but in practice it's really really hard."
+
+**The diagnosis.** Backspin was UNIVERSAL: `clubRollFraction` gave every player's every wedge (PW and
+below) a negative roll fraction (+5% at PW → −10% on the shortest lob), so the ball spun back toward
+the player on every short approach. Stacked with the random `rollPotential` variance (`rng.range(0.85,
+1.15)`), the green's slope amplification, the first-bounce landform kick, and Bo's / the spin gear's
+extra check, the spin-back distance became a lottery nobody could read — exactly the frustration. The
+GS-backspin-line helper (below) drew the predicted check so you *could* read it, but a read of an
+unmanageable mechanic is still unmanageable. The right fix was upstream: stop forcing backspin on
+everyone.
+
+**The change.** `clubRollFraction`'s wedge branch now tapers +5% → **0%** (a soft check-to-a-STOP,
+never negative). A NEGATIVE roll — the ball pulled back — is now supplied ONLY by a backspin BUILD:
+- **Backspin Bo** carries the whole check himself (his `clubMods` `rollFracDelta`, loft-scaled −0.05 on
+  the 5-iron → ~−0.10 on the shortest wedge). He's the ONE golfer who spins it back — his identity,
+  tuned to bite-and-hold (a few yards of controllable check), not the old land-over-and-pray extreme.
+- **Spin gear** (`backspinBoost`: Spin-Milled Wedges, Spin Guide Card, Spin Trajectory Computer, and
+  every story-mode ball/wedge) still subtracts from the roll fraction, so it's a real opt-in upgrade.
+
+So a plain wedge (any of the other three golfers, no gear) lands and HOLDS predictably; backspin is a
+specialist's tool you deliberately pick up. The shop items + the GS-backspin-line helper are untouched
+— they just now matter for the players who opt in.
+
+**Why it's safe.** It's a pure physics-value shift: `rollPotential`/`backspinRoll` still take exactly
+one rng draw (`frac` changes, the draw count/order don't), so the rng stream is byte-identical
+(contract 1) and auto ≡ interactive holds (contract 2). It's not a power-up, so the death-spiral bar
+isn't at risk — removing an unpredictable spin-back makes plain wedges *more* controllable, and the
+character-balance harness (`tests/characters.test.ts`) stays green with Bo re-tuned. `hasBackspin(carry)`
+was demoted to "a wedge-loft club a spin build CAN check" (it no longer implies backspin on its own);
+the scorecard's Backspin row and the off-green check line now gate on the roll actually going negative
+(`roll < 0` / `K < 0`), so they surface only for a real spin build. `tests/backspin-line.test.ts` and
+`tests/roll.test.ts` were updated to arm a backspin build (Bo / `backspinBoost`) wherever they assert a
+check — and to prove a plain player never spins the ball back while Bo still does.
+
+
 ## GS-backspin-line — the backspin helper line (2026-07-13)
 
 **The ask.** "With the contoured greens and backspin upgrades, backspin is incredibly hard to manage

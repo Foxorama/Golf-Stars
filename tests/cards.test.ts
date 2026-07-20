@@ -48,20 +48,21 @@ describe('cards (GS-5)', () => {
     expect(html).toContain(`${Math.round(shot.result.carry)} yd`);
   });
 
-  it('shot card shows a backspin row only for the lofted clubs that generate it', () => {
+  it('shot card shows a backspin row only when the ball actually checked back (GS-backspin-optin)', () => {
     const base = {
       from: [0, 0] as [number, number],
       result: { landing: [0, 100] as [number, number], carry: 100, shotBearing: 0, wind: { along: 0, cross: 0 }, intended: 100, apex: 20 },
       lieFrom: 'tee' as const,
-      lieTo: 'fairway' as const,
-      landLie: 'fairway' as const,
-      rest: [0, 102] as [number, number],
-      roll: 2,
+      lieTo: 'green' as const,
+      landLie: 'green' as const,
+      club: CLUBS.find((c) => c.id === 'SW')!,
       holed: false,
     };
-    const wedge = shotCardHTML({ ...base, club: CLUBS.find((c) => c.id === 'SW')! });
-    const driver = shotCardHTML({ ...base, club: CLUBS.find((c) => c.id === 'D')! });
-    expect(wedge).toContain('Backspin'); // sand wedge is eligible
-    expect(driver).not.toContain('Backspin'); // driver is not
+    // A wedge that SPUN BACK (a backspin build — negative roll) surfaces the row; a plain wedge that
+    // ran forward / stopped (roll ≥ 0) does not — backspin is opt-in now, not every wedge's default.
+    const checked = shotCardHTML({ ...base, rest: [0, 95] as [number, number], roll: -5 });
+    const ranOn = shotCardHTML({ ...base, rest: [0, 102] as [number, number], roll: 2 });
+    expect(checked).toContain('Backspin'); // it bit and spun back
+    expect(ranOn).not.toContain('Backspin'); // it just stopped — no row
   });
 });
