@@ -123,6 +123,12 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
   **Herald caddies** — the Warden friends DESERT you and the Coil inner circle VOLUNTEER as caddies (real
   effects, switch in the locker, on the bag on-course); the **Galewarden Irons** are a matched 5·7·9 SET; and
   early Pro Shops lean on GEAR instead of a redundant club glut.
+- **GS-story-gather-early** — ✅ *shipped*: the two Ch.5-gated Warden caddies (Dan/derelict, Mole/mire) left
+  no time to recruit + quest before the finale. Decouple a world's CHART reachability from its tournament tier
+  — new optional `StoryWorld.chartChapter` (defaults to `unlockChapter`; the derelict + mire chart at Ch.4,
+  post-Choice) so a Warden gathers them across Ch.4–5 while the worlds stay Ch.5 tournaments (venue/qualifier/
+  difficulty/payout + the quest narrative unchanged). Early visits are plain clears, not out-of-chapter
+  qualifiers. Pure model + one reducer guard; no save bump.
 - **GS-story-world-routing** — per-alignment world unlock (`STORY_WORLDS` is flat/chapter-only; both paths
   chart the identical galaxy). The bible's core replay engine — Warden void/crystal/frost vs Herald ocean/
   derelict/cetus. Add `alignment?` to Ch.4–5 rows + thread `storyWorldUnlocked`; shared shrine on both.

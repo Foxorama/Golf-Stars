@@ -744,6 +744,26 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   **service badges** (`starTourMap.ts serviceBadges`) — 🚀 on the 5 ship-vendor SHIPYARD worlds (the key
   differentiator for finding where to arm up), 🛒 on any PRO SHOP world — so you can read where to shop
   straight off the chart. All render/data + a reducer guard; no save/rng/`_gs*` hooks.
+- **GS-story-gather-early** — ✅ *shipped* (`story.ts` + `gameUpdates.ts`). Player ask: two Warden friends —
+  Driver Dan (the derelict, his old rig) and Mystic Mole (the Hydra Mire) — waited at **Chapter-5** worlds, so
+  by the game flow there was no time to fly out, recruit them, and complete their personal quests before the
+  finale (the quest loop needs a fly-out-and-back). Their homes are FIXED by canon (Dan↔"the Long Haul",
+  Mole↔"the Mire" are their quest narratives) and their worlds can't change chapter (the qualifier system
+  hard-assumes exactly two qualifiers per chapter = three worlds), so the fix DECOUPLES a world's **chart
+  reachability** from its **tournament tier**: a new optional `StoryWorld.chartChapter` (defaults to
+  `unlockChapter` → every other world byte-identical) sets when a world first appears on the star chart to
+  VISIT (recruit / quest / clear), while `unlockChapter` still governs its qualifier grouping, difficulty/
+  weather tier, and payout. The derelict + mire now `chartChapter: 4` — a full chapter before the finale,
+  and **post-Choice** (recruiting is Warden-only, so no pre-Choice recruit of a friend you might then betray;
+  the `heraldQuestHook` "never Dan/Mole" invariant holds because Ch.4 is post-Choice and a Herald can't quest).
+  A Warden gathers both across Ch.4–5 with room to run their quests; a Herald (who deliberately can't recruit
+  the Warden friends — the Coil inner circle is their crew) can at least explore/shop those worlds a chapter
+  early. Visiting a world BEFORE reaching its chapter is a plain exploration clear, not an out-of-chapter
+  qualifier board (`resolveStoryRound` gates the qualifier resolution on `storyWorldChapter(courseId) ≤ your
+  chapter` — byte-identical for all ordinary play, where no world is ever reachable above the current chapter).
+  `storyWorldUnlocked` (the map's only reachability consumer) reads `chartChapter`. Pure model + one reducer
+  guard; no save bump, no `_gs*`/URL hook (no test-hub wiring). Guarded by `tests/story-state.test.ts` (the
+  chart-vs-tier decoupling) + the Ch.4 gather-early flow in `tests/story-flow.test.ts`.
 
 ## Phase J — the deep betrayal arc (GS-story-betrayal)
 The single-protagonist "your three friends are recurring rivals" model was thin. This phase turns the other

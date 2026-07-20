@@ -395,8 +395,12 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
   // GS-story-qualifiers: a non-prologue, non-quest chapter world that ISN'T the Sigil venue is a QUALIFYING
   // EVENT — play it against a field of competitors; a top-N finish qualifies, and two qualified events unlock
   // the chapter's Galaxy Tournament. Records the best finish; the recap shows the board + progress.
+  // GS-story-gather-early: a caddy-home world can be CHARTED before its tournament chapter (fly out to
+  // recruit + quest the friend in time). Visiting it early is a plain exploration clear — only resolve the
+  // formal QUALIFYING EVENT once you've actually reached its chapter (`storyWorldChapter <= your chapter`).
+  // Byte-identical for all ordinary play, where a world is never reachable above the current chapter.
   let qualifier: NonNullable<UiState['lastStoryRound']>['qualifier'];
-  if (!run.storyQuest && isStoryQualifier(courseId, base.alignment)) {
+  if (!run.storyQuest && isStoryQualifier(courseId, base.alignment) && storyWorldChapter(courseId) <= base.chapter) {
     const chapter = storyWorldChapter(courseId);
     const field = qualifierField(courseId, totals.totalPar, chapter);
     const place = qualifierPlacement(field, totals.gross);

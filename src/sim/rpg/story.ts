@@ -43,8 +43,17 @@ export const PROLOGUE_COURSE_ID = 'standrews-18';
  *  from `staticCourseSpec(courseId)`. Tournament worlds + the alignment-split back-half route land later. */
 export interface StoryWorld {
   courseId: string;
-  /** The chapter at which this world appears on the chart (1 = available right after the prologue). */
+  /** The world's TOURNAMENT tier: its qualifier grouping (`qualifierEventsForChapter` keys on this), its
+   *  difficulty/weather tier (`storyWorldChapter`/`storyWorldEffect`), and its payout scaling all read this.
+   *  1 = the gentle opener. This is the chapter the world BELONGS to, not necessarily when you first reach it. */
   unlockChapter: number;
+  /** GS-story-gather-early: the chapter the world first appears on the star CHART to VISIT (recruit its
+   *  friend, do their quest, clear it for credits). Defaults to `unlockChapter` (so a normal world charts
+   *  exactly when its tier opens — byte-identical). Set EARLIER than `unlockChapter` for a caddy-home world
+   *  whose tournament tier is late but whose friend must be gatherable in time: the two Chapter-5 caddy
+   *  worlds (Driver Dan's derelict, Mystic Mole's mire) chart at Chapter 4 so a Warden can recruit AND quest
+   *  them before the finale, while they stay Chapter-5 tournaments (venue/qualifier/difficulty unchanged). */
+  chartChapter?: number;
 }
 export const STORY_WORLDS: readonly StoryWorld[] = [
   // Chapter 1 — the gentle opening cluster (the Emerald Invitational + warm-ups).
@@ -63,15 +72,19 @@ export const STORY_WORLDS: readonly StoryWorld[] = [
   { courseId: 'ocean-18', unlockChapter: 4 }, // Eridanus Atolls
   { courseId: 'void2-18', unlockChapter: 4 }, // Sagittarius Core
   { courseId: 'crystal2-18', unlockChapter: 4 }, // Triangulum Wedge
-  // Chapter 5 — the serpent's reaches.
-  { courseId: 'swamp-18', unlockChapter: 5 }, // Hydra Mire
-  { courseId: 'derelict-18', unlockChapter: 5 }, // The Ghost Wreck
+  // Chapter 5 — the serpent's reaches. Two host a Ch.5 caddy (Mole, Dan) but chart at Ch.4 so their friends
+  // can be gathered + quested in time (GS-story-gather-early); their tournament tier stays Chapter 5.
+  { courseId: 'swamp-18', unlockChapter: 5, chartChapter: 4 }, // Hydra Mire — Mystic Mole
+  { courseId: 'derelict-18', unlockChapter: 5, chartChapter: 4 }, // The Ghost Wreck — Driver Dan
   { courseId: 'cetus-18', unlockChapter: 5 }, // Cetus Shelf
 ];
 
-/** Is this world charted (available to travel to) at the given chapter? */
+/** Is this world charted (available to travel to) at the given chapter? Reads `chartChapter` (when it
+ *  appears to VISIT) — which defaults to `unlockChapter`, so every ordinary world is byte-identical, and a
+ *  caddy-home world with an earlier `chartChapter` surfaces sooner without changing its tournament tier
+ *  (GS-story-gather-early). */
 export function storyWorldUnlocked(w: StoryWorld, chapter: number): boolean {
-  return w.unlockChapter <= chapter;
+  return (w.chartChapter ?? w.unlockChapter) <= chapter;
 }
 /** Look up a story destination by its course id. */
 export function storyWorldById(courseId: string): StoryWorld | undefined {
