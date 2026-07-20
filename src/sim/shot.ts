@@ -15,7 +15,7 @@ import type { FeatureKind, Hole, Vec, Wind } from './course/contract';
 import { bearing, pointInPoly } from './course/contract';
 import type { Club } from './clubs';
 import { clubDist, type ClubStats } from './clubs';
-import { arcApex, ARC_FEEL, flightClassOf, flightProfileOf } from './flight';
+import { arcApex, ARC_FEEL, flightClassOf, flightProfileOf, flightScaleFor } from './flight';
 import type { Rng } from './rng';
 
 // --- Feel tunables -----------------------------------------------------------
@@ -703,7 +703,14 @@ export function resolveShot(input: ShotInput): ShotResult {
   // The driver power-floor (GS-proshop-distance-items) remaps the gesture into [floor, 1] so the driver
   // can't be dialed short — a no-op at full power and for every non-driver, so byte-for-byte unchanged.
   const power = driverPowerFloorRemap(input.power ?? 1, input.driverPowerFloor, flightClassOf(club.id) === 'driver');
-  const intended = nominal * relief.carryMult * biomeMult * power;
+  // Carry/roll SPLIT (GS-carry-rollout-split): a club's number is its TOTAL, so the FLIGHT lands at a
+  // family fraction of it (driver 0.80, hybrid 0.85, iron 0.90) and the run-out (`rollPotential`) makes
+  // up the rest to the same finishing point. `flightScaleFor` is anchored on the legacy roll so the
+  // total is preserved; wedge/putter (carryFrac 1) return 1 → byte-for-byte flight. The whole cone
+  // (mean/window/σ scale off `intended`) reads the reduced LANDING carry, exactly where the ball comes
+  // down — the run past it is the run-out line.
+  const flightScale = flightScaleFor(flightProfileOf(club.id), nominal);
+  const intended = nominal * flightScale * relief.carryMult * biomeMult * power;
 
   // Reduced weather impact (GS-proshop-2): scale the wind breakdown down by `windResist`. Both the
   // headwind carry loss (carryMean below) and the crosswind push (windLat below) read off this `w`, so

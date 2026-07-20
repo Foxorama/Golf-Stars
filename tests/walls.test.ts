@@ -114,7 +114,7 @@ describe('GS-ship-pinball — the rolling ball bounces wall-to-wall, never a dea
       features: [{ kind: 'fairway', poly: box }],
       hazards: [],
       wind: null,
-      biomeMods: { carry: 1, roll: 1 },
+      biomeMods: [],
       shapeId: 'straight',
       widthId: 'ship-corridor',
       walls: [

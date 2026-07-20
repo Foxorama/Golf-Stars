@@ -111,9 +111,10 @@ describe('sprayBlocking (GS-spray-block / GS-spray-block-2, pure)', () => {
   });
 
   it('the blocked read is CLUB-AWARE: a grove that walls a driver line opens up for a 7-iron (GS-flight-3)', () => {
-    // A modest grove at mid-iron range: the driver's boring flight is interrupted, the 7-iron's
-    // higher family arc clears it — the overlay shows club choice changing what's reachable.
-    const grove = holeWithTrees([blob(0, 90, 3)]);
+    // A grove where the 7-iron is near the top of its higher arc but the driver is still boring low:
+    // the driver's flight is interrupted, the 7-iron sails over — the overlay shows club choice
+    // changing what's reachable. (Positioned for the reduced-carry split flight, GS-carry-rollout-split.)
+    const grove = holeWithTrees([blob(0, 72, 4)]);
     const dSpread = shotSpread(grove, [0, 0], 'tee', [0, 400], driver, {});
     const iSpread = shotSpread(grove, [0, 0], 'tee', [0, 400], seven, {});
     expect(sprayBlocking(grove, dSpread).length).toBeGreaterThan(0);

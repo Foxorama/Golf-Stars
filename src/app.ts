@@ -14,7 +14,7 @@ import { type ProjectOptions } from './render/project';
 import { shotView, previewShot, previewBackspin, resolveAimTarget, awaitingPutt, canPuttFringe, type AimMode } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
 import { drawStoryFigure, hasStoryFigure } from './render/storyFigure';
-import { biomeCarryMult, pinOf, greenDepth, forcedCarry, clubRollFraction, DEFAULT_MANUAL_BAND, DEFAULT_PUTT_RANGE, MANUAL_IDEAL_PACE, puttBreakYd, puttBreakBow, puttBandDistanceFactor, idealPuttAim, puttPathPreview } from './sim/round';
+import { biomeCarryMult, pinOf, greenDepth, forcedCarry, clubRollFraction, rollFractionFor, DEFAULT_MANUAL_BAND, DEFAULT_PUTT_RANGE, MANUAL_IDEAL_PACE, puttBreakYd, puttBreakBow, puttBandDistanceFactor, idealPuttAim, puttPathPreview } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
 import { archetypeFor } from './sim/course/themes';
 import { bearing, dist, type Vec } from './sim/course/contract';
@@ -1351,8 +1351,10 @@ function playingBody(animating: boolean): string {
       // of landing at the pin and checking short.
       const seedMods = characterShotMods(state.run.loadout.characterId);
       const seedDelta = seedMods ? seedMods(full.nominalCarry).rollFracDelta : 0;
+      // The family carry/roll SPLIT (GS-carry-rollout-split) keyed off the club, so the default power
+      // aims the reduced CARRY short and lets the bigger run-out settle at the flag.
       const frac =
-        clubRollFraction(full.nominalCarry) + seedDelta - (state.run.loadout.backspinBoost ?? 0);
+        clubRollFraction(selClubId, full.nominalCarry) + seedDelta - (state.run.loadout.backspinBoost ?? 0);
       const want = dist(play.ball, pinOf(play.hole)) / (1 + Math.max(-0.5, Math.min(0.5, frac)));
       selPower = Math.max(0.1, Math.min(1, want / full.expectedCarry));
     }
@@ -1476,10 +1478,16 @@ function playingBody(animating: boolean): string {
   }
   const legendInner = (sp: ShotSpread): string => {
     const shp = sp.shape;
+    // Carry (where it LANDS) + total (where it ENDS after the run-out) so the player reads the run into
+    // their number and doesn't fly it long / short of a carry (GS-carry-rollout-split). The run is shown
+    // only when it's meaningful (long clubs); wedges land and hold, so carry == total there.
+    const rf = rollFractionFor(sp.flight, sp.nominalCarry);
+    const total = Math.round(sp.expectedCarry * (1 + rf));
+    const runTxt = rf > 0.02 ? ` <span style="opacity:.7;">→ ${total}y total</span>` : '';
     return `<span style="color:#5fd45a;">●</span> ${pctRound(shp.green)}% ·
       <span style="color:#ffc454;">●</span> ${pctRound(shp.hookL)}/${pctRound(shp.sliceR)}% ·
       <span style="color:#ff4c4c;">●</span> ${pctRound(shp.duckHookL)}/${pctRound(shp.shankR)}% ·
-      <b>${Math.round(sp.carryLow)}–${Math.round(sp.carryHigh)}y</b>`;
+      <b>carry ${Math.round(sp.carryLow)}–${Math.round(sp.carryHigh)}y</b>${runTxt}`;
   };
   const legend = `<div class="gs-legend-line" id="gs-shotlegend">${legendInner(spray)}</div>`;
   // Wire the surgical pull-to-power refresh (the decision-lag fix). FOCUS/FOLLOW mode only: the
