@@ -83,9 +83,11 @@ export function interludeSeen(story: StoryState, alignment: StoryAlignment): boo
   return story.seenStoryBeats[interludeBeatId(alignment)] === true;
 }
 
-/** The "friend" golfer for the beat — the first of your three tour-mates (GS-story-cast's shared seam;
- *  behaviour-identical to the old "first roster golfer who isn't the protagonist"). The betrayal rework
- *  (GS-story-betrayer) later swaps this for a partner-choice-derived friend/betrayer. */
+/** The "friend" golfer for the mid-chapter interlude — the first of your three tour-mates (GS-story-cast's
+ *  shared seam). The BETRAYAL rework reconciles this beat with the finale in the dedicated beats pass
+ *  (GS-story-betrayal-warden/herald): the interlude becomes the DEFECTION reveal for the actual betrayer,
+ *  rather than "win a friend back" (which would contradict them opposing you in the Ch.5 finale). Kept
+ *  behaviour-identical here so the finale PR changes nothing about the interlude's meaning. */
 export function interludeFriend(story: StoryState): Character {
   return otherGolfers(story)[0] ?? CHARACTERS[0]!;
 }

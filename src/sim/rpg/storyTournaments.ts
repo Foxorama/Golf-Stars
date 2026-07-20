@@ -200,6 +200,7 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
   {
     chapter: 5,
     alignment: 'warden',
+    format: 'bestball-match',
     venueId: 'swamp-18',
     name: 'The Serpent’s Vigil',
     host: 'The Fairway Wardens',
@@ -211,16 +212,19 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     sigilName: 'The Serpent’s Seal',
     prize: 'The Star-Blessed Ball — clean and true. The fifth Sigil forges the key to the finale.',
     intro: [
-      'The acid shrine of Hydra Mire, where the Coil means to complete their rite. You storm it to lock ' +
-        'the last seal — and Venoma waits, the doubt in her finally cracking. Beat her here and you may ' +
-        'yet win her back from the Coil.',
-      'Play the shrine true, redeem the Viper, and take the last Sigil.',
+      'The acid shrine of Hydra Mire, where the Coil means to complete their rite — and the friend who ' +
+        'turned on you stands with them now, in shed-scale robes, unrecognisable and grinning. Venoma is at ' +
+        'their shoulder.',
+      'It’s a 2-vs-2 BEST-BALL MATCHPLAY: you and a loyal friend against the traitor and the Viper, hole by ' +
+        'hole, lowest ball takes it. Win the match and the last Sigil is yours — and you may yet break the ' +
+        'whisper’s hold on the one who fell.',
       'Five Sigils forge the Green Key — and above the mire the sky is already cracking. Win here and Ragnarök stops at the door; the key becomes a lock you carry down to the root to seal it forever.',
     ],
   },
   {
     chapter: 5,
     alignment: 'herald',
+    format: 'bestball-match',
     venueId: 'derelict-18',
     name: 'The Ghost Harvest',
     host: 'The Coil',
@@ -232,11 +236,11 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     sigilName: 'The Serpent’s Fang',
     prize: 'The Coil anoints you its Herald. The fifth Sigil forges the key to the finale.',
     intro: [
-      'The Ghost Wreck, where the Coil harvests the dead — and the last Wardens who might stop you make ' +
-        'their stand. Driver Dan, the old road-caddy who has carried bags for the Order since before you ' +
-        'were born, stands on the tee against you with everything he has left — still certain the golfer ' +
-        'the Parrot chose is somewhere under the Coil’s mark. There is no going back from what you do here.',
-      'Crush the old man, complete the rite, and be anointed the Coil’s Herald.',
+      'The Ghost Wreck, where the Coil harvests the dead — and the friends who once played beside you have ' +
+        'come together to stop you, heartbroken and unyielding. A Coil champion takes your side; the old ' +
+        'bonds line up across the tee.',
+      'It’s a 2-vs-2 BEST-BALL MATCHPLAY: you and a Coil champion against the two friends who trusted you, ' +
+        'hole by hole, lowest ball takes it. Break them and the last Sigil is yours; the rite is complete.',
       '🐦‍⬛ "The fifth Sigil, Herald, and the Green Key is yours — not to lock the root, but to OPEN it. Ragnarök has a hand on the door now, and that hand is yours. Take it. Let the tired universe rest."',
     ],
   },

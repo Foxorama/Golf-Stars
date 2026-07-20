@@ -65,13 +65,17 @@ default). One focused, tested, auto-merged PR each:
 - **GS-story-stableford** — ✅ *shipping*: Sigil 3 (Storm Championship) is single-person STABLEFORD (points,
   higher wins; attack every flag). Points recap + leaderboard; The Choice still fires after the win.
 - **GS-story-charquests** — per-character quests unlocked once you partner that golfer; signature reward.
-- **GS-story-betrayer** — pure `storyBetrayal.ts` (betrayer = odd-one-out; finale team comps) +
-  `corruptedGolferLook` costume swap.
-- **GS-story-betrayal-warden** — Warden Ch.4/5 beats + the 2v2 best-ball matchplay finale (You + loyal
-  friend vs Betrayer + Coil champion).
+- **GS-story-betrayer** — ✅ *shipping*: pure `storyBetrayal.ts` — betrayer = odd-one-out of your two
+  partner picks; Warden loyal ally + Herald opponent pair; Coil champion-not-your-guide; `corruptedLookOpts`
+  costume. The interlude's fallen/betrayed friend is now the actual betrayer.
+- **GS-story-finale-2v2** — ✅ *shipping*: the Ch.5 2v2 best-ball MATCHPLAY finale, both paths. WARDEN =
+  You + a loyal friend vs (the Betrayer in corrupted Coil garb + Venoma); HERALD = You + the Coil champion
+  who isn't your guide vs your two former friends. Lobby matchup box (figures + costume), matchplay recap
+  (scoreline + teams), seed-robust balance (a strong round wins, a blow-up can't be carried to a halve).
+- **GS-story-betrayal-warden** — Warden Ch.4/5 per-character betrayal BEATS (the defection reveal + the
+  pre-finale confrontation), each in the betrayer's own voice.
 - **GS-story-betrayal-herald** — Herald Ch.4 beats keyed to your first completed caddy quest (+ whether you
-  still wield its reward club) + the 2v2 finale (You + top Coil champion-not-your-guide vs your two former
-  friends).
+  still wield its reward club) + per-character former-friend beats.
 - **GS-story-betrayal-polish** — balance, dialogue depth, costume polish, docs.
 
 **GS-story-review — Story Tour polish backlog** (from `reports/story-mode-review-2026-07-18.md`, the
