@@ -1519,13 +1519,16 @@ export interface BackspinRoll {
 const SPIN_LINE_MIN = 1.0;
 
 /**
- * Deterministic MEAN roll-out of a contemplated shot — the backspin helper line (GS-backspin-line).
- * Mirrors `executeShot`'s roll block at the mean roll energy (rng.range midpoint 1.0, NO draw taken),
- * so it is a PURE render aid: the same `clubRollFraction` + character `rollFracDelta` − `backspinBoost`
- * the sim uses, fed through the SAME `rollOut` — the drawn check + contour curl is exactly the physics.
- * Returns null for non-backspin clubs (driver/long irons), a landing that plugs in a penalty, or a
- * negligible roll. Zero rng. (The rare ship-corridor pinball flight + tent ricochet are not reproduced
- * — the line is a helper, the actual bounce is the truth.) */
+ * Deterministic MEAN roll-out of a contemplated shot — the roll/check helper line (GS-backspin-line +
+ * GS-runout-line). Mirrors `executeShot`'s roll block at the mean roll energy (rng.range midpoint 1.0, NO
+ * draw taken), so it is a PURE render aid: the same `clubRollFraction` + character `rollFracDelta` −
+ * `backspinBoost` the sim uses, fed through the SAME `rollOut` — the drawn check/run + contour curl is
+ * exactly the physics. A backspin club (wedge/short iron) always yields its check line; a FORWARD-rolling
+ * club (mid/long iron, hybrid, wood) yields its forward RUN-OUT only when the ball lands ON THE GREEN (so
+ * the graphic shows where an approach actually settles instead of just its carry — the "ball goes long of
+ * the arc" fix). Returns null for a club that runs forward but lands off the green, a landing that plugs
+ * in a penalty, or a negligible roll. Zero rng. (The rare ship-corridor pinball flight + tent ricochet are
+ * not reproduced — the line is a helper, the actual bounce is the truth.) */
 export function backspinRoll(
   hole: Hole,
   spray: ShotSpread,
@@ -1541,7 +1544,7 @@ export function backspinRoll(
 ): BackspinRoll | null {
   const nominal = spray.nominalCarry;
   const carry = spray.expectedCarry;
-  if (!hasBackspin(nominal) || carry <= 0) return null;
+  if (carry <= 0) return null;
   const br = (spray.bearing * Math.PI) / 180;
   const dir: Vec = [Math.sin(br), Math.cos(br)];
   const landing: Vec = [spray.origin[0] + dir[0] * carry, spray.origin[1] + dir[1] * carry];
@@ -1550,6 +1553,11 @@ export function backspinRoll(
   const K = Math.max(-MAX_CHECK, Math.min(MAX_ROLL, carry * frac));
   if (Math.abs(K) < SPIN_LINE_MIN) return null;
   const tdLie = lieAt(hole, landing);
+  // A BACKSPIN club (wedge/short iron) always draws its check/curl. A FORWARD-rolling club (mid/long iron,
+  // hybrid, wood) draws its RUN-OUT only when it lands on the GREEN — the "the arc lands on the green but
+  // the ball runs well past it" case the player is surprised by (GS-runout-line). Ordinary tee/fairway
+  // shots that don't land on the putting surface are unchanged (no line, byte-for-byte the old behaviour).
+  if (!hasBackspin(nominal) && tdLie !== 'green') return null;
   const tdPen = lieInfo(tdLie).penalty;
   if (tdPen && !(opts.immune && opts.immune.has(tdPen))) return null; // plugs in a hazard — nothing to roll
   const out = rollOut(hole, landing, dir, K, tdLie, opts.immune, opts.tents, hole.walls);
