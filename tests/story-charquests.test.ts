@@ -17,6 +17,8 @@ import { defaultStoryState, storyBagClubs, type StoryState } from '../src/sim/rp
 import { heraldQuestHook } from '../src/sim/rpg/storyQuests';
 import { friendInspectOverlayHTML } from '../src/render/storyCastOverlay';
 import { initState, reduce } from '../src/ui/game';
+import { setState } from '../src/app/ctx';
+import { storyLockerScreen } from '../src/app/storyLockerScreens';
 
 const base = (over: Partial<StoryState> = {}): StoryState => ({ ...defaultStoryState('feather-fade'), ...over });
 
@@ -79,6 +81,25 @@ describe('GS-story-charquests — reducer + card', () => {
   it('a not-yet-partnered friend is nudged to partner them first', () => {
     const html = friendInspectOverlayHTML('backspin-bo', base(), 0);
     expect(html).toMatch(/partner/i);
+  });
+
+  it('tapping a claimed charquest club in the locker raises ITS card, not the green starter (bug fix)', () => {
+    // A friend's signature club (`charquest:backspin-bo` → a Solar gap wedge) was mis-mapped by the locker
+    // to `plain:GW`, so its chip inspected as the green starter card. It must now inspect as itself.
+    const hub = reduce(reduce(initState('seed'), { type: 'openStory' }), { type: 'selectCharacter', characterId: 'feather-fade' });
+    const partnered = { ...hub, story: { ...hub.story!, sigil2Partner: 'backspin-bo' } };
+    const claimed = reduce(partnered, { type: 'claimCharacterQuest', charId: 'backspin-bo' });
+    // The reducer must ACCEPT inspecting the raw charquest id (it was rejected as a dead tap before).
+    const inspect = reduce(reduce(claimed, { type: 'openStoryLocker' }), {
+      type: 'storyInspectItem',
+      itemId: 'charquest:backspin-bo',
+    });
+    expect(inspect.storyItemInspectId).toBe('charquest:backspin-bo');
+    // And the locker renders the signature card (name + ally-gift tag), NOT the green "Starter" card.
+    setState(inspect);
+    const html = storyLockerScreen();
+    expect(html).toContain('Portland Check'); // the signature name
+    expect(html).not.toContain('Starter · '); // never the plain green starter card
   });
 });
 

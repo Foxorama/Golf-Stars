@@ -250,14 +250,19 @@ function gearSlotRow(slot: GearSlot): string {
     </div>`;
 }
 
-/** The id to inspect for a club: themed + quest ids carry lore directly; a plain club maps to its 'starter' card. */
+/** The id to inspect for a club: themed + NAMED reward ids (quest / major / charquest) carry lore directly;
+ *  a plain club maps to its 'starter' card. A NAMED reward is any id `storyRewardBaseId` remaps to a real
+ *  `club:` base — so a friend's `charquest:` signature is inspected as itself, not mis-mapped to the green
+ *  starter of its base type (the "tapping a reward shows the original green club" bug). */
 function lorableId(id: string): string {
-  return id.startsWith('club:') || id.startsWith('quest:') || id.startsWith('major:') ? id : `plain:${storyClubType(id)}`;
+  return id.startsWith('club:') || storyRewardBaseId(id) !== id ? id : `plain:${storyClubType(id)}`;
 }
 
-/** Resolve any locker id (themed / quest / major / `plain:<type>` / gear) to a display card for the lore overlay. */
+/** Resolve any locker id (themed / quest / major / charquest / `plain:<type>` / gear) to a display card for
+ *  the lore overlay. */
 function lockerCard(id: string): StoryCard | undefined {
-  if (id.startsWith('quest:') || id.startsWith('major:')) {
+  // A NAMED reward club — an ally's gift (`quest:`/`charquest:`) or a Galaxy-Tournament prize (`major:`).
+  if (storyRewardBaseId(id) !== id) {
     // A named reward club — an ally's gift (GS-story-quest-club) or a Galaxy-Tournament prize
     // (GS-story-tournament-reward): its own signature name, legendary tier, and its signature EFFECT.
     const club = resolveStoryClub(id);
