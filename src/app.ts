@@ -25,7 +25,7 @@ import { getFormat, ASGARD_FORMAT, STROKEPLAY_FORMAT } from './sim/rpg/formats';
 import { holeGateArmed, snapshotRun, currentCourse } from './sim/rpg/run';
 import { shopOffer, starmartOffer } from './sim/rpg/runShop';
 import { shopItem } from './sim/rpg/economy';
-import { CHARACTERS } from './sim/rpg/characters';
+import { CHARACTERS, characterShotMods } from './sim/rpg/characters';
 import { endlessMilestonesCrossed, endlessMilestoneShards, endlessSetGateOverPar, endlessSetLabel, endlessUnlocksCrossed } from './sim/rpg/endless';
 import { liveLeaderboard } from './sim/rpg/league';
 import { holeResult } from './sim/rpg/play';
@@ -1343,9 +1343,16 @@ function playingBody(animating: boolean): string {
     const full = previewShot(play, { clubId: selClubId, aim: selAim, power: 1 }, state.run.loadout);
     if (full.expectedCarry > 1) {
       // Aim the CARRY so carry + run-out ≈ the pin, not carry = pin: an iron/wood releases forward (land
-      // short, roll to the flag), a wedge checks back (land just past, spin to the flag). The old seed
-      // carried the full distance to the pin and then ran PAST it — the "ball goes long of the arc" report.
-      const frac = clubRollFraction(full.nominalCarry);
+      // short, roll to the flag), a backspin build's wedge checks back (land just past, spin to the flag).
+      // The old seed carried the full distance to the pin and then ran PAST it — the "ball goes long of
+      // the arc" report. Use the SAME effective roll fraction the sim rolls with (GS-backspin-optin):
+      // `clubRollFraction` + the golfer's per-club `rollFracDelta` (Backspin Bo) − any `backspinBoost`
+      // spin gear, so a backspin build's default approach aims PAST the flag and spins back to it instead
+      // of landing at the pin and checking short.
+      const seedMods = characterShotMods(state.run.loadout.characterId);
+      const seedDelta = seedMods ? seedMods(full.nominalCarry).rollFracDelta : 0;
+      const frac =
+        clubRollFraction(full.nominalCarry) + seedDelta - (state.run.loadout.backspinBoost ?? 0);
       const want = dist(play.ball, pinOf(play.hole)) / (1 + Math.max(-0.5, Math.min(0.5, frac)));
       selPower = Math.max(0.1, Math.min(1, want / full.expectedCarry));
     }
