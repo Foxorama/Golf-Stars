@@ -3,6 +3,7 @@ import { initState, reduce } from '../src/ui/game';
 import { DEFAULT_CHARACTER_ID } from '../src/sim/rpg/characters';
 import { defaultStoryState, REVISIT_CREDIT_MULT } from '../src/sim/rpg/story';
 import { questOfferable, questBeatPending } from '../src/sim/rpg/storyQuests';
+import { effectWindMult } from '../src/sim/rpg/effects';
 import { hasStory, loadStory, writeStory, clearStory, exportStory, importStory } from '../src/save/storyStore';
 
 describe('Story Mode entry flow (GS-story-save wiring)', () => {
@@ -442,11 +443,13 @@ describe('Story shop/vendor ACCESS — per-world, never a clubhouse buy-anything
     expect(intro.run.loadout.perks).toContain('sandy-sandsaver');
   });
 
-  it('a deep world plays under a stiffer wind (fair physics) and still resolves (GS-story-worlddiff)', () => {
+  it('a deep world plays under a stiffer sky (fair physics) and still resolves (GS-story-weather-variety)', () => {
     const story = { ...defaultStoryState('feather-fade'), chapter: 5, credits: 500, clearedWorldIds: ['standrews-18'] };
     const hub = { ...initState('wind-seed', {}, undefined, story), screen: 'story' as const };
-    // A Ch.1 world stays calm; a Ch.5 world blows the wildest sky — pure physics, records-safe.
-    expect(reduce(hub, { type: 'storyPlayWorld', courseId: 'verdant-18' }).run.staticEffect).toBe('none');
+    // A Ch.1 world plays a CALM sky (no wind bump — the new-player fix); a Ch.5 world blows the wildest storm.
+    const early = reduce(hub, { type: 'storyPlayWorld', courseId: 'verdant-18' });
+    expect(early.run.staticEffect).toBe('moonlight'); // calm, atmospheric — not a gale
+    expect(effectWindMult(early.run.staticEffect)).toBeLessThanOrEqual(1);
     const intro = reduce(hub, { type: 'storyPlayWorld', courseId: 'swamp-18' });
     expect(intro.run.staticEffect).toBe('ionStorm');
     expect(intro.course.meta.effect).toBe('ionStorm'); // stamped so the render/HUD show the storm

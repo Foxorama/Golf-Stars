@@ -33,6 +33,7 @@ import {
 } from '../src/sim/rpg/story';
 import { DEFAULT_SHIP_ID } from '../src/sim/rpg/ships';
 import { DEFAULT_CHARACTER_ID } from '../src/sim/rpg/characters';
+import { COURSE_EFFECTS, EFFECT_PATCH, effectWindMult, effectCarryMult, type CourseEffectId } from '../src/sim/rpg/effects';
 
 describe('story-state model (GS-story-save)', () => {
   it('a fresh campaign starts with the green bag, the station wagon, an empty purse, chapter 0', () => {
@@ -169,25 +170,41 @@ describe('story-state model (GS-story-save)', () => {
       expect(storyWorldChapter('not-a-world')).toBe(1);
     });
 
-    it('storyWorldEffect stiffens the wind by world tier — deep worlds harder, not just longer (GS-story-worlddiff)', () => {
-      // Ch.1 worlds + the Earth prologue play calm; the sky rises to the wildest storm by Ch.5.
-      expect(storyWorldEffect('verdant-18')).toBe('none');
-      expect(storyWorldEffect(PROLOGUE_COURSE_ID)).toBe('none');
-      expect(storyWorldEffect('swamp-18')).toBe('ionStorm'); // Ch.5
-      // Rising, and only ever from the PURE wind/carry set (no craters / lies / tents that would alter the
-      // layout or fairness) — a fair, readable difficulty, records-safe.
-      const PURE_WIND = new Set(['none', 'solarWind', 'solarStorm', 'dustStorm', 'ionStorm']);
-      const tiers = STORY_WORLDS.map((w) => w.unlockChapter);
-      const windOf = (e: string) => ({ none: 1, solarWind: 1.15, solarStorm: 1.2, dustStorm: 1.25, ionStorm: 1.35 }[e] ?? 1);
-      let prevWind = 0;
-      for (let ch = 1; ch <= 5; ch++) {
-        const w = STORY_WORLDS.find((x) => x.unlockChapter === ch)!;
-        const e = storyWorldEffect(w.courseId);
-        expect(PURE_WIND.has(e), `${e} is a pure-wind effect`).toBe(true);
-        expect(windOf(e)).toBeGreaterThanOrEqual(prevWind); // monotonically stiffer by tier
-        prevWind = windOf(e);
+    it('storyWorldEffect gives each world a varied, PURE-PHYSICS sky — calm early, stormy deep (GS-story-weather-variety)', () => {
+      // Every world's sky is a valid CourseEffect, keyed to the WORLD (stable across revisits → records-safe).
+      for (const w of STORY_WORLDS) {
+        const e = storyWorldEffect(w.courseId) as CourseEffectId;
+        expect(COURSE_EFFECTS[e], `${w.courseId} → ${e} is a real effect`).toBeTruthy();
+        // PURE PHYSICS only — no ground-patch / tent effect that would alter the layout or fairness.
+        expect(EFFECT_PATCH[e], `${e} scatters no ground patches`).toBeUndefined();
+        expect(e).not.toBe('tradeMarket');
+        expect(e).not.toBe('meteorShower');
       }
-      expect(tiers.length).toBeGreaterThan(0);
+      // The Earth prologue (off-chart) plays clear skies.
+      expect(storyWorldEffect(PROLOGUE_COURSE_ID)).toBe('none');
+      // Deterministic (a world's sky never changes → its `worldBest` stays comparable).
+      expect(storyWorldEffect('swamp-18')).toBe(storyWorldEffect('swamp-18'));
+
+      const windOf = (id: string) => effectWindMult(storyWorldEffect(id));
+      const carryOf = (id: string) => effectCarryMult(storyWorldEffect(id));
+      const inChapter = (ch: number) => STORY_WORLDS.filter((w) => w.unlockChapter === ch);
+
+      // (1) NEW-PLAYER FIX: every Chapter 1–2 world is CALM — wind at or below neutral, carry never dragged.
+      for (const w of [...inChapter(1), ...inChapter(2)]) {
+        expect(windOf(w.courseId), `${w.courseId} early wind ≤ 1`).toBeLessThanOrEqual(1);
+        expect(carryOf(w.courseId), `${w.courseId} early carry ≥ 1`).toBeGreaterThanOrEqual(1);
+      }
+      // (2) VARIETY: the campaign is not a wind ladder — plenty of distinct skies, several with NO wind bump.
+      const skies = new Set(STORY_WORLDS.map((w) => storyWorldEffect(w.courseId)));
+      expect(skies.size).toBeGreaterThanOrEqual(6);
+      const nonWind = STORY_WORLDS.filter((w) => windOf(w.courseId) <= 1);
+      expect(nonWind.length).toBeGreaterThanOrEqual(6);
+      // (3) DIFFICULTY RAMP: the deep worlds blow the wildest skies; the early ones the calmest.
+      const maxWind = (ch: number) => Math.max(...inChapter(ch).map((w) => windOf(w.courseId)));
+      expect(maxWind(5)).toBeGreaterThan(maxWind(1));
+      expect(maxWind(5)).toBeGreaterThanOrEqual(maxWind(3));
+      expect(maxWind(1)).toBeLessThanOrEqual(1); // the opening cluster never blows harder than neutral
+      expect(storyWorldEffect('swamp-18')).toBe('ionStorm'); // the Ch.5 shrine still blows the wildest sky
     });
 
     it('completeStoryRound clears the world, pays, keeps best, and advances the prologue chapter', () => {

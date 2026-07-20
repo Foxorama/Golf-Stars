@@ -19,6 +19,7 @@
 
 import { CLUBS, clubById, type Club } from '../clubs';
 import { clubSetById, buildRewardClub } from './economy';
+import type { CourseEffectId } from './effects';
 import { DEFAULT_CHARACTER_ID } from './characters';
 import { DEFAULT_SHIP_ID } from './ships';
 
@@ -54,29 +55,38 @@ export interface StoryWorld {
    *  worlds (Driver Dan's derelict, Mystic Mole's mire) chart at Chapter 4 so a Warden can recruit AND quest
    *  them before the finale, while they stay Chapter-5 tournaments (venue/qualifier/difficulty unchanged). */
   chartChapter?: number;
+  /** GS-story-weather-variety — the WEATHER this world plays under (`storyWorldEffect`): a per-world,
+   *  thematically-fitting sky drawn from the full atmospheric palette, NOT a wind-only difficulty ladder.
+   *  Early worlds get CALM, non-wind skies (a new player shouldn't meet a gale on world two), the deep
+   *  worlds turn stormy — so the campaign has visible weather variety (moonlit / eclipse / nebula / aurora /
+   *  radiant / gravity-well, not "always wind") AND a fair difficulty ramp. All are PURE-PHYSICS effects
+   *  (wind/carry only, `applyEffectPhysics` — no craters/lies/tents that would alter the layout), so records
+   *  / Star-Tour stay comparable, `validateFairness`/`Crossings` are untouched and auto ≡ interactive holds.
+   *  Optional: an absent row (the Earth prologue / off-chart) plays 'none' (clear skies). */
+  weather?: CourseEffectId;
 }
 export const STORY_WORLDS: readonly StoryWorld[] = [
-  // Chapter 1 — the gentle opening cluster (the Emerald Invitational + warm-ups).
-  { courseId: 'verdant-18', unlockChapter: 1 }, // Lyra Meadows
-  { courseId: 'verdant2-18', unlockChapter: 1 }, // Centaurus Fairways
-  { courseId: 'desert-18', unlockChapter: 1 }, // Vela Dunes
-  // Chapter 2 — the Forge (fire) opens up.
-  { courseId: 'inferno-18', unlockChapter: 2 }, // Orion Forge
-  { courseId: 'inferno2-18', unlockChapter: 2 }, // Scorpius Sting
-  { courseId: 'frost-18', unlockChapter: 2 }, // Cygnus Links
-  // Chapter 3 — the Storm.
-  { courseId: 'tempest-18', unlockChapter: 3 }, // Draco Gale
-  { courseId: 'crystal-18', unlockChapter: 3 }, // Coronae Prism
-  { courseId: 'fungal-18', unlockChapter: 3 }, // Vulpecula Hollows
-  // Chapter 4 — the deep sky.
-  { courseId: 'ocean-18', unlockChapter: 4 }, // Eridanus Atolls
-  { courseId: 'void2-18', unlockChapter: 4 }, // Sagittarius Core
-  { courseId: 'crystal2-18', unlockChapter: 4 }, // Triangulum Wedge
-  // Chapter 5 — the serpent's reaches. Two host a Ch.5 caddy (Mole, Dan) but chart at Ch.4 so their friends
-  // can be gathered + quested in time (GS-story-gather-early); their tournament tier stays Chapter 5.
-  { courseId: 'swamp-18', unlockChapter: 5, chartChapter: 4 }, // Hydra Mire — Mystic Mole
-  { courseId: 'derelict-18', unlockChapter: 5, chartChapter: 4 }, // The Ghost Wreck — Driver Dan
-  { courseId: 'cetus-18', unlockChapter: 5 }, // Cetus Shelf
+  // Chapter 1 — the gentle opening cluster: CALM, non-wind skies so a new player isn't hammered.
+  { courseId: 'verdant-18', unlockChapter: 1, weather: 'moonlight' }, // Lyra Meadows — a still silver night
+  { courseId: 'verdant2-18', unlockChapter: 1, weather: 'nebula' }, // Centaurus Fairways — drifting colour fog
+  { courseId: 'desert-18', unlockChapter: 1, weather: 'radiant' }, // Vela Dunes — bright STILL air tames the dune gale (+carry, fun not tight)
+  // Chapter 2 — the Forge opens up: still gentle, more variety (calming the windy ice links most).
+  { courseId: 'inferno-18', unlockChapter: 2, weather: 'eclipse' }, // Orion Forge — a black sun, dead-still air
+  { courseId: 'inferno2-18', unlockChapter: 2, weather: 'aurora' }, // Scorpius Sting — charged colour ribbons (+carry)
+  { courseId: 'frost-18', unlockChapter: 2, weather: 'moonlight' }, // Cygnus Links — a calm frosted night (the ice-ring gale softened)
+  // Chapter 3 — the Storm: the first real winds arrive, mixed with a heavy-sky drag.
+  { courseId: 'tempest-18', unlockChapter: 3, weather: 'solarWind' }, // Draco Gale — a steady stiff breeze
+  { courseId: 'crystal-18', unlockChapter: 3, weather: 'gravityWell' }, // Coronae Prism — a giant looms, heavy sky (carry down)
+  { courseId: 'fungal-18', unlockChapter: 3, weather: 'solarStorm' }, // Vulpecula Hollows — charged, gusty air
+  // Chapter 4 — the deep sky: hard, still varied (a gust-and-drag storm, a black-hole pull, a charged storm).
+  { courseId: 'ocean-18', unlockChapter: 4, weather: 'dustStorm' }, // Eridanus Atolls — a storm-swept sea (gust + drag)
+  { courseId: 'void2-18', unlockChapter: 4, weather: 'gravityWell' }, // Sagittarius Core — the galactic black hole's pull
+  { courseId: 'crystal2-18', unlockChapter: 4, weather: 'solarStorm' }, // Triangulum Wedge — a red flare over the spires
+  // Chapter 5 — the serpent's reaches: brutal skies as the galaxy frays. Two host a Ch.5 caddy (Mole, Dan)
+  // but chart at Ch.4 (GS-story-gather-early); their tournament tier stays Chapter 5.
+  { courseId: 'swamp-18', unlockChapter: 5, chartChapter: 4, weather: 'ionStorm' }, // Hydra Mire — the wildest lightning
+  { courseId: 'derelict-18', unlockChapter: 5, chartChapter: 4, weather: 'ionStorm' }, // The Ghost Wreck — forked storm
+  { courseId: 'cetus-18', unlockChapter: 5, weather: 'dustStorm' }, // Cetus Shelf — a gritty gale over the tide-shelf
 ];
 
 /** Is this world charted (available to travel to) at the given chapter? Reads `chartChapter` (when it
@@ -127,20 +137,21 @@ export function storyWorldChapter(courseId: string): number {
 }
 
 /**
- * GS-story-worlddiff — the WEATHER a Story world plays under, scaled by its difficulty TIER (unlock chapter)
- * so deep worlds are genuinely harder, not just longer. A rising, fair WIND: pure physics (wind/carry only,
- * no geometry, `applyEffectPhysics`), so it never touches the layout — records/Star-Tour stay comparable —
- * and wind reads true off the shot bearing (club up, aim off), the strategic axis the review asked for
- * ("difficulty is just length" was the complaint). Deliberately PURE wind/carry effects (no craters / lies /
- * tents). Ch.1 worlds play calm; the sky stiffens to the wildest storm by Ch.5 — which also reads as the
- * galaxy fraying as the serpent stirs. Scaled by the WORLD (tier), not the run chapter, so a given world's
- * difficulty is stable (a revisit is the same test, `worldBest` stays comparable). The Earth prologue (tier
- * 1, off-chart) stays calm. Returns a `CourseEffectId` string (the sim reads it through `run.staticEffect`).
+ * GS-story-weather-variety (superseding the wind-only GS-story-worlddiff ladder) — the WEATHER a Story world
+ * plays under. Each world carries its OWN thematically-fitting sky (`StoryWorld.weather`), drawn from the full
+ * atmospheric palette, so the campaign has real VARIETY (moonlit nights, an eclipse, drifting nebulae, aurorae,
+ * a radiant burst, a gravity well, storms) — not the old "every world is just more wind". Two goals shaped the
+ * table: (1) the EARLY worlds are CALM — Chapter 1–2 skies all sit at or below neutral wind (a new player used
+ * to meet a gale on world two, worst of all on the windy dune/ice biomes, which now get the strongest CALMING
+ * effect); (2) a fair difficulty RAMP — the deep worlds turn stormy (dust/ion storms, heavy-sky drag) as the
+ * galaxy frays near the serpent. Every effect is PURE PHYSICS (wind/carry only via `applyEffectPhysics` — no
+ * craters/lies/tents that alter the layout), so records / Star-Tour stay comparable, `validateFairness`/
+ * `Crossings` are untouched and auto ≡ interactive holds. Keyed by the WORLD (a stable per-course sky, so a
+ * revisit is the same test — `worldBest` stays comparable). Off-chart (the Earth prologue) plays 'none' (clear
+ * skies). Returns a `CourseEffectId` the sim reads through `run.staticEffect`.
  */
-const STORY_TIER_EFFECT: readonly string[] = ['none', 'solarWind', 'solarStorm', 'dustStorm', 'ionStorm'];
 export function storyWorldEffect(courseId: string): string {
-  const tier = Math.max(1, Math.min(STORY_TIER_EFFECT.length, storyWorldChapter(courseId)));
-  return STORY_TIER_EFFECT[tier - 1] ?? 'none';
+  return storyWorldById(courseId)?.weather ?? 'none';
 }
 
 /**
