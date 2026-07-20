@@ -64,7 +64,10 @@ default). One focused, tested, auto-merged PR each:
   is locked into the campaign (drives the betrayal branch).
 - **GS-story-stableford** — ✅ *shipping*: Sigil 3 (Storm Championship) is single-person STABLEFORD (points,
   higher wins; attack every flag). Points recap + leaderboard; The Choice still fires after the win.
-- **GS-story-charquests** — per-character quests unlocked once you partner that golfer; signature reward.
+- **GS-story-charquests** — ✅ *shipping*: each friend carries a SIGNATURE quest that opens once you PARTNER
+  them in a team Sigil — they open up about home (Feather's Nairobi wind, Larry's ocean ball, …) and hand you
+  their signature club (`charquest:<id>`) on their clubhouse talk card (🎁 marker). Reuses `completedQuestIds`
+  (no save bump); `heraldQuestHook` skips the markers.
 - **GS-story-betrayer** — ✅ *shipping*: pure `storyBetrayal.ts` — betrayer = odd-one-out of your two
   partner picks; Warden loyal ally + Herald opponent pair; Coil champion-not-your-guide; `corruptedLookOpts`
   costume. The interlude's fallen/betrayed friend is now the actual betrayer.

@@ -22,9 +22,10 @@ import { storyCaddyHired } from './storyCaddies';
  *  — the personal thread the Herald Ch.4 betrayal beat pulls on ("you still swing Dan's Long Haul, the club
  *  he gave you when you were someone he could be proud of"). Undefined if you never finished an ally quest. */
 export function heraldQuestHook(story: StoryState): { caddyName: string; clubName: string; stillUsing: boolean } | undefined {
-  const firstId = story.completedQuestIds[0];
-  if (!firstId) return undefined;
-  const q = STORY_QUESTS.find((x) => x.id === firstId);
+  // The first CADDY quest completed — skip any `charquest:` markers that share `completedQuestIds`.
+  const firstCaddyId = story.completedQuestIds.find((id) => STORY_QUESTS.some((x) => x.id === id));
+  if (!firstCaddyId) return undefined;
+  const q = STORY_QUESTS.find((x) => x.id === firstCaddyId);
   if (!q) return undefined;
   return {
     caddyName: allyName(q.caddyId),

@@ -25,6 +25,7 @@ import { heraldCrew, type HeraldAgent } from '../sim/rpg/storyHeraldCrew';
 import { storyBarName, type StoryState } from '../sim/rpg/story';
 import { questOfferable } from '../sim/rpg/storyQuests';
 import { otherGolfers } from '../sim/rpg/storyCast';
+import { characterQuestOfferable } from '../sim/rpg/characterQuests';
 import type { Character } from '../sim/rpg/characters';
 
 /** The Parrot's lore bust, made embeddable at 320×340 inside a positioned `<g transform>` (the Crow's Nest
@@ -495,7 +496,7 @@ export function spaceportSceneHTML(story: StoryState): string {
     !herald && story.chapter >= 1
       ? otherGolfers(story)
           .slice(0, FRIEND_SPOTS.length)
-          .map((ch, i) => friendStandee(ch, FRIEND_SPOTS[i]!))
+          .map((ch, i) => friendStandee(ch, FRIEND_SPOTS[i]!, characterQuestOfferable(story, ch.id)))
           .join('')
       : '';
 
@@ -524,7 +525,7 @@ const FRIEND_SPOTS: { left: number; top: number }[] = [
 /** One friend golfer as a feet-anchored standee (their signature look via `golferPreviewSVG`, drawn a touch
  *  smaller so they read further back on the deck). Tap → their friend talk card (`storyInspectAlly`, widened
  *  in the reducer to accept a playable-golfer id). */
-function friendStandee(ch: Character, spot: { left: number; top: number }): string {
+function friendStandee(ch: Character, spot: { left: number; top: number }, hasQuest = false): string {
   const figure = golferPreviewSVG(undefined, undefined, undefined, {
     skin: ch.style.skin,
     shirtBase: ch.style.shirt,
@@ -534,10 +535,13 @@ function friendStandee(ch: Character, spot: { left: number; top: number }): stri
     w: 60,
     h: 175,
   });
+  // GS-story-charquests: a gift marker bobs over a friend whose signature club is ready to claim.
+  const questMark = hasQuest ? `<span class="gs-sclub-questmark" aria-hidden="true">🎁</span>` : '';
   return `<button class="gs-sclub-golfer gs-sclub-friend"
       data-action='${JSON.stringify({ type: 'storyInspectAlly', caddyId: ch.id })}'
-      aria-label="Talk to ${ch.name}, your friend"
+      aria-label="Talk to ${ch.name}, your friend${hasQuest ? ' — they have a gift for you' : ''}"
       style="left:${spot.left}%;top:${spot.top}%;width:11cqw;">
+      ${questMark}
       <span class="gs-sclub-shadow" style="background:radial-gradient(ellipse at 50% 50%, ${ch.style.cap}55, #0000 70%);"></span>
       ${figure}
       <span class="gs-sclub-plate gs-sclub-plate--friend">${ch.shortName}</span>

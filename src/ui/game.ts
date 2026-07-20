@@ -78,6 +78,7 @@ import { hireStoryCaddy, setActiveStoryCaddy, applyStoryCaddy, worldCaddy } from
 import { allyTalk } from '../sim/rpg/storyAllies';
 import { isHeraldAgent, applyHeraldCaddies } from '../sim/rpg/storyHeraldCrew';
 import { isOtherGolfer } from '../sim/rpg/storyCast';
+import { claimCharacterQuest } from '../sim/rpg/characterQuests';
 import { acceptQuest, completeQuest, activeQuest, questWorld } from '../sim/rpg/storyQuests';
 import { isStoryShipId, buyStoryShip, equipStoryShip, worldIsShipVendor } from '../sim/rpg/storyShips';
 import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
@@ -568,6 +569,16 @@ export function reduce(state: UiState, action: Action): UiState {
       const story = acceptQuest(state.story, action.questId);
       if (story === state.story) return state;
       return { ...state, story, storyAllyInspectId: undefined, storyAllyTalk: undefined };
+    }
+
+    case 'claimCharacterQuest': {
+      // GS-story-charquests: claim a friend's SIGNATURE club from their talk card (once you've partnered
+      // them in a team Sigil). Guarded to the hub / aboard + an offerable claim (claimCharacterQuest
+      // re-checks). Keeps the card open so the "claimed" badge shows immediately.
+      if ((state.screen !== 'story' && state.screen !== 'shipInterior') || !state.story) return state;
+      const story = claimCharacterQuest(state.story, action.charId);
+      if (story === state.story) return state;
+      return { ...state, story };
     }
 
     case 'playStoryQuest': {

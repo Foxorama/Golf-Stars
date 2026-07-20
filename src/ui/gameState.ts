@@ -448,6 +448,7 @@ export type Action =
   | { type: 'storyAllyTalk'; caddyId: string } // GS-story-allies: cycle the open ally's banter line
   | { type: 'storyCloseAlly' } // GS-story-allies: dismiss the ally talk card
   | { type: 'acceptStoryQuest'; questId: string } // GS-story-quests: accept an ally's side quest (from their card)
+  | { type: 'claimCharacterQuest'; charId: string } // GS-story-charquests: claim a friend's signature club
   | { type: 'playStoryQuest' } // GS-story-quests: tee off the active quest's round (the ally's home world)
   | { type: 'completeStoryQuest' } // GS-story-quests: claim the quest reward on the round recap
   | { type: 'playYggdrasilRealm'; realmId: string } // GS-star-tour-yggdrasil: play a Norse realm off the World Tree (Asgard only, today)
