@@ -224,7 +224,11 @@ export function previewBackspin(
   if (!roll) return null;
   const read = spinReadOf(loadout);
   const arc = Math.abs(roll.rollYd);
-  const readFrac = read.full || arc < 1e-3 ? 1 : Math.max(0, Math.min(1, read.readYd / arc));
+  // A forward RUN-OUT (an iron/wood released onto the green) is fundamental "here's where it settles" info —
+  // always drawn in FULL, so the player sees the ball run past the carry landing (GS-runout-line). A
+  // BACKSPIN check/curl stays a premium READ gated by spin gear (a confident prefix + terminus; gear traces
+  // the rest), so the always-on short base read is unchanged for wedges.
+  const readFrac = roll.rollYd > 0 || read.full || arc < 1e-3 ? 1 : Math.max(0, Math.min(1, read.readYd / arc));
   return { landing: roll.landing, path: roll.path, readFrac };
 }
 

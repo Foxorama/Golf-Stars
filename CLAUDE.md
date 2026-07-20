@@ -894,19 +894,26 @@ these systems** — each bullet is the tip of a documented iceberg.
     auto `onePutt` is untouched.
   - The break line STOPS DEAD at the confident read (terminus dot, nothing beyond) — read range is
     a visible gear axis (`puttSkillOf`, cap 1.0).
-  - The BACKSPIN helper line (GS-backspin-line) is the full-shot twin of the putt read: on the shot
-    screen a wedge/short-iron (`hasBackspin`) draws a short cyan roll/check line from the aim-line
-    touchdown to where the ball settles — the "fly past, spin back" mechanic made visible on contoured
-    greens. `backspinRoll` (round.ts) is PURE: the MEAN roll energy (no rng draw) through the SAME
-    `rollOut` the sim resolves, so the drawn check + curl IS the physics (contract 5). `previewBackspin`
-    (play.ts) reads the character `rollFracDelta` + `loadout.backspinBoost` + `spinReadOf` for the read
-    reach; it lives in the shot-cone overlay group (`spinPath`/`spinReadFrac`, holeView) so the
-    pull-to-power gesture redraws it. Interactive/render-only — zero sim rng, the headless auto path
-    never reads it. Read range is a shoppable gear axis like the putt line: a short base reach
-    (`DEFAULT_SPIN_READ`) always on; **Spin Guide Card** extends `spinReadBonus`, the **Spin Trajectory
-    Computer** reads the whole roll (`spinReadFull`) — each pairs a small `backspinBoost` so the auto
-    sim still gains (the Green-Reading-Book pattern; contract 4). The prefix cut is by ARC LENGTH (a
-    straight 2-point roll would never show a terminus on an index cut). No new `_gs*` hook / save bump.
+  - The ROLL/CHECK helper line (GS-backspin-line + GS-runout-line) is the full-shot twin of the putt
+    read: on the shot screen it draws a short cyan line from the aim-line touchdown to where the ball
+    settles. A wedge/short-iron (`hasBackspin`) always draws its "fly past, spin BACK" check/curl; a
+    FORWARD-rolling club (mid/long iron, hybrid, wood) draws its forward RUN-OUT **only when the ball
+    lands ON THE GREEN** — the fix for "the ball goes long of the aim arc": the cone shows CARRY, but an
+    approach releases forward, so the graphic now shows where it actually settles (ordinary tee/fairway
+    shots that don't land on the green are unchanged — no line). `backspinRoll` (round.ts) is PURE: the
+    MEAN roll energy (no rng draw) through the SAME `rollOut` the sim resolves, so the drawn run + curl IS
+    the physics (contract 5). `previewBackspin` (play.ts) reads the character `rollFracDelta` +
+    `loadout.backspinBoost` + `spinReadOf` for the read reach; it lives in the shot-cone overlay group
+    (`spinPath`/`spinReadFrac`, holeView) so the pull-to-power gesture redraws it. A forward RUN-OUT is
+    always shown in FULL (fundamental "where it settles" info); a BACKSPIN check stays a gear-gated read.
+    The at-rest power seed (`app.ts`) also aims the CARRY so carry + run-out ≈ the pin (via
+    `clubRollFraction`), so the DEFAULT approach rests at the flag instead of running past it.
+    Interactive/render-only — zero sim rng, the headless auto path never reads it. Read range is a
+    shoppable gear axis like the putt line: a short base reach (`DEFAULT_SPIN_READ`) always on; **Spin
+    Guide Card** extends `spinReadBonus`, the **Spin Trajectory Computer** reads the whole roll
+    (`spinReadFull`) — each pairs a small `backspinBoost` so the auto sim still gains (the
+    Green-Reading-Book pattern; contract 4). The prefix cut is by ARC LENGTH (a straight 2-point roll
+    would never show a terminus on an index cut). No new `_gs*` hook / save bump.
   - Greens layer 1–2 contour LOBES (`Hole.greenContour`, own side rng stream) over the plane;
     `greenSlopeAt` is the ONE local field the resolver, preview line, read, AND arrow field sample.
     The field math is the surface-agnostic `sim/contour.ts`; `rollOut` samples it per step and

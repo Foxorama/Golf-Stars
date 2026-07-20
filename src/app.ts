@@ -14,7 +14,7 @@ import { type ProjectOptions } from './render/project';
 import { shotView, previewShot, previewBackspin, resolveAimTarget, awaitingPutt, canPuttFringe, type AimMode } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
 import { drawStoryFigure, hasStoryFigure } from './render/storyFigure';
-import { biomeCarryMult, pinOf, greenDepth, forcedCarry, DEFAULT_MANUAL_BAND, DEFAULT_PUTT_RANGE, MANUAL_IDEAL_PACE, puttBreakYd, puttBreakBow, puttBandDistanceFactor, idealPuttAim, puttPathPreview } from './sim/round';
+import { biomeCarryMult, pinOf, greenDepth, forcedCarry, clubRollFraction, DEFAULT_MANUAL_BAND, DEFAULT_PUTT_RANGE, MANUAL_IDEAL_PACE, puttBreakYd, puttBreakBow, puttBandDistanceFactor, idealPuttAim, puttPathPreview } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
 import { archetypeFor } from './sim/course/themes';
 import { bearing, dist, type Vec } from './sim/course/contract';
@@ -1342,7 +1342,11 @@ function playingBody(animating: boolean): string {
   if (newShot && selClubId !== 'putter' && !selPutt) {
     const full = previewShot(play, { clubId: selClubId, aim: selAim, power: 1 }, state.run.loadout);
     if (full.expectedCarry > 1) {
-      const want = dist(play.ball, pinOf(play.hole));
+      // Aim the CARRY so carry + run-out ≈ the pin, not carry = pin: an iron/wood releases forward (land
+      // short, roll to the flag), a wedge checks back (land just past, spin to the flag). The old seed
+      // carried the full distance to the pin and then ran PAST it — the "ball goes long of the arc" report.
+      const frac = clubRollFraction(full.nominalCarry);
+      const want = dist(play.ball, pinOf(play.hole)) / (1 + Math.max(-0.5, Math.min(0.5, frac)));
       selPower = Math.max(0.1, Math.min(1, want / full.expectedCarry));
     }
   }

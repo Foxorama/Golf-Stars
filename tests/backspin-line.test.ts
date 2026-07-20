@@ -64,10 +64,21 @@ describe('spinReadOf — the backspin-line gear axis (GS-backspin-line)', () => 
 describe('backspinRoll — the predicted roll/check (GS-backspin-line)', () => {
   const spray = shotSpread(hole, hole.tee, 'tee', hole.green, lob, { power: 1 });
 
-  it('is null for a non-backspin club (driver) — no check line to draw', () => {
+  it('is null for a non-backspin club that lands OFF the green (driver flies into the rough) — no line', () => {
     const big = shotSpread(hole, hole.tee, 'tee', hole.green, driver, { power: 1 });
     expect(hasBackspin(big.nominalCarry)).toBe(false);
-    expect(backspinRoll(hole, big)).toBeNull();
+    expect(backspinRoll(hole, big)).toBeNull(); // the driver flies well past this par-3 green into the rough
+  });
+
+  it('a forward-rolling iron LANDING on the green draws its RUN-OUT line (GS-runout-line)', () => {
+    // The "ball goes long of the arc" fix: a mid-iron releases forward, so when the carry lands ON the
+    // green the graphic now shows the run-out past the touchdown instead of nothing.
+    const iron = CLUBS.find((c) => c.id === '7i')!;
+    const s7 = shotSpread(hole, hole.tee, 'tee', hole.green, iron, { power: 1 });
+    expect(hasBackspin(s7.nominalCarry)).toBe(false); // a forward-rolling club
+    const roll = backspinRoll(hole, s7);
+    expect(roll).not.toBeNull(); // it lands on the green here → the run-out IS drawn
+    expect(roll!.rollYd).toBeGreaterThan(0); // and it runs FORWARD past the carry landing
   });
 
   it('a lofted wedge checks BACK (rollYd < 0) toward the player', () => {
@@ -143,9 +154,18 @@ describe('previewBackspin — the read fraction from gear (GS-backspin-line)', (
     expect(p!.readFrac).toBe(1);
   });
 
-  it('is null for a driver (non-backspin club) — no line', () => {
+  it('is null for a driver (non-backspin club) — flies off the green, no line', () => {
     const dSpray = previewShot(play, { clubId: 'D', aim: 'attack', power: 1 }, startingLoadout());
     expect(previewBackspin(play, dSpray, startingLoadout())).toBeNull();
+  });
+
+  it('a forward RUN-OUT onto the green is shown in FULL even with base gear (GS-runout-line)', () => {
+    // A run-out is fundamental "here's where it settles" info — not a premium read — so a base loadout
+    // still traces the whole forward roll (readFrac 1), unlike a wedge's gear-gated backspin curl.
+    const s7 = previewShot(play, { clubId: '7i', aim: 'attack', power: 1 }, startingLoadout());
+    const p = previewBackspin(play, s7, startingLoadout());
+    expect(p).not.toBeNull();
+    expect(p!.readFrac).toBe(1);
   });
 });
 

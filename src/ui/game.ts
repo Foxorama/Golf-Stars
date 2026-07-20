@@ -625,11 +625,15 @@ export function reduce(state: UiState, action: Action): UiState {
         return state;
       // GS-story-locker-inspect: a hired CADDY is inspectable too (its effect + lore card in the locker).
       const isHiredCaddy = state.story.hiredCaddyIds.includes(action.itemId);
-      // GS-story-quality: quest/major REWARD clubs (`quest:`/`major:`) and PLAIN starter clubs (`plain:<type>`)
-      // carry lore cards too (the locker builds these ids via `lorableId`) — accept them so tapping a reward
-      // or a green starter club in the locker actually raises its card, not a dead tap.
+      // GS-story-quality: quest/major/charquest REWARD clubs and PLAIN starter clubs (`plain:<type>`) carry
+      // lore cards too (the locker builds these ids via `lorableId`) — accept them so tapping a reward or a
+      // green starter club in the locker actually raises its card, not a dead tap. `charquest:` (a friend's
+      // signature club) was missing here + in the locker, so tapping one raised the original green iron.
       const isLorableClub =
-        action.itemId.startsWith('quest:') || action.itemId.startsWith('major:') || action.itemId.startsWith('plain:');
+        action.itemId.startsWith('quest:') ||
+        action.itemId.startsWith('major:') ||
+        action.itemId.startsWith('charquest:') ||
+        action.itemId.startsWith('plain:');
       if (
         !storyItemKind(action.itemId) &&
         !isStoryShipId(action.itemId) &&

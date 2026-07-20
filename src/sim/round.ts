@@ -1519,13 +1519,16 @@ export interface BackspinRoll {
 const SPIN_LINE_MIN = 1.0;
 
 /**
- * Deterministic MEAN roll-out of a contemplated shot — the backspin helper line (GS-backspin-line).
- * Mirrors `executeShot`'s roll block at the mean roll energy (rng.range midpoint 1.0, NO draw taken),
- * so it is a PURE render aid: the same `clubRollFraction` + character `rollFracDelta` − `backspinBoost`
- * the sim uses, fed through the SAME `rollOut` — the drawn check + contour curl is exactly the physics.
- * Returns null for non-backspin clubs (driver/long irons), a landing that plugs in a penalty, or a
- * negligible roll. Zero rng. (The rare ship-corridor pinball flight + tent ricochet are not reproduced
- * — the line is a helper, the actual bounce is the truth.) */
+ * Deterministic MEAN roll-out of a contemplated shot — the roll/check helper line (GS-backspin-line +
+ * GS-runout-line). Mirrors `executeShot`'s roll block at the mean roll energy (rng.range midpoint 1.0, NO
+ * draw taken), so it is a PURE render aid: the same `clubRollFraction` + character `rollFracDelta` −
+ * `backspinBoost` the sim uses, fed through the SAME `rollOut` — the drawn check/run + contour curl is
+ * exactly the physics. A backspin club (wedge/short iron) always yields its check line; a FORWARD-rolling
+ * club (mid/long iron, hybrid, wood) yields its forward RUN-OUT only when the ball lands ON THE GREEN (so
+ * the graphic shows where an approach actually settles instead of just its carry — the "ball goes long of
+ * the arc" fix). Returns null for a club that runs forward but lands off the green, a landing that plugs
+ * in a penalty, or a negligible roll. Zero rng. (The rare ship-corridor pinball flight + tent ricochet are
+ * not reproduced — the line is a helper, the actual bounce is the truth.) */
 export function backspinRoll(
   hole: Hole,
   spray: ShotSpread,
@@ -1541,7 +1544,7 @@ export function backspinRoll(
 ): BackspinRoll | null {
   const nominal = spray.nominalCarry;
   const carry = spray.expectedCarry;
-  if (!hasBackspin(nominal) || carry <= 0) return null;
+  if (carry <= 0) return null;
   const br = (spray.bearing * Math.PI) / 180;
   const dir: Vec = [Math.sin(br), Math.cos(br)];
   const landing: Vec = [spray.origin[0] + dir[0] * carry, spray.origin[1] + dir[1] * carry];
@@ -1550,6 +1553,11 @@ export function backspinRoll(
   const K = Math.max(-MAX_CHECK, Math.min(MAX_ROLL, carry * frac));
   if (Math.abs(K) < SPIN_LINE_MIN) return null;
   const tdLie = lieAt(hole, landing);
+  // A BACKSPIN club (wedge/short iron) always draws its check/curl. A FORWARD-rolling club (mid/long iron,
+  // hybrid, wood) draws its RUN-OUT only when it lands on the GREEN — the "the arc lands on the green but
+  // the ball runs well past it" case the player is surprised by (GS-runout-line). Ordinary tee/fairway
+  // shots that don't land on the putting surface are unchanged (no line, byte-for-byte the old behaviour).
+  if (!hasBackspin(nominal) && tdLie !== 'green') return null;
   const tdPen = lieInfo(tdLie).penalty;
   if (tdPen && !(opts.immune && opts.immune.has(tdPen))) return null; // plugs in a hazard — nothing to roll
   const out = rollOut(hole, landing, dir, K, tdLie, opts.immune, opts.tents, hole.walls);
@@ -1899,18 +1907,24 @@ export function forcedCarry(hole: Hole, from: Vec, target: Vec): { carry: number
 /**
  * The club to SUGGEST to an interactive player aiming at the green (GS-mechanics #6). Unlike
  * the auto `aiClub` (shortest club that just reaches — tuned for the headless balance), this
- * reasons about green COVERAGE:
+ * reasons about green COVERAGE *and the pin*:
  *   - green unreachable → the longest usable club (give it your best go);
- *   - green reachable   → the LONGEST club whose EXPECTED carry still lands on the green
- *     (`expectedCarry ≤ distToBack`), so you take the most club you can without flying the
- *     green on a normal strike — overshooting the front is fine, but the typical shot won't
- *     sail the back.
+ *   - reachable, a full club holds the green → the LONGEST club whose EXPECTED carry both REACHES
+ *     THE PIN and still stops by the back edge (`distToPin ≤ expectedCarry ≤ distToBack`), so you
+ *     take the most club you can without flying the green AND never come up short of the flag;
+ *   - too close for any full club to hold the green → the SHORTEST club that can still carry to
+ *     the pin, to be DIALED DOWN to it (a partial pitch — the at-rest power seed scales the shot
+ *     to the pin), rather than the shortest club in the bag.
  *
  * The earlier rule gated on `carryLow ≤ distToFront` (the club's WORST-case carry). That let
  * the driver in for any approach long enough that the driver's worst miss could still come up
- * short of the front — even though the driver's MEAN carry flew 60+ yards past the green. The
- * symptom was "the suggestion keeps handing me the driver": it was clubbing off the minimum
- * carry instead of the expected one. Gating on the expected carry fixes it.
+ * short of the front — the "the suggestion keeps handing me the driver" bug — so it was retuned
+ * to gate on the EXPECTED carry `≤ back`. But that left a near-green failure: with no pin term,
+ * whenever the next club up would fly the back edge the rule fell to the shortest club in the bag
+ * — the 20-yд Chipper — leaving any pin past its range well short (brutal in the sparse Story bag
+ * where the drop below the Sand Wedge is the Chipper). Adding the pin floor fixes both: a club is
+ * never chosen if it can't carry to the flag, and the Chipper is picked only when the pin is
+ * genuinely within its ~20-yд range.
  *
  * Pure; uses the same `shotSpread` the cone draws so the suggestion reads true. Does NOT touch
  * the auto sim.
@@ -1927,6 +1941,7 @@ export function suggestPlayerClub(
   const cand = bag.filter((c) => c.id !== 'putter');
   if (cand.length === 0) return bag[0]!;
   const { front, back } = greenDepth(hole, ball);
+  const distToPin = dist(ball, pinOf(hole));
   const target = hole.green;
   const spreadOf = (c: Club) =>
     shotSpread(hole, ball, lie, target, c, {
@@ -1939,15 +1954,25 @@ export function suggestPlayerClub(
   // Unreachable: even the longest club's best carry can't get to the front → swing the longest.
   if (spreadOf(longest).carryHigh < front) return longest;
 
-  // Reachable: the LONGEST club whose EXPECTED carry still stops on the green (≤ the back edge).
-  // Walk shortest→longest and keep the last qualifier; if even the shortest club's expected carry
-  // flies the back (the ball is right next to the green), fall back to the shortest (a chip).
   const byCarryAsc = [...cand].sort((a, b) => clubDist(a, opts.stats) - clubDist(b, opts.stats));
-  let pick: Club | undefined;
+  const EPS = 1e-6;
+  // The honest approach: the LONGEST club whose EXPECTED carry reaches the PIN yet still stops by the
+  // back edge. Walk shortest→longest, keep the last qualifier — never short of the flag, never over the
+  // back on a normal strike.
+  let onGreen: Club | undefined;
   for (const c of byCarryAsc) {
-    if (spreadOf(c).expectedCarry <= back) pick = c;
+    const ec = spreadOf(c).expectedCarry;
+    if (ec >= distToPin - EPS && ec <= back) onGreen = c;
   }
-  return pick ?? byCarryAsc[0]!;
+  if (onGreen) return onGreen;
+  // Too close for any full club to hold the green (every full carry flies the back): the SHORTEST club
+  // that can still carry to the pin, dialed DOWN to it (a partial pitch). NOT the shortest club in the
+  // bag — that under-clubbed to the Chipper and left mid pins short (the near-green bug).
+  for (const c of byCarryAsc) {
+    if (spreadOf(c).expectedCarry >= distToPin - EPS) return c;
+  }
+  // Nothing reaches the pin (a forced lay-up short) → the longest club, best go.
+  return longest;
 }
 
 /**

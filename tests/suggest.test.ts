@@ -72,4 +72,44 @@ describe('suggestPlayerClub (green coverage)', () => {
     const s = suggestPlayerClub(par3, [0, 120] as Vec, 'fairway', CLUBS, { carryMult: cm });
     expect(s.id).not.toBe('putter');
   });
+
+  // GS-neargreen-club: close to the green, the old "longest club that stays under the back edge" rule
+  // dropped to the shortest club in the bag (the 20-yд Chipper) as soon as the next club up would fly the
+  // back — leaving any pin past ~20 yд well short. It must now pick a club that can carry to the PIN.
+  const DEFAULT_STORY_BAG = ['D', '5W', '3H', '5i', '7i', '9i', 'PW', 'SW', 'chip', 'putter'];
+  const storyBag = DEFAULT_STORY_BAG.map((id) => CLUBS.find((c) => c.id === id)!);
+  // A pin ~45 yд away, ball just off the front: the Sand Wedge (74) flies the back at full power, but the
+  // Chipper (20) can't reach the flag — so the pick must be a club whose full carry ≥ the pin (dial down).
+  const nearGreen: Hole = {
+    par: 4,
+    tee: [0, 0],
+    green: [0, 45],
+    centreline: [[0, 0], [0, 45]],
+    features: [
+      { kind: 'fairway', poly: [[-12, 0], [12, 0], [12, 30], [-12, 30]] },
+      { kind: 'green', poly: [[-9, 38], [9, 38], [9, 52], [-9, 52]] },
+    ],
+    hazards: [],
+  };
+
+  it('does NOT drop to the Chipper for a ~45-yд pin in the sparse Story bag (near-green fix)', () => {
+    const cm = biomeCarryMult(nearGreen);
+    const ball: Vec = [0, 0];
+    const s = suggestPlayerClub(nearGreen, ball, 'fairway', storyBag, { carryMult: cm });
+    expect(s.id).not.toBe('chip');
+    // The chosen club can actually carry to the flag (dialed down by the at-rest power seed).
+    const reach = shotSpread(nearGreen, ball, 'fairway', nearGreen.green, s, { carryMult: cm });
+    expect(reach.expectedCarry).toBeGreaterThanOrEqual(pinDist(nearGreen, ball) - 1e-6);
+  });
+
+  it('still picks the Chipper for a pin genuinely within its ~20-yд range', () => {
+    const cm = biomeCarryMult(nearGreen);
+    const ball: Vec = [0, 30]; // 15 yд from the [0,45] pin — a true short chip
+    const s = suggestPlayerClub(nearGreen, ball, 'fringe', storyBag, { carryMult: cm });
+    expect(s.id).toBe('chip');
+  });
 });
+
+function pinDist(hole: Hole, ball: Vec): number {
+  return Math.hypot(hole.green[0] - ball[0], hole.green[1] - ball[1]);
+}
