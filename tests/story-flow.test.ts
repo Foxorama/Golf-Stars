@@ -343,6 +343,24 @@ describe('Story qualifying events (GS-story-qualifiers)', () => {
     const done = reduce(reduce(map, { type: 'storyPlayWorld', courseId: 'verdant-18' }), { type: 'play' });
     expect(done.lastStoryRound!.qualifier).toBeUndefined();
   });
+
+  it('a Ch.5 caddy world is chartable at Ch.4 — visited early it is a PLAIN clear (not a Ch.5 qualifier), and its friend recruits in time (GS-story-gather-early)', () => {
+    // A Warden in Chapter 4 (post-Choice) flies out to the derelict — Driver Dan's world, a Ch.5 tournament —
+    // to gather him a full chapter before the finale.
+    const story = { ...defaultStoryState('feather-fade'), chapter: 4, alignment: 'warden' as const, credits: 2000, clearedWorldIds: ['standrews-18'] };
+    const map = { ...initState('gather-seed', {}, undefined, story), screen: 'starTour' as const };
+    let intro = reduce(map, { type: 'storyPlayWorld', courseId: 'derelict-18' });
+    if (intro.screen === 'lore') intro = reduce(intro, { type: 'dismissLore' }); // a deep-world arrival beat may fire
+    const played = reduce(intro, { type: 'play' });
+    // Visiting it BEFORE reaching its chapter is a plain exploration clear — no out-of-chapter qualifier board.
+    expect(played.lastStoryRound!.qualifier).toBeUndefined();
+    expect(played.run.staticEffect).toBe('ionStorm'); // but it still plays at its Chapter-5 difficulty
+    expect(played.story!.clearedWorldIds).toContain('derelict-18');
+    // Recruit Dan from the world-clear recap — with room left to do his quest before the final battle.
+    const hired = reduce(played, { type: 'hireStoryCaddy', worldId: 'derelict-18', caddyId: 'driver-dan' });
+    expect(hired.story!.hiredCaddyIds).toContain('driver-dan');
+    expect(hired.story!.activeCaddyId).toBe('driver-dan');
+  });
 });
 
 describe('Story shop/vendor ACCESS — per-world, never a clubhouse buy-anything (GS-story-shop-access)', () => {

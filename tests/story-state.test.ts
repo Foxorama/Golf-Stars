@@ -236,6 +236,30 @@ describe('story-state model (GS-story-save)', () => {
       expect(storyWorldUnlocked(storyWorldById('swamp-18')!, 5)).toBe(true);
     });
 
+    it('a Ch.5 caddy world charts EARLY (Ch.4) so its friend is gatherable in time, but stays a Ch.5 tournament (GS-story-gather-early)', () => {
+      const derelict = storyWorldById('derelict-18')!; // Driver Dan waits here
+      const swamp = storyWorldById('swamp-18')!; // Mystic Mole waits here
+      // Both chart at Chapter 4 (a full chapter before the finale) — not Chapter 5.
+      for (const w of [derelict, swamp]) {
+        expect(storyWorldUnlocked(w, 3)).toBe(false); // still hidden through Ch.3 (pre-Choice)
+        expect(storyWorldUnlocked(w, 4)).toBe(true); // charts at Ch.4 — time to recruit + quest
+        expect(storyWorldUnlocked(w, 5)).toBe(true);
+      }
+      // …but their TOURNAMENT tier is UNCHANGED — still Chapter 5 (difficulty/weather/qualifier/payout read this).
+      expect(storyWorldChapter('derelict-18')).toBe(5);
+      expect(storyWorldChapter('swamp-18')).toBe(5);
+      expect(storyWorldEffect('derelict-18')).toBe('ionStorm'); // still braves the wildest sky
+      // cetus-18 (no caddy) is left alone — it still charts only at Chapter 5.
+      const cetus = storyWorldById('cetus-18')!;
+      expect(storyWorldUnlocked(cetus, 4)).toBe(false);
+      expect(storyWorldUnlocked(cetus, 5)).toBe(true);
+      // An ordinary world charts exactly at its unlock chapter (chartChapter defaults to unlockChapter).
+      const desert = storyWorldById('desert-18')!;
+      expect(desert.chartChapter).toBeUndefined();
+      expect(storyWorldUnlocked(desert, 0)).toBe(false);
+      expect(storyWorldUnlocked(desert, 1)).toBe(true);
+    });
+
     it('the key to the other realm needs all five trophies', () => {
       const s: StoryState = { ...defaultStoryState(), trophyIds: ['a', 'b', 'c', 'd'] };
       expect(keyToOtherRealm(s)).toBe(false);

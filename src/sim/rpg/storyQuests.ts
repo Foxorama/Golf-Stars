@@ -23,7 +23,9 @@ import { storyCaddyHired } from './storyCaddies';
  *  she gave you when you were someone she could be proud of"). Undefined if you never finished an ally quest.
  *  NOTE: caddy quests are only offerable BEFORE The Choice (Ch.1–3, un-turned), so this can only ever be a
  *  caddy reachable by Ch.3 — Sandy (Vela Dunes, Ch.1) / Chipinski (Orion, Ch.2) / Sam (Cygnus, Ch.2) /
- *  Penelope (Coronae, Ch.3). It is NEVER Dan or Mole (their worlds — the derelict + the mire — are Ch.5). */
+ *  Penelope (Coronae, Ch.3). It is NEVER Dan or Mole: their worlds (the derelict + the mire) chart only at
+ *  Ch.4 (GS-story-gather-early — post-Choice), where recruiting is Warden-only and questing is off for a
+ *  Herald, so a completed Dan/Mole quest is a Warden-path, post-Choice thing this hook never reads. */
 export function heraldQuestHook(story: StoryState): { caddyName: string; clubName: string; stillUsing: boolean } | undefined {
   // The first CADDY quest completed — skip any `charquest:` markers that share `completedQuestIds`.
   const firstCaddyId = story.completedQuestIds.find((id) => STORY_QUESTS.some((x) => x.id === id));
