@@ -29,7 +29,10 @@ import { CHARACTERS } from './sim/rpg/characters';
 import { endlessMilestonesCrossed, endlessMilestoneShards, endlessSetGateOverPar, endlessSetLabel, endlessUnlocksCrossed } from './sim/rpg/endless';
 import { liveLeaderboard } from './sim/rpg/league';
 import { holeResult } from './sim/rpg/play';
+import type { PlayedHole } from './sim/round';
 import { betterPlayedHole } from './sim/rpg/match';
+import { storyPartnerBestBallScore } from './sim/rpg/storyTeams';
+import { TEAM_PARTNER_EDGE } from './sim/rpg/storyTournaments';
 import { ACE_SHIP_ID } from './sim/rpg/ships';
 import { bagTierRank, type BagTier } from './sim/rpg/bag';
 import { endlessScoreCard } from './render/endlessCards';
@@ -1015,6 +1018,13 @@ let birdCelebratedHole = -1;
 // hole even though render() runs many times while the ball rests in the cup. Reset per hole in render().
 let strokeAutoAdvancedHole = -1;
 
+/** A minimal synthetic PlayedHole carrying just a ghost SCORE (GS-story-sigil-play) — enough for the
+ *  best-ball reveal card, the `betterPlayedHole` compare, and the running-total maths (they read only
+ *  `.record.strokes`/`.record.par`). Used to reveal a Story best-ball partner's per-hole ghost ball. */
+function synthGhostHole(strokes: number, par: number): PlayedHole {
+  return { record: { par, strokes }, stat: {}, shots: [], putts: [], holed: true, pickedUp: false } as unknown as PlayedHole;
+}
+
 function playingBody(animating: boolean): string {
   const play = state.play!;
   const v = shotView(play, state.run.loadout);
@@ -1045,13 +1055,29 @@ function playingBody(animating: boolean): string {
     // moment the hole finished (`withBestBallPartner`) — THIS screen is its reveal. Everything scored
     // below (duel, points, banner) uses the KEPT team ball, exactly what `holeComplete` will record.
     const tSetup = state.match?.setup;
+    // GS-story-sigil-play: a Story BEST-BALL Sigil reveals the partner's ball each hole too — synthesised
+    // from the SAME per-hole ghost `resolveStoryTeamStroke` folds at the end (deterministic, so the reveal +
+    // the running team total match the finished recap to the stroke; `stopPlayed` stays the player's solo
+    // hole, and the resolution folds the ghost, so auto ≡ interactive is untouched).
+    const storyBestBall = state.run.storyTeamFormat === 'bestball' && !!state.run.storyTournamentPartner;
+    const storyPartnerHoleAt = (holeIndex: number, holePar: number): PlayedHole =>
+      synthGhostHole(
+        storyPartnerBestBallScore(state.run.storyTournamentPartner!, TEAM_PARTNER_EDGE, String(state.run.seed), holeIndex, holePar),
+        holePar,
+      );
     const partnerHole =
       tSetup?.partnerSide === 'player' && tSetup.format === 'bestball'
         ? state.match?.partnerHoles?.[play.holeIndex]
+        : storyBestBall
+        ? storyPartnerHoleAt(play.holeIndex, par)
         : undefined;
     const kept = partnerHole ? betterPlayedHole(raw, partnerHole) : raw;
     const name = kept.pickedUp ? 'Picked up' : scoreName(par, kept.record.strokes);
-    const playedSoFar = [...(state.stopPlayed ?? []), kept];
+    // The running board reflects the TEAM ball too on a story best-ball (past holes teamed via the same
+    // ghost), so the running total agrees with the final recap. Solo `stopPlayed` is unchanged underneath.
+    const playedSoFar = storyBestBall
+      ? [...(state.stopPlayed ?? []).map((h, i) => betterPlayedHole(h, storyPartnerHoleAt(i, h.record.par))), kept]
+      : [...(state.stopPlayed ?? []), kept];
     const lastIsHoled = kept.holed && kept.shots.some((s) => s.holed);
     const stopPts = playTotals(playedSoFar.map((p) => p.record)).stableford;
     // The two big shot/putt vignette cards used to push the score + leaderboard off the bottom of the

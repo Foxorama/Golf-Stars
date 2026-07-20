@@ -829,6 +829,9 @@ export function reduce(state: UiState, action: Action): UiState {
       // GS-story-partners: a TEAM Sigil (Scramble/Best-ball) carries your chosen partner onto the run so the
       // resolution folds their ghost in (defaulting to your first tour-mate if the picker was skipped).
       const partner = isTeamTournament(t) ? teamPartnerOrDefault(state.story, state.storyPartnerPick) : undefined;
+      // GS-story-sigil-play: a TEAM Sigil carries its co-op FORMAT so the round plays interactively — a
+      // SCRAMBLE arms the per-shot pick card, a BEST-BALL the per-hole reveal.
+      const teamFormat = isTeamTournament(t) ? (t.format as 'scramble' | 'bestball') : undefined;
       const run = {
         ...run0,
         loadout,
@@ -838,6 +841,7 @@ export function reduce(state: UiState, action: Action): UiState {
         storyRound: true,
         storyTournament: t.chapter,
         ...(partner ? { storyTournamentPartner: partner } : {}),
+        ...(teamFormat ? { storyTeamFormat: teamFormat } : {}),
       };
       return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', viewHole: 0, played: undefined, storyItemInspectId: undefined });
     }
@@ -1142,6 +1146,23 @@ export function reduce(state: UiState, action: Action): UiState {
           state.run.loadout,
           state.holeRng,
           setup.playerPartnerMods,
+          tents,
+          scorch,
+          patch,
+        );
+        return { ...state, scrambleChoice };
+      }
+      // GS-story-sigil-play: a Story team Sigil in SCRAMBLE format — you and your chosen partner both hit,
+      // pick the better ball (the same choice card the team-duel/parrot use). `scrambleOptsFor` also arms
+      // the AUTO path (playStop/autoShotHole), so auto ≡ interactive. Only on a full swing (not on the green).
+      const storyScramble = state.run.storyTeamFormat === 'scramble' ? scrambleOptsFor(state.run) : undefined;
+      if (storyScramble) {
+        const scrambleChoice = resolveScrambleShot(
+          state.play,
+          { clubId: action.clubId, aim: action.aim, target: action.target, power: action.power },
+          state.run.loadout,
+          state.holeRng,
+          storyScramble.partnerMods,
           tents,
           scorch,
           patch,

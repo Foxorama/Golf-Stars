@@ -177,6 +177,11 @@ export interface Run {
    *  `storyTournament` when the major is a team format; resolved by `resolveStoryTournament` (your real round
    *  + this partner's ghost = your team). Absent for a solo major. Run-lifetime, not snapshotted. */
   storyTournamentPartner?: string;
+  /** GS-story-sigil-play: the TEAM format of this story Sigil, so the play engine can arm the interactive
+   *  co-op mechanic (SCRAMBLE → the per-shot pick-your-ball card; BEST-BALL → the per-hole reveal). Set
+   *  alongside `storyTournamentPartner` at tee-off; read by `scrambleOptsFor` (auto ≡ interactive) and the
+   *  reducer. Absent for a solo major. Run-lifetime, not snapshotted. */
+  storyTeamFormat?: 'scramble' | 'bestball';
   /** GS-story-quests: this story round is an ally SIDE QUEST (the quest id), played at the ally's home
    *  world. Set alongside `storyRound`; the recap offers to complete the quest (grant the reward club).
    *  Run-lifetime, not snapshotted. */
@@ -652,8 +657,14 @@ export function underdogSide(playerPosition: number, opponentPosition: number): 
  */
 export function scrambleOptsFor(run: Run): ScrambleOpts | undefined {
   const setup = teamDuelSetupForRun(run);
-  if (!setup || setup.format !== 'scramble' || setup.partnerSide !== 'player') return undefined;
-  return { partnerMods: setup.playerPartnerMods };
+  if (setup && setup.format === 'scramble' && setup.partnerSide === 'player') return { partnerMods: setup.playerPartnerMods };
+  // GS-story-sigil-play: a Story team Sigil in SCRAMBLE format arms the partner's ball on the player's own
+  // round — so the auto sim (playStop/playHole) plays best-of-two exactly like the interactive pick card
+  // (auto ≡ interactive). Gated on the armed Sigil, so a non-scramble round is byte-for-byte unchanged.
+  if (run.storyTeamFormat === 'scramble' && run.storyTournamentPartner) {
+    return { partnerMods: characterShotMods(run.storyTournamentPartner) };
+  }
+  return undefined;
 }
 
 /**
