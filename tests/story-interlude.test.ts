@@ -51,13 +51,23 @@ describe('emotional mid-chapters (GS-story-midchapter / betrayal rework)', () =>
 
   it('HERALD: the beat pulls on your first completed caddy quest + whether you still wield its club', () => {
     const base = { ...defaultStoryState('feather-fade'), alignment: 'herald' as const, sigil1Partner: 'huang-woo-hook', sigil2Partner: 'longshot-larry' };
-    // completed Dan's quest and still carrying the reward club
-    const wielding = interludeScene({ ...base, completedQuestIds: ['quest-dan'], equippedBagIds: ['quest:dan'] });
+    // Sandy's quest — a caddy actually reachable before The Choice (Vela Dunes, Ch.1). Dan/Mole are Ch.5
+    // worlds, so they can NEVER be a Herald player's first completed caddy quest — the hook never surfaces them.
+    const wielding = interludeScene({ ...base, completedQuestIds: ['quest-sandy'], equippedBagIds: ['quest:sandy'] });
     expect(wielding.outcome).toMatch(/heavy/i);
-    expect(wielding.lines.some((l) => l.who === 'coil' && /Dan|Long Haul/i.test(l.text))).toBe(true);
+    expect(wielding.lines.some((l) => l.who === 'coil' && /Sandy|Sand-Saver/i.test(l.text))).toBe(true);
     // benched it
-    const benched = interludeScene({ ...base, completedQuestIds: ['quest-dan'], equippedBagIds: [] });
+    const benched = interludeScene({ ...base, completedQuestIds: ['quest-sandy'], equippedBagIds: [] });
     expect(benched.lines.some((l) => /bench|dust/i.test(l.text))).toBe(true);
+  });
+
+  it('the caddy-quest hook can NEVER surface a Ch.5-only caddy (Dan/Mole) — reachability sanity', () => {
+    // Even if a Dan/Mole quest id somehow appeared, a real Herald run can't have completed one pre-Choice;
+    // and the FIRST completed CADDY quest is what the hook reads (skipping charquest markers).
+    const base = { ...defaultStoryState('feather-fade'), alignment: 'herald' as const };
+    // a charquest marker first, then a real caddy quest → the hook skips the marker to the caddy quest
+    const s = interludeScene({ ...base, completedQuestIds: ['charquest:huang-woo-hook', 'quest-chipinski'], equippedBagIds: ['quest:chipinski'] });
+    expect(s.lines.some((l) => l.who === 'coil' && /Chip/i.test(l.text))).toBe(true);
   });
 
   it('every playable golfer has a distinct betrayal voice', () => {

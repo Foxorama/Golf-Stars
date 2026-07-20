@@ -19,8 +19,11 @@ import { storyCaddyHired } from './storyCaddies';
 /** One ally's side quest (content-as-data). The reward is a themed reward-club id (`club:<set>:<type>`),
  *  resolved through the shared club machinery so it plays + looks like the Voyage reward it is. */
 /** GS-story-betrayal-herald: the FIRST caddy quest you completed + whether you STILL wield its reward club
- *  — the personal thread the Herald Ch.4 betrayal beat pulls on ("you still swing Dan's Long Haul, the club
- *  he gave you when you were someone he could be proud of"). Undefined if you never finished an ally quest. */
+ *  — the personal thread the Herald Ch.4 betrayal beat pulls on ("you still swing Sandy's Second, the club
+ *  she gave you when you were someone she could be proud of"). Undefined if you never finished an ally quest.
+ *  NOTE: caddy quests are only offerable BEFORE The Choice (Ch.1–3, un-turned), so this can only ever be a
+ *  caddy reachable by Ch.3 — Sandy (Vela Dunes, Ch.1) / Chipinski (Orion, Ch.2) / Sam (Cygnus, Ch.2) /
+ *  Penelope (Coronae, Ch.3). It is NEVER Dan or Mole (their worlds — the derelict + the mire — are Ch.5). */
 export function heraldQuestHook(story: StoryState): { caddyName: string; clubName: string; stillUsing: boolean } | undefined {
   // The first CADDY quest completed — skip any `charquest:` markers that share `completedQuestIds`.
   const firstCaddyId = story.completedQuestIds.find((id) => STORY_QUESTS.some((x) => x.id === id));
