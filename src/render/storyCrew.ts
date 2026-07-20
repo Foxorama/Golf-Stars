@@ -86,8 +86,9 @@ export function allyInspectOverlayHTML(caddyId: string, story: StoryState, talkC
 }
 
 /** GS-story-quests: the ally card's quest row — an OFFER (accept), an ACTIVE note, or a COMPLETE badge with
- *  the reward. Empty when the ally has no quest (they all do) or it isn't yet available at this chapter. */
-function questSlotHTML(caddyId: string, story: StoryState): string {
+ *  the reward. Empty when the ally has no quest (they all do) or it isn't yet available at this chapter.
+ *  Exported so the Herald agent card (GS-story-herald-quests) reuses the identical quest UI for the Coil crew. */
+export function questSlotHTML(caddyId: string, story: StoryState): string {
   const q = questForCaddy(caddyId);
   if (!q) return '';
   if (questDone(story, q.id)) {

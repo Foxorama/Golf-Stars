@@ -15,13 +15,20 @@ import {
   COIL_FACTION_NAME,
   COIL_FACTION_BLURB,
 } from '../sim/rpg/storyHeraldCrew';
+import { questSlotHTML } from './storyCrew';
+import { activeStoryCaddy } from '../sim/rpg/storyCaddies';
+import type { StoryState } from '../sim/rpg/story';
 
-/** The Coil agent talk card. `talkCount` selects which banter line shows; the backdrop/✕ closes it. */
-export function heraldAgentOverlayHTML(agentId: string, talkCount: number): string {
+/** The Coil agent talk card. `talkCount` selects which banter line shows; the backdrop/✕ closes it. On the
+ *  Herald path a Coil agent also carries a QUEST (GS-story-herald-quests) — the SAME quest row as a Warden
+ *  ally (`questSlotHTML`) — and a "carry my bag" swap so you can build the reputation their quest needs. */
+export function heraldAgentOverlayHTML(agentId: string, talkCount: number, story?: StoryState): string {
   const a = heraldAgent(agentId);
   if (!a) return '';
   const line = heraldAgentLineAt(agentId, talkCount);
   const close = JSON.stringify({ type: 'storyCloseAlly' });
+  const questSlot = story ? questSlotHTML(agentId, story) : '';
+  const active = !!story && activeStoryCaddy(story) === agentId;
   return `${HERALD_STYLE}
     <div class="gs-herald-ov" data-action='${close}'>
       <div class="gs-herald-card" onclick="event.stopPropagation()">
@@ -38,8 +45,14 @@ export function heraldAgentOverlayHTML(agentId: string, talkCount: number): stri
           </div>
         </div>
         <div class="gs-herald-speech">${line}</div>
+        ${questSlot}
         <div class="gs-herald-actions">
           <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'storyAllyTalk', caddyId: agentId })}'>🐍 Another ›</button>
+          ${story
+            ? active
+              ? `<div class="gs-herald-activebadge">🎒 Carrying your bag ★</div>`
+              : `<button class="gs-btn" data-action='${JSON.stringify({ type: 'setStoryCaddy', caddyId: agentId })}'>🎒 Carry my bag</button>`
+            : ''}
         </div>
       </div>
     </div>`;
@@ -67,6 +80,8 @@ const HERALD_STYLE = `<style>
   .gs-herald-fblurb{margin:3px 0 0;font-size:11.5px;line-height:1.4;color:#9a8aa8;font-style:italic;}
   .gs-herald-speech{margin:14px 0 0;padding:12px 14px;background:#0a0710;border:1px solid #3a2a48;border-radius:12px;
     font-size:14px;line-height:1.5;color:#ecd8f4;min-height:2.6em;}
-  .gs-herald-actions{display:flex;gap:10px;margin-top:14px;}
+  .gs-herald-actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;}
   .gs-herald-actions .gs-btn{flex:1 1 auto;}
+  .gs-herald-activebadge{flex:1 1 auto;text-align:center;padding:8px 10px;border-radius:10px;font-size:12.5px;
+    font-weight:800;color:#f0a8c8;background:#22101a;border:1px solid #6a3a52;}
 </style>`;

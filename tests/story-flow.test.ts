@@ -901,6 +901,34 @@ describe('Ally side quests (GS-story-quests)', () => {
     expect(claimed.story?.equippedBagIds).toContain('quest:dan');
   });
 
+  it('GS-story-herald-quests: a Coil caddy offers a quest on the dark path, accepted + teed off at its world', () => {
+    // Herald path, chapter 4, Venoma on the bag with a round already carried (rep), cleared elsewhere.
+    const story = {
+      ...defaultStoryState('feather-fade'),
+      alignment: 'herald' as const,
+      chapter: 4,
+      hiredCaddyIds: ['coil-venoma', 'coil-voss'],
+      activeCaddyId: 'coil-venoma',
+      caddiedRoundIds: ['coil-venoma'],
+      clearedWorldIds: ['standrews-18'], // elsewhere from swamp-18 (Venoma's quest world)
+    };
+    expect(questOfferable(story, 'coil-venoma')).toBe(true);
+    const hub = { ...initState('herald-quest-seed', {}, undefined, story), screen: 'story' as const };
+
+    // accept it from the Coil agent's card → active
+    const accepted = reduce(hub, { type: 'acceptStoryQuest', questId: 'quest-coil-venoma' });
+    expect(accepted.story?.activeQuestId).toBe('quest-coil-venoma');
+
+    // play it → tees off Venoma's quest world (the Mire), marked as the quest (a lore beat may fire first)
+    let intro = reduce(accepted, { type: 'playStoryQuest' });
+    if (intro.screen === 'lore') intro = reduce(intro, { type: 'dismissLore' });
+    expect(intro.screen).toBe('intro');
+    expect(intro.run.staticCourseId).toBe('swamp-18');
+    expect(intro.run.storyQuest).toBe('quest-coil-venoma');
+    // the Coil caddy's effect rides into the round loadout (Venoma folds wind resistance) — auto ≡ interactive
+    expect(intro.run.loadout.windResist ?? 0).toBeGreaterThanOrEqual(0.15);
+  });
+
   it('a quest cannot be accepted before its chapter, and only one runs at a time', () => {
     const early = { ...initState('s', {}, undefined, { ...defaultStoryState('feather-fade'), chapter: 1, hiredCaddyIds: ['driver-dan'] }), screen: 'story' as const };
     expect(reduce(early, { type: 'acceptStoryQuest', questId: 'quest-dan' }).story?.activeQuestId).toBeUndefined();

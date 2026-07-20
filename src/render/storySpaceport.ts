@@ -476,7 +476,7 @@ export function spaceportSceneHTML(story: StoryState): string {
     // marked at your side; the rest gather along the deck.
     crewStandees = agents
       .slice(0, HERALD_SPOTS.length)
-      .map((a, i) => heraldStandee(a, HERALD_SPOTS[i]!, a.id === activeCaddyId))
+      .map((a, i) => heraldStandee(a, HERALD_SPOTS[i]!, a.id === activeCaddyId, questOfferable(story, a.id)))
       .join('');
   } else {
     const others = crewRoster(story).filter((id) => id !== activeCaddyId);
@@ -557,13 +557,16 @@ const HERALD_SPOTS: { left: number; top: number }[] = [
 ];
 
 /** One Coil agent as a feet-anchored standee (their lore portrait, tinted). Tap → their Herald talk card. */
-function heraldStandee(agent: HeraldAgent, spot: { left: number; top: number }, active: boolean): string {
+function heraldStandee(agent: HeraldAgent, spot: { left: number; top: number }, active: boolean, hasQuest = false): string {
   const name = agent.name.replace(/^.*?["']([^"']+)["'].*$/, '$1') || agent.name.split(' ')[0];
   const short = agent.name.includes('"') ? name : agent.name.split(' ')[0];
+  // GS-story-herald-quests: a bobbing marker floats over a Coil agent with an offerable quest right now.
+  const questMark = hasQuest ? `<span class="gs-sclub-questmark" aria-hidden="true">❗</span>` : '';
   return `<button class="gs-sclub-caddy gs-sclub-caddy--herald${active ? ' gs-sclub-caddy--on' : ''}"
       data-action='${JSON.stringify({ type: 'storyInspectAlly', caddyId: agent.id })}'
-      aria-label="Speak with ${agent.name}${active ? ', on your bag' : ''}"
+      aria-label="Speak with ${agent.name}${active ? ', on your bag' : ''}${hasQuest ? ' — they have a quest for you' : ''}"
       style="left:${spot.left}%;top:${spot.top}%;">
+      ${questMark}
       <span class="gs-sclub-cav"${agent.tint ? ` style="filter:${agent.tint};"` : ''}><canvas class="gs-caddycv" data-caddy="${agent.id}" width="260" height="260"></canvas></span>
       <span class="gs-sclub-cplate">${active ? `🎒 ${short}` : short}</span>
     </button>`;

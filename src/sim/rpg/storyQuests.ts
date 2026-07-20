@@ -11,7 +11,7 @@
  * pure transitions (offer → accept → play → complete-with-reward). Screens/round wiring live in app/ui.
  */
 
-import { equipStoryClub, NAMED_STORY_CLUBS, type StoryState } from './story';
+import { equipStoryClub, NAMED_STORY_CLUBS, type StoryState, type StoryAlignment } from './story';
 import { allyHomeWorld, allyName } from './storyAllies';
 import { factionForCaddy, factionById } from './factions';
 import { storyCaddyHired, caddiedWith } from './storyCaddies';
@@ -27,8 +27,12 @@ import { storyCaddyHired, caddiedWith } from './storyCaddies';
  *  Ch.4 (GS-story-gather-early — post-Choice), where recruiting is Warden-only and questing is off for a
  *  Herald, so a completed Dan/Mole quest is a Warden-path, post-Choice thing this hook never reads. */
 export function heraldQuestHook(story: StoryState): { caddyName: string; clubName: string; stillUsing: boolean } | undefined {
-  // The first CADDY quest completed — skip any `charquest:` markers that share `completedQuestIds`.
-  const firstCaddyId = story.completedQuestIds.find((id) => STORY_QUESTS.some((x) => x.id === id));
+  // The first WARDEN caddy quest completed — skip `charquest:` markers AND the Coil (`alignment:'herald'`)
+  // quests (GS-story-herald-quests) that also live in `completedQuestIds`: the Severing beat is about a
+  // friend you BETRAYED, so it only ever reads a Warden ally's quest, never a Coil inner-circle one.
+  const firstCaddyId = story.completedQuestIds.find((id) =>
+    STORY_QUESTS.some((x) => x.id === id && x.alignment !== 'herald'),
+  );
   if (!firstCaddyId) return undefined;
   const q = STORY_QUESTS.find((x) => x.id === firstCaddyId);
   if (!q) return undefined;
@@ -43,6 +47,14 @@ export interface StoryQuest {
   id: string;
   /** The ally who gives it (their shop-item / roster id). */
   caddyId: string;
+  /** GS-story-herald-quests: which PATH this quest belongs to. Absent = a WARDEN caddy quest (offerable on
+   *  the light/undecided path only — the existing six). `'herald'` = a COIL inner-circle quest (offerable on
+   *  the dark path only). `questOfferable` matches this against `story.alignment`. */
+  alignment?: StoryAlignment;
+  /** GS-story-herald-quests: the world this quest plays on. Absent = the ally's recruit home world
+   *  (`allyHomeWorld`, the Warden pattern). Set explicitly for a Coil quest — the Coil volunteers have no
+   *  recruit world, so their quest names its own thematic Herald world. */
+  world?: string;
   /** The chapter the campaign must have reached for the quest to be offered. */
   minChapter: number;
   title: string;
@@ -191,6 +203,105 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
     rewardName: NAMED_STORY_CLUBS['quest:mole']!.name,
     rewardBlurb: 'A solar iron dowsed from beneath the mire — it hums toward the hole through any ground.',
   },
+  // ── The Coil inner circle (GS-story-herald-quests) — the Herald path's caddy quests. The Coil volunteers
+  // have no recruit world, so each names its own thematic Herald world; offerable ONLY on the dark path, and
+  // (like every caddy quest) only after you've carried the bag with them a round (GS-story-caddy-rep). ──
+  {
+    id: 'quest-coil-voss',
+    caddyId: 'coil-voss',
+    alignment: 'herald',
+    world: 'void2-18', // the Sagittarius Core abyss — where the Apostate first heard the whisper
+    minChapter: 4,
+    title: "The Apostate's Confession",
+    hook: 'Sable Voss will take you to the black mouth where he first heard the whisper.',
+    offer: [
+      '🖤 "Come to the edge of the Core with me, champion. To the black mouth where I first heard it — the ' +
+        'whisper under the world. I have shown that place to no living soul."',
+      '"Play the abyss at my side. Not to conquer it — to LISTEN. When you understand what I understood out ' +
+        'there, I will put my own driver in your hands. The one I carried down when I fell."',
+    ],
+    complete: [
+      '🖤 "There. You heard it too — I watched your hands go still on the club. That quiet is the truth the ' +
+        'Wardens spend their whole lives shouting over."',
+      '"Take my driver. Sable-black, solar-forged, and it does not care where the ball lies — no lie is ' +
+        'unplayable to one who has stopped fearing the rest. Swing it, and swing it certain."',
+    ],
+    rewardClubId: 'quest:voss',
+    rewardName: NAMED_STORY_CLUBS['quest:voss']!.name,
+    rewardBlurb: "The Apostate's own black driver, carried down the day he fell. Hits from any lie, enormous carry.",
+  },
+  {
+    id: 'quest-coil-venoma',
+    caddyId: 'coil-venoma',
+    alignment: 'herald',
+    world: 'swamp-18', // the Hydra Mire acid shrine — where the Coil raised the Viper
+    minChapter: 4,
+    title: "The Viper's Nest",
+    hook: 'Venoma will take you down into the Mire that made her.',
+    offer: [
+      '🐍 "You want to really know me? Come down into the Mire — the acid shrine, where the Coil raised me ' +
+        'and I shed the girl I used to be. I have never taken a partner there."',
+      '"Play the serpent\'s own green at my side. Beat it, and I will forge you a blade from the fang I keep. ' +
+        'On this bag I never miss — let me make sure you never do either."',
+    ],
+    complete: [
+      '🐍 "Ha — you played the Mire like you were born in the mud. Maybe you were, and never knew. The old me ' +
+        'would have hated you for it. I think she would be jealous."',
+      '"The Viper\'s Fang — solar-forged, weighted to strike dead straight, and it bends the wind to its line. ' +
+        'It does not waver. Neither do we, you and I. Not any more."',
+    ],
+    rewardClubId: 'quest:venoma',
+    rewardName: NAMED_STORY_CLUBS['quest:venoma']!.name,
+    rewardBlurb: 'A blade forged from the Viper\'s own fang — solar-true, flies dead straight and cuts the wind.',
+  },
+  {
+    id: 'quest-coil-ouros',
+    caddyId: 'coil-ouros',
+    alignment: 'herald',
+    world: 'cetus-18', // the Cetus Shelf deep — where the Whisperer listens back
+    minChapter: 4,
+    title: 'The Listening Deep',
+    hook: 'Brother Ouros will teach you to read a green by the whisper alone.',
+    offer: [
+      '🖤 "Walk the Cetus Shelf with me, champion, out where the star-tides fall and the deep listens back. ' +
+        'I whispered the Offer to you once at the crossroads. Now let me teach you to HEAR."',
+      '"Read nothing with your eyes on that green — let me whisper the line, and hole out on faith. Do it, ' +
+        'and I give you the reader I have carried since before your grandfather ever teed off."',
+    ],
+    complete: [
+      '🖤 "You holed it on a whisper. No read, no doubt — only trust. That is the whole of the Long Rest: to ' +
+        'stop striving, and let the world choose your line for you."',
+      '"The Whisperer\'s Read — solar-true, and it hums the break into your hands like a confession. Every ' +
+        'line it gives you is honest. It has never once lied. Nor have I, to you."',
+    ],
+    rewardClubId: 'quest:ouros',
+    rewardName: NAMED_STORY_CLUBS['quest:ouros']!.name,
+    rewardBlurb: 'The Whisperer\'s ancient putter — it hums the true break to your hands. Reads run honest and long.',
+  },
+  {
+    id: 'quest-coil-ecdysis',
+    caddyId: 'coil-ecdysis',
+    alignment: 'herald',
+    world: 'ocean-18', // the Eridanus Atolls — where the Shedmaker drowns the wards
+    minChapter: 4,
+    title: 'The Shedding',
+    hook: 'Sister Ecdysis will forge you a wedge from the serpent\'s cast scale.',
+    offer: [
+      '🖤 "Bring me to the Atolls, Herald, where I drown the old wards and harvest what the sea gives up. ' +
+        'Come hold the tide down with me, and I will grow you a gift from the serpent\'s own cast scale."',
+      '"Play the drowning shrine at my side. When the water is ours, I will fit your bag with a wedge shed ' +
+        'from the World-Eater — power, and its price, as all true things carry."',
+    ],
+    complete: [
+      '🖤 "The wards are drowned; the sea kept its bargain, and so will I. You did not flinch when the old ' +
+        'shrine went under. Good. Flinching is for those who still hope."',
+      '"The Shedmaker\'s Scale — a wedge of serpent-plate, and no lie on any world can hold it. It lifts the ' +
+        'ball from anywhere, the way the Long Rest lifts the weary from everything. Wear it well."',
+    ],
+    rewardClubId: 'quest:ecdysis',
+    rewardName: NAMED_STORY_CLUBS['quest:ecdysis']!.name,
+    rewardBlurb: 'A wedge of cast serpent-scale — no lie on any world can hold it. Escapes anything, from anywhere.',
+  },
 ];
 
 /** Every quest id (for the completed-set + tests). */
@@ -210,9 +321,16 @@ export function questDone(story: StoryState, questId: string): boolean {
 export function activeQuest(story: StoryState): StoryQuest | undefined {
   return questById(story.activeQuestId);
 }
-/** The world a quest sends you to — the ally's home world (where you recruited them). */
+/** The world a quest sends you to — an explicit `world` (a Coil quest names its own, GS-story-herald-quests),
+ *  else the ally's recruit home world (the Warden pattern). */
 export function questWorld(quest: StoryQuest): string | undefined {
-  return allyHomeWorld(quest.caddyId);
+  return quest.world ?? allyHomeWorld(quest.caddyId);
+}
+
+/** GS-story-herald-quests: does this quest belong to the player's chosen PATH? A Coil (`alignment:'herald'`)
+ *  quest is offerable only to a Herald; a Warden quest only to a non-Herald (undecided/warden). */
+function questMatchesPath(quest: StoryQuest, story: StoryState): boolean {
+  return (quest.alignment === 'herald') === (story.alignment === 'herald');
 }
 
 /**
@@ -223,9 +341,10 @@ export function questWorld(quest: StoryQuest): string | undefined {
 export function questOfferable(story: StoryState, caddyId: string): boolean {
   const q = questForCaddy(caddyId);
   if (!q) return false;
-  // GS-story-quality (GAP2): once you turn Herald you've betrayed the Wardens — their loyal personal
-  // quests (Dan's last haul, Penelope's stillest green, …) are off the table on the dark path.
-  if (story.alignment === 'herald') return false;
+  // GS-story-herald-quests: a quest belongs to a PATH. A Warden caddy's loyal quest is off the table once
+  // you turn Herald (GS-story-quality GAP2 — you betrayed them); a Coil inner-circle quest is offerable ONLY
+  // on the dark path. `questMatchesPath` collapses both rules into one alignment match.
+  if (!questMatchesPath(q, story)) return false;
   if (!storyCaddyHired(story, caddyId)) return false;
   if (questDone(story, q.id)) return false;
   if (story.activeQuestId) return false; // one quest at a time
@@ -255,7 +374,7 @@ function clearedElsewhere(story: StoryState, world: string): boolean {
  */
 export function questBeatPending(story: StoryState, caddyId: string): boolean {
   const q = questForCaddy(caddyId);
-  if (!q || !storyCaddyHired(story, caddyId) || questDone(story, q.id)) return false;
+  if (!q || !questMatchesPath(q, story) || !storyCaddyHired(story, caddyId) || questDone(story, q.id)) return false;
   if (story.activeQuestId) return false;
   if (story.chapter < q.minChapter) return false;
   if (!caddiedWith(story, caddyId)) return true; // recruited + ready, but not yet carried a round together

@@ -9,8 +9,10 @@ import {
   completeQuest,
   activeQuest,
   questDone,
+  heraldQuestHook,
 } from '../src/sim/rpg/storyQuests';
 import { STORY_CADDY_STOCK } from '../src/sim/rpg/storyCaddies';
+import { HERALD_CADDY_IDS } from '../src/sim/rpg/storyHeraldCrew';
 import { defaultStoryState, resolveStoryClub } from '../src/sim/rpg/story';
 import { staticCourseSpec, regenerateStaticCourse } from '../src/sim/course/staticCourseSpecs';
 
@@ -105,6 +107,59 @@ describe('Story ally side quests (GS-story-quests)', () => {
       const c = regenerateStaticCourse({ ...spec, seed: `${spec.seed}:quest`, opts: { ...spec.opts, holes: 9 } });
       expect(c.holes.length, `${world} quest holes`).toBe(9);
     }
+  });
+
+  it('GS-story-herald-quests: every Coil inner-circle caddy has a herald quest with a world + resolvable reward', () => {
+    for (const coilId of HERALD_CADDY_IDS) {
+      const q = questForCaddy(coilId);
+      expect(q, `${coilId} has a quest`).toBeDefined();
+      expect(q!.alignment, `${coilId} quest is herald-path`).toBe('herald');
+      expect(questWorld(q!), `${coilId} quest names its own world`).toBeTruthy();
+      expect(q!.offer.length).toBeGreaterThan(0);
+      expect(q!.complete.length).toBeGreaterThan(0);
+      expect(resolveStoryClub(q!.rewardClubId), `${q!.id} reward resolves`).toBeDefined();
+    }
+    // ids stay unique across the whole (Warden + Coil) quest table
+    expect(new Set(STORY_QUESTS.map((q) => q.id)).size).toBe(STORY_QUESTS.length);
+  });
+
+  it('GS-story-herald-quests: a quest is offerable only on its OWN path (Coil ↔ herald, Warden ↔ light)', () => {
+    // A Coil quest: offerable on the Herald path, never on the Warden/undecided path.
+    const heraldReady = {
+      ...defaultStoryState('feather-fade'),
+      alignment: 'herald' as const,
+      chapter: 4,
+      hiredCaddyIds: ['coil-voss'],
+      activeCaddyId: 'coil-voss',
+      caddiedRoundIds: ['coil-voss'],
+      clearedWorldIds: ['standrews-18'], // elsewhere from void2-18 (Voss's quest world)
+    };
+    expect(questOfferable(heraldReady, 'coil-voss')).toBe(true);
+    // …but the same setup on the undecided/warden path never offers a Coil quest.
+    expect(questOfferable({ ...heraldReady, alignment: undefined }, 'coil-voss')).toBe(false);
+    // And a Warden caddy's quest is never offerable on the Herald path (they were betrayed).
+    const wardenOnHerald = {
+      ...defaultStoryState('feather-fade'),
+      alignment: 'herald' as const,
+      chapter: 3,
+      hiredCaddyIds: ['driver-dan'],
+      activeCaddyId: 'driver-dan',
+      caddiedRoundIds: ['driver-dan'],
+      clearedWorldIds: ['standrews-18'],
+    };
+    expect(questOfferable(wardenOnHerald, 'driver-dan')).toBe(false);
+  });
+
+  it('GS-story-herald-quests: the Severing hook reads only a WARDEN caddy quest, never a completed Coil one', () => {
+    const base = { ...defaultStoryState('feather-fade'), alignment: 'herald' as const };
+    // A Herald who finished a COIL quest but no Warden quest → the betrayal hook has nothing to pull on.
+    expect(heraldQuestHook({ ...base, completedQuestIds: ['quest-coil-voss'] })).toBeUndefined();
+    // A Herald who completed a Warden caddy quest pre-Choice → the hook names that ally + club.
+    const hook = heraldQuestHook({ ...base, completedQuestIds: ['quest-sandy'] });
+    expect(hook?.clubName).toBe(questForCaddy('sandy-sandsaver')!.rewardName);
+    // A completed Coil quest listed FIRST is skipped in favour of the Warden one.
+    const mixed = heraldQuestHook({ ...base, completedQuestIds: ['quest-coil-voss', 'quest-chipinski'] });
+    expect(mixed?.clubName).toBe(questForCaddy('dr-chipinski')!.rewardName);
   });
 
   it('GS-story-caddy-rep: holds the offer until you have carried the bag with this ally at least once', () => {
