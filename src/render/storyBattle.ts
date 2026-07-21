@@ -1223,9 +1223,9 @@ export function mountStoryBattle(opts: {
     if (!ctx) return;
     weaponRects.length = 0;
     const n = loadout.weapons.length;
-    const bw = Math.min(150, Math.floor((DW - 250) / Math.max(1, n)) - 10);
-    const bh = 56;
-    const y = DH - bh - 14;
+    const bw = Math.min(160, Math.floor((DW - 240) / Math.max(1, n)) - 10);
+    const bh = 72; // deep buttons — they letterbox down to thumb-size on phones
+    const y = DH - bh - 12;
     let x = 20;
     for (let i = 0; i < n; i++) {
       const w = loadout.weapons[i]!;
@@ -1251,14 +1251,14 @@ export function mountStoryBattle(opts: {
         ctx.restore();
       }
       // glyph + label + damage
-      drawWeaponGlyph(w.style, x + 20, y + bh / 2, w.color, w.color2);
+      drawWeaponGlyph(w.style, x + 22, y + bh / 2, w.color, w.color2);
       ctx.fillStyle = ready ? '#eaf1fb' : 'rgba(200,210,225,0.55)';
-      ctx.font = '800 12.5px system-ui, sans-serif';
+      ctx.font = '800 14px system-ui, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(w.name, x + 38, y + 24);
+      ctx.fillText(w.name, x + 42, y + 31);
       ctx.fillStyle = ready ? w.color : 'rgba(160,170,190,0.5)';
-      ctx.font = '600 11px system-ui, sans-serif';
-      ctx.fillText(ready ? `⚡ ${w.damage} dmg` : `${(readyIn / 1000).toFixed(1)}s`, x + 38, y + 41);
+      ctx.font = '600 12.5px system-ui, sans-serif';
+      ctx.fillText(ready ? `⚡ ${w.damage} dmg` : `${(readyIn / 1000).toFixed(1)}s`, x + 42, y + 50);
       // ready pulse edge
       if (ready && interactive) {
         ctx.strokeStyle = `rgba(255,255,255,${0.2 + 0.2 * Math.sin(now0 / 220 + i)})`;
@@ -1308,7 +1308,7 @@ export function mountStoryBattle(opts: {
     ctx.fillStyle = col;
     ctx.font = '700 19px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(text, DW / 2, DH - 96);
+    ctx.fillText(text, DW / 2, DH - 106); // clears the deep weapon bar
     ctx.globalAlpha = 1;
   }
 

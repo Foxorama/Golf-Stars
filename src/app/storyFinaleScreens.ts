@@ -61,12 +61,13 @@ export function storyFinaleScreen(): string {
         in the dark below sleeps the world-serpent — and something worse wears it now, a corruption from
         beyond the stars. It is waking. Only your ship stands between it and every world you crossed to get here.`;
   const guide = herald
-    ? `<p class="gs-fin-lore" style="color:#b0e04f;">🐦‍⬛ "Two stages, Herald. First shatter the wards that
-        cage it — fire your guns, hold your shields as it thrashes awake. Then, when the final seal lies bare,
-        strike it and let the serpent rise. The cage was always meant to open."</p>`
-    : `<p class="gs-fin-lore" style="color:#7fe0a0;">🦜 "This is it, ${who}. Two stages: first we break the
-        serpent's guard — fire your guns, hold your shields — then, when it's reeling and bares its eye, you
-        take the shot. Don’t miss."</p>`;
+    ? `<p class="gs-fin-lore" style="color:#b0e04f;">🐦‍⬛ "Fly sharp, Herald. Wear the wards down and it
+        will thrash harder with every one that gives — venom, lances, the void itself. Keep shields for the
+        moment the last ward cracks; nothing dodges that. Then the seal lies bare — strike it, and let the
+        serpent rise."</p>`
+    : `<p class="gs-fin-lore" style="color:#7fe0a0;">🦜 "This is it, ${who}. It gets MEANER as it bleeds —
+        acid, then lightning, then the void itself. Fly around what you can, save the shields for what you
+        can't, and when it finally uncoils and bares that eye… you take the shot. Don’t miss."</p>`;
   // GS-story-battle-3: the R-Type sequence fight — fly your ship, fire each weapon from its own trigger,
   // dodge the phase attacks, and hold shields for the near-undodgeable overwhelm at the end.
   const plan = herald
