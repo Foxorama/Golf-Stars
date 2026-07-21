@@ -166,6 +166,47 @@ export const STORY_SHIPS: readonly StoryShip[] = [
       'The grail of the ordinary fleet. Everything after this flies under its own kind of story.',
     ],
   },
+  // GS-story-shipyards — three more rides, sold at two NEW shipyards on the metal worlds (Pyxis Foundry,
+  // Antlia Scrapworks). Pure credit-bonus effects (no combat rating), so the finale gates are untouched;
+  // they just give the fleet more homes + the metal worlds a reason to visit beyond qualifying.
+  {
+    shipId: 'wagon-gold',
+    acquire: 'buy',
+    price: 560,
+    creditMult: 1.14,
+    lore: [
+      'The Gilded Estate — a wagon re-coachbuilt by the Pyxis foundries in beaten gold leaf and burl ' +
+        'panelling, with a hold deep enough for a full staff of clubs and a wine cellar. It is slow, it is ' +
+        'heavy, and it arrives at a tournament like landed money.',
+      'The sponsors adore it. So does your bankroll.',
+    ],
+  },
+  {
+    shipId: 'racer-nebula',
+    acquire: 'buy',
+    price: 820,
+    creditMult: 1.16,
+    lore: [
+      'The Nebula Streak — a racer wrapped in a skin of captured nebula-gas that swirls violet and gold as ' +
+        'it moves, so it never once looks the same twice. Salvaged half-wrecked from the scrap belt and ' +
+        'rebuilt faster than new, it is the flashiest thing in any berth it parks in.',
+      'Pure spectacle with a purse to match — the crowd comes for the ship and stays for the golf.',
+    ],
+  },
+  {
+    shipId: 'chopper-thunderbolt',
+    acquire: 'milestone',
+    price: 1400,
+    unlockAfterClears: 10,
+    creditMult: 1.28,
+    lore: [
+      'The Thunderbolt — a storm-forged chopper hauled out of the deepest scrapworks and struck back to ' +
+        'life, flame licking down its flanks and a voice like a breaking sky. Ten worlds conquered is the ' +
+        'price of admission; after that the scrapworks master will build you the meanest, richest-earning ' +
+        'ride in the ordinary fleet.',
+      'The grail of the scrap belt. It banks harder than anything with wheels or wings has a right to.',
+    ],
+  },
 ];
 
 /**
@@ -191,6 +232,14 @@ export const SHIP_VENDOR_STOCK: Record<string, { ships: readonly string[]; upgra
   'void2-18': { ships: ['pegasus-valkyrie'], upgrades: ['upg:weapon:nova', 'upg:engine:singularity'] },
   // Chapter 5 — Cetus Shelf: the grail + the capital bulwark.
   'cetus-18': { ships: ['ufo-mothership'], upgrades: ['upg:shield:bulwark'] },
+  // GS-story-shipyards — two NEW shipyards on the metal worlds added by GS-story-world-variety. They stock
+  // SHIPS only (pure credit-bonus rides, no combat upgrades), so the finale arsenal's reachability + gates
+  // are byte-identical — the existing five vendors still hold every weapon/engine/shield. A foundry + a
+  // scrapworks are the natural homes for coachbuilt + salvaged-and-reborn hulls.
+  // Chapter 2 — Pyxis Foundry: the gilded coachbuilt wagon.
+  'metal2-18': { ships: ['wagon-gold'], upgrades: [] },
+  // Chapter 5 — Antlia Scrapworks: the salvaged racer + the storm-forged chopper grail.
+  'metal-18': { ships: ['racer-nebula', 'chopper-thunderbolt'], upgrades: [] },
 };
 
 /** Is this world a ship-vendor (sells ships/upgrades from its shipyard)? */

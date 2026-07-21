@@ -1057,7 +1057,32 @@ shops / stock.
   qualifier-count assertions (`tests/story-qualifiers.test.ts`, `tests/story-tournament.test.ts` — three
   offered, two required) and the per-chapter weather-uniqueness + ramp checks in `tests/story-state.test.ts`.
 
+- **GS-story-shipyards** — ✅ *shipped* (`storyShips.ts`). Follow-on to the world-variety pass + the player
+  ask for "a new shipyard or two" and "new items so there's interesting stock." The two metal worlds added
+  above become SHIP-VENDOR worlds too (a foundry + a scrapworks are the natural homes for coachbuilt +
+  salvaged hulls), so a chapter can now host more than one shipyard and the metal worlds are a destination
+  beyond qualifying: **Pyxis Foundry** (`metal2-18`, Ch.2) sells the **Gilded Estate** (a gold-coachbuilt
+  wagon, +14% credits); **Antlia Scrapworks** (`metal-18`, Ch.5) sells the **Nebula Streak** (a salvaged
+  nebula-skinned racer, +16%) and — milestone-gated at 10 clears — the **Thunderbolt** (a storm-forged
+  chopper, +28%, the new richest-earning ride in the ordinary fleet). Three new `STORY_SHIPS` rows over
+  existing `ships.ts` hulls (`wagon-gold`/`racer-nebula`/`chopper-thunderbolt`), each with bespoke lore, all
+  pure **credit-bonus** rides with **no combat rating** — so the finale gates + the arsenal's
+  reachability-by-travel are byte-identical (the existing five vendors still hold every weapon/engine/
+  shield; the vendor-coverage invariant "every sellable ship/upgrade at exactly one vendor" holds — the new
+  ships sit only at the new vendors). The star-map 🚀 service badges, world dossier "Visit the Shipyard",
+  and the shop↔shipyard cross-nav all key off `worldIsShipVendor`, so the two new yards surface with zero UI
+  plumbing. No save bump, no sim rng. Guarded by the extended vendor-coverage + fleet tests in
+  `tests/story-ships.test.ts`.
+
 ## Open questions / deferred (revisit as chunks land)
+- **A genuinely-new gas-giant BIOME** (play on gas cloud-tops) — the player's optional "if we need to add
+  more" ask. Deferred as its OWN focused session: a new `BiomeArchetype` fans out to ~16 compile-forced
+  archetype tables + a new `Biome` physics row + constellation theme + static course + render painters
+  (relief/ground/flora/OB/space) + a music track + weather ambience + the biome-identity/audio coverage
+  tests, and must clear the fairness + no-death-spiral harnesses — a full dedicated feature (the size of the
+  `earth` PR), not a rider on the world-variety pass. The world-variety worlds reuse existing proven
+  archetypes so players get the "options, not a single line" win now; the gas giant is the next big content
+  chunk.
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.
 - **"Gather your friends"** — single protagonist (per the design call); the other three golfers are
   recurring Warden allies/friendly rivals in the majors, not a party you swap. Full recruitment stays a
