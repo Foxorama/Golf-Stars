@@ -352,6 +352,21 @@ export function questWorld(quest: StoryQuest): string | undefined {
   return quest.world ?? allyHomeWorld(quest.caddyId);
 }
 
+/** GS-story-map-nav: the OFFERABLE quest that plays on this world (path-matched), if any — so the star-map
+ *  dossier for a world can surface "accept & fly" straight from the chart, not only the clubhouse. */
+export function offerableQuestForWorld(story: StoryState, courseId: string): StoryQuest | undefined {
+  return STORY_QUESTS.find((q) => questWorld(q) === courseId && questOfferable(story, q.caddyId));
+}
+
+/** GS-story-map-nav: the quest a world's "start quest" map action should tee off — the ACTIVE quest if it
+ *  plays here (already accepted), else an offerable quest that plays here. Undefined if neither. The reducer
+ *  accepts it (if not already active) and tees off the quest round, so a quest is playable from the map. */
+export function startableQuestForWorld(story: StoryState, courseId: string): StoryQuest | undefined {
+  const active = activeQuest(story);
+  if (active && questWorld(active) === courseId) return active;
+  return offerableQuestForWorld(story, courseId);
+}
+
 /** GS-story-herald-quests: does this quest belong to the player's chosen PATH? A Coil (`alignment:'herald'`)
  *  quest is offerable only to a Herald; a Warden quest only to a non-Herald (undecided/warden). */
 function questMatchesPath(quest: StoryQuest, story: StoryState): boolean {

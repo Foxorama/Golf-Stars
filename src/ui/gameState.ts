@@ -353,6 +353,10 @@ export interface UiState {
   /** GS-story-parrot-bar: the Parrot's chatter tap-count at the bar (0 = greeting; each tap advances,
    *  wrapping through the eligible lines). Transient — reset to 0 each time the bar is opened, never saved. */
   storyBarTalk?: number;
+  /** GS-story-map-nav: the screen the Galaxy Tournament lobby was opened FROM — the clubhouse banner OR the
+   *  star-map venue dossier (fly directly to the Sigil) — so backing out of the lobby returns there instead
+   *  of always dumping to the clubhouse. Transient (never persisted). Absent ⇒ the clubhouse. */
+  storyTournamentReturn?: Screen;
   /** GS-story-partners: the friend chosen as your PARTNER in the team-Sigil lobby (Scramble/Best-ball),
    *  before you tee off. Transient (carried onto the run at tee-off; the locked pick persists on StoryState).
    *  Absent ⇒ default to your first tour-mate. */
@@ -456,6 +460,7 @@ export type Action =
   | { type: 'acceptStoryQuest'; questId: string } // GS-story-quests: accept an ally's side quest (from their card)
   | { type: 'claimCharacterQuest'; charId: string } // GS-story-charquests: claim a friend's signature club
   | { type: 'playStoryQuest' } // GS-story-quests: tee off the active quest's round (the ally's home world)
+  | { type: 'storyStartQuest'; courseId: string } // GS-story-map-nav: from the star-map dossier, accept (if needed) + tee off the quest that plays on this world
   | { type: 'completeStoryQuest' } // GS-story-quests: claim the quest reward on the round recap
   | { type: 'playYggdrasilRealm'; realmId: string } // GS-star-tour-yggdrasil: play a Norse realm off the World Tree (Asgard only, today)
   | { type: 'dismissLore' } // GS-lore: close the story-beat popup (marks it seen) and continue to the stop intro

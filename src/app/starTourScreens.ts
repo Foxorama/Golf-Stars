@@ -24,6 +24,8 @@ import { COURSE_EFFECTS, type CourseEffectId } from '../sim/rpg/effects';
 import { starTourMapSVG, SHIP_DOCK_HEADING, YGGDRASIL_REALMS, type StarTourWorld } from '../render/starTourMap';
 import { bestStrokeFor, bestStrokeRounds } from '../sim/rpg/strokePlay';
 import { STORY_WORLDS, storyWorldUnlocked, STORY_CHAPTER_COUNT, worldCleared } from '../sim/rpg/story';
+import { storyWorldNav, storyWorldMarker, type StoryWorldNav } from '../sim/rpg/storyMapNav';
+import { qualifyTop } from '../sim/rpg/storyQualifiers';
 import { storyWorldShoppable, worldHasShop } from '../sim/rpg/storyShop';
 import { worldIsShipVendor } from '../sim/rpg/storyShips';
 import { ownedCategoryCount } from '../sim/rpg/storyShipUpgrades';
@@ -220,6 +222,9 @@ export function starTourWorlds(): StarTourWorld[] {
       const c = staticCourseSpec(w.courseId);
       if (!c || !c.themeId || !c.archetype) return [];
       const best = story.worldBest[w.courseId];
+      // GS-story-map-nav: stamp the campaign MARKER so quests / qualifiers / the Sigil venue are findable
+      // straight off the chart (the top pill + a qualifier bottom flag), not only via the clubhouse.
+      const nav = storyWorldNav(story, w.courseId);
       return [{
         id: c.id,
         name: c.name,
@@ -232,6 +237,8 @@ export function starTourWorlds(): StarTourWorld[] {
         // (🚀 buy ships/weapons — the key differentiator) and any world with a PRO SHOP (🛒 clubs/gear).
         hasShipyard: worldIsShipVendor(w.courseId),
         hasProShop: worldHasShop(w.courseId),
+        storyMarker: storyWorldMarker(nav),
+        qualifierFlag: nav.qualifier ? (nav.qualifier.qualified ? 'qualified' : 'open') : undefined,
       }];
     });
   }
@@ -387,6 +394,88 @@ function weatherPicker(): string {
   return `<div class="gs-st-wxrow">${chips}</div>`;
 }
 
+/** Ordinal suffix for a finishing place (1st, 2nd, 3rd, 11th…). */
+function ordinalPlace(n: number): string {
+  const v = n % 100;
+  const s = v >= 11 && v <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th');
+  return `${n}${s}`;
+}
+
+/**
+ * GS-story-map-nav: the campaign-navigation sections for a world's dossier — the SIGIL venue call-to-action,
+ * an ally QUEST (accept & fly / go play / a "soon" hint), and the QUALIFYING-event status line. These make
+ * the three campaign pulls actionable straight from the star chart instead of only via the clubhouse. Empty
+ * for an ordinary world / the free-roam records chase (`nav` undefined).
+ */
+function storyNavSectionsHTML(w: StarTourWorld, nav: StoryWorldNav | undefined): string {
+  if (!nav) return '';
+  let out = '';
+
+  // ── The Sigil TOURNAMENT venue — fly here and tee off the major directly (GS-story-map-nav). ──
+  if (nav.venue) {
+    const v = nav.venue;
+    const t = v.tournament;
+    const rival = t.rivalName.split(' ')[0];
+    if (v.ready) {
+      out += `
+        <div class="gs-st-rec" style="margin-top:10px;padding:10px 12px;background:linear-gradient(180deg,#2a2410,#1c1808);border:1px solid #6a5320;border-radius:10px;">
+          <div style="font-size:13px;font-weight:800;color:#ffe6a6;">🏆 ${t.name} — you're qualified</div>
+          <div style="font-size:11.5px;color:#d8c089;font-weight:600;margin-top:2px;">Play for ${t.sigilName} · beat your rival ${rival}</div>
+        </div>
+        <button class="gs-st-play" style="margin-top:8px;background:linear-gradient(180deg,#3a2c08,#231a06);border-color:#8a6a20;color:#ffe6a6;" data-action='${JSON.stringify({ type: 'openStoryTournament' })}'>⚔ Enter ${t.name}</button>`;
+    } else if (v.won) {
+      out += `<div class="gs-st-rec" style="margin-top:10px;color:#9dffce;">🏆 ${t.sigilName} won here — the Sigil is yours.</div>`;
+    } else {
+      const need = Math.max(1, v.needed - v.qualifiersMet);
+      out += `<div class="gs-st-rec" style="margin-top:10px;padding:10px 12px;background:#181510;border:1px solid #3a3320;border-radius:10px;color:#d8c089;">
+        🔒 <b style="color:#ffe6a6;">${t.name}</b> — the Sigil major. Finish top ${qualifyTop(t.chapter)} in <b>${need}</b> more qualifying ${need === 1 ? 'event' : 'events'} this chapter to earn your start.</div>`;
+    }
+  }
+
+  // ── An ally SIDE QUEST that plays HERE — accept & fly / go play / a "soon" hint (GS-story-map-nav). ──
+  if (nav.quest) {
+    const q = nav.quest;
+    const reward = `
+      <div style="margin:8px 0 0;background:#181322;border:1px solid #3a2f4a;border-left:3px solid #a97b25;border-radius:10px;padding:7px 11px;">
+        <div style="font-size:12px;font-weight:800;color:#f0c874;">🎁 ${q.rewardName}</div>
+        ${q.rewardEffect ? `<div style="font-size:11px;font-weight:700;color:#7fe0a0;margin-top:2px;">✦ ${q.rewardEffect}</div>` : ''}
+      </div>`;
+    if (q.state === 'offerable') {
+      out += `
+        <div style="margin-top:10px;padding:11px 13px;background:linear-gradient(180deg,#1e1630,#140e1e);border:1px solid #5a3f8a;border-radius:12px;">
+          <div style="font-size:13px;font-weight:800;color:#d6c2ff;">🗺 ${q.title} — with ${q.giver}</div>
+          <div style="font-size:11.5px;color:#b6a8d6;margin-top:3px;line-height:1.4;">${q.hook}</div>
+          ${reward}
+        </div>
+        <button class="gs-st-play" style="margin-top:8px;background:linear-gradient(180deg,#2a1e44,#1a1230);border-color:#7a5ab0;color:#e2d4ff;" data-action='${JSON.stringify({ type: 'storyStartQuest', courseId: w.id })}'>🎒 Accept &amp; play with ${q.giver} — 9 holes</button>`;
+    } else if (q.state === 'active') {
+      out += `
+        <div style="margin-top:10px;padding:11px 13px;background:linear-gradient(180deg,#1e1630,#140e1e);border:1px solid #7a5ab0;border-radius:12px;">
+          <div style="font-size:13px;font-weight:800;color:#e2d4ff;">🗺 ${q.title} — your active quest</div>
+          <div style="font-size:11.5px;color:#c6b8e6;margin-top:3px;line-height:1.4;">${q.hook}</div>
+          ${reward}
+        </div>
+        <button class="gs-st-play" style="margin-top:8px;background:linear-gradient(180deg,#2a1e44,#1a1230);border-color:#9a7ad0;color:#f0e6ff;" data-action='${JSON.stringify({ type: 'storyStartQuest', courseId: w.id })}'>▸ Play the quest with ${q.giver} — 9 holes</button>`;
+    } else {
+      out += `<div class="gs-st-rec" style="margin-top:10px;color:#9a8fb8;">🎒 ${q.giver} has something to show you here — carry their bag a round, then fly on, and they'll open up.</div>`;
+    }
+  }
+
+  // ── QUALIFYING-event status: what to shoot for, and where you stand (GS-story-map-nav). ──
+  if (nav.qualifier) {
+    const qu = nav.qualifier;
+    const verdict = qu.qualified
+      ? `<span style="color:#7fe0a0;font-weight:800;">✓ Qualified</span>${qu.place ? ` <span style="opacity:.75;">(best ${ordinalPlace(qu.place)})</span>` : ''}`
+      : qu.place !== undefined
+      ? `<span style="color:#ffb0b0;font-weight:700;">not yet</span> <span style="opacity:.75;">(best ${ordinalPlace(qu.place)} — replay to improve)</span>`
+      : `<span style="opacity:.75;">not yet played</span>`;
+    out += `<div class="gs-st-rec" style="margin-top:10px;padding:9px 12px;background:#0c1a22;border:1px solid #234a5a;border-radius:10px;color:#bfe6f5;">
+      🏁 <b>Qualifying event</b> · finish top ${qu.top} of ${qu.field} to qualify — ${verdict}</div>`;
+  }
+
+  return out;
+}
+
 /** The bottom dossier for a selected world — flavour, difficulty, your record, weather + play. In STORY
  *  mode (GS-story-map) it reads the campaign's own best, drops the weather picker (story worlds play their
  *  designed sky), and tees off into the campaign (`storyPlayWorld`) instead of a records round. */
@@ -406,10 +495,26 @@ function dossier(w: StarTourWorld): string {
       })();
   const cleared = story && worldCleared(state.story!, w.id);
   const shoppable = story && storyWorldShoppable(state.story!, w.id);
+  // GS-story-map-nav: the campaign status for this world (quest / qualifier / Sigil venue), stamped as
+  // actionable dossier sections so the three pulls are reachable straight from the chart.
+  const nav = story ? storyWorldNav(state.story!, w.id) : undefined;
+  const navSections = storyNavSectionsHTML(w, nav);
   const playAction = story
     ? { type: 'storyPlayWorld', courseId: w.id }
     : { type: 'pickStarTourCourse', courseId: w.id, effect: starTourView.effect };
-  const playLabel = story ? (cleared ? 'Play again' : 'Fly here &amp; tee off') : 'Fly here &amp; play 18';
+  // The plain world round is a secondary "practice" at a Sigil venue (the tournament is the headline CTA
+  // above); at a qualifying event it's the qualifying round itself, so it says so.
+  const playLabel = !story
+    ? 'Fly here &amp; play 18'
+    : nav?.venue?.ready
+    ? 'Practice round — no Sigil'
+    : nav?.qualifier
+    ? cleared
+      ? 'Replay this qualifying event'
+      : 'Fly here &amp; tee off — qualifying event'
+    : cleared
+    ? 'Play again'
+    : 'Fly here &amp; tee off';
   // GS-story-econ: a cleared, shoppable world offers its Pro Shop right from the dossier.
   const shopBtn = shoppable
     ? `<button class="gs-st-play" style="margin-top:8px;background:linear-gradient(180deg,#2a2416,#1c1810);border-color:#5a4a22;color:#e9c46a;" data-action='${JSON.stringify({ type: 'openStoryShop', worldId: w.id })}'>🛒 Pro Shop</button>`
@@ -440,6 +545,7 @@ function dossier(w: StarTourWorld): string {
       </div>
       <p class="gs-st-sheet__blurb">${spec?.blurb ?? ''}</p>
       ${recordLine}
+      ${navSections}
       ${story ? '' : `<div class="gs-st-sheet__wxlabel">Weather sky</div>${weatherPicker()}`}
       <button class="gs-st-play" data-action='${JSON.stringify(playAction)}'>▸ ${playLabel}</button>
       ${shopBtn}

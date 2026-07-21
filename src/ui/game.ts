@@ -79,7 +79,7 @@ import { allyTalk } from '../sim/rpg/storyAllies';
 import { isHeraldAgent, applyHeraldCaddies } from '../sim/rpg/storyHeraldCrew';
 import { isOtherGolfer } from '../sim/rpg/storyCast';
 import { claimCharacterQuest } from '../sim/rpg/characterQuests';
-import { acceptQuest, completeQuest, activeQuest, questWorld } from '../sim/rpg/storyQuests';
+import { acceptQuest, completeQuest, activeQuest, questWorld, startableQuestForWorld } from '../sim/rpg/storyQuests';
 import { isStoryShipId, buyStoryShip, equipStoryShip, worldIsShipVendor } from '../sim/rpg/storyShips';
 import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
 import { currentTournament, tournamentForChapter, rivalTotalThrough, isTeamTournament, teamPartnerOrDefault } from '../sim/rpg/storyTournaments';
@@ -606,6 +606,32 @@ export function reduce(state: UiState, action: Action): UiState {
       return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', viewHole: 0, played: undefined, storyItemInspectId: undefined });
     }
 
+    case 'storyStartQuest': {
+      // GS-story-map-nav: accept + tee off an ally quest STRAIGHT FROM THE STAR MAP's world dossier — so you
+      // can identify a quest world on the chart, fly there, and play it without going back through the
+      // clubhouse. Resolves the quest that plays on this world (an already-active one, else an offerable
+      // one for the path), accepts it if needed, then builds the quest round exactly like `playStoryQuest`.
+      if (state.screen !== 'starTour' || !state.story) return state;
+      const q = startableQuestForWorld(state.story, action.courseId);
+      const worldId = q ? questWorld(q) : undefined;
+      if (!q || !worldId) return state;
+      // Accept it if it isn't already the active quest; bail if it turned out not to be offerable.
+      const story = state.story.activeQuestId === q.id ? state.story : acceptQuest(state.story, q.id);
+      if (story.activeQuestId !== q.id) return state;
+      const run0 = startRun(state.run.seed, STROKEPLAY_FORMAT, {}, story.characterId, 0, DEFAULT_BAG_TIER, []);
+      const bag = storyBagClubs(story);
+      const loadout = applyStoryClubEffects(applyStoryCaddy(applyStoryGear({ ...run0.loadout, bag }, story), story), story);
+      const run = {
+        ...run0,
+        loadout,
+        staticCourseId: worldId,
+        staticEffect: storyWorldEffect(worldId),
+        storyRound: true,
+        storyQuest: q.id,
+      };
+      return withLoreGate({ ...state, story, run, course: currentCourse(run), screen: 'intro', viewHole: 0, played: undefined, storyItemInspectId: undefined });
+    }
+
     case 'completeStoryQuest': {
       // GS-story-quests: claim the reward on the quest round's recap (grants + equips the reward club,
       // records the quest done), then back to the clubhouse. Guarded to the recap of an active quest round.
@@ -807,16 +833,19 @@ export function reduce(state: UiState, action: Action): UiState {
     }
 
     case 'openStoryTournament': {
-      // GS-story-tournament: open the current chapter's Galaxy Tournament lobby (from the clubhouse), only
-      // when one is actually unlocked (enough chapter worlds cleared, Sigil unwon).
-      if (state.screen !== 'story' || !state.story) return state;
+      // GS-story-tournament: open the current chapter's Galaxy Tournament lobby, only when one is actually
+      // unlocked (qualified in two events, Sigil unwon).
+      // GS-story-map-nav: reachable from the clubhouse banner OR the star-map VENUE dossier (fly directly to
+      // the Sigil). Records the origin so backing out of the lobby returns THERE, not always the clubhouse.
+      if ((state.screen !== 'story' && state.screen !== 'starTour') || !state.story) return state;
       if (!currentTournament(state.story)) return state;
-      return { ...state, screen: 'storyTournament' };
+      return { ...state, screen: 'storyTournament', storyTournamentReturn: state.screen };
     }
 
     case 'exitStoryTournament': {
       if (state.screen !== 'storyTournament') return state;
-      return { ...state, screen: 'story' };
+      // GS-story-map-nav: return to wherever the lobby was opened from (the star map, or the clubhouse).
+      return { ...state, screen: state.storyTournamentReturn ?? 'story', storyTournamentReturn: undefined };
     }
 
     case 'selectStoryPartner': {
