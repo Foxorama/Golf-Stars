@@ -25,10 +25,12 @@ figure{margin:0;position:relative;}</style>
 <script type="module">
   import { paintSerpent } from '/src/render/sigilCeremony.ts';
   const states = [
-    { wake: 0.4, focus: 0, label: 'wake 0.4 · body view (drowsy)' },
-    { wake: 0.8, focus: 0, label: 'wake 0.8 · body view (restless)' },
-    { wake: 1.0, focus: 0.55, label: 'wake 1.0 · zooming to head' },
-    { wake: 1.0, focus: 1.0, label: 'wake 1.0 · FINAL reveal (eye open)' },
+    { wake: 0.2, focus: 0, label: 'Sigil 1 · wake 0.2 (eye sealed)' },
+    { wake: 0.4, focus: 0, label: 'Sigil 2 · wake 0.4 (a sliver)' },
+    { wake: 0.6, focus: 0, label: 'Sigil 3 · wake 0.6 (eye cracks open)' },
+    { wake: 0.8, focus: 0, label: 'Sigil 4 · wake 0.8 (looking back at you)' },
+    { wake: 1.0, focus: 0.55, label: 'Sigil 5 · zooming to head' },
+    { wake: 1.0, focus: 1.0, label: 'Sigil 5 · FINAL reveal (eye wide)' },
   ];
   const app = document.getElementById('app');
   const DW = 1000, DH = 640;
