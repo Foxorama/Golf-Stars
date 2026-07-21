@@ -5,6 +5,7 @@ import { defaultStoryState, REVISIT_CREDIT_MULT } from '../src/sim/rpg/story';
 import { questOfferable, questBeatPending } from '../src/sim/rpg/storyQuests';
 import { effectWindMult } from '../src/sim/rpg/effects';
 import { hasStory, loadStory, writeStory, clearStory, exportStory, importStory } from '../src/save/storyStore';
+import { storyWorldServicesHTML } from '../src/app/storyServices';
 
 describe('Story Mode entry flow (GS-story-save wiring)', () => {
   it('New campaign: title → openStory (no save) → pick golfer → hub with a fresh StoryState', () => {
@@ -418,6 +419,34 @@ describe('Story shop/vendor ACCESS — per-world, never a clubhouse buy-anything
     expect(hangar.screen).toBe('storyShipyard');
     expect(hangar.storyShipyardWorldId).toBeUndefined();
     expect(reduce(hangar, { type: 'exitStoryShipyard' }).screen).toBe('story');
+  });
+
+  it('cross-nav (GS-story-shop-crossnav): shop ↔ shipyard ↔ caddy at the same world, loop-free', () => {
+    // desert-18 (Vela Dunes) hosts a Pro Shop, a ship vendor, AND Sandy the Sand-Saver — all three.
+    const recap = afterClear('desert-18');
+    const shop = reduce(recap, { type: 'openStoryShop', worldId: 'desert-18' });
+    expect(shop.screen).toBe('storyShop');
+    // from the shop, jump to the shipyard...
+    const yardFromShop = reduce(shop, { type: 'openStoryShipyard', worldId: 'desert-18' });
+    expect(yardFromShop.screen).toBe('storyShipyard');
+    expect(yardFromShop.storyShipyardWorldId).toBe('desert-18');
+    // ...and from the shipyard back to the shop
+    const shopFromYard = reduce(yardFromShop, { type: 'openStoryShop', worldId: 'desert-18' });
+    expect(shopFromYard.screen).toBe('storyShop');
+    // exiting either cross-linked service returns to the STAR MAP (loop-free — no service back-stack)
+    expect(reduce(shopFromYard, { type: 'exitStoryShop' }).screen).toBe('starTour');
+    expect(reduce(yardFromShop, { type: 'exitStoryShipyard' }).screen).toBe('starTour');
+    // the caddy can be recruited from the shop AND from the shipyard, not just the recap/map
+    expect(reduce(shop, { type: 'hireStoryCaddy', worldId: 'desert-18', caddyId: 'sandy-sandsaver' }).story!.hiredCaddyIds).toContain('sandy-sandsaver');
+    expect(reduce(yardFromShop, { type: 'hireStoryCaddy', worldId: 'desert-18', caddyId: 'sandy-sandsaver' }).story!.hiredCaddyIds).toContain('sandy-sandsaver');
+    // the services fragment offers the OTHER two services (not the one you're in)
+    const inShop = storyWorldServicesHTML(shop.story!, 'desert-18', 'shop');
+    expect(inShop).toContain('openStoryShipyard');
+    expect(inShop).toContain('sandy-sandsaver');
+    expect(inShop).not.toContain('openStoryShop'); // don't link back to itself
+    const inYard = storyWorldServicesHTML(shop.story!, 'desert-18', 'shipyard');
+    expect(inYard).toContain('openStoryShop');
+    expect(inYard).not.toContain('openStoryShipyard');
   });
 
   it('a friend is recruited at their world (recap), chosen active in the locker, and rides into the round', () => {

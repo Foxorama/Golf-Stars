@@ -14,6 +14,7 @@ import { itemArtSVG } from '../render/itemArt';
 import { loreCardHTML } from '../render/loreCard';
 import { proAvatarSVG } from '../render/golferCards';
 import { roughBaseFor } from '../render/palette';
+import { storyWorldServicesHTML } from './storyServices';
 import type { BiomeArchetype } from '../sim/course/themes';
 import {
   storyShopStock,
@@ -130,6 +131,7 @@ export function storyShopScreen(): string {
       ${body}
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:16px auto 0;">
+      ${storyWorldServicesHTML(story, worldId, 'shop')}
       <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'storyPlayWorld', courseId: worldId })}'>↺ Play this world again</button>
       <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStoryShop' })}'>‹ Back to the star chart</button>
     </div>

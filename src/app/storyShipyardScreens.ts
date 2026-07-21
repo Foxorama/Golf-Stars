@@ -12,6 +12,7 @@ import { getCharacter } from '../sim/rpg/characters';
 import { shipCardSVG } from '../render/shipArt';
 import { itemArtSVG } from '../render/itemArt';
 import { loreCardHTML } from '../render/loreCard';
+import { storyWorldServicesHTML } from './storyServices';
 import type { StoryState } from '../sim/rpg/story';
 import { COSMETIC_RARITY } from '../sim/rpg/cosmetics';
 import { DEFAULT_SHIP_ID } from '../sim/rpg/ships';
@@ -141,6 +142,7 @@ export function storyShipyardScreen(): string {
       </p>${upgradeSections}` : ''}
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:16px auto 0;">
+      ${storyWorldServicesHTML(story, vendorWorldId, 'shipyard')}
       <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStoryShipyard' })}'>‹ Leave the shipyard</button>
     </div>
     ${overlay}

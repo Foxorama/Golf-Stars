@@ -901,6 +901,18 @@ each shop a place you're *excited* to reach. Shipped as focused, auto-merged PRs
   corner instead of overlapping, and the shopkeeper's intro line reads as a quote. Pure model + render; no
   save/sim/rng touch, no `_gs*`/URL hook. Guarded by `storyShopSlotView` coverage in `tests/story-shop.test.ts`
   (new/equipped/owned/upgrade/sidegrade for gear + clubs) + the existing `?screen=storyshop` browser smoke.
+- **GS-story-shop-crossnav** — ✅ *shipped* (`app/storyServices.ts` + reducer origins). A single world can host a
+  Pro Shop, a Ship Vendor, AND a recruitable caddy (a friend belongs to a place), but the shop/shipyard were
+  dead-ends — to reach another of a world's services you flew back to the star map. Now an "Also at this world"
+  footer (shared `storyWorldServicesHTML(story, worldId, here)`) surfaces the OTHER services from wherever you
+  are: from the Pro Shop you can recruit the world's caddy and jump to its Shipyard; from the Shipyard you can
+  recruit the caddy and jump to the Pro Shop. The reducer gained the cross-nav origins (`openStoryShop` from
+  `storyShipyard`, `openStoryShipyard` from `storyShop`, `hireStoryCaddy` from both) — and every cross-link
+  returns to the STAR MAP on exit (each service is one tap from the map), so there's no service back-stack to
+  ping-pong (loop-free by construction). Caddy recruit stays Warden-only (a Herald turned on the friends).
+  Pure render + reducer guards; no save/sim/rng touch, no `_gs*`/URL hook. Guarded by the cross-nav flow in
+  `tests/story-flow.test.ts` (shop↔shipyard↔caddy, loop-free returns, the services fragment offers only the
+  other two).
 
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.
