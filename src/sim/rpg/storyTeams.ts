@@ -267,6 +267,11 @@ export function resolveStory2v2Match(
   seed: string,
   pars: readonly number[],
   format: StoryTeamFormat = 'bestball',
+  /** GS-story-sigil5-play: the player's strokes are already the SIDE's scramble score — the round was
+   *  PLAYED as an interactive/auto scramble (ally ball hit + the better kept, per shot), so no ally ghost
+   *  is folded on top (it would double-count the ally). Default false = the legacy ghost fold, so every
+   *  pre-existing caller is byte-identical. The opposing side stays the ghost pair either way. */
+  playerTeamPlayed = false,
 ): StoryMatchResult {
   const allyForm = golferForm(allyId, `${seed}:ally:${allyId}`);
   const oppForm0 = golferForm(oppIds[0], `${seed}:opp:${oppIds[0]}`);
@@ -275,15 +280,18 @@ export function resolveStory2v2Match(
   const duels: HoleDuel[] = [];
   for (let i = 0; i < n; i++) {
     const par = pars[i]!;
-    // Your team: your real strokes + the ally ghost (+ a scramble "assist" bite off the ally). The opposing
-    // team: the two opponent ghosts (+ a scramble assist off the first). teamHoleScore = the best of them.
-    const playerCards = [playerHoleStrokes[i]!, ghostCard(allyId, `${seed}:ally`, i, par, allyEdge, allyForm)];
+    // Your team: your real strokes + the ally ghost (+ a scramble "assist" bite off the ally) — or, when
+    // the round was PLAYED as the team (playerTeamPlayed), the real strokes alone. The opposing team: the
+    // two opponent ghosts (+ a scramble assist off the first). teamHoleScore = the best of them.
+    const playerCards = playerTeamPlayed
+      ? [playerHoleStrokes[i]!]
+      : [playerHoleStrokes[i]!, ghostCard(allyId, `${seed}:ally`, i, par, allyEdge, allyForm)];
     const oppCards = [
       ghostCard(oppIds[0], `${seed}:opp`, i, par, oppEdge, oppForm0),
       ghostCard(oppIds[1], `${seed}:opp`, i, par, oppEdge, oppForm1),
     ];
     if (format === 'scramble') {
-      playerCards.push(ghostCard(allyId, `${seed}:ally`, i, par, allyEdge, allyForm, 'assist:'));
+      if (!playerTeamPlayed) playerCards.push(ghostCard(allyId, `${seed}:ally`, i, par, allyEdge, allyForm, 'assist:'));
       oppCards.push(ghostCard(oppIds[0], `${seed}:opp`, i, par, oppEdge, oppForm0, 'assist:'));
     }
     const playerTeam = teamHoleScore(playerCards);

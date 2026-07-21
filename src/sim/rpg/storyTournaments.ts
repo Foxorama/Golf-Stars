@@ -188,12 +188,17 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     sigilName: 'The Abyssal Sigil',
     prize: 'The Radiant Warden Cruiser — a celestial ship, awarded to the victor.',
     rewardShipId: 'warden-cruiser',
+    // GS-story-doubt: this intro used to dwell on Venoma's own fear ("saving Venoma") — the chapter's real
+    // story is the betrayal brewing aboard YOUR ship, so the copy now carries the doubt thread instead.
     intro: [
       'Not a show — a vigil. At the edge of a black hole the Coil is trying to wake a lesser dreamer, and ' +
-        'the Wardens play the Sagittarius Core to hold it down. Venoma hunts you openly now — but her ' +
-        'taunts have cracks; she is afraid of what she serves.',
-      'Hold the vigil, beat the Viper, and take the Abyssal Sigil.',
-      'The eye at the root is half-open now. Every Sigil you set both locks the seal and forges the key that could break it — and only the fourth or fifth will tell which. Play like the dark is watching. It is.',
+        'the Wardens play the Sagittarius Core to hold it down. Venoma hunts you openly now, and her ' +
+        'gallery of hooded faithful grows by the world.',
+      'But the cold at your back is not the void — it is the quiet on your own ship. {betrayer} has hardly ' +
+        'spoken since the storm-world, and the Choice you made there is still being made, hole by hole, by ' +
+        'everyone who followed you out here. The Coil’s favourite door is a doubting heart.',
+      'Hold the vigil, beat the Viper, and take the Abyssal Sigil — and watch your friends, champion. The eye ' +
+        'at the root is half-open now, and it is not only looking at you.',
     ],
   },
   {
@@ -353,7 +358,10 @@ export function tournamentIntroLines(t: StoryTournament, story?: StoryState): st
         .map((id) => friendName(id))
         .join(' & ')
     : 'your former friends';
-  return t.intro.map((p) => p.replaceAll('{rival}', rival.name).replaceAll('{opponents}', opponents));
+  // GS-story-doubt: `{betrayer}` — the friend the betrayal arc says will turn (the Ch.4W intro foreshadows
+  // them by name; the Ch.5W intro confronts them). Resolved from the SAME `betrayerId` seam as the beats.
+  const betrayer = story ? friendName(betrayerId(story)) : 'a friend';
+  return t.intro.map((p) => p.replaceAll('{rival}', rival.name).replaceAll('{opponents}', opponents).replaceAll('{betrayer}', betrayer));
 }
 
 /** All of a chapter's worlds (from the chapter-gated list). */
@@ -524,6 +532,11 @@ export function sigilMatchThrough(
   playerHoleStrokes: readonly number[],
   seed: string,
   pars: readonly number[],
+  /** GS-story-sigil5-play: `teamPlayed` = the played strokes are already the TEAM's scramble score (the
+   *  round was played with the interactive/auto scramble armed — ally ball hit + better kept per shot),
+   *  so the resolver must NOT fold an ally ghost on top. Absent/false = the legacy ghost fold, so every
+   *  pre-existing caller/save is byte-identical. */
+  opts?: { teamPlayed?: boolean },
 ): SigilMatch | undefined {
   const rival = tournamentRival(t, story);
   if (isSinglesMatchTournament(t)) {
@@ -531,7 +544,17 @@ export function sigilMatchThrough(
   }
   if (isTeamMatchTournament(t) && story) {
     const m = finaleMatchup(story, story.activeCaddyId);
-    const res = resolveStory2v2Match(playerHoleStrokes, m.allyId, FINALE_ALLY_EDGE, m.oppIds, t.rivalEdge * FINALE_OPP_EDGE_SCALE, seed, pars, 'scramble');
+    const res = resolveStory2v2Match(
+      playerHoleStrokes,
+      m.allyId,
+      FINALE_ALLY_EDGE,
+      m.oppIds,
+      t.rivalEdge * FINALE_OPP_EDGE_SCALE,
+      seed,
+      pars,
+      'scramble',
+      opts?.teamPlayed === true,
+    );
     return { kind: 'team', rival, res, matchup: m };
   }
   return undefined;

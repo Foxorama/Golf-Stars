@@ -156,6 +156,15 @@ export function scrambleChoiceOverlay(): string {
     : state.run.storyTournamentPartner
     ? getCharacter(state.run.storyTournamentPartner)
     : undefined;
+  // GS-story-sigil5-play: on the Herald finale the scramble partner is a Coil CHAMPION (Voss/Venoma) —
+  // not a playable character — so name them for the card instead of a generic "your partner".
+  const partnerName =
+    partner?.name ??
+    (state.run.storyTournamentPartner === 'voss'
+      ? 'Sable Voss'
+      : state.run.storyTournamentPartner === 'venoma'
+      ? 'Venoma'
+      : undefined);
   const hole = sc.base.hole;
   // Both balls from the SAME spot: the player's line solid, the partner's muted (ghost) beneath.
   const map = renderHoleSVG(hole, {
@@ -187,9 +196,9 @@ export function scrambleChoiceOverlay(): string {
     ? { title: '🔮 FORTUNE\'S MULLIGAN — PICK YOUR TEE SHOT', sub: 'The fortune teller gifted a second tee shot — keep whichever line you like best.' }
     : isPreview
     ? { title: '🦜 PROGNOSTIC PARROT — PICK YOUR SHOT', sub: 'The captain foresaw the shot & played it twice — keep whichever ball you like best.' }
-    : { title: '🤝 SCRAMBLE — CHOOSE YOUR BALL', sub: `You and ${partner?.name ?? 'your partner'} both hit — play on from the better lie.` };
+    : { title: '🤝 SCRAMBLE — CHOOSE YOUR BALL', sub: `You and ${partnerName ?? 'your partner'} both hit — play on from the better lie.` };
   const labelA = isPreview ? 'Vision A' : isMulligan ? 'Tee shot A' : 'Your ball';
-  const labelB = isPreview ? 'Vision B' : isMulligan ? 'Tee shot B' : `${partner?.name ?? 'Partner'}'s ball`;
+  const labelB = isPreview ? 'Vision B' : isMulligan ? 'Tee shot B' : `${partnerName ?? 'Partner'}'s ball`;
   return `
     <div style="position:fixed;inset:0;background:rgba(5,7,11,0.82);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px;overflow:auto;">
       <div style="display:flex;flex-direction:column;gap:11px;max-width:360px;width:100%;">

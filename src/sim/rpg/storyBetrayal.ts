@@ -174,6 +174,13 @@ export function finaleMatchup(story: StoryState, activeGuideId?: string): Finale
 // `farewell` = their words when YOU turn and cut them loose (the Herald path, they stay a Warden). Written
 // against each golfer's cast profile (storyCast) so the same beat has four distinct hearts.
 
+/** One beat of a doubt scene — the `LoreLine` shape (kept structural so this module stays free of a
+ *  lore.ts import; lore.ts consumes these rows verbatim). */
+export interface DoubtLine {
+  kind: 'say' | 'action';
+  text: string;
+}
+
 interface BetrayalVoice {
   defection: readonly string[]; // Warden: they defect to the Coil
   farewell: readonly string[]; // Herald: you betray them; they stay Warden, heartbroken
@@ -183,6 +190,12 @@ interface BetrayalVoice {
    *  when they lead (brag), halftime when you lead (curse/plea)]. */
   confront: readonly [string, string, string];
   corrupt: readonly [string, string, string];
+  /** GS-story-doubt — the Warden-path FORESHADOW, before the defection is revealed: the whisper working on
+   *  this friend during the Chapter-4 qualifiers. `doubt` = the first strange question (a crack showing);
+   *  `distance` = the eve-of-the-vigil beat (they're slipping away). Each references the same motifs their
+   *  `defection` lines later pay off, so the betrayal reads as an arc, not a switch-flip. */
+  doubt: readonly DoubtLine[];
+  distance: readonly DoubtLine[];
 }
 
 const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
@@ -205,6 +218,18 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       '"See how quiet my ball flies now? No wind. No doubt. Nine holes more and you’ll stop fighting the stillness too."',
       '"You’re ahead… good. GOOD. Some small part of me — the old part — hoped you would be. Don’t you dare let up now."',
     ],
+    doubt: [
+      { kind: 'action', text: 'You find Feather alone on the observation deck, a ball turning slowly in her hand, watching the void go by.' },
+      { kind: 'say', text: '"Can I ask you something strange? When you play a hole true — really true — do you ever wonder who we’re keeping the lights on FOR? Whether anyone down there ever asked us to?"' },
+      { kind: 'say', text: '"The Apostate said order is a cage. I’ve aimed two yards right of the trouble my whole life, and I’m just… tired of the wind, sometimes. Forget I said anything."' },
+      { kind: 'action', text: 'She flips the ball once, catches it without looking, and doesn’t say another word all night.' },
+    ],
+    distance: [
+      { kind: 'action', text: 'The night before the vigil, Feather’s bunk is empty. You find her on the cargo ramp, staring into the black.' },
+      { kind: 'say', text: '"Out there — no wind at all. Imagine reading a line with nothing left to read. Just the ball, and the still, and the end of the line."' },
+      { kind: 'say', text: '"I’m fine. I’ll play tomorrow. I always play."' },
+      { kind: 'action', text: 'In her open locker, half-wrapped in a towel, is a ball you have seen before. It is very quietly hissing.' },
+    ],
   },
   'huang-woo-hook': {
     defection: [
@@ -224,6 +249,18 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       '"You want to know the secret? The serpent’s gallery never stops roaring. Never! I just had to stop caring who it was roaring FOR. Tee it up — the noise is on my side now."',
       '"HA! Hear that hum in the mire? That’s for ME now. Nine more holes and even you will want to kneel and listen."',
       '"Stop WINNING! You’re making the noise go quiet and I can’t— I won’t go back to the quiet. SWING SOFTER!"',
+    ],
+    doubt: [
+      { kind: 'action', text: 'Woo hasn’t shouted in three worlds. At dinner he pushes noodles around the bowl, then finally looks up.' },
+      { kind: 'say', text: '"Hey. Real question. When the gallery goes quiet — REALLY quiet — do you hear it? Underneath? There’s a hum. Like a crowd, but a long, long way down."' },
+      { kind: 'say', text: '"The hooded weirdos say everyone hears it eventually. HA! Creepy, right? …Right. Anyway. Forget it. GREAT noodles tonight!"' },
+      { kind: 'action', text: 'His laugh lands half a beat late, like an echo of itself.' },
+    ],
+    distance: [
+      { kind: 'action', text: 'You find Woo in the hold with the lights off, forehead against the hull, listening.' },
+      { kind: 'say', text: '"Sh— shh. There. You feel that, through the metal? It ROARS down there, friend. It never stops roaring. It never gets tired of me."' },
+      { kind: 'say', text: '"I’m fine! Warm-up ritual! New thing I’m trying!"' },
+      { kind: 'action', text: 'He snaps the lights back on too fast and grins too wide, and neither of you mentions it at breakfast.' },
     ],
   },
   'longshot-larry': {
@@ -245,6 +282,18 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       '"Longest front nine of me life, and every yard of it went MY way. The serpent likes a big send. Sit down, mate."',
       '"You’re ahead?! Good on ya… no. NO. Forget I said that. Grip it and rip it, serpent’s orders. I’m coming for the back nine."',
     ],
+    doubt: [
+      { kind: 'action', text: 'Larry is at the aft window with a bucket of range balls — not hitting them, just weighing one in his hand.' },
+      { kind: 'say', text: '"Mate. Every ball I ever sent into the void — reckon they’re still out there somewhere? All of ’em, just… at rest. Kind of peaceful, when you put it like that."' },
+      { kind: 'say', text: '"That Apostate bloke said the tide always wins the long game. I hate that he’s got a point. Don’t tell Woo I said that."' },
+      { kind: 'action', text: 'He finally rips one down the range, and doesn’t watch where it lands.' },
+    ],
+    distance: [
+      { kind: 'action', text: 'On the eve of the vigil, Larry’s driver is missing from the rack. So is Larry.' },
+      { kind: 'say', text: '"Went for a spacewalk," he says later, too easily. "Wanted to see the black up close. It’s not scary, mate. That’s the bit nobody tells ya — it’s not scary at all."' },
+      { kind: 'say', text: '"Course I’m right for tomorrow. Grip it and rip it, eh?"' },
+      { kind: 'action', text: 'His grin is the same as ever. His eyes have gone very still — like the tide finally came in.' },
+    ],
   },
   'backspin-bo': {
     defection: [
@@ -265,12 +314,49 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       '"Feel the mire pulling every putt toward the centre? That’s not break. That’s the truth, settling. Nine holes and you’ll stop fighting it."',
       '"Still ahead of me… you always could out-play my quiet. Then hear the old me, one last time: don’t stop. Whatever I say on the back nine — don’t stop."',
     ],
+    doubt: [
+      { kind: 'action', text: 'Bo has been reading the same practice green for an hour — walking the line, marking nothing.' },
+      { kind: 'say', text: '"Here’s what I can’t stop thinking. Every green breaks somewhere. Every read bends. But there’s supposed to be one green, somewhere, that’s perfectly still. No break. No wind. A pin that never moves."' },
+      { kind: 'say', text: '"The Apostate called it mercy. I read greens for a living — you can see why that reaches me. …It’s fine. It’s nothing. The line’s just noisy this week."' },
+      { kind: 'action', text: 'He putts once, dead straight, and the ball dies exactly on the lip — and he stares at it for a long, long time.' },
+    ],
+    distance: [
+      { kind: 'action', text: 'You find Bo asleep on the practice green, marker still in hand — every slope on it charted a dozen times over.' },
+      { kind: 'say', text: '"I keep dreaming the final read," he says, without opening his eyes. "Everything, everywhere, at rest. And in the dream I’m not sad about it. That’s the part that scares me."' },
+      { kind: 'say', text: '"I’ll be at the vigil. Whatever I’m becoming, I’ll be there. Promise."' },
+      { kind: 'action', text: 'When he does open his eyes, it takes a moment too long for them to find you.' },
+    ],
   },
 };
 
 /** The betrayer's per-character DEFECTION lines (Warden path — they turn to the Coil). */
 export function betrayalDefection(charId: string): readonly string[] {
   return BETRAYAL_VOICE[charId]?.defection ?? ['The Coil showed me the end of it all, and I chose the quiet. Don’t follow me.'];
+}
+
+const FALLBACK_DOUBT: readonly DoubtLine[] = [
+  { kind: 'action', text: 'Your friend has gone quiet since the storm — and tonight they finally speak.' },
+  { kind: 'say', text: '"Do you ever wonder if the Apostate was half right? About the cage? …Forget it. Forget I said anything."' },
+];
+const FALLBACK_DISTANCE: readonly DoubtLine[] = [
+  { kind: 'action', text: 'On the eve of the vigil your friend is nowhere aboard — and when they return, they offer no explanation at all.' },
+  { kind: 'say', text: '"I’ll be there tomorrow. I promise." They do not meet your eye when they say it.' },
+];
+
+/** GS-story-doubt: the betrayer's first CRACK — a strange question aboard the ship, in their own voice
+ *  (the Warden-path Ch.4 foreshadow, before the defection is revealed). */
+export function betrayalDoubt(charId: string): readonly DoubtLine[] {
+  return BETRAYAL_VOICE[charId]?.doubt ?? FALLBACK_DOUBT;
+}
+/** GS-story-doubt: the betrayer DRIFTING — the eve-of-the-vigil beat, deeper than the first crack. */
+export function betrayalDistance(charId: string): readonly DoubtLine[] {
+  return BETRAYAL_VOICE[charId]?.distance ?? FALLBACK_DISTANCE;
+}
+
+/** The betrayer's display short-name for story copy (the `{betrayer}` token) — falls back generic so a
+ *  fresh campaign with no picks still reads sensibly. */
+export function betrayerName(story: StoryState): string {
+  return getCharacter(betrayerId(story))?.shortName ?? 'your friend';
 }
 /** The betrayer's per-character FAREWELL lines (Herald path — you cut them loose; they stay a Warden). */
 export function betrayalFarewell(charId: string): readonly string[] {
@@ -304,12 +390,20 @@ export function friendRivalHalftime(charId: string, voice: FriendRivalVoice, bra
   return brag ? lines[1] : lines[2];
 }
 
-/** Every playable golfer has a distinct betrayal voice (defection + farewell + both rival contexts) — a
- *  coverage invariant. */
+/** Every playable golfer has a distinct betrayal voice (defection + farewell + both rival contexts + the
+ *  GS-story-doubt foreshadow pair) — a coverage invariant. */
 export function everyGolferHasBetrayalVoice(): boolean {
   return CHARACTERS.every((c) => {
     const v = BETRAYAL_VOICE[c.id];
-    return !!v && v.defection.length >= 2 && v.farewell.length >= 2 && v.confront.length === 3 && v.corrupt.length === 3;
+    return (
+      !!v &&
+      v.defection.length >= 2 &&
+      v.farewell.length >= 2 &&
+      v.confront.length === 3 &&
+      v.corrupt.length === 3 &&
+      v.doubt.length >= 3 &&
+      v.distance.length >= 3
+    );
   });
 }
 

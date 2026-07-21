@@ -199,6 +199,12 @@ function applyDebugParams(): void {
 function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
   const run = s.run;
   const withShop = (): UiState => ({ ...s, screen: 'shop', shopOffer: shopOffer(run).map((o) => o.item.id), shopRerolls: 0 });
+  // GS-story-early-beats: a Story world arrival may open on a lore beat (the Ch.1 true-line lesson, the
+  // Ch.2+ escalation thread) — dismiss any so a deep-link flow lands on the intro it drives through.
+  const pastLore = (st: UiState): UiState => {
+    while (st.screen === 'lore') st = reduce(st, { type: 'dismissLore' });
+    return st;
+  };
   switch (screen) {
     case 'character':
       // GS-select-onescreen: the golfer roster — mount it the honest way (the Star Tour tile opens
@@ -248,7 +254,7 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       // non-venue Chapter-1 world (a qualifier) and resolve it, so the smoke exercises the qualifier board.
       const hub = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
       const ch1 = reduce(reduce(reduce(hub, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' }), { type: 'storyRoundContinue' });
-      return reduce(reduce(ch1, { type: 'storyPlayWorld', courseId: 'verdant2-18' }), { type: 'play' });
+      return reduce(pastLore(reduce(ch1, { type: 'storyPlayWorld', courseId: 'verdant2-18' })), { type: 'play' });
     }
     case 'storymap': {
       // GS-story-map: reach the galaxy star map in STORY mode the honest way — play the prologue to Chapter
@@ -268,7 +274,7 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const hub0 = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
       const afterProl = reduce(reduce(hub0, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' });
       const hub1 = reduce(afterProl, { type: 'storyRoundContinue' });
-      const world = reduce(reduce(hub1, { type: 'storyPlayWorld', courseId: 'verdant-18' }), { type: 'play' });
+      const world = reduce(pastLore(reduce(hub1, { type: 'storyPlayWorld', courseId: 'verdant-18' })), { type: 'play' });
       const hub2 = reduce(world, { type: 'storyRoundContinue' });
       starTourView.storyMode = true; // dispatch normally sets this; the deep-link builds state directly
       const map = reduce(hub2, { type: 'openStoryMap' });
@@ -289,7 +295,7 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const hub0 = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
       const afterProl = reduce(reduce(hub0, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' });
       const hub1 = reduce(afterProl, { type: 'storyRoundContinue' });
-      const afterVendor = reduce(reduce(hub1, { type: 'storyPlayWorld', courseId: 'desert-18' }), { type: 'play' });
+      const afterVendor = reduce(pastLore(reduce(hub1, { type: 'storyPlayWorld', courseId: 'desert-18' })), { type: 'play' });
       return reduce(afterVendor, { type: 'openStoryShipyard', worldId: 'desert-18' });
     }
     case 'storybar': {
@@ -348,7 +354,7 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       if (screen === 'storytournament') return lobby;
       // GS-story-ragnarok: the Emerald Sigil match opens with the Parrot's stakes beat — dismiss it, then play.
       const teed = reduce(lobby, { type: 'storyPlayTournament' });
-      const round = teed.screen === 'lore' ? reduce(teed, { type: 'dismissLore' }) : teed;
+      const round = pastLore(teed);
       return reduce(round, { type: 'play' });
     }
     case 'storytournamentpop': {

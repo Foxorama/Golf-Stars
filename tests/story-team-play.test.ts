@@ -8,8 +8,9 @@ import { describe, it, expect } from 'vitest';
 import { scrambleOptsFor } from '../src/sim/rpg/run';
 import { defaultStoryState } from '../src/sim/rpg/story';
 import { initState, reduce } from '../src/ui/game';
-import { storyPartnerBestBallScore, resolveStoryTeamStroke } from '../src/sim/rpg/storyTeams';
+import { storyPartnerBestBallScore, resolveStoryTeamStroke, resolveStory2v2Match } from '../src/sim/rpg/storyTeams';
 import { TEAM_PARTNER_EDGE } from '../src/sim/rpg/storyTournaments';
+import { loyalAllyId, betrayerId } from '../src/sim/rpg/storyBetrayal';
 
 /** A Chapter-1 (scramble) campaign with the Emerald major unlocked. */
 function scrambleReady() {
@@ -83,6 +84,93 @@ describe('GS-story-sigil-play — the interactive scramble pick card (Sigil 1)',
     expect(r.team!.format).toBe('scramble');
     // won is internally consistent with the team gross vs the leading pair
     expect(r.won).toBe(r.playerGross <= r.rivalGross);
+  });
+});
+
+describe('GS-story-sigil5-play — the 2v2 scramble-matchplay finale plays as a REAL interactive scramble', () => {
+  /** A Chapter-5 Warden campaign with the Serpent's Vigil (2v2 scramble matchplay) unlocked. */
+  function finaleReady() {
+    const story = {
+      ...defaultStoryState('feather-fade'),
+      chapter: 5,
+      alignment: 'warden' as const,
+      trophyIds: ['sigil-emerald', 'sigil-ember', 'sigil-storm', 'sigil-abyssal'],
+      sigil1Partner: 'huang-woo-hook',
+      sigil2Partner: 'longshot-larry',
+      clearedWorldIds: ['standrews-18', 'derelict-18', 'cetus-18'],
+      qualifierResults: { 'derelict-18': { place: 1, field: 12 }, 'cetus-18': { place: 2, field: 12 } },
+    };
+    return { ...initState('sigil5-seed', {}, undefined, story), screen: 'story' as const };
+  }
+
+  /** Dismiss however many arrival beats fire (Ch.5 runs the Ragnarök omen thread). */
+  function pastLore(s: ReturnType<typeof reduce>) {
+    while (s.screen === 'lore') s = reduce(s, { type: 'dismissLore' });
+    return s;
+  }
+
+  it('tees off with the scramble armed and the finale ALLY as the shared-ball partner', () => {
+    const hub = finaleReady();
+    const armed = pastLore(reduce(reduce(hub, { type: 'openStoryTournament' }), { type: 'storyPlayTournament' }));
+    expect(armed.run.storyTournament).toBe(5);
+    expect(armed.run.storyTeamFormat).toBe('scramble');
+    // The partner is the loyal ally the finale matchup names (the betrayer sits on the other side).
+    expect(armed.run.storyTournamentPartner).toBe(loyalAllyId(hub.story!));
+    expect(armed.run.storyTournamentPartner).not.toBe(betrayerId(hub.story!));
+    // The auto path is armed too (auto ≡ interactive).
+    expect(scrambleOptsFor(armed.run)).toBeTruthy();
+  });
+
+  it('the HERALD finale arms the scramble with the Coil champion as the shared-ball partner', () => {
+    const hub = finaleReady();
+    const story = {
+      ...hub.story!,
+      alignment: 'herald' as const,
+      trophyIds: ['sigil-emerald', 'sigil-ember', 'sigil-storm', 'sigil-drowned'],
+      clearedWorldIds: ['standrews-18', 'swamp-18', 'cetus-18'],
+      qualifierResults: { 'swamp-18': { place: 1, field: 12 }, 'cetus-18': { place: 2, field: 12 } },
+    };
+    const heraldHub = { ...hub, story };
+    const armed = pastLore(reduce(reduce(heraldHub, { type: 'openStoryTournament' }), { type: 'storyPlayTournament' }));
+    expect(armed.run.storyTeamFormat).toBe('scramble');
+    // The Herald side's partner is a Coil champion (Voss/Venoma) — not a playable character.
+    expect(['voss', 'venoma']).toContain(armed.run.storyTournamentPartner);
+    // A champion has no character mods, but the scramble still arms (partner plays a neutral swing).
+    expect(scrambleOptsFor(armed.run)).toBeTruthy();
+  });
+
+  it('a full swing raises the pick-your-ball card, exactly like the Sigil-1 scramble', () => {
+    const hub = finaleReady();
+    const intro = pastLore(reduce(reduce(hub, { type: 'openStoryTournament' }), { type: 'storyPlayTournament' }));
+    const playing = reduce(intro, { type: 'playInteractive' });
+    expect(playing.screen).toBe('playing');
+    const clubId = playing.run.loadout.bag.find((c) => c.id === 'D')?.id ?? playing.run.loadout.bag[0]!.id;
+    const shot = reduce(playing, { type: 'shot', clubId, aim: 'auto', power: 1 });
+    expect(shot.scrambleChoice).toBeTruthy();
+    const picked = reduce(shot, { type: 'chooseScrambleBall', pick: 'partner' });
+    expect(picked.scrambleChoice).toBeUndefined();
+    expect(picked.play!.shots.length).toBe(1);
+  });
+
+  it('teamPlayed scoring uses the PLAYED strokes as the side\'s score — no ally ghost re-folded on top', () => {
+    const PARS = Array.from({ length: 18 }, () => 4);
+    const played = PARS.map((p, i) => p + (i % 3 === 0 ? -1 : 0));
+    const res = resolveStory2v2Match(played, 'huang-woo-hook', -0.1, ['backspin-bo', 'venoma'], 0.1, 's5', PARS, 'scramble', true);
+    // Every duel's player-side score is EXACTLY the played stroke — the ghost fold would only ever lower it.
+    for (const d of res.duels) expect(d.playerStrokes).toBe(played[d.holeIndex]!);
+    // The legacy fold (teamPlayed absent) still folds the ally ghost — never worse than the played ball.
+    const legacy = resolveStory2v2Match(played, 'huang-woo-hook', -0.1, ['backspin-bo', 'venoma'], 0.1, 's5', PARS, 'scramble');
+    for (const d of legacy.duels) expect(d.playerStrokes).toBeLessThanOrEqual(played[d.holeIndex]!);
+  });
+
+  it('the auto-played finale resolves to a matchplay recap (auto ≡ interactive end-to-end)', () => {
+    const hub = finaleReady();
+    const intro = pastLore(reduce(reduce(hub, { type: 'openStoryTournament' }), { type: 'storyPlayTournament' }));
+    const done = reduce(intro, { type: 'play' });
+    expect(done.screen).toBe('storyTournamentResult');
+    const r = done.lastStoryTournament!;
+    expect(r.match?.kind).toBe('team');
+    expect(r.match?.scoreline).toBeTruthy();
   });
 });
 

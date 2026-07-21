@@ -49,28 +49,33 @@ export function storyChoiceScreen(): string {
         cracked down the middle. The Prognostic Parrot digs his claws into your shoulder, wordless for once.
         The Apostate waits for your answer. Two roads. One golfer. <span style="color:var(--gs-ink);">Choose.</span></p>
       <div class="gs-choice-grid">
+        ${
+          // GS-story-choice-blind: the fork is presented IN STORY FORM — two voices making their case —
+          // never a feature list of worlds, rivals, and endings (the old cards spoiled the back half:
+          // "win her back", "crush Driver Dan & Penelope", the ending names). What each road costs is for
+          // the road to reveal.
+          ''
+        }
         ${card(
           'warden',
           '🛡',
-          'Stay a Warden',
-          'The light path — protect the galaxy, race the Coil, and try to save a friend from it.',
+          'Pick your clubs back up',
+          'The Parrot digs his claws in, and finally finds his voice.',
           '#54c8ff',
           [
-            'Play the vigil worlds — hold the void, re-consecrate the shrines.',
-            'Face Venoma again — and you may yet <b>win her back</b> from the Coil.',
-            'Ending: <b>The Reseal</b> — the serpent bound, the universe saved clean.',
+            '🦜 <i>"Keep the ball moving, champion. While a fairway is walked, the universe endures. That’s the whole creed — and I’d walk it beside you to the last hole in the sky."</i>',
+            '<i>The road ahead is cold, clean, and lonely — and somebody on it is going to need you more than they can say.</i>',
           ],
         )}
         ${card(
           'herald',
           '🐍',
-          'Join the Coil',
-          'The dark path — desecrate, take the serpent’s power, and crush the friends who stand in your way.',
+          'Lay your burden down',
+          'The Apostate’s hand is open. His voice is terribly kind.',
           '#b060c0',
           [
-            'Play the desecration worlds — drown the wards, harvest the dead.',
-            'Your old allies become your rivals — <b>crush Driver Dan &amp; Penelope</b>.',
-            'Ending: <b>The Long Rest</b> — the serpent freed, a victory that grieves.',
+            '🐍 <i>"All fairways end. We only hasten the green. You have carried the whole sky long enough — put it down, and hear how quiet it gets."</i>',
+            '<i>The deep worlds are drowned and dark and restful — and the people who love you will come looking. They always do.</i>',
           ],
         )}
       </div>

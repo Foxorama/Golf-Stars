@@ -8,16 +8,40 @@
  */
 
 import { state, btn } from './ctx';
-import { loreEventById, type LoreLine } from '../sim/rpg/lore';
+import { loreEventById, resolveLoreTokens, type LoreLine } from '../sim/rpg/lore';
 import { lorePortraitSVG } from '../render/loreArt';
+import { getCharacter } from '../sim/rpg/characters';
+import { betrayerName } from '../sim/rpg/storyBetrayal';
+import { golferPreviewSVG } from '../render/apparelArt';
 
 const DEFAULT_ACCENT = '#ffd97a';
 
-/** A spoken line reads as a bubble; a stage direction (a gesture, a sigh) reads as dim, centred italic. */
-function loreLineHTML(l: LoreLine): string {
+/** A spoken line reads as a bubble; a stage direction (a gesture, a sigh) reads as dim, centred italic.
+ *  `resolve` fills the `{betrayer}` story token with the campaign's actual odd-one-out (GS-story-doubt). */
+function loreLineHTML(l: LoreLine, resolve: (t: string) => string): string {
   return l.kind === 'action'
-    ? `<div class="gs-lore__action">${l.text}</div>`
-    : `<div class="gs-lore__say">${l.text}</div>`;
+    ? `<div class="gs-lore__action">${resolve(l.text)}</div>`
+    : `<div class="gs-lore__say">${resolve(l.text)}</div>`;
+}
+
+/** GS-story-doubt: a beat spoken by one of the PLAYABLE golfers carries a `golfer:<id>` portrait — drawn
+ *  as their real figure (the cast is the portrait). Everything else resolves through `lorePortraitSVG`. */
+function lorePortrait(portrait: string): string {
+  if (portrait.startsWith('golfer:')) {
+    const ch = getCharacter(portrait.slice('golfer:'.length));
+    if (ch) {
+      return golferPreviewSVG(undefined, undefined, undefined, {
+        skin: ch.style.skin,
+        shirtBase: ch.style.shirt,
+        capColor: ch.style.cap,
+        hair: ch.style.hair,
+        uid: `lore${ch.id.replace(/[^a-z0-9]/gi, '')}`,
+        w: 150,
+        h: 300,
+      });
+    }
+  }
+  return lorePortraitSVG(portrait);
 }
 
 /** Render the pending lore beat. Defensive fallback (a Continue button) if the id doesn't resolve, so a
@@ -32,7 +56,10 @@ export function loreScreen(): string {
     )}</div>`;
   }
   const acc = event.accent ?? DEFAULT_ACCENT;
-  const lines = event.lines.map(loreLineHTML).join('');
+  // GS-story-doubt: the {betrayer} token names the campaign's ACTUAL odd-one-out (the betrayal arc's
+  // single seam), so a beat always speaks about the right friend at the right point in time.
+  const resolve = (t: string): string => resolveLoreTokens(t, state.story ? betrayerName(state.story) : undefined);
+  const lines = event.lines.map((l) => loreLineHTML(l, resolve)).join('');
   return `
     <div class="gs-lore" style="--gs-lore-acc:${acc};">
       <div class="gs-lore__card">
@@ -42,7 +69,7 @@ export function loreScreen(): string {
           <div class="gs-lore__speaker"><span class="gs-lore__dot" aria-hidden="true"></span>${event.speaker}</div>
         </div>
         <div class="gs-lore__stage">
-          <div class="gs-lore__portrait">${lorePortraitSVG(event.portrait)}</div>
+          <div class="gs-lore__portrait">${lorePortrait(event.portrait)}</div>
           <div class="gs-lore__lines">${lines}</div>
         </div>
         <div class="gs-lore__cta">

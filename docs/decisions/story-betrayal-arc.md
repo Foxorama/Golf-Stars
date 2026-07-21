@@ -160,6 +160,42 @@ the corrupted one; the former friends stay clean Warden.
   on a partial round (the quest-round rule — a 12-hole close-out can never clobber the 18-hole record).
   Render + reducer only, zero sim rng, no save bump. Guarded by `tests/story-sigil-live.test.ts`
   (prefix-consistency, live≡final duels, close-out banking + worldBest skip, the interactive reducer flow).
+- **GS-story-sigil5-play** — ✅ (2026-07-21) the Ch.5 2v2 SCRAMBLE MATCHPLAY finale now PLAYS as a real
+  interactive scramble (player report: "the sigil 5 encounter isn't correctly doing an interactive
+  scramble" — it used to fold the ally as a resolution-time ghost only, so the round felt solo). Tee-off
+  arms `run.storyTeamFormat: 'scramble'` with `run.storyTournamentPartner` = the FINALE ALLY
+  (`finaleMatchup(story).allyId` — the loyal friend on Warden, the Coil champion Voss/Venoma on Herald), so
+  the per-shot pick-your-ball card raises exactly like Sigil 1 and the AUTO path plays best-of-two via
+  `scrambleOptsFor` (auto ≡ interactive). The resolver chain (`resolveStory2v2Match` `playerTeamPlayed` /
+  `sigilMatchThrough` `opts.teamPlayed`) then scores the PLAYED strokes as the side's team score — no ally
+  ghost re-folded on top (it would double-count) — with the flag passed identically by the live HUD, the
+  halftime pop, the mid-round close-out and the final resolution. Default-off ⇒ every legacy caller/save is
+  byte-identical; a Coil-champion ally plays a neutral swing (`characterShotMods` misses) and the pick card
+  names them properly. Guarded in `tests/story-team-play.test.ts`.
+- **GS-story-sigil5-look** — ✅ (2026-07-21) the finale matchup box draws a Coil champion as their real
+  PORTRAIT bust (`venomaPortraitSVG`/`vossPortraitSVG`, `.gs-tourn-mport`) — never the "cute little snake"
+  🐍 emoji the player reported standing in for Venoma.
+- **GS-story-early-beats / GS-story-doubt / GS-story-choice-blind** — ✅ (2026-07-21) the narrative
+  correctness pass (player report: "no sense of what is happening till Sigil 3; no lead-up before the
+  betrayal; the Choice spoils its consequences"):
+  - **Trunk build-up**: new arrival beats through the lore machinery — Ch.1 `story-true-line` (the Parrot's
+    first lesson on a qualifying arrival; the Sigil-1 tee-off keeps the omen), Ch.2 `story-venoma-debut`
+    (the Viper strides in uninvited at the Forge tee-off — her bible entrance, previously just a lobby
+    name) and `story-rough-moved` (the course goes wrong; the first hooded stranger).
+  - **The betrayer-doubt thread (Warden Ch.4)**: `story-warden-vow` (the Parrot names who's gone quiet via
+    the `{betrayer}` token) → `story-doubt-<golfer>` (the betrayer's strange question, in their own voice)
+    → `story-distance-<golfer>` (their eve-of-the-vigil drifting; fires even at the major tee-off so the
+    minimum path still gets all three). Per-character rows generated from `BETRAYAL_VOICE.doubt/distance`
+    (coverage machine-checked in `everyGolferHasBetrayalVoice`), keyed off the new
+    `LoreContext.storyBetrayerId` so the beat is always the RIGHT friend — the betrayer and the tournament
+    rival can be different characters. Golfer-spoken beats carry a `golfer:<id>` portrait (their real
+    figure); the `{betrayer}` token resolves at render (`resolveLoreTokens` + `betrayerName`).
+  - **Sigil 4W is about the betrayal**: the Abyssal Vigil intro + the rewritten `story-venoma-warden` beat
+    now carry the doubt thread (the empty seat, the whisper inside your camp) instead of Venoma's own
+    redemption crack ("saving Venoma" content moved out of Ch.4 — her turn stays at the Ch.6W shrine).
+  - **The Choice is blind**: the alignment cards are two in-fiction voices (the Parrot's creed vs the
+    Apostate's kind offer) with NO mechanical spoilers — no world lists, no "win her back", no "crush
+    Driver Dan & Penelope", no ending names. What each road costs is for the road to reveal.
 - **GS-story-betrayal-polish** — balance re-tune (the finale + team-major edges), any dialogue-depth follow-up,
   constitution/roadmap docs.
 

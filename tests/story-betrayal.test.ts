@@ -144,7 +144,7 @@ describe('GS-story-sigil-rivals — the severed friend + dynamic tournament riva
       for (let ch = 1; ch <= 5; ch++) {
         const t = tournamentForChapter(ch, path)!;
         for (const line of tournamentIntroLines(t, { ...st, alignment: path })) {
-          expect(line).not.toMatch(/\{rival\}|\{opponents\}/);
+          expect(line).not.toMatch(/\{rival\}|\{opponents\}|\{betrayer\}/);
         }
       }
     }

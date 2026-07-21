@@ -83,6 +83,18 @@ default). One focused, tested, auto-merged PR each:
   heavy) — realistically Sandy/Chipinski/Sam/Penelope, the caddies reachable before The Choice, never the
   Ch.5-only Dan/Mole. The friend's per-character farewell. Four distinct betrayal voices (`BETRAYAL_VOICE`).
 - **GS-story-betrayal-polish** — balance, dialogue depth, costume polish, docs.
+- **GS-story-early-beats + GS-story-doubt + GS-story-choice-blind + GS-story-sigil5-play/-look** — ✅
+  *shipped* (the story-beats correctness pass, player report): (1) the pre-Choice trunk gained real arrival
+  beats (Ch.1 true-line lesson, Ch.2 Venoma DEBUT at the Forge tee-off + the rough-that-moved dread) so the
+  story builds from the World Tour to Sigil 3 instead of starting there; (2) the Warden Ch.4 qualifiers run
+  the BETRAYER-DOUBT thread (the Parrot's vow naming who's gone quiet → the betrayer's strange question →
+  their eve-of-vigil drifting, per-character voices in `BETRAYAL_VOICE.doubt/distance`, keyed off
+  `LoreContext.storyBetrayerId` + the `{betrayer}` token so the RIGHT friend speaks) and the Ch.4W Sigil
+  intro/Venoma beat are about the brewing betrayal, not "saving Venoma"; (3) The Choice hides its
+  consequences — two in-fiction voices, no world/rival/ending spoilers; (4) Sigil 5 plays as a REAL
+  interactive 2v2 scramble (the finale ally shares your ball via `scrambleOptsFor`, the resolver's
+  `teamPlayed` mode scores the played strokes without re-folding an ally ghost, auto ≡ interactive) and the
+  matchup box draws Venoma/Voss portrait busts, never a snake emoji.
 
 **GS-story-review — Story Tour polish backlog** (from `reports/story-mode-review-2026-07-18.md`, the
 designer/QA/story-editor pass). The systems all shipped; these close the gaps between the campaign and the
@@ -147,9 +159,9 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
   mechanical divergence (wards to shatter, blockade lances to dodge, the seal strike, the serpent waking as
   the wards fall); still open: the Ark itself on screen with the NAMED friends at its helm + the wyrm-ship as
   the drawn player craft.
-- **GS-story-penelope-placement** — Ch.4H rival should be a real roster friend; stand Dan + Penelope TOGETHER
-  at the Ghost Harvest (the choice-screen "crush Dan & Penelope" promise is never delivered today; it also
-  doubles the interlude "Severing" beat).
+- **GS-story-penelope-placement** — stand Dan + Penelope TOGETHER at the Ghost Harvest (the bible's "crush
+  Dan & Penelope" beat is never delivered today; the choice screen no longer promises it —
+  GS-story-choice-blind removed the spoiler — but the beat itself is still owed).
 - **GS-story-boss-juice** — ✅ *shipped as GS-story-battle-2* (the final-battle overhaul): dodgeable
   telegraphed strikes (tap-to-VEER), hit bursts, an enrage ramp, AND further than asked — the outcome now
   has stakes (an armed ship that fights badly is REPELLED, a costless rematch), the whole fight is tuned
