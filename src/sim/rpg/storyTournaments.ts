@@ -251,9 +251,12 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
       'The acid shrine of Hydra Mire, where the Coil means to complete their rite — and {rival}, the ' +
         'friend who turned on you, stands with them now in shed-scale robes, familiar and wrong all at ' +
         'once. Venoma is at their shoulder, wearing your grief like a trophy.',
+      // GS-story-ambiguous-fate: no promised redemption — winning is for the Sigil; what winning leaves of
+      // the friend is deliberately unknowable (the ending resolves where they went, not who they are now).
       'It’s a 2-vs-2 SCRAMBLE MATCHPLAY: you and a loyal friend SHARE a ball — the best of your every shot — ' +
         'against {rival} and the Viper sharing theirs, hole by hole, the lower team score takes it. Win ' +
-        'the match and the last Sigil is yours — and you may yet break the whisper’s hold on {rival}.',
+        'the match and the last Sigil is yours. As for {rival} — nobody can say how deep the whisper has ' +
+        'gone, or what winning will leave standing on the far side of it.',
       'Five Sigils forge the Green Key — and above the mire the sky is already cracking. Win here and Ragnarök stops at the door; the key becomes a lock you carry down to the root to seal it forever.',
     ],
   },

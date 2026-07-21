@@ -2,7 +2,10 @@
  * The four STORY ENDINGS cinematic (GS-story-endings) — Canvas2D, render-only, a full-screen overlay played
  * after the Jörmungandr finale resolves, one of four ways depending on your PATH (Warden / Herald) and the
  * OUTCOME (win / lose):
- *   'good-win'  — the Wardens win: the serpent shatters into light and dawn breaks across every world saved.
+ *   'good-win'  — the Wardens win (THE RESEAL): the serpent is sung back to SLEEP — it settles, the seal
+ *                 takes, its eye slides shut — while dawn breaks across every world saved… and the Coil's
+ *                 last wyrm-ship (the lost friend aboard) jets away into the Universe Unending
+ *                 (GS-story-unending-tease — the named unknown deep a future mode will open).
  *   'good-lose' — the Wardens fall: the CROW — the Coil's true prophet — reveals it let you win all along so
  *                 you'd free the World-Eater with the Keystone; the maw opens and swallows the stars.
  *   'cult-win'  — the Herald wins: the serpent uncoils around the galaxy; Ragnarok; the lights go out, one by
@@ -39,12 +42,23 @@ const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 const easeOut = (t: number): number => 1 - Math.pow(1 - t, 3);
 const easeInOut = (t: number): number => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
-/** Copy for each ending: a title + a subtitle + one line of the speaker's voice (Parrot or the Crow). */
+/** Copy for each ending: a title + a subtitle + one line of the speaker's voice (Parrot or the Crow).
+ *  `{betrayer}` (GS-story-unending-tease) resolves at mount to the campaign's actual odd-one-out. */
 const ENDING_COPY: Record<StoryEndingVariant, { title: string; sub: string; voice: string; voiceCol: string }> = {
   'good-win': {
-    title: 'The Universe is Saved',
-    sub: 'Jörmungandr falls. The corruption scatters into harmless light, and dawn breaks across every world you crossed.',
-    voice: '🦜 "You did it, champion. You actually did it. Every fairway, everywhere, endures another age."',
+    // GS-story-unending-tease: the Reseal does not KILL the World-Eater — it sings it back to SLEEP. And
+    // the victory is left one friend short: the betrayer and the Coil's remnant flee past every chart,
+    // into the UNIVERSE UNENDING (the named unknown deep — a future mode's front door), so redeeming them
+    // is a voyage the galaxy cannot yet make.
+    title: 'The Reseal',
+    sub:
+      'Jörmungandr does not die. It sleeps — resealed beneath the root, dreaming of nothing, while dawn breaks ' +
+      'across every world you crossed. And ahead of the dawn one dark sail runs for open night: {betrayer}, and ' +
+      'what remains of the Coil, fleeing into the Universe Unending.',
+    voice:
+      '🦜 "Let it sleep, champion. We saved everything… and I still count us one short. {betrayer} is out past ' +
+      'every chart I can read now — the Universe Unending, the deep with no fairways in it yet. When you\'re ' +
+      'ready to fly that far to bring a friend home — so am I."',
     voiceCol: '#8fffbe',
   },
   'good-lose': {
@@ -67,9 +81,17 @@ const ENDING_COPY: Record<StoryEndingVariant, { title: string; sub: string; voic
   },
 };
 
-export function mountStoryEnding(opts: { variant: StoryEndingVariant; onDone?: () => void }): StoryEndingHandle {
+export function mountStoryEnding(opts: {
+  variant: StoryEndingVariant;
+  /** GS-story-unending-tease: the betrayed friend's short-name — fills the `{betrayer}` token in the
+   *  good-win copy (the one who flees with the Coil). Absent → a generic "your lost friend". */
+  betrayerName?: string;
+  onDone?: () => void;
+}): StoryEndingHandle {
   const variant = opts.variant;
-  const copy = ENDING_COPY[variant];
+  const raw = ENDING_COPY[variant];
+  const fill = (s: string): string => s.replaceAll('{betrayer}', opts.betrayerName ?? 'your lost friend');
+  const copy = { ...raw, title: fill(raw.title), sub: fill(raw.sub), voice: fill(raw.voice) };
 
   const overlay = document.createElement('div');
   overlay.setAttribute('data-gs-story-ending', variant);
@@ -166,17 +188,22 @@ export function mountStoryEnding(opts: { variant: StoryEndingVariant; onDone?: (
     }
   }
 
-  /** The coiled serpent (the ceremony/finale style), `wake`/`rear` shape it. */
-  function serpent(t: number, cx: number, cy: number, spread: number, wake: number, dim: number): void {
+  /** The coiled serpent (the ceremony/finale style), `wake`/`rear` shape it. `sleep` 0..1
+   *  (GS-story-unending-tease) settles it: the sway stills, the body sinks, and the burning eye slides
+   *  shut — the Reseal sings it back to sleep, it never shatters. */
+  function serpent(t: number, cx: number, cy: number, spread: number, wake: number, dim: number, sleep = 0): void {
     if (!ctx) return;
     ctx.globalAlpha = 1 - dim;
+    const sway = 1 - sleep * 0.85; // stillness takes the body
+    const spd = 1 - sleep * 0.7; // and the movement slows
+    const sink = sleep * 70; // it settles down toward the root
     const segs = 30;
     for (let i = segs; i >= 0; i--) {
       const u = i / segs;
       const x = cx - spread / 2 + u * spread;
-      const y = cy + Math.sin(u * 6 + t * (0.6 + wake)) * (60 + wake * 30) * (0.4 + u * 0.7);
+      const y = cy + sink + Math.sin(u * 6 + t * (0.6 + wake) * spd) * (60 + wake * 30) * (0.4 + u * 0.7) * sway;
       const r = lerp(8, 40, u);
-      const corr = 0.5 + 0.5 * Math.sin(t * 2.4 + u * 5);
+      const corr = (0.5 + 0.5 * Math.sin(t * 2.4 * spd + u * 5)) * (1 - sleep * 0.6);
       const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.2, x, y, r);
       g.addColorStop(0, `rgba(${34 + corr * 40},${80 + corr * 90 + wake * 30},${58 + corr * 30},1)`);
       g.addColorStop(1, `rgba(8,${22 + corr * 18},18,1)`);
@@ -187,7 +214,7 @@ export function mountStoryEnding(opts: { variant: StoryEndingVariant; onDone?: (
     }
     // head + eye
     const hx = cx + spread / 2;
-    const hy = cy + Math.sin(6 + t * (0.6 + wake)) * (60 + wake * 30) * 1.1;
+    const hy = cy + sink + Math.sin(6 + t * (0.6 + wake) * spd) * (60 + wake * 30) * 1.1 * sway;
     const hr = 44;
     const hg = ctx.createRadialGradient(hx - hr * 0.3, hy - hr * 0.3, hr * 0.2, hx, hy, hr);
     hg.addColorStop(0, `rgba(50,${110 + wake * 40},80,1)`);
@@ -196,15 +223,75 @@ export function mountStoryEnding(opts: { variant: StoryEndingVariant; onDone?: (
     ctx.beginPath();
     ctx.arc(hx, hy, hr, 0, 6.283);
     ctx.fill();
-    ctx.fillStyle = 'rgba(210,255,225,0.95)';
+    // the sclera dims as the lid comes down; the burning slit fades to nothing
+    ctx.fillStyle = `rgba(210,255,225,${0.95 * (1 - sleep * 0.85)})`;
     ctx.beginPath();
     ctx.arc(hx, hy, hr * 0.5, 0, 6.283);
     ctx.fill();
-    ctx.fillStyle = `rgba(255,140,60,${0.7 + 0.3 * Math.sin(t * 6)})`;
+    ctx.fillStyle = `rgba(255,140,60,${(0.7 + 0.3 * Math.sin(t * 6)) * (1 - sleep)})`;
     ctx.beginPath();
     ctx.ellipse(hx, hy, hr * 0.1, hr * 0.4, 0, 0, 6.283);
     ctx.fill();
+    if (sleep > 0.45) {
+      // the closed eye — a soft lid-line where the burning slit was
+      ctx.strokeStyle = `rgba(20,44,32,${clamp01((sleep - 0.45) / 0.55)})`;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(hx, hy - hr * 0.06, hr * 0.42, 0.35, Math.PI - 0.35);
+      ctx.stroke();
+    }
     ctx.globalAlpha = 1;
+  }
+
+  /** GS-story-unending-tease: the Coil's last wyrm-ship, running dark ahead of the dawn — a small
+   *  serpent-hulled craft streaking up and out of frame toward the Universe Unending, venom-green engine
+   *  trail fading behind it. `p` 0..1 sweeps the whole flight. */
+  function coilShipFlees(t: number, p: number): void {
+    if (!ctx || p <= 0) return;
+    const x = lerp(520, DW + 80, easeInOut(p));
+    const y = lerp(330, 60, easeInOut(p));
+    const ang = Math.atan2(60 - 330, DW + 80 - 520);
+    // engine trail — venom-green motes strung out behind the hull
+    for (let i = 1; i <= 16; i++) {
+      const d = i * 14;
+      const px = x - Math.cos(ang) * d + Math.sin(t * 3 + i) * 2;
+      const py = y - Math.sin(ang) * d + Math.cos(t * 2.4 + i) * 2;
+      ctx.fillStyle = `rgba(127,224,160,${0.38 * (1 - i / 16) * clamp01(p * 3)})`;
+      ctx.beginPath();
+      ctx.arc(px, py, 2.5 + i * 0.7, 0, 6.283);
+      ctx.fill();
+    }
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(ang);
+    // serpent hull — a dark scaled sliver with a coiled tail fin
+    ctx.fillStyle = '#241832';
+    ctx.beginPath();
+    ctx.moveTo(30, 0);
+    ctx.quadraticCurveTo(8, -10, -22, -6);
+    ctx.quadraticCurveTo(-30, 0, -22, 6);
+    ctx.quadraticCurveTo(8, 10, 30, 0);
+    ctx.closePath();
+    ctx.fill();
+    // scale glints
+    ctx.fillStyle = 'rgba(176,96,192,0.5)';
+    for (let k = 0; k < 4; k++) {
+      ctx.beginPath();
+      ctx.arc(-10 + k * 9, (k % 2 ? 3 : -3) * 0.8, 1.6, 0, 6.283);
+      ctx.fill();
+    }
+    // the coiled tail
+    ctx.strokeStyle = '#3a2450';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(-26, 0, 6, 0.6, 5.2);
+    ctx.stroke();
+    // engine flare
+    ctx.fillStyle = `rgba(160,255,200,${0.75 + 0.25 * Math.sin(t * 14)})`;
+    ctx.beginPath();
+    ctx.ellipse(-30, 0, 8 + Math.sin(t * 12) * 2, 3.4, 0, 0, 6.283);
+    ctx.fill();
+    ctx.restore();
   }
 
   /** The Crow — the Coil's true prophet, the dark mirror of the Parrot. A great black bird with a pale
@@ -334,19 +421,27 @@ export function mountStoryEnding(opts: { variant: StoryEndingVariant; onDone?: (
     if (!ctx) return;
     ctx.globalAlpha = a;
     ctx.textAlign = 'center';
+    // Flow the block bottom-up-aware: the sub + voice wrap to a variable number of lines (the Reseal copy
+    // runs long), so lay them out sequentially instead of at fixed y's — no more overlapping captions.
+    ctx.font = '400 17px system-ui, sans-serif';
+    const subLines = measureWrap(copy.sub, 720);
+    ctx.font = 'italic 500 16px Georgia, serif';
+    const voiceLines = measureWrap(copy.voice, 760);
+    const blockH = 34 + subLines * 23 + 14 + voiceLines * 21;
+    const titleY = DH - 28 - blockH;
     ctx.fillStyle = '#f4ecd6';
     ctx.font = '800 44px Georgia, "Times New Roman", serif';
-    ctx.fillText(copy.title, DW / 2, DH - 150);
+    ctx.fillText(copy.title, DW / 2, titleY);
     ctx.fillStyle = '#c2ccda';
     ctx.font = '400 17px system-ui, sans-serif';
-    wrap(copy.sub, DW / 2, DH - 116, 720, 23);
+    wrap(copy.sub, DW / 2, titleY + 34, 720, 23);
     ctx.fillStyle = copy.voiceCol;
     ctx.font = 'italic 500 16px Georgia, serif';
-    wrap(copy.voice, DW / 2, DH - 58, 760, 21);
+    wrap(copy.voice, DW / 2, titleY + 34 + subLines * 23 + 14, 760, 21);
     ctx.globalAlpha = 1;
   }
-  function wrap(text: string, cx: number, y: number, maxW: number, lh: number): void {
-    if (!ctx) return;
+  function splitLines(text: string, maxW: number): string[] {
+    if (!ctx) return [text];
     const words = text.split(' ');
     let line = '';
     const lines: string[] = [];
@@ -358,7 +453,14 @@ export function mountStoryEnding(opts: { variant: StoryEndingVariant; onDone?: (
       } else line = test;
     }
     if (line) lines.push(line);
-    lines.forEach((l, i) => ctx.fillText(l, cx, y + i * lh));
+    return lines;
+  }
+  function measureWrap(text: string, maxW: number): number {
+    return splitLines(text, maxW).length;
+  }
+  function wrap(text: string, cx: number, y: number, maxW: number, lh: number): void {
+    if (!ctx) return;
+    splitLines(text, maxW).forEach((l, i) => ctx.fillText(l, cx, y + i * lh));
   }
 
   function frame(now: number): void {
@@ -374,7 +476,10 @@ export function mountStoryEnding(opts: { variant: StoryEndingVariant; onDone?: (
     ctx.scale(scale, scale);
 
     if (variant === 'good-win') {
-      // dawn sweeps up from the bottom; the serpent shatters into light; worlds brighten.
+      // GS-story-unending-tease — THE RESEAL: dawn sweeps up from the bottom while the serpent is sung
+      // back to SLEEP (it settles, the sway stills, the burning eye slides shut — it never shatters);
+      // golden seal-rings tighten over it, worlds brighten… and the Coil's last wyrm-ship runs dark
+      // ahead of the dawn, jetting off-frame toward the Universe Unending with the lost friend aboard.
       const dawn = ctx.createLinearGradient(0, DH, 0, 0);
       dawn.addColorStop(0, `rgba(255,${180 + sp * 40},120,${0.25 + sp * 0.35})`);
       dawn.addColorStop(0.5, `rgba(120,180,255,${0.1 + sp * 0.2})`);
@@ -384,20 +489,26 @@ export function mountStoryEnding(opts: { variant: StoryEndingVariant; onDone?: (
       ctx.fillStyle = dawn;
       ctx.fillRect(0, 0, DW, DH);
       starfield(t, 1 - sp * 0.7);
-      // shattering serpent → light shards
-      if (sp < 0.5) serpent(t, DW / 2, 300, 500, 0.4, sp * 2);
-      const shards = 60;
-      for (let i = 0; i < shards; i++) {
-        const a = (i / shards) * 6.283;
-        const d = sp * (120 + (i % 5) * 60);
-        ctx.globalAlpha = clamp01(sp * 2) * (1 - sp);
-        ctx.fillStyle = '#bfffe0';
+      // the serpent settles into its dreamless sleep
+      const sleep = easeInOut(clamp01(sp * 1.4));
+      serpent(t, DW / 2, 300, 500, 0.4 * (1 - sleep), 0, sleep);
+      // the seal takes: amber rings converging on the sleeping coils, then holding steady
+      const ringN = 3;
+      for (let i = 0; i < ringN; i++) {
+        const converge = easeOut(clamp01(sp * 1.6 - i * 0.18));
+        if (converge <= 0) continue;
+        const rr = lerp(430 + i * 70, 250 + i * 26, converge);
+        ctx.strokeStyle = `rgba(240,200,110,${0.16 + converge * 0.3})`;
+        ctx.lineWidth = 2 + converge * 1.5;
         ctx.beginPath();
-        ctx.arc(DW / 2 + Math.cos(a) * d, 300 + Math.sin(a) * d * 0.6, 3, 0, 6.283);
-        ctx.fill();
+        ctx.ellipse(DW / 2, 330 + sleep * 60, rr, rr * 0.42, 0, 0, 6.283);
+        ctx.stroke();
       }
       ctx.globalAlpha = 1;
       for (const w of worlds) planet(w.x, w.y, w.r, w.hue, easeOut(sp));
+      // one dark sail, running for the deep — it lifts once the seal is taking and is still flying
+      // through the HOLD (paced on the whole cinematic, not the scene, so the jet-off reads to the end)
+      coilShipFlees(t, clamp01((e / TOTAL - 0.3) / 0.75));
     } else if (variant === 'good-lose') {
       ctx.fillStyle = '#050307';
       ctx.fillRect(0, 0, DW, DH);

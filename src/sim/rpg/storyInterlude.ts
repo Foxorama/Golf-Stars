@@ -106,10 +106,12 @@ export function interludeScene(story: StoryState): InterludeScene {
         { who: 'friend', text: d1! },
         {
           who: 'parrot',
-          text: `Save your breath, champion — they’re too far gone to talk back from. You’ll have to PLAY them back, and not here. At the shrine, last Sigil, everything on the line. Take a friend who stayed true. Arm up.`,
+          // GS-story-ambiguous-fate: the Parrot promises the CONFRONTATION, never the rescue — his foresight
+          // goes dark in the mire, so whether any of the old friend survives the whisper stays unknowable.
+          text: `Save your breath, champion — they’re too far gone to talk back from. You’ll have to face them at the shrine — last Sigil, everything on the line. What’s left of the friend you knew, under all that shed-scale… I can’t see. My foresight goes dark in the mire. Take a friend who stayed true. Arm up.`,
         },
       ],
-      outcome: `${name} walks into the mire in shed-scale robes and does not look back. There is no reunion — only the Serpent’s Vigil, where you and a loyal friend must out-play ${name} and the Viper to break the whisper’s hold. It ends at the shrine.`,
+      outcome: `${name} walks into the mire in shed-scale robes and does not look back. There is no reunion — only the Serpent’s Vigil, where you and a loyal friend must out-play ${name} and the Viper for the last Sigil. What the whisper has left of them — and whether any road leads them home — not even the Parrot will say.`,
     };
   }
   // HERALD — the caddy-quest thread (the user's ask): the Coil pulls on the club a friend once gave you.

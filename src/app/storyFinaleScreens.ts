@@ -9,6 +9,7 @@
 
 import { state } from './ctx';
 import { getCharacter } from '../sim/rpg/characters';
+import { betrayerName } from '../sim/rpg/storyBetrayal';
 import {
   finaleResult,
   finaleBattleTuning,
@@ -135,30 +136,39 @@ export function storyFinaleResultScreen(): string {
     // GS-story-chapters: the ending diverges by the path chosen at The Choice — the Warden RESEAL (a clean
     // salvation) vs the Herald LONG REST (a victory that grieves).
     const herald = state.story?.alignment === 'herald';
-    // GS-story-finisher: the interactive strike's quality colours the win — a dead-centre CLEAN kill vs a
-    // GRAZE that clipped the eye (the serpent still falls; an armed champion always wins).
+    // GS-story-finisher: the interactive strike's quality colours the win — a dead-centre CLEAN strike vs a
+    // GRAZE that clipped the eye (the seal still takes; an armed champion always wins). GS-story-unending-
+    // tease: the RESEAL never kills the serpent — it sings it to SLEEP — and the win is left one friend
+    // short: the betrayer and the Coil's remnant flee into the UNIVERSE UNENDING (the named unknown deep).
     const graze = r.strike === 'graze';
+    const fled = state.story ? betrayerName(state.story) : 'your lost friend';
     const strikeLine = herald
       ? graze
         ? `<p style="color:#ffd08a;">🎯 Your finisher <b>clipped</b> the seal — not the clean release you meant, but enough. The last ward cracks all the same, and you'll always know how close it was.</p>`
         : `<p style="color:#c8e88a;">🎯 A <b>dead-centre</b> strike — the ball vanished into the seal like it was always meant to, and the cage sprang open clean.</p>`
       : graze
-        ? `<p style="color:#ffd08a;">🎯 Your finisher <b>clipped</b> the eye — not the killing blow you wanted, but enough. The serpent falls all the same, and you'll always know how close it was.</p>`
-        : `<p style="color:#9dffce;">🎯 A <b>dead-centre</b> strike — the ball vanished into the serpent's eye like it was always meant to. A perfect kill.</p>`;
+        ? `<p style="color:#ffd08a;">🎯 Your finisher <b>clipped</b> the eye — not the pure note you meant to strike, but enough. The great eye wavered, dimmed… and slid shut all the same.</p>`
+        : `<p style="color:#9dffce;">🎯 A <b>dead-centre</b> strike — the ball vanished into the serpent's eye like it was always meant to, and the eye… closed. Not a kill. A lullaby.</p>`;
     const title = herald ? '🐍 Ragnarök — The Long Rest' : '🌌 The Reseal — The Universe is Saved';
     const tag = herald
       ? 'The serpent uncoils around the galaxy. The lights go out, one by one, into a final green silence.'
-      : 'Jörmungandr falls. The corruption scatters into harmless light.';
+      : 'Jörmungandr sleeps. The seal takes, the root goes quiet, and dawn breaks across every world you crossed.';
     const body = herald
       ? `<p>Your finisher struck true, but not to kill — to <em>release</em>. The World-Eater unwinds across
           the sky, and the lights go out one by one, into a serene and perfect stillness. The Coil hails you
           as its Herald as the last star gutters. The Universe is devoured. You tell yourself it was mercy.</p>
          <p style="color:#b0e04f;">🐍 "It is done, Herald. The old Game is over. What comes next is rest — endless, perfect, still."</p>`
-      : `<p>Your finisher found the serpent’s eye, and the world-eater came apart across the sky like a
-          shattered constellation. The Great Game is won — the galaxy will spin on, and every world you
-          crossed remembers the golfer who saved it.</p>
-         <p style="color:#7fe0a0;">🦜 "You did it, champion. You actually did it. Now — the whole galaxy is
-          open to you. Go and fly it."</p>`;
+      : `<p>Your finisher found the serpent’s eye — and the World-Eater did not break. It <em>exhaled</em>.
+          The coils loosened, the seal took hold, and Jörmungandr sank back beneath the root into a sleep
+          with no dreams in it. The Great Game is won — not with a killing blow, but with the truest shot
+          ever struck: the one that sang the end of everything back to sleep.</p>
+         <p>And yet the dawn came up one friend short. Ahead of the light, a single dark sail ran for open
+          night — <b>${fled}</b>, and what remains of the Coil, fleeing past the edge of every chart into
+          the <b>Universe Unending</b>. Whatever the whisper has left of them is out there still, in a deep
+          no Warden has ever flown.</p>
+         <p style="color:#7fe0a0;">🦜 "Let it sleep, champion. We saved everything… and I still count us one
+          short. Bringing ${fled} home will mean flying further than any chart we own — into the Universe
+          Unending itself. Not today. But when that door opens — you and I go through it together."</p>`;
     return `
       <header class="gs-hero gs-storyres">
         <h1 class="gs-hero-title">${title}</h1>

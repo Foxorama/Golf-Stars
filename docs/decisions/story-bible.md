@@ -343,16 +343,23 @@ between phases, a **golf finisher** — line up and strike the ball down the ser
 (the Game's weapon against the Un-Game). Your bought ship, weapons, engine and relics are your loadout; cursed
 gear hits harder but you're frailer.
 
-- **WARDEN ending — "The Reseal."** Whittle its coils, land the final true shot into its central eye; it
-  shudders and sinks back down the root. Dawn breaks across all the re-consecrated worlds at once; the Parrot
-  weeps; Pim salutes; you are crowned **Champion of the Great Game**, and the fairway endures another age.
+- **WARDEN ending — "The Reseal."** Whittle its coils, land the final true shot into its central eye — and
+  the World-Eater is not killed but **sung back to SLEEP**: the eye slides shut, the seal takes, and it sinks
+  back down the root to dream of nothing. Dawn breaks across all the re-consecrated worlds at once; the Parrot
+  weeps; you are crowned **Champion of the Great Game**, and the fairway endures another age. But the victory
+  is left ONE FRIEND SHORT (GS-story-unending-tease): ahead of the dawn, the betrayer and the Coil's remnant
+  flee in the last wyrm-ship past the edge of every chart — into the **UNIVERSE UNENDING**, the named unknown
+  deep (a future game mode's front door). Redeeming them will take a voyage no Warden has yet flown; the
+  ending cinematic closes on that dark sail jetting into open night.
 - **HERALD ending — "The Long Rest."** You bring the Key to *unseal* it — but the Ark and your former friends
   arrive to stop you. Defeat the Warden fleet, then present yourself. The serpent accepts you as its **Herald**,
   and the universe comes, gently and horribly, to **rest** — every ball, everywhere, still at last; a serene,
   final, green silence. A *victory* that is a grief. (Hidden falter-state: if you fail the last phase, it
   devours you first — the cult's reward for the unworthy.)
 - **LOSS is path-specific too (GS-story-endings).** There are **four** ending cinematics — path × outcome:
-  - *good-win* → **The Universe is Saved** (the serpent shatters, dawn breaks across the worlds).
+  - *good-win* → **The Reseal / The Universe is Saved** (the serpent SLEEPS — settled, resealed, its eye
+    closed — dawn breaks across the worlds, and the Coil's last wyrm-ship flees with the betrayed friend
+    toward the Universe Unending).
   - *good-lose* → **The World-Eater is Free** — the **Crow** reveals it let you win all along so you'd carry
     the Keystone and open the cage; the maw swallows the stars.
   - *cult-win* → **Ragnarök** — the serpent uncoils, the lights go out one by one, the Universe devoured.
