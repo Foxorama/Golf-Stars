@@ -25,15 +25,15 @@ h3{margin:14px 0 6px;font-size:15px;} .row{display:flex;gap:8px;} .cell{position
   import { shipInteriorTheme, shipRoomArt, shipRoomMeta } from '/src/render/shipInteriorArt.ts';
   import { SHIP_ROOMS } from '/src/ui/gameState.ts';
   import { shipById } from '/src/sim/rpg/ships.ts';
-  const ships = ['wagon-classic','racer-redline','firebird','ufo-saucer','ufo-mothership','pegasus-valkyrie','moto-nitro','chopper-thunderbolt','hauler-barge','infinity-ace'];
+  const ships = ['wagon-classic','racer-redline','firebird','ufo-saucer','ufo-mothership','pegasus-valkyrie','moto-nitro','chopper-thunderbolt','hauler-barge','infinity-ace','wyrm-ship','warden-cruiser'];
   const root = document.getElementById('root');
   for (const id of ships) {
     const t = shipInteriorTheme(id);
-    const h = document.createElement('h3'); h.textContent = shipById(id).name + '  ·  ' + t.kind; root.appendChild(h);
+    const h = document.createElement('h3'); h.textContent = shipById(id).name + '  ·  ' + t.kind + ' → ' + t.style; root.appendChild(h);
     const row = document.createElement('div'); row.className = 'row';
     for (const r of SHIP_ROOMS) {
       const c = document.createElement('div'); c.className = 'cell';
-      const m = shipRoomMeta(r, t.kind);
+      const m = shipRoomMeta(r, t.style);
       c.innerHTML = shipRoomArt(r, t) + '<span class="rl">' + m.icon + ' ' + m.label + '</span>';
       row.appendChild(c);
     }

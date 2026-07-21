@@ -15,7 +15,7 @@ import {
 import { SHIP_ROOMS } from '../src/ui/gameState';
 import { SHIPS } from '../src/sim/rpg/ships';
 
-const ALL_STYLES: CabinStyle[] = ['auto', 'disc', 'steed', 'bike', 'freighter', 'aurora'];
+const ALL_STYLES: CabinStyle[] = ['auto', 'disc', 'steed', 'bike', 'freighter', 'aurora', 'wyrm', 'radiant'];
 
 /** Rough count of balanced SVG element opens/closes so a malformed scene is caught. */
 function svgWellFormed(svg: string): boolean {
@@ -38,6 +38,21 @@ describe('ship interior cabin styles', () => {
     expect(cabinStyleOf('wagon')).not.toBe(cabinStyleOf('pegasus'));
     // an unknown kind degrades safely to the car cabin
     expect(cabinStyleOf('totally-made-up')).toBe('auto');
+  });
+
+  it('gives the route-reward hulls their bespoke cabins via per-ship overrides (GS-ship-interior-2)', () => {
+    // The herald wyrm-ship reuses a racer hull, the warden cruiser a shuttle hull — by kind alone they'd
+    // get the car cabin / freighter hold. The override hands them their own styles.
+    expect(shipInteriorTheme('wyrm-ship').style).toBe('wyrm');
+    expect(shipInteriorTheme('warden-cruiser').style).toBe('radiant');
+    // and every other ship still follows its kind fold
+    for (const s of SHIPS) {
+      if (s.id === 'wyrm-ship' || s.id === 'warden-cruiser') continue;
+      expect(shipInteriorTheme(s.id).style).toBe(cabinStyleOf(s.look.kind));
+    }
+    // meta accepts a style directly (the screens pass theme.style) — the wyrm helm is the Skull Helm
+    expect(shipRoomMeta('bridge', 'wyrm').label).toBe('Skull Helm');
+    expect(shipRoomMeta('bridge', 'radiant').label).toBe('Sanctum Helm');
   });
 
   it('renders a valid, non-trivial SVG for every ship × room', () => {
@@ -69,6 +84,8 @@ describe('ship interior cabin styles', () => {
       bike: 'moto-nitro',
       freighter: 'hauler-barge',
       aurora: 'infinity-ace',
+      wyrm: 'wyrm-ship',
+      radiant: 'warden-cruiser',
     };
     // Strip colours/ids so the comparison is about STRUCTURE, not palette.
     const skeleton = (id: string) =>
@@ -82,11 +99,11 @@ describe('ship interior cabin styles', () => {
 
   it('flavours room labels per cabin style, covering all five rooms', () => {
     for (const style of ALL_STYLES) {
-      // find a ship kind that maps to this style
-      const kind = SHIPS.map((s) => s.look.kind).find((k) => cabinStyleOf(k) === style)!;
-      expect(kind, `a ship exists for ${style}`).toBeTruthy();
+      // find a ship whose resolved theme draws this style (covers the per-ship override styles too)
+      const ship = SHIPS.find((s) => shipInteriorTheme(s.id).style === style)!;
+      expect(ship, `a ship exists for ${style}`).toBeTruthy();
       for (const room of SHIP_ROOMS) {
-        const m = shipRoomMeta(room, kind);
+        const m = shipRoomMeta(room, style);
         expect(m.label.length).toBeGreaterThan(0);
         expect(m.icon.length).toBeGreaterThan(0);
       }

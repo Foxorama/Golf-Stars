@@ -106,7 +106,7 @@ export function shipInteriorScreen(): string {
     : '';
 
   const rating = combatRating(story);
-  const meta = shipRoomMeta(room, theme.kind);
+  const meta = shipRoomMeta(room, theme.style);
 
   return `${SI_STYLE}
     <header class="gs-hero gs-storyhub" style="--ac:${theme.trim};">
@@ -125,7 +125,7 @@ export function shipInteriorScreen(): string {
         ${friendsHere}
         ${standees}
       </div>
-      ${roomNav(room, theme, theme.kind)}
+      ${roomNav(room, theme, theme.style)}
       ${panel}
     </section>
 
@@ -135,10 +135,11 @@ export function shipInteriorScreen(): string {
     ${overlay}`;
 }
 
-/** The room-navigation tab bar — walk between rooms aboard the ship. Tab labels flavour to the ship. */
-function roomNav(current: ShipRoom, theme: { trim: string }, kind: string): string {
+/** The room-navigation tab bar — walk between rooms aboard the ship. Tab labels flavour to the ship's
+ *  resolved cabin STYLE (carries the wyrm/radiant per-ship overrides, GS-ship-interior-2). */
+function roomNav(current: ShipRoom, theme: { trim: string }, style: string): string {
   const tabs = SHIP_ROOMS.map((r) => {
-    const m = shipRoomMeta(r, kind);
+    const m = shipRoomMeta(r, style);
     const on = r === current;
     return `<button class="si-tab${on ? ' si-tab--on' : ''}" ${on ? 'aria-current="page"' : ''}
         data-action='${JSON.stringify({ type: 'shipInteriorGoto', room: r })}' aria-label="${m.label}">
@@ -227,6 +228,8 @@ function crewStandee(c: Crewmate, count: number, i: number, active: boolean, has
  *  (their signature look), fanned across the floor by index. Tap → their friend talk card. */
 function friendStandeeSI(ch: Character, count: number, i: number): string {
   const left = count <= 1 ? 50 : 20 + (60 * i) / (count - 1);
+  // The figure is authored on a 72×210 frame (the clubhouse's tight golfer frame) — pass the natural
+  // height so it never squashes; the DISPLAY size is set in CSS (.si-friend svg) to human scale.
   const figure = golferPreviewSVG(undefined, undefined, undefined, {
     skin: ch.style.skin,
     shirtBase: ch.style.shirt,
@@ -234,7 +237,7 @@ function friendStandeeSI(ch: Character, count: number, i: number): string {
     hair: ch.style.hair,
     uid: `sifriend${ch.id.replace(/[^a-z0-9]/gi, '')}`,
     w: 72,
-    h: 200,
+    h: 210,
   });
   return `<button class="si-friend"
       data-action='${JSON.stringify({ type: 'storyInspectAlly', caddyId: ch.id })}'
@@ -269,7 +272,10 @@ const SI_STYLE = `<style>
   .si-friend{position:absolute;bottom:2%;background:none;border:0;padding:0;cursor:pointer;color:inherit;text-align:center;
     transform:translateX(-50%);z-index:15;transition:transform .15s ease,filter .15s ease;filter:drop-shadow(0 4px 4px #000a);}
   .si-friend:hover,.si-friend:focus-visible{outline:none;transform:translateX(-50%) scale(1.06);z-index:22;filter:drop-shadow(0 7px 6px #000b) brightness(1.06);}
-  .si-friend svg{width:26cqw;max-width:150px;height:auto;display:block;margin:0 auto;}
+  /* GS-ship-interior-2: the golfer frame is 72×210 (tall + narrow), so sizing it by the caddy WIDTH blew
+     the figures up to near the full room height (the "giant stretched golfers" bug). Size by a width that
+     yields a ~40%-of-scene standing height, matching the caddy standees' human scale. */
+  .si-friend svg{width:11cqw;max-width:64px;height:auto;display:block;margin:0 auto;}
   .si-cplate--friend{background:linear-gradient(180deg,#5a7fb0,#2f4a6e);border-color:#1b2c42;color:#eaf2ff;}
   @media(prefers-reduced-motion:reduce){.si-questmark{animation:none;}}
   /* room nav */

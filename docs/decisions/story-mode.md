@@ -758,6 +758,36 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   byte-stable (no rng, per-theme/room `si-*` gradient ids), an unknown kind degrades to `auto`. Eyeball via
   `scripts/ship-interior-preview.mjs`; guarded by `tests/ship-interior.test.ts` (fold coverage + valid/stable
   SVG per ship×room + distinct-shell-per-style). No `_gs*`/URL hook (no test-hub wiring).
+- **GS-ship-interior-2** — ✅ *shipped* (`render/shipInteriorArt.ts` + `app/shipInteriorScreens.ts`). The
+  quality pass on the player report "the character proportions are incredibly wrong and the rooms just
+  don't look cool". Three fixes:
+  1. **The buried-floor z-order bug.** Every shell painted its FLOOR in `close`, AFTER the room props — so
+     half of every scene (the saucer's pilot pod, the Pegasus nest, the plasma pool…) was silently buried
+     under the deck and rooms read as empty domes. THE RULE (comment-pinned in the file): a shell's `open`
+     paints the whole room box, walls AND floor; `close` is only a thin foreground `vignette()`. Never move
+     a floor back into `close`.
+  2. **Giant stretched golfers.** The lounge friend standees are `golferPreviewSVG` figures on the 72×210
+     clubhouse frame, but `.si-friend svg` sized them by the caddy WIDTH rule (26cqw/150px) — a tall-narrow
+     frame at that width is ~417px tall in a ~465px scene. Now sized by a width that yields a ~40%-of-scene
+     standing height (11cqw/64px), matching the caddy-canvas human scale; the figure is passed its natural
+     `h: 210` so it never squashes.
+  3. **Set-dressing pass on every room** (all styles): a large focal set piece on the floor line, contact
+     shadows (`sh()`), dark outline contrast against tinted walls, and a light source that exists in the
+     scene (windshield glow, work-lamp cone, reactor bloom).
+  Plus the FORGOTTEN route-reward hulls: the herald **Coil Wyrm-Ship** flies a `racer` hull and the warden
+  **Radiant Warden Cruiser** a `shuttle` hull, so by kind alone the living serpent got a station-wagon cabin
+  and the celestial cruiser a freighter hold. `SHIP_CABIN_OVERRIDE` (per-SHIP-ID, resolved into
+  `ShipTheme.style` by `shipInteriorTheme` → `cabinStyleForShip`) hands them two NEW bespoke styles: `wyrm`
+  (a grown serpent-gut — pale cartilage rib-vault, bioluminescent venom veins, scale-plated belly floor;
+  skull-eye viewports, a beating heart-sac, a fang array, a pulsing venom-core gland, lifted-scale lockers)
+  and `radiant` (a white-gold celestial cathedral — vaulted nave, columns of light, halo rings, deep-blue
+  sanctum floor; rose-window helm, a sunken lightwell, the winged aegis shield, a captive-sun halo drive, a
+  marble reliquary; NOTE its `gold` is `darken(trim, 0.26)` — raw `#ffe08a` trim washes out on pale marble,
+  so raw trim is reserved for the lit `goldLit` focal glows). Dispatch runs off `theme.style` everywhere
+  (`shipRoomArt`, `shipRoomMeta` accepts a style or a kind — names never collide), so a new bespoke interior
+  is an override row + a style block. Guarded by `tests/ship-interior.test.ts` (override coverage + every
+  style structurally distinct); eyeball via `scripts/ship-interior-preview.mjs` (now includes both reward
+  hulls). Pure render, byte-stable, no save/rng/`_gs*` hook.
 
 ## Phase I — the herald/sigil follow-up (player asks)
 - **GS-story-ragnarok** — ✅ *shipped* (`sim/rpg/lore.ts` + `render/sigilCeremony.ts` + tournament intros).
