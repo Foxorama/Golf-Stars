@@ -1,7 +1,7 @@
-// Eyes-on preview for the finale battle (GS-story-battle-2). Mounts mountStoryBattle non-interactively
-// (the auto-pilot fires + strikes for itself) for BOTH paths and screenshots the key states — Warden
-// assault (the mythic serpent + a telegraphed lunge), Herald assault (the golden wards + blockade lance),
-// the aim reveal (reticle on the eye / the seal), and the climaxes.
+// Eyes-on preview for the finale battle (GS-story-battle-3). Mounts mountStoryBattle non-interactively
+// (the autopilot flies + fires for itself) at several serpent-health fractions so every PHASE of the
+// R-Type fight can be screenshotted — opening assault, ACID SPRAY (75%), +LIGHTNING (50%), +VOID (25%),
+// the OVERWHELM (5%), the aim reveal and the climax — for BOTH paths.
 //   node scripts/battle-preview.mjs      (OUTDIR=/path to choose the folder)
 import { createServer } from 'vite';
 import http from 'node:http';
@@ -25,13 +25,27 @@ const html = `<!doctype html><meta charset="utf8">
 <body>
 <script type="module">
   import { mountStoryBattle } from '/src/render/storyBattle.ts';
-  window.__mount = (herald) => {
+  // A stocked arsenal (the real ids' styles/damage), hand-authored so the preview needs no StoryState.
+  const LOADOUT = {
+    weapons: [
+      { id: 'upg:weapon:scatter', name: 'SCATTER', style: 'scatter', damage: 8, cooldownMs: 1400, color: '#ffd36b', color2: '#fff2c0' },
+      { id: 'upg:weapon:railgun', name: 'RAILGUN', style: 'railgun', damage: 18, cooldownMs: 3000, color: '#ff6b5a', color2: '#fff2c0' },
+      { id: 'upg:weapon:nova', name: 'NOVA', style: 'nova', damage: 34, cooldownMs: 6200, color: '#ffd76b', color2: '#4fe0b0' },
+      { id: 'upg:weapon:starlance', name: 'LANCE', style: 'lance', damage: 34, cooldownMs: 5300, color: '#c8ecff', color2: '#ffffff' },
+    ],
+    shieldCells: 6,
+    shipSpeed: 380,
+  };
+  window.__mount = (herald, hpFrac, shipId) => {
     window.__done = false;
+    window.__handle?.destroy?.();
     window.__handle = mountStoryBattle({
       won: true,
-      tuning: { shotsToKill: 13, lungesToBreak: 10, rechargeMs: 900 },
+      loadout: LOADOUT,
+      shipId,
       interactive: false,
       herald,
+      startHpFrac: hpFrac,
       onDone: () => { window.__done = true; },
     });
   };
@@ -50,19 +64,26 @@ page.on('console', (m) => { if (m.type() === 'error') console.error('CONSOLE:', 
 await page.goto(`http://127.0.0.1:${port}/`);
 await page.waitForFunction('window.__ready === true', { timeout: 60000 });
 
-for (const herald of [false, true]) {
-  const tag = herald ? 'herald' : 'warden';
-  await page.evaluate((h) => window.__mount(h), herald);
-  await page.waitForTimeout(2600); // mid-assault, a telegraph in flight
-  await page.screenshot({ path: join(outDir, `${tag}-1-assault.png`) });
-  await page.waitForTimeout(3400); // ~6s in: damage landed / wards cracking
-  await page.screenshot({ path: join(outDir, `${tag}-2-assault-late.png`) });
-  await page.waitForTimeout(4200); // ~10.2s: past the auto deadline → the aim reveal
-  await page.screenshot({ path: join(outDir, `${tag}-3-aim.png`) });
-  await page.waitForTimeout(1600); // ~11.8s: the auto strike has landed → climax
-  await page.screenshot({ path: join(outDir, `${tag}-4-climax.png`) });
-  await page.waitForFunction('window.__done === true', { timeout: 20000 });
+/** Mount a state, wait, screenshot, tear down. */
+async function shot(name, { herald = false, hpFrac = 1, shipId, waits }) {
+  await page.evaluate(({ h, f, s }) => window.__mount(h, f, s), { h: herald, f: hpFrac, s: shipId });
+  for (const [ms, suffix] of waits) {
+    await page.waitForTimeout(ms);
+    await page.screenshot({ path: join(outDir, `${name}${suffix ? '-' + suffix : ''}.png`) });
+  }
+  await page.evaluate(() => window.__handle?.destroy?.());
 }
+
+// The Warden fight, phase by phase (hauler ship — a mid-fleet ride).
+await shot('warden-1-open', { hpFrac: 1, shipId: 'hauler-barge', waits: [[2400, '']] });
+await shot('warden-2-acid', { hpFrac: 0.74, shipId: 'hauler-barge', waits: [[3400, '']] });
+await shot('warden-3-lightning', { hpFrac: 0.48, shipId: 'hauler-barge', waits: [[3600, '']] });
+await shot('warden-4-void', { hpFrac: 0.22, shipId: 'hauler-barge', waits: [[3600, '']] });
+// The overwhelm fires as soon as the autopilot's first volley lands below 5% (waits are DELTAS).
+await shot('warden-5-overwhelm', { hpFrac: 0.055, shipId: 'hauler-barge', waits: [[3300, ''], [3200, 'aim'], [1500, 'climax']] });
+// The Herald fight (saucer): gold lances + the waking bound serpent.
+await shot('herald-1-open', { herald: true, hpFrac: 0.74, shipId: 'ufo-saucer', waits: [[3400, '']] });
+await shot('herald-2-late', { herald: true, hpFrac: 0.22, shipId: 'ufo-saucer', waits: [[3600, '']] });
 
 console.log('battle preview →', outDir);
 await browser.close();
