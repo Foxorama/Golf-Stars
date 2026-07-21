@@ -739,6 +739,25 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   clubhouse Hangar; buying a new ship already auto-equips (`buyStoryShip`), so a fresh hull's rooms show at
   once. Own `.si-*` CSS prefix (never `.gs-hud`); pure render + reducer plumbing, no rng/save bump. Deep-link
   `?screen=shipinterior` + a `tests/build.test.ts` smoke row guard the render.
+- **GS-ship-interior-variety** — ✅ *shipped* (`render/shipInteriorArt.ts` + `tests/ship-interior.test.ts`).
+  Player ask: the interiors were the SAME five-room layout just recoloured — a saucer, the Mothership and the
+  Pegasus should feel VERY different from the car cabins, not the same room in a new paint job. `cabinStyleOf`
+  folds the 11 hull `kind`s into six CABIN STYLES, each drawing its OWN shell + its own take on all five rooms:
+  `auto` (wheeled road-trip cabin — windshield, dashboard dials, steering yoke, rear-view fuzzy dice, bench
+  seat, trunk arsenal, hood-reactor, boot lockers — wagon/racer/comet/firebird), `disc` (alien saucer — domed
+  ceiling seams, circular deck ring, pilot pod, plasma pool, orbiting beam array, antigrav gyro-core, stasis
+  tubes — saucer/ufo), `steed` (the living winged Pegasus — two great wings framing open sky, saddle+reins+
+  star-mane, a nest of furs, a panoply of lances/shield, a blazing star-HEART, saddlebags — pegasus), `bike`
+  (open single-rider frame against space — roll-cage arc, handlebars, glowing hover-wheels, pit-stop neon,
+  exposed V-twin core, panniers — moto/chopper), `freighter` (industrial hauler — ribbed bulkheads, split
+  cockpit window, mess table, cargo arsenal, boxy fusion reactor, cargo-hold lockers — shuttle) and `aurora`
+  (luxury star-yacht — drifting aurora light bands, crystal helm, chandelier salon, gilded nova cannon,
+  phoenix-wing heart, treasure vault — infinity). Still tinted per-ship (`shipInteriorTheme`), so the woody
+  wagon and black-gold Firebird differ WITHIN the auto style too. Room LABELS flavour to the style
+  (`shipRoomMeta` → a Pegasus helm reads "Saddle", a saucer "Helm Pod", a bike "Handlebars"). Pure render,
+  byte-stable (no rng, per-theme/room `si-*` gradient ids), an unknown kind degrades to `auto`. Eyeball via
+  `scripts/ship-interior-preview.mjs`; guarded by `tests/ship-interior.test.ts` (fold coverage + valid/stable
+  SVG per ship×room + distinct-shell-per-style). No `_gs*`/URL hook (no test-hub wiring).
 
 ## Phase I — the herald/sigil follow-up (player asks)
 - **GS-story-ragnarok** — ✅ *shipped* (`sim/rpg/lore.ts` + `render/sigilCeremony.ts` + tournament intros).
