@@ -18,6 +18,7 @@
 import { ghostHoleStrokes, golferForm } from './competition';
 import { CHARACTERS, getCharacter } from './characters';
 import { otherGolferIds } from './storyCast';
+import { betrayerId, heraldOpponentIds, heraldSeveredId, type FriendRivalVoice } from './storyBetrayal';
 import type { OpposingPair } from './storyTeams';
 import {
   STORY_WORLDS,
@@ -49,9 +50,21 @@ export interface StoryTournament {
   venueId: string;
   name: string;
   host: string;
-  /** The rival to beat for the Sigil — an id fed to the ghost model, and a display name. */
+  /** The rival to beat for the Sigil — an id fed to the ghost model, and a display name. When
+   *  `dynamicRival` is set these are the FALLBACK only (an unstarted campaign); resolve the real rival
+   *  through `tournamentRival(t, story)` (GS-story-sigil-rivals). */
   rivalId: string;
   rivalName: string;
+  /** GS-story-sigil-rivals: the back-half rivals are PEOPLE FROM YOUR OWN STORY, not fixed NPCs — who
+   *  stands across the tee is derived from the betrayal arc (your team-Sigil partner picks + path):
+   *    • `severed`  — Ch.4 Herald: the Warden friend sent to stop you at the Drowning Rite — the SAME
+   *      friend the Severing interlude then cuts loose (rival ≡ the one you betray).
+   *    • `betrayer` — Ch.5 Warden: the friend who turned on you, in corrupted Coil garb (Venoma at
+   *      their shoulder — the matchup box shows the pair; the FEATURED rival is the traitor).
+   *    • `heraldPair` — Ch.5 Herald: the two former friends who partnered you, come to end you (the
+   *      featured rival is the first of them — the more personal face).
+   *  Absent = the static row rival (the shared trunk + Ch.4 Warden). */
+  dynamicRival?: 'severed' | 'betrayer' | 'heraldPair';
   /** How sharply the rival plays (per-hole stroke edge; scales up the deeper the chapter). */
   rivalEdge: number;
   /** LEGACY (GS-story-qualifiers): the old "clear this many worlds" gate. The tournament now opens after
@@ -183,8 +196,11 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     venueId: 'ocean-18',
     name: 'The Drowning Rite',
     host: 'Sister Ecdysis',
-    rivalId: 'penelope',
-    rivalName: 'Penelope',
+    // GS-story-sigil-rivals: the REAL rival is the friend the Order sends to stop you — resolved from your
+    // partner picks via `tournamentRival` (the same friend the Severing then cuts loose). Fallback only.
+    dynamicRival: 'severed',
+    rivalId: 'warden-champion',
+    rivalName: 'A Warden champion',
     rivalEdge: 0.23,
     unlockAfterClears: 2,
     sigilId: 'sigil-drowned',
@@ -194,10 +210,11 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     intro: [
       'You wear the Coil’s mark now, and Sister Ecdysis — the Shedmaker, who forges the cult’s cursed ' +
         'relics from serpent-scale — presides over your rite. At the Eridanus Atolls you desecrate a ' +
-        'Warden shrine to drown its wards — and the Warden sent to stop you is Penelope, whose putting ' +
-        'reads have steadied the Order’s champions for years. She does not recognise the golfer you have become.',
-      'Play the rite, put the old Warden to the sword, and take the Drowned Sigil.',
-      '🐦‍⬛ "Four Sigils, and the serpent exhales a little deeper. This is the drowning, Herald — the first world you take FOR the Long Rest instead of against it. It should feel like a sin. That feeling is how you know it is working."',
+        'Warden shrine to drown its wards — and the champion the Wardens send to stop you is {rival}, ' +
+        'your own Earth tour-mate, who answered the Parrot’s call at your side. They came alone. They ' +
+        'still believe you can be reached.',
+      'They don’t hate you. That is worse. Drown {rival}’s round, and take the Drowned Sigil.',
+      '🐦‍⬛ "Four Sigils, and the serpent exhales a little deeper. This is the drowning, Herald — the first world you take FOR the Long Rest instead of against it. And it is {rival} across the tee because it MUST be — a rite is only a rite if it costs. It should feel like a sin. That feeling is how you know it is working."',
     ],
   },
   // ── Chapter 5 — the fifth Sigil, per route (both forge the key) ──
@@ -208,6 +225,9 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     venueId: 'swamp-18',
     name: 'The Serpent’s Vigil',
     host: 'The Fairway Wardens',
+    // GS-story-sigil-rivals: the FEATURED rival is the friend who turned on you (corrupted Coil garb),
+    // with Venoma at their shoulder — the matchup box shows the pair. Fallback only.
+    dynamicRival: 'betrayer',
     rivalId: 'venoma',
     rivalName: 'Venoma "the Viper" Krait',
     rivalEdge: 0.29,
@@ -217,12 +237,12 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     prize: 'The Star-Blessed Lance — clean starfire slung under your hull, forged for the last fight. The fifth Sigil forges the key to the finale.',
     rewardUpgradeId: 'upg:weapon:starlance',
     intro: [
-      'The acid shrine of Hydra Mire, where the Coil means to complete their rite — and the friend who ' +
-        'turned on you stands with them now, in shed-scale robes, unrecognisable and grinning. Venoma is at ' +
-        'their shoulder.',
+      'The acid shrine of Hydra Mire, where the Coil means to complete their rite — and {rival}, the ' +
+        'friend who turned on you, stands with them now in shed-scale robes, familiar and wrong all at ' +
+        'once. Venoma is at their shoulder, wearing your grief like a trophy.',
       'It’s a 2-vs-2 SCRAMBLE MATCHPLAY: you and a loyal friend SHARE a ball — the best of your every shot — ' +
-        'against the traitor and the Viper sharing theirs, hole by hole, the lower team score takes it. Win ' +
-        'the match and the last Sigil is yours — and you may yet break the whisper’s hold on the one who fell.',
+        'against {rival} and the Viper sharing theirs, hole by hole, the lower team score takes it. Win ' +
+        'the match and the last Sigil is yours — and you may yet break the whisper’s hold on {rival}.',
       'Five Sigils forge the Green Key — and above the mire the sky is already cracking. Win here and Ragnarök stops at the door; the key becomes a lock you carry down to the root to seal it forever.',
     ],
   },
@@ -233,6 +253,9 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     venueId: 'derelict-18',
     name: 'The Ghost Harvest',
     host: 'The Coil',
+    // GS-story-sigil-rivals: the opposing pair are the two friends who PARTNERED you (heraldOpponentIds);
+    // the featured rival is the first of them. Fallback only.
+    dynamicRival: 'heraldPair',
     rivalId: 'driver-dan',
     rivalName: 'Driver Dan',
     rivalEdge: 0.29,
@@ -242,13 +265,14 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     prize: 'The Coil anoints you its Herald — and slings the Wyrm-Fang Cannon under your hull. The fifth Sigil forges the key to the finale.',
     rewardUpgradeId: 'upg:weapon:wyrmfang',
     intro: [
-      'The Ghost Wreck, where the Coil harvests the dead — and the friends who once played beside you have ' +
-        'come together to stop you, heartbroken and unyielding. A Coil champion takes your side; the old ' +
-        'bonds line up across the tee.',
+      'The Ghost Wreck, where the Coil harvests the dead — and {opponents}, the two friends who shared ' +
+        'your ball and trusted you with their Sigils, have come together to stop you: heartbroken, ' +
+        'unyielding, and still calling you by your name. A Coil champion takes your side; the old bonds ' +
+        'line up across the tee.',
       'It’s a 2-vs-2 SCRAMBLE MATCHPLAY: you and a Coil champion SHARE a ball — the best of your every shot — ' +
-        'against the two friends who trusted you sharing theirs, hole by hole, the lower team score takes it. ' +
+        'against {opponents} sharing theirs, hole by hole, the lower team score takes it. ' +
         'Break them and the last Sigil is yours; the rite is complete.',
-      '🐦‍⬛ "The fifth Sigil, Herald, and the Green Key is yours — not to lock the root, but to OPEN it. Ragnarök has a hand on the door now, and that hand is yours. Take it. Let the tired universe rest."',
+      '🐦‍⬛ "The fifth Sigil, Herald, and the Green Key is yours — not to lock the root, but to OPEN it. They sent the two who loved you best — the Wardens understand ceremony after all. Ragnarök has a hand on the door now, and that hand is yours. Take it. Let the tired universe rest."',
     ],
   },
 ];
@@ -263,6 +287,67 @@ export function tournamentForChapter(chapter: number, alignment?: StoryAlignment
   if (shared) return shared;
   const path = alignment ?? 'warden';
   return STORY_TOURNAMENTS.find((t) => t.chapter === chapter && t.alignment === path);
+}
+
+// ── The EFFECTIVE rival (GS-story-sigil-rivals) ────────────────────────────────────────────────────────
+
+/** The resolved rival actually standing across the tee. `golferId` is set when the rival is one of the
+ *  playable friends (draw their real figure, speak their betrayal voice); `corrupted` when they wear the
+ *  Coil garb (the Warden-path defector); `voice` picks their dialogue context. */
+export interface EffectiveRival {
+  id: string;
+  name: string;
+  golferId?: string;
+  corrupted?: boolean;
+  voice?: FriendRivalVoice;
+}
+
+/** A friend's display short-name (falls back to the raw id). */
+function friendName(id: string): string {
+  return getCharacter(id)?.shortName ?? id;
+}
+
+/**
+ * Resolve the rival for a Sigil from the player's OWN story (pure): the betrayal arc decides who stands
+ * across the tee in the back half — the rival in the competition is always who you betrayed or who
+ * betrayed you, never a stranger. Rows without `dynamicRival` (the trunk + Ch.4 Warden) return the static
+ * rival unchanged, so an unstarted/legacy campaign is byte-identical.
+ */
+export function tournamentRival(t: StoryTournament, story?: StoryState): EffectiveRival {
+  const fallback: EffectiveRival = { id: t.rivalId, name: t.rivalName };
+  if (!t.dynamicRival || !story) return fallback;
+  switch (t.dynamicRival) {
+    case 'severed': {
+      // Ch.4 Herald — the friend the Wardens send to stop you (and the one you then sever).
+      const id = heraldSeveredId(story);
+      return { id, name: friendName(id), golferId: id, voice: 'confront' };
+    }
+    case 'betrayer': {
+      // Ch.5 Warden — the friend who fell to the Coil, in corrupted garb (Venoma at their shoulder).
+      const id = betrayerId(story);
+      return { id, name: friendName(id), golferId: id, corrupted: true, voice: 'corrupt' };
+    }
+    case 'heraldPair': {
+      // Ch.5 Herald — the two former friends who partnered you; the first is the featured face.
+      const [a] = heraldOpponentIds(story);
+      return { id: a, name: friendName(a), golferId: a, voice: 'confront' };
+    }
+  }
+}
+
+/**
+ * The tournament's intro paragraphs with the story TOKENS resolved (pure): `{rival}` → the effective
+ * rival's name, `{opponents}` → the Herald finale's opposing pair ("A & B"). Static rows pass through
+ * untouched. Screens must read intros through this, never `t.intro` raw.
+ */
+export function tournamentIntroLines(t: StoryTournament, story?: StoryState): string[] {
+  const rival = tournamentRival(t, story);
+  const opponents = story
+    ? heraldOpponentIds(story)
+        .map((id) => friendName(id))
+        .join(' & ')
+    : 'your former friends';
+  return t.intro.map((p) => p.replaceAll('{rival}', rival.name).replaceAll('{opponents}', opponents));
 }
 
 /** All of a chapter's worlds (from the chapter-gated list). */
@@ -316,18 +401,20 @@ export function tournamentUnlocked(story: StoryState): boolean {
   return !!currentTournament(story);
 }
 
-/** The rival's ghost gross total over the venue's pars (deterministic from the round seed). */
-export function rivalTotal(t: StoryTournament, seed: string, pars: readonly number[]): number {
-  return rivalTotalThrough(t, seed, pars, pars.length);
+/** The rival's ghost gross total over the venue's pars (deterministic from the round seed). Pass the
+ *  resolved `rival` on a dynamic-rival Sigil (GS-story-sigil-rivals) so the ghost is the real opponent. */
+export function rivalTotal(t: StoryTournament, seed: string, pars: readonly number[], rival?: EffectiveRival): number {
+  return rivalTotalThrough(t, seed, pars, pars.length, rival);
 }
 
 /** The rival's ghost gross through the FIRST `upto` holes (deterministic; same per-hole draws as the full
  *  total, so a partial standing is consistent with the finish). Used by the halftime pop (GS-story-tournament-midpop). */
-export function rivalTotalThrough(t: StoryTournament, seed: string, pars: readonly number[], upto: number): number {
-  const form = golferForm(t.rivalId, `${seed}:form`);
+export function rivalTotalThrough(t: StoryTournament, seed: string, pars: readonly number[], upto: number, rival?: EffectiveRival): number {
+  const rivalId = rival?.id ?? t.rivalId;
+  const form = golferForm(rivalId, `${seed}:form`);
   const n = Math.max(0, Math.min(pars.length, upto));
   let total = 0;
-  for (let i = 0; i < n; i++) total += ghostHoleStrokes(t.rivalId, `${seed}:${i}`, pars[i]!, form, t.rivalEdge);
+  for (let i = 0; i < n; i++) total += ghostHoleStrokes(rivalId, `${seed}:${i}`, pars[i]!, form, t.rivalEdge);
   return total;
 }
 
@@ -365,15 +452,17 @@ export function tournamentField(
   seed: string,
   pars: readonly number[],
   protagonistId?: string,
+  rival?: EffectiveRival,
 ): FieldGolfer[] {
+  const rid = rival?.id ?? t.rivalId;
   const out: FieldGolfer[] = [
-    { id: t.rivalId, name: t.rivalName, gross: rivalTotal(t, seed, pars), kind: 'rival' },
+    { id: rid, name: rival?.name ?? t.rivalName, gross: rivalTotal(t, seed, pars, rival), kind: 'rival' },
   ];
   for (const c of CHARACTERS) {
     if (c.id === protagonistId) continue;
-    // Don't duplicate a friend who is also this tournament's named rival (rivals are cult NPCs, not the
-    // playable four — but guard anyway so the board never lists someone twice).
-    if (c.id === t.rivalId) continue;
+    // Don't duplicate a friend who is also this tournament's rival — on a dynamic-rival Sigil the rival IS
+    // one of the playable friends (GS-story-sigil-rivals), so they must never also post a friend card.
+    if (c.id === rid) continue;
     out.push({ id: c.id, name: c.shortName, gross: friendTotal(c.id, seed, pars), kind: 'friend' });
   }
   return out;
@@ -447,12 +536,17 @@ export function teamFieldPairs(t: StoryTournament, story: StoryState, partnerId:
 /** The competitor IDENTITIES for the pre-round hype (GS-story-tournament-field) — the rival + your three
  *  friends, WITHOUT grosses (no course needed yet). Used by the tournament intro/lobby to show who's in the
  *  field before you tee off. */
-export function tournamentCompetitors(t: StoryTournament, protagonistId?: string): { id: string; name: string; kind: 'rival' | 'friend' }[] {
+export function tournamentCompetitors(
+  t: StoryTournament,
+  protagonistId?: string,
+  rival?: EffectiveRival,
+): { id: string; name: string; kind: 'rival' | 'friend' }[] {
+  const rid = rival?.id ?? t.rivalId;
   const out: { id: string; name: string; kind: 'rival' | 'friend' }[] = [
-    { id: t.rivalId, name: t.rivalName, kind: 'rival' },
+    { id: rid, name: rival?.name ?? t.rivalName, kind: 'rival' },
   ];
   for (const c of CHARACTERS) {
-    if (c.id === protagonistId || c.id === t.rivalId) continue;
+    if (c.id === protagonistId || c.id === rid) continue;
     out.push({ id: c.id, name: c.shortName, kind: 'friend' });
   }
   return out;

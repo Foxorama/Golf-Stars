@@ -81,6 +81,21 @@ export function heraldOpponentIds(story: StoryState): [string, string] {
   return [others[0] ?? story.characterId, others[1] ?? story.characterId];
 }
 
+/**
+ * The friend you SEVER on the HERALD path (GS-story-sigil-rivals, pure): the one tour-mate who is NOT in
+ * the Ch.5 opposing pair — always exactly one of the three. They are the Warden champion the Order sends
+ * to stop you at the Drowning Rite (the Ch.4 Herald rival), and the same friend the Coil then makes you
+ * cut loose in "The Severing" interlude — so the rival you crush and the friend you sever are ONE person,
+ * and the two who remain are exactly the pair who come for you at the Ghost Harvest ("only two old
+ * friends remain"). Distinct picks → the friend you never partnered; same-partner-twice → the second
+ * spurned tour-mate (the trusted friend + the first spurned one keep coming at Ch.5).
+ */
+export function heraldSeveredId(story: StoryState): string {
+  const opponents = heraldOpponentIds(story);
+  const others = otherGolferIds(story);
+  return others.find((id) => !opponents.includes(id)) ?? others[0] ?? story.characterId;
+}
+
 // ── The Coil champion who partners you on the Herald finale / opposes you on the Warden finale ──────────
 
 /** The two top Coil champions (their lore-portrait / ghost ids). */
@@ -162,6 +177,12 @@ export function finaleMatchup(story: StoryState, activeGuideId?: string): Finale
 interface BetrayalVoice {
   defection: readonly string[]; // Warden: they defect to the Coil
   farewell: readonly string[]; // Herald: you betray them; they stay Warden, heartbroken
+  /** GS-story-sigil-rivals — the friend as your RIVAL across a tee, per context. `confront` = the Herald
+   *  Ch.4 Drowning Rite (they came to stop you, heartbroken, still hoping); `corrupt` = the Warden Ch.5
+   *  shrine (they defected — the Coil speaks through their swing). Each is [pre-round taunt, halftime
+   *  when they lead (brag), halftime when you lead (curse/plea)]. */
+  confront: readonly [string, string, string];
+  corrupt: readonly [string, string, string];
 }
 
 const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
@@ -174,6 +195,16 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       'I read the wind true my whole life, and I still didn’t see this coming off you. That’s the one that stings.',
       'Go on, then. I hope the stillness you’re chasing is worth the friend you spent to reach it.',
     ],
+    confront: [
+      '"The Wardens asked who would stand against you. Nobody spoke. So I did — because if it has to be anyone, it should be someone who still loves you. Aim true. I will."',
+      '"You’re pressing. I can hear it in your tempo. The friend I knew never pressed… come back, and I’ll stop having to win."',
+      '"You’re ahead. Of course you’re ahead — I taught you half of what you know. Just tell me the golfer beating me is still in there somewhere."',
+    ],
+    corrupt: [
+      '"I don’t need to read the wind anymore. There is no wind where the serpent is taking us. Only the long, still green — and you, standing in the way of everyone’s rest."',
+      '"See how quiet my ball flies now? No wind. No doubt. Nine holes more and you’ll stop fighting the stillness too."',
+      '"You’re ahead… good. GOOD. Some small part of me — the old part — hoped you would be. Don’t you dare let up now."',
+    ],
   },
   'huang-woo-hook': {
     defection: [
@@ -183,6 +214,16 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
     farewell: [
       'I was your HYPE MAN. I’d have followed you onto any tee in any sky — but not this one. Not for this.',
       'I’m not clapping. For the first time in my life, I’ve got nothing to shout. Look what you did to me.',
+    ],
+    confront: [
+      '"No gallery today. No noise. Just you, me, and the water you want to drown this world under. I came because your hype man is the only one who can still reach you — so REACH."',
+      '"I’m beating you and I HATE it! Do you understand? I have waited my whole life to beat you and it was never supposed to feel like this!"',
+      '"There you are! THAT swing — that’s my friend’s swing! Keep hitting it like that and maybe you’ll remember whose side you’re on!"',
+    ],
+    corrupt: [
+      '"You want to know the secret? The serpent’s gallery never stops roaring. Never! I just had to stop caring who it was roaring FOR. Tee it up — the noise is on my side now."',
+      '"HA! Hear that hum in the mire? That’s for ME now. Nine more holes and even you will want to kneel and listen."',
+      '"Stop WINNING! You’re making the noise go quiet and I can’t— I won’t go back to the quiet. SWING SOFTER!"',
     ],
   },
   'longshot-larry': {
@@ -194,6 +235,16 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       'I’d have climbed into any bunker on any rock in the galaxy for you. Any but this one.',
       'You went QUIET, and that’s how I knew — I lost me best mate a long way back, before we ever teed it up here.',
     ],
+    confront: [
+      '"They told me not to come alone, mate. Came alone anyway. Figured if me best mate’s gonna drown a world, the least I can do is make ’em beat me first. Rip it. I’m not moving."',
+      '"I’m up on ya. First time ever, and it’s the worst day of me life. Concede, eh? Come home. Noodles on Woo, bunkers on me."',
+      '"Course you’re beating me. You always beat me. So beat THIS out of yourself while you’re at it — the mate I know is still swinging in there."',
+    ],
+    corrupt: [
+      '"The void kept every ball I ever fed it, mate. Reckon it’s time I went and got ’em back — all of ’em, and everything else besides. Stand clear or get carried."',
+      '"Longest front nine of me life, and every yard of it went MY way. The serpent likes a big send. Sit down, mate."',
+      '"You’re ahead?! Good on ya… no. NO. Forget I said that. Grip it and rip it, serpent’s orders. I’m coming for the back nine."',
+    ],
   },
   'backspin-bo': {
     defection: [
@@ -203,6 +254,16 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
     farewell: [
       'I read greens for a living, and I read the dark growing in you hole by hole. I kept waiting for the line to turn back toward the light.',
       'It didn’t turn. I’m sorry — for you, not for me. Goodbye.',
+    ],
+    confront: [
+      '"I read this green a hundred times on the flight out, hoping the line would break your way. It never did. So I’m here — the last still thing between you and the drowning. Play me true."',
+      '"Your putts are dying low. They always die low when you’re ashamed. I’m ahead because you can’t look at what you’re doing — so LOOK at it."',
+      '"You’re winning. Even now, you’re winning. That’s what breaks my heart — all that grace, spent on THIS."',
+    ],
+    corrupt: [
+      '"I told you once: the ball always tells you the truth if you wait. I waited. The truth is rest — every ball, every world, still at last. Let me show you the final read."',
+      '"Feel the mire pulling every putt toward the centre? That’s not break. That’s the truth, settling. Nine holes and you’ll stop fighting it."',
+      '"Still ahead of me… you always could out-play my quiet. Then hear the old me, one last time: don’t stop. Whatever I say on the back nine — don’t stop."',
     ],
   },
 };
@@ -215,11 +276,40 @@ export function betrayalDefection(charId: string): readonly string[] {
 export function betrayalFarewell(charId: string): readonly string[] {
   return BETRAYAL_VOICE[charId]?.farewell ?? ['After everything we played through — this is how it ends. I hope it was worth it.'];
 }
-/** Every playable golfer has a distinct betrayal voice (defection + farewell) — a coverage invariant. */
+
+/** GS-story-sigil-rivals: a friend-rival's voice CONTEXT — a heartbroken Warden barring your way (Herald
+ *  Ch.4) vs the corrupted defector across the shrine tee (Warden Ch.5). */
+export type FriendRivalVoice = 'confront' | 'corrupt';
+
+const FALLBACK_RIVAL_LINES: Record<FriendRivalVoice, readonly [string, string, string]> = {
+  confront: [
+    '"The Wardens sent me because no one else could bear to come. Play me true — it’s the last thing I’ll ever ask of you."',
+    '"I’m ahead, and I’d trade every hole of it to have you back. Concede the round. Come home."',
+    '"You’re still better than me. Then be better than THIS."',
+  ],
+  corrupt: [
+    '"The Coil showed me the end of every line, and every one comes to rest. Stand aside, or be played through."',
+    '"Feel the mire pulling? Nine holes more and you’ll stop fighting it."',
+    '"You’re ahead… the old me would have been proud. Don’t let up now."',
+  ],
+};
+
+/** The pre-round TAUNT a friend-rival gives across the tee, in their own voice, per context. */
+export function friendRivalTaunt(charId: string, voice: FriendRivalVoice): string {
+  return (BETRAYAL_VOICE[charId]?.[voice] ?? FALLBACK_RIVAL_LINES[voice])[0];
+}
+/** The halftime line — the friend-rival BRAGS/pleads when ahead, or CURSES/hopes when you lead. */
+export function friendRivalHalftime(charId: string, voice: FriendRivalVoice, brag: boolean): string {
+  const lines = BETRAYAL_VOICE[charId]?.[voice] ?? FALLBACK_RIVAL_LINES[voice];
+  return brag ? lines[1] : lines[2];
+}
+
+/** Every playable golfer has a distinct betrayal voice (defection + farewell + both rival contexts) — a
+ *  coverage invariant. */
 export function everyGolferHasBetrayalVoice(): boolean {
   return CHARACTERS.every((c) => {
     const v = BETRAYAL_VOICE[c.id];
-    return !!v && v.defection.length >= 2 && v.farewell.length >= 2;
+    return !!v && v.defection.length >= 2 && v.farewell.length >= 2 && v.confront.length === 3 && v.corrupt.length === 3;
   });
 }
 

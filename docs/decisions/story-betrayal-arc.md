@@ -124,6 +124,24 @@ the corrupted one; the former friends stay clean Warden.
   (Warden, corrupted portrait) / caddy-quest-keyed severing (Herald); four distinct `BETRAYAL_VOICE`s.
 - **GS-story-charquests** — ✅ each friend's signature quest, unlocked by partnering them; `charquest:<id>`
   reward on their talk card (no save bump).
+- **GS-story-sigil-rivals** — ✅ (2026-07-21) the back-half Sigil RIVALS are the betrayal-arc people, never a
+  mismatched NPC (player report: "in Sigil 4 the Herald rival is Penelope, but the dialogue is about your
+  betrayed friend"). `StoryTournament.dynamicRival` (`severed`/`betrayer`/`heraldPair`) + the pure
+  `tournamentRival(t, story)` resolve who actually stands across the tee: **Ch.4H** = the SEVERED friend —
+  the new `heraldSeveredId` (the one tour-mate NOT in `heraldOpponentIds`), so the rival you crush at the
+  Drowning Rite IS the friend the Severing interlude then cuts loose (`interludeFriend`'s Herald branch now
+  reads it too — in the same-partner-twice case the trusted friend is preserved for the Ghost Harvest);
+  **Ch.5W** = the corrupted BETRAYER (Venoma at their shoulder — matches the matchup box + `finaleMatchup`);
+  **Ch.5H** = the lead former friend-partner. The effective rival feeds the ghost totals
+  (`rivalTotal*`/`tournamentField`/`tournamentCompetitors` take an optional `rival`), the singles-match
+  resolver, the halftime pop (payload carries `rivalGolferId`/`rivalVoice`/`rivalCorrupted`), the lobby
+  (their real golfer figure, Coil-tinted when corrupted; relationship label "Your friend — barring your
+  way" / "lost to the Coil"), the clubhouse/star-map banners and the mission log. Dialogue is
+  per-character: `BETRAYAL_VOICE` gained `confront` (heartbroken Warden friend) + `corrupt` (Coil-garbed
+  defector) triples — [taunt, halftime-brag, halftime-curse] in each golfer's established voice
+  (`friendRivalTaunt`/`friendRivalHalftime`, coverage machine-checked). Intros carry `{rival}`/`{opponents}`
+  tokens resolved by `tournamentIntroLines(t, story)` (screens must never read `t.intro` raw; a test proves
+  no token survives). Trunk + Ch.4W rows have no `dynamicRival` → byte-identical; no save bump.
 - **GS-story-betrayal-polish** — balance re-tune (the finale + team-major edges), any dialogue-depth follow-up,
   constitution/roadmap docs.
 

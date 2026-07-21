@@ -14,7 +14,7 @@
 
 import { CHARACTERS, getCharacter, type Character } from './characters';
 import { otherGolfers } from './storyCast';
-import { betrayerId, betrayalDefection, betrayalFarewell } from './storyBetrayal';
+import { betrayerId, heraldSeveredId, betrayalDefection, betrayalFarewell } from './storyBetrayal';
 import { heraldQuestHook } from './storyQuests';
 import { addCredits, type StoryState, type StoryAlignment } from './story';
 
@@ -76,11 +76,14 @@ export function interludeSeen(story: StoryState, alignment: StoryAlignment): boo
   return story.seenStoryBeats[interludeBeatId(alignment)] === true;
 }
 
-/** The "friend" of the interlude — the BETRAYER (the odd one out of your team-Sigil partner picks). Now
- *  consistent with the finale (the beat is the DEFECTION reveal, not "win them back"). Falls back to your
- *  first tour-mate when no team Sigil is on record. */
+/** The "friend" of the interlude. WARDEN: the BETRAYER (the odd one out of your team-Sigil partner picks)
+ *  — the beat is the DEFECTION reveal. HERALD (GS-story-sigil-rivals): the friend you SEVER — the SAME
+ *  friend whose round you just drowned at the Drowning Rite (`heraldSeveredId`), so the rival you crushed
+ *  and the friend the Coil makes you cut loose are one person, and the two who remain are exactly the pair
+ *  who come for you at the Ghost Harvest. Falls back to your first tour-mate when no team Sigil is on record. */
 export function interludeFriend(story: StoryState): Character {
-  return getCharacter(betrayerId(story)) ?? otherGolfers(story)[0] ?? CHARACTERS[0]!;
+  const id = story.alignment === 'herald' ? heraldSeveredId(story) : betrayerId(story);
+  return getCharacter(id) ?? otherGolfers(story)[0] ?? CHARACTERS[0]!;
 }
 
 /**
@@ -110,13 +113,15 @@ export function interludeScene(story: StoryState): InterludeScene {
     };
   }
   // HERALD — the caddy-quest thread (the user's ask): the Coil pulls on the club a friend once gave you.
+  // GS-story-sigil-rivals: `name` IS the rival whose round you just drowned at the Drowning Rite — the
+  // severing lands on the eighteenth green of the round you took from them, not on some third party.
   const hook = heraldQuestHook(story);
   const [f0, f1] = betrayalFarewell(betrayer.id);
   const coilOpen = hook
     ? hook.stillUsing
-      ? `Cut it loose, Herald. You still swing ${hook.clubName} — ${hook.caddyName}’s gift, pressed into your hands when you were still someone they could be proud of. ${name} is the same kind of anchor. Let go of both.`
-      : `You benched ${hook.caddyName}’s gift long ago — ${hook.clubName} gathers dust in the locker. Good. ${name} is the last cord. Cut it too.`
-    : `The seal will not break while you hold on to who you were, Herald. ${name} is an anchor. Let it go.`;
+      ? `${name} came alone to stop you, and you drowned their round. Now finish it. You still swing ${hook.clubName} — ${hook.caddyName}’s gift, pressed into your hands when you were still someone they could be proud of. ${name} is the same kind of anchor. Let go of both.`
+      : `${name} came alone to stop you, and you drowned their round. You benched ${hook.caddyName}’s gift long ago — ${hook.clubName} gathers dust in the locker. Good. ${name} is the last cord. Cut it too.`
+    : `${name} came alone to stop you, and you drowned their round. But the seal will not break while you hold on to who you were, Herald. ${name} is an anchor. Let it go.`;
   return {
     corrupt: false,
     lines: [
@@ -128,8 +133,8 @@ export function interludeScene(story: StoryState): InterludeScene {
     ],
     outcome:
       hook && hook.stillUsing
-        ? `You leave ${name} behind. ${hook.clubName} is suddenly heavy in the bag — ${hook.caddyName}’s gift, swung now by a stranger. The Coil’s blood-money is heavier still. You tell yourself that’s strength.`
-        : `You leave ${name} behind and do not look back. The Coil’s blood-money is heavy in the hold. Something in you is quieter now — you tell yourself that’s strength.`,
+        ? `You leave ${name} standing on the green of the round you drowned. ${hook.clubName} is suddenly heavy in the bag — ${hook.caddyName}’s gift, swung now by a stranger. The Coil’s blood-money is heavier still. You tell yourself that’s strength.`
+        : `You leave ${name} standing on the green of the round you drowned, and do not look back. The Coil’s blood-money is heavy in the hold. Something in you is quieter now — you tell yourself that’s strength.`,
   };
 }
 

@@ -803,7 +803,8 @@ describe('The Choice + alignment fork (GS-story-chapters)', () => {
     const recap = {
       ...initState('seed', {}, undefined, story),
       screen: 'storyTournamentResult' as const,
-      lastStoryTournament: { chapter: 4, name: 'The Drowning Rite', sigilName: 'The Drowned Sigil', prize: '', rivalName: 'Penelope', playerGross: 70, rivalGross: 72, won: true, finalSigil: false },
+      // GS-story-sigil-rivals: the Drowning Rite rival is the severed FRIEND (here: Woo, the first tour-mate).
+      lastStoryTournament: { chapter: 4, name: 'The Drowning Rite', sigilName: 'The Drowned Sigil', prize: '', rivalName: 'Woo', playerGross: 70, rivalGross: 72, won: true, finalSigil: false },
     };
     const interlude = reduce(recap, { type: 'storyTournamentContinue' });
     expect(interlude.screen).toBe('storyInterlude');

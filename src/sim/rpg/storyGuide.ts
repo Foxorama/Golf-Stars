@@ -20,6 +20,7 @@ import {
 import {
   currentTournament,
   tournamentForChapter,
+  tournamentRival,
   chapterQualifiersMet,
 } from './storyTournaments';
 import { QUALIFY_EVENTS_NEEDED, qualifyTop } from './storyQualifiers';
@@ -82,7 +83,8 @@ export function storyObjective(story: StoryState): StoryObjective {
   // A chapter tournament is ready to enter (enough worlds cleared).
   const ready = currentTournament(story);
   if (ready) {
-    const rival = ready.rivalName.split(' ')[0];
+    // GS-story-sigil-rivals: name the EFFECTIVE rival (the betrayal-arc friend on the back-half Sigils).
+    const rival = tournamentRival(ready, story).name.split(' ')[0];
     return {
       ...base,
       stage: 'tournament',

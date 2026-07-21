@@ -16,7 +16,7 @@ import { shipById } from '../sim/rpg/ships';
 import { earthClubhouseSceneHTML, golferInspectOverlayHTML } from '../render/storyClubhouse';
 import { spaceportSceneHTML } from '../render/storySpaceport';
 import { STORY_CHAPTER_COUNT, PROLOGUE_COURSE_ID, worldCleared, type StoryState } from '../sim/rpg/story';
-import { currentTournament, tournamentForChapter } from '../sim/rpg/storyTournaments';
+import { currentTournament, tournamentForChapter, tournamentRival } from '../sim/rpg/storyTournaments';
 import { finaleUnlocked } from '../sim/rpg/storyFinale';
 import { worldHasShop } from '../sim/rpg/storyShop';
 import { worldIsShipVendor } from '../sim/rpg/storyShips';
@@ -230,7 +230,7 @@ function tournamentBannerHTML(story: StoryState): string {
       <button class="gs-btn" style="background:linear-gradient(180deg,#2a2410,#1c1808);border-color:#6a5320;color:#ffe6a6;text-align:left;padding:12px 16px;"
         data-action='${JSON.stringify({ type: 'openStoryTournament' })}'>
         <div style="font-size:15px;font-weight:800;">🏆 ${t.name} — now open</div>
-        <div style="font-size:12px;color:#d8c089;font-weight:600;margin-top:2px;">Play for ${t.sigilName} · your rival ${t.rivalName.split(' ')[0]} awaits</div>
+        <div style="font-size:12px;color:#d8c089;font-weight:600;margin-top:2px;">Play for ${t.sigilName} · ${tournamentRival(t, story).name.split(' ')[0]} awaits</div>
       </button>
     </section>`;
 }
