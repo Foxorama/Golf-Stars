@@ -13,7 +13,7 @@
 
 import { state } from './ctx';
 import { shipById } from '../sim/rpg/ships';
-import { shipInteriorTheme, shipRoomArt, SHIP_ROOM_META } from '../render/shipInteriorArt';
+import { shipInteriorTheme, shipRoomArt, shipRoomMeta } from '../render/shipInteriorArt';
 import { SHIP_ROOMS, type ShipRoom } from '../ui/gameState';
 import { crewRoster, allyName } from '../sim/rpg/storyAllies';
 import { heraldCrew } from '../sim/rpg/storyHeraldCrew';
@@ -106,7 +106,7 @@ export function shipInteriorScreen(): string {
     : '';
 
   const rating = combatRating(story);
-  const meta = SHIP_ROOM_META[room];
+  const meta = shipRoomMeta(room, theme.kind);
 
   return `${SI_STYLE}
     <header class="gs-hero gs-storyhub" style="--ac:${theme.trim};">
@@ -125,7 +125,7 @@ export function shipInteriorScreen(): string {
         ${friendsHere}
         ${standees}
       </div>
-      ${roomNav(room, theme)}
+      ${roomNav(room, theme, theme.kind)}
       ${panel}
     </section>
 
@@ -135,10 +135,10 @@ export function shipInteriorScreen(): string {
     ${overlay}`;
 }
 
-/** The room-navigation tab bar — walk between rooms aboard the ship. */
-function roomNav(current: ShipRoom, theme: { trim: string }): string {
+/** The room-navigation tab bar — walk between rooms aboard the ship. Tab labels flavour to the ship. */
+function roomNav(current: ShipRoom, theme: { trim: string }, kind: string): string {
   const tabs = SHIP_ROOMS.map((r) => {
-    const m = SHIP_ROOM_META[r];
+    const m = shipRoomMeta(r, kind);
     const on = r === current;
     return `<button class="si-tab${on ? ' si-tab--on' : ''}" ${on ? 'aria-current="page"' : ''}
         data-action='${JSON.stringify({ type: 'shipInteriorGoto', room: r })}' aria-label="${m.label}">
