@@ -497,11 +497,13 @@ export function reduce(state: UiState, action: Action): UiState {
       // world you just finished, before you leave). Deliberately NOT from the clubhouse: a per-world shop
       // keeps the galaxy big — if you can't afford or skip an item, you fly back to that world for it.
       // Guarded to a campaign + a cleared, shoppable world. Records the origin so exiting returns there.
-      if ((state.screen !== 'starTour' && state.screen !== 'storyResult') || !state.story) return state;
+      // GS-story-shop-crossnav: also reachable from the SHIPYARD at the same world (the two services link to
+      // each other so you don't fly back to the map between them).
+      if ((state.screen !== 'starTour' && state.screen !== 'storyResult' && state.screen !== 'storyShipyard') || !state.story) return state;
       if (!worldCleared(state.story, action.worldId) || !worldHasShop(action.worldId)) return state;
       // GS-story-shop-routing: the Pro Shop always returns to the STAR MAP (fly on), whether opened from the
-      // star-map dossier (revisit) or the world-clear RECAP (first-time). Both entry screens are the map's
-      // orbit, so a first-time clear no longer dumps you back at the clubhouse (the reported bug).
+      // star-map dossier (revisit), the world-clear RECAP (first-time), or the shipyard cross-link — every
+      // origin is one tap from the map, so exiting always lands there (loop-free, no service back-stack).
       const storyShopReturn: Screen = 'starTour';
       return { ...state, screen: 'storyShop', storyShopWorldId: action.worldId, storyShopReturn, storyItemInspectId: undefined };
     }
@@ -517,7 +519,9 @@ export function reduce(state: UiState, action: Action): UiState {
       // Per-world + travel-back, like every other purchase — spend credits, keep them, first hire carries
       // the bag by default. Guarded to the world actually hosting THIS caddy so a stray dispatch can't hire.
       if (!state.story) return state;
-      if (state.screen !== 'starTour' && state.screen !== 'storyResult' && state.screen !== 'storyShop') return state;
+      // GS-story-shop-crossnav: recruit the world's caddy from its Pro Shop OR its Shipyard too, not only the
+      // star-map dossier / clear recap.
+      if (state.screen !== 'starTour' && state.screen !== 'storyResult' && state.screen !== 'storyShop' && state.screen !== 'storyShipyard') return state;
       // GS-story-quality (GAP1): a Herald can't recruit the Warden friends they turned against (Dan &
       // Penelope are rivals to crush on the dark path) — the recruit UI is hidden, and a stray dispatch
       // is refused here too.
@@ -734,9 +738,11 @@ export function reduce(state: UiState, action: Action): UiState {
       // ship only, NO buying). Records the origin so exiting returns there.
       const wid = action.worldId;
       if (wid) {
-        if ((state.screen !== 'starTour' && state.screen !== 'storyResult') || !state.story) return state;
+        // GS-story-shop-crossnav: also reachable from the PRO SHOP at the same world.
+        if ((state.screen !== 'starTour' && state.screen !== 'storyResult' && state.screen !== 'storyShop') || !state.story) return state;
         if (!worldCleared(state.story, wid) || !worldIsShipVendor(wid)) return state;
-        const back: Screen = state.screen === 'starTour' ? 'starTour' : 'story';
+        // Return to the map from the map/shop cross-links; the recap origin still returns to the clubhouse.
+        const back: Screen = state.screen === 'storyResult' ? 'story' : 'starTour';
         return { ...state, screen: 'storyShipyard', storyShipyardWorldId: wid, storyShipyardReturn: back, storyItemInspectId: undefined };
       }
       if (state.screen !== 'story' || !state.story) return state;
