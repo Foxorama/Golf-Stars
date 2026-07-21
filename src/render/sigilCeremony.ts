@@ -103,6 +103,17 @@ export interface SerpentAnchors {
   headAng: number;
 }
 
+/**
+ * How far the serpent's great eye is open, 0 (sealed) → 1 (wide) — PURE, the one source `paintSerpent`
+ * reads (GS-story-serpent-eye). The ceremonies drive `wake = sigils/5`, so the eye tracks the campaign:
+ * sealed at one Sigil, the barest sliver at two, visibly CRACKED at three (the caption's "eye cracks
+ * open"), half-lidded and looking back at four — and the fifth Sigil's head-cut (`focusHead`) opens it
+ * wide. Monotone in both inputs (machine-checked), so the teasers' slow opening can never regress.
+ */
+export function serpentEyeOpen(wake: number, focusHead: number): number {
+  return clamp01(focusHead * 1.05 + Math.max(0, wake - 0.3) * 1.0);
+}
+
 export function paintSerpent(
   ctx: CanvasRenderingContext2D,
   CX: number,
@@ -237,11 +248,13 @@ function drawSerpentHead(
     x: neck.x + fx * a + nx * u,
     y: neck.y + fy * a + ny * u,
   });
-  // The maw + eye stay SHUT while it merely stirs (the non-final sigils, focusHead=0) and only open on the
-  // FINAL reveal as the camera cuts to the head — the eye opening is the fifth-Sigil payoff. A touch of `wake`
-  // past ~0.6 adds the faintest life to a restless serpent, but never a fully open eye off the reveal.
+  // The maw stays SHUT while it merely stirs and only gapes on the FINAL reveal; the EYE, though, opens
+  // SLOWLY across the ceremonies (GS-story-serpent-eye) — sealed through the first teaser, a sliver at the
+  // second, visibly cracked at the third ("the World-Eater's eye cracks open"), half-lidded and looking back
+  // at the fourth — so the teaser captions and the drawn head finally agree. The full wide-open glare is
+  // still the fifth-Sigil focus payoff (and the battle's wide-awake serpent).
   const gape = clamp01(focusHead * 0.95 + Math.max(0, wake - 0.62) * 0.4);
-  const eyeOpen = clamp01(focusHead * 1.05 + Math.max(0, wake - 0.6) * 0.18);
+  const eyeOpen = serpentEyeOpen(wake, focusHead);
   const litR = 60 + wake * 40;
   const litG = 168 + wake * 60;
 
@@ -417,6 +430,9 @@ function drawSerpentHead(
   const hx = eye.x;
   const hy = eye.y;
   const eyeR = H * (0.4 + focusHead * 0.16);
+  // Lid APERTURE tracks eyeOpen hard (GS-story-serpent-eye): a cracked eye is a genuine narrow slit,
+  // a watching eye half-lidded, the reveal wide — so the slow opening reads across the teasers.
+  const aper = 0.16 + eyeOpen * 0.84;
   if (eyeOpen > 0.04) {
     // outer glow
     const eg = ctx.createRadialGradient(hx, hy, 2, hx, hy, eyeR * 1.7);
@@ -430,7 +446,7 @@ function drawSerpentHead(
     // eyeball clipped to the lid aperture (opens with eyeOpen)
     ctx.save();
     ctx.beginPath();
-    ctx.ellipse(hx, hy, eyeR, eyeR * (0.5 + eyeOpen * 0.5), headAng, 0, 6.283);
+    ctx.ellipse(hx, hy, eyeR, eyeR * aper, headAng, 0, 6.283);
     ctx.clip();
     const sg = ctx.createRadialGradient(hx - nx * eyeR * 0.3, hy - ny * eyeR * 0.3, 1, hx, hy, eyeR);
     sg.addColorStop(0, '#eafff0');
@@ -475,16 +491,16 @@ function drawSerpentHead(
     ctx.fill();
     ctx.restore();
   }
-  // heavy upper lid / brow rim casting over the eye
+  // heavy upper lid / brow rim casting over the eye — traces the aperture, so it narrows with the lids
   ctx.strokeStyle = `rgba(${20 + wake * 20},${70 + wake * 30},52,1)`;
   ctx.lineWidth = 3 + focusHead * 3 + H * 0.04;
   ctx.beginPath();
-  ctx.ellipse(hx, hy, eyeR + 2, eyeR * (0.6 + eyeOpen * 0.5), headAng, Math.PI, Math.PI * 2);
+  ctx.ellipse(hx, hy, eyeR + 2, eyeR * (aper + 0.08), headAng, Math.PI, Math.PI * 2);
   ctx.stroke();
   // lower lid
   ctx.lineWidth = 2 + focusHead * 2;
   ctx.beginPath();
-  ctx.ellipse(hx, hy, eyeR + 1, eyeR * (0.6 + eyeOpen * 0.5), headAng, 0, Math.PI);
+  ctx.ellipse(hx, hy, eyeR + 1, eyeR * (aper + 0.08), headAng, 0, Math.PI);
   ctx.stroke();
   // the closed slit line when nearly shut
   if (eyeOpen < 0.4) {

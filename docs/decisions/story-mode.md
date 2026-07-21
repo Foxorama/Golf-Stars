@@ -429,6 +429,50 @@ Ordered so each ships something playable and nothing lands before its foundation
   Render + pure-sim tuning + one reducer param; no save bump, no sim rng, no `_gs*`/URL hook (no test-hub
   wiring). Guarded by the extended `tests/story-finale.test.ts` + the repelled/clamp flow in
   `tests/story-flow.test.ts` + the existing finale browser smoke (mount → interactive hold → skip → win).
+  **SUPERSEDED by GS-story-battle-3** — the tap-to-fire/veer cinematic, `finaleBattleTuning`, and the
+  Herald's three-ward stage are gone; the anchors/held-pose/seal/gate-clamp machinery carried forward.
+
+- **GS-story-battle-3** — ✅ *shipped* (the R-Type finale; player report: "doesn't use the art styling or
+  assets, difficulty trivially outclassed at purple+, one fire button for a whole arsenal, and the battle
+  ignores 'high quality or don't do it'"). The battle-2 tap-parry cinematic became a REAL sequence fight:
+  1. **Your ship is the fighter.** The equipped story ship's real `shipSVG` art is rasterized at mount
+     (SVG → data-URL → Image, first-frame; a vector dart covers the load gap) and flown with a
+     hull-hugging shield bubble, canvas thrust flame and bank-into-the-turn. **TAP THE FIELD to fly
+     there** (speed = `FinaleLoadout.shipSpeed`, engine-scaled) — dodging is real navigation with a
+     fading destination ring, `SHIP_R` collision circle deliberately smaller than the drawn hull
+     (player-friendly).
+  2. **Every weapon is its own HUD trigger.** The bottom bar seats one deep button per owned weapon
+     upgrade (`FinaleLoadout.weapons` — scatter/railgun/nova/lance/wyrmfang, distinct canvas glyphs +
+     projectile painters, cooldown sweep, hotkeys 1–5). Damage = the upgrade's shipyard `battle` rating
+     (the readiness number made literal); the star-blessed LANCE is a hitscan beam.
+  3. **The fight is the sim's phase script** (`FINALE_PHASES` — see the storyFinale.ts header): 75%
+     health opens the ACID SPRAY (slow `ACID_SPEED` globes you fly around), 50% adds LIGHTNING
+     (full-width telegraphed lines, `BOLT_TELEGRAPH_MS` warning — leave the line), 25% adds VOID BLASTS
+     (orbs that detonate into expanding rings), and at 5% the OVERWHELM — a scripted ~5s barrage whose
+     `FINALE_OVERWHELM_HITS` strikes are undodgeable BY DESIGN (arrive with shields or be driven back);
+     each phase turn regens one cell (the breather) + banners its warning. Phases key off HEALTH, so a
+     maxed arsenal shortens the fight but never skips the gauntlet — the answer to "purple+ outclasses
+     the requirement 3×" (the gates are now clearance, the FIGHT is the difficulty). Survive the
+     overwhelm → the aim reveal + golf finisher (unchanged machinery: held pose, sweep reticle,
+     clean/graze, Herald seal). Under-breach the hide holds at `FINALE_HOPELESS_FLOOR_FRAC` and the
+     ship is driven off by the deadline.
+  4. **Backdrop at star-map quality**: three parallax starfield layers (seeded mulberry32), nebula
+     washes, a distant ringed world, corruption haze; screen-shake + impact bursts sell the hits.
+     The HERALD variant re-skins the same gauntlet (gold "blockade lance" bolts, lime venom, the bound
+     serpent visibly WAKING as its health falls, `THE BOUND WORLD-EATER` bar) — one engine, two fights.
+  The reducer contract is UNCHANGED (`engageStoryFinale` outcome clamped under the gate verdict; an armed
+  battle-loss is `repelled`, costless). App wiring passes `finaleLoadout(story)` + `equippedShipId` and
+  owns the SFX hooks (`onFire`/`onShipHit`/`onPhase` → sfx; the overlay stays node-clean). The briefing
+  quotes the SAME loadout the fight consumes (per-weapon dmg/recharge rows, `finaleAssaultSeconds`,
+  shield cells vs the overwhelm's cost). `startHpFrac` is a PREVIEW-ONLY opt for
+  `scripts/battle-preview.mjs` (autopilot, per-phase screenshots, both paths). Guarded by the rewritten
+  `tests/story-finale.test.ts` (per-weapon loadout, monotone cooldowns/cells, kill-time bounds 60–180s
+  floor / 25–90s maxed, overwhelm coverable at the survive floor, phases descend, hopeless floor above
+  the overwhelm) + the unchanged finale browser smoke. Sibling **GS-story-serpent-eye**
+  (sigilCeremony.ts): the teaser captions promised an eye that "cracks open" at Sigil 3 — the pure
+  `serpentEyeOpen(wake, focusHead)` (monotone, machine-checked) + a hard lid-aperture track now make the
+  eye SLOWLY open across the five ceremonies (sealed → sliver → cracked → watching → wide), and give the
+  battle serpent its wide-awake glare.
 
 **Phase G — Polish**
 - **GS-story-beats** — ✅ *shipped* (the story-round dialogue beats). Campaign NPC scenes threaded through

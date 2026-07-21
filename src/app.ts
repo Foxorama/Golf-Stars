@@ -101,7 +101,7 @@ import { mountStoryBattle } from './render/storyBattle';
 import { mountSigilCeremony } from './render/sigilCeremony';
 import { mountStoryEnding, endingVariant } from './render/storyEnding';
 import { betrayerName } from './sim/rpg/storyBetrayal';
-import { finaleResult, finaleBattleTuning } from './sim/rpg/storyFinale';
+import { finaleResult, finaleLoadout } from './sim/rpg/storyFinale';
 import { loreScreen } from './app/loreScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
@@ -2611,14 +2611,15 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-story-finale-engage]').forEach((el) => {
     el.addEventListener('click', () => {
       resumeAudio();
-      // GS-story-battle-2: "Engage" plays the INTERACTIVE two-stage battle — Stage 1 you FIRE (tap) between
-      // the serpent's telegraphed strikes and VEER (tap the telegraph) to dodge them; Stage 2 is the golf
-      // FINAL STRIKE (the eye / the Herald's seal). Whether you CAN win is still the deterministic arm-up
-      // verdict (`won`, the two gates — an under-armed ship can't drop it, the hide holds by construction),
-      // but an ARMED ship that fights badly can now LOSE the live fight — it is merely REPELLED (a costless
-      // rematch), so the battle has stakes without ever walling progress. The whole fight is tuned by the
-      // pure `finaleBattleTuning` (weapons → volleys to kill, engines+shields → strikes absorbed, engines →
-      // recharge speed), so every upgrade past the floor measurably improves the real fight.
+      // GS-story-battle-3: "Engage" plays the INTERACTIVE sequence battle — you FLY your equipped ship
+      // (tap the field to move), FIRE each owned weapon from its own HUD trigger, and DODGE the serpent's
+      // phase attacks (acid spray at 75% health, + lightning at 50%, + void blasts at 25%, and a
+      // near-undodgeable OVERWHELM at 5% that your shields must absorb) — then land the golf FINAL STRIKE
+      // (the eye / the Herald's seal). Whether you CAN win is still the deterministic arm-up verdict
+      // (`won`, the two gates — under the breach gate the hide holds by construction), but an ARMED ship
+      // that flies badly LOSES the live fight — merely REPELLED (a costless rematch), so the battle has
+      // stakes without ever walling progress. The whole fight consumes the pure `finaleLoadout` (each
+      // weapon's damage/cooldown, the shield-cell pool, engine-scaled flight speed).
       const fr = state.story ? finaleResult(state.story) : undefined;
       const won = fr?.won ?? false;
       // GS-story-endings: after the battle resolves, play the path+outcome ENDING cinematic (good/cult ×
@@ -2635,16 +2636,21 @@ function render(): void {
             betrayerName: state.story ? betrayerName(state.story) : undefined,
           });
       };
-      if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-        // Reduced motion: skip both the battle AND the ending — straight to the recap (the gate verdict).
+      if (!state.story || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        // Reduced motion (or no campaign): skip the battle — straight to the recap (the gate verdict).
         dispatch({ type: 'engageStoryFinale', strike: 'clean' });
         return;
       }
       mountStoryBattle({
         won,
-        tuning: finaleBattleTuning(fr?.weaponRating ?? 0, fr?.defenceRating ?? 0, fr?.engineRating ?? 0),
+        loadout: finaleLoadout(state.story),
+        shipId: state.story?.equippedShipId, // the fighter is YOUR equipped ship's real art
         interactive: true,
-        herald: alignment === 'herald', // GS-story-battle-2: the Herald fights a genuinely different battle
+        herald: alignment === 'herald', // the Herald frees the bound serpent under the blockade's lances
+        // the app layer owns audio — the overlay stays node-clean like its cinematic siblings
+        onFire: (style) => sfx.redirectFire(style === 'scatter' || style === 'pea' ? 'boomerang' : 'laser', 480),
+        onShipHit: () => sfx.penalty(),
+        onPhase: () => sfx.scan(),
         onDone: go,
       });
     });

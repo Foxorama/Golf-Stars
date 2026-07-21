@@ -12,9 +12,11 @@ import { getCharacter } from '../sim/rpg/characters';
 import { betrayerName } from '../sim/rpg/storyBetrayal';
 import {
   finaleResult,
-  finaleBattleTuning,
+  finaleLoadout,
+  finaleAssaultSeconds,
   FINALE_BREACH_NEED,
   FINALE_SURVIVE_NEED,
+  FINALE_OVERWHELM_HITS,
 } from '../sim/rpg/storyFinale';
 
 /** A readiness gate row — its rating vs the threshold, met or short. */
@@ -59,36 +61,63 @@ export function storyFinaleScreen(): string {
         in the dark below sleeps the world-serpent — and something worse wears it now, a corruption from
         beyond the stars. It is waking. Only your ship stands between it and every world you crossed to get here.`;
   const guide = herald
-    ? `<p class="gs-fin-lore" style="color:#b0e04f;">🐦‍⬛ "Two stages, Herald. First shatter the wards that
-        cage it — fire your guns, hold your shields as it thrashes awake. Then, when the final seal lies bare,
-        strike it and let the serpent rise. The cage was always meant to open."</p>`
-    : `<p class="gs-fin-lore" style="color:#7fe0a0;">🦜 "This is it, ${who}. Two stages: first we break the
-        serpent's guard — fire your guns, hold your shields — then, when it's reeling and bares its eye, you
-        take the shot. Don’t miss."</p>`;
-  // GS-story-battle-2: TAP fires; a tap during the telegraphed warning VEERS instead (dodging the strike).
+    ? `<p class="gs-fin-lore" style="color:#b0e04f;">🐦‍⬛ "Fly sharp, Herald. Wear the wards down and it
+        will thrash harder with every one that gives — venom, lances, the void itself. Keep shields for the
+        moment the last ward cracks; nothing dodges that. Then the seal lies bare — strike it, and let the
+        serpent rise."</p>`
+    : `<p class="gs-fin-lore" style="color:#7fe0a0;">🦜 "This is it, ${who}. It gets MEANER as it bleeds —
+        acid, then lightning, then the void itself. Fly around what you can, save the shields for what you
+        can't, and when it finally uncoils and bares that eye… you take the shot. Don’t miss."</p>`;
+  // GS-story-battle-3: the R-Type sequence fight — fly your ship, fire each weapon from its own trigger,
+  // dodge the phase attacks, and hold shields for the near-undodgeable overwhelm at the end.
   const plan = herald
-    ? `<p class="gs-fin-battleplan">⚔ <b>Stage 1 — the Assault.</b> TAP to fire and shatter the three golden
-        wards binding the sleeping serpent — it WAKES as each one falls. The Warden blockade arrives to stop
-        you: when a lance locks on, <b>tap the warning to VEER</b> clear; every hit you eat costs a shield cell.<br>
-        🎯 <b>Stage 2 — the Final Strike.</b> When the final seal lies bare on its brow, strike the ball home
-        and break it.<br>
+    ? `<p class="gs-fin-battleplan">🚀 <b>Fly your ship</b> — tap anywhere on the field to move; the serpent's
+        venom drifts slow enough to fly around.<br>
+        ⚔ <b>Fire your arsenal</b> — every weapon you own is its own trigger on the battle HUD, each with its
+        own punch and recharge.<br>
+        🐍 <b>It wakes in stages.</b> As the wards wear down it sprays ACID, the Warden blockade sweeps the
+        field with telegraphed LANCES, and void-rifts tear open — and when the last ward cracks, one
+        <b>overwhelming barrage</b> lands that no pilot dodges: your shields must absorb
+        ${FINALE_OVERWHELM_HITS} strikes, so keep cells in hand.<br>
+        🎯 <b>The Final Strike.</b> When the seal lies bare on its brow, strike the ball home and break it.<br>
         <span style="color:#8fb8ff;">Lose the fight and you are only driven off — re-engage at no cost.</span></p>`
-    : `<p class="gs-fin-battleplan">⚔ <b>Stage 1 — the Assault.</b> TAP to fire and break the serpent's hide.
-        When it rears to strike, <b>tap the warning to VEER</b> clear; every lunge you eat costs a shield cell.<br>
-        🎯 <b>Stage 2 — the Final Strike.</b> When it's broken and its eye opens, strike the ball home.<br>
+    : `<p class="gs-fin-battleplan">🚀 <b>Fly your ship</b> — tap anywhere on the field to move; the serpent's
+        acid drifts slow enough to fly around.<br>
+        ⚔ <b>Fire your arsenal</b> — every weapon you own is its own trigger on the battle HUD, each with its
+        own punch and recharge.<br>
+        🐍 <b>It escalates as it bleeds.</b> At 75% it opens the ACID SPRAY, at 50% it calls telegraphed
+        LIGHTNING, at 25% VOID BLASTS detonate across the field — and at the last sliver it UNCOILS in one
+        <b>overwhelming barrage</b> no pilot dodges: your shields must absorb ${FINALE_OVERWHELM_HITS}
+        strikes, so keep cells in hand.<br>
+        🎯 <b>The Final Strike.</b> When its eye is bared, strike the ball home.<br>
         <span style="color:#8fb8ff;">Lose the fight and you are only driven back — re-engage at no cost.</span></p>`;
-  // GS-story-battle-2: the LIVE battle readout — quoted straight from the same `finaleBattleTuning` the
-  // fight consumes, so the briefing IS the physics: every rating point past the floor shows up here.
-  const tune = finaleBattleTuning(r.weaponRating, r.defenceRating, r.engineRating);
+  // The LIVE battle readout — quoted straight from the same `finaleLoadout` the fight consumes, so the
+  // briefing IS the physics: every owned weapon, its real damage and recharge, the real shield pool.
+  const lo = finaleLoadout(story);
+  const assaultS = finaleAssaultSeconds(lo);
+  const weaponRows = lo.weapons
+    .map(
+      (w) =>
+        `<span style="color:${w.color};">▸ ${w.name}</span><b>${w.damage} dmg · ${(w.cooldownMs / 1000).toFixed(1)}s recharge</b>`,
+    )
+    .join('');
   const readout = `
-    <h2 class="gs-fin-sec">Ship readout</h2>
+    <h2 class="gs-fin-sec">Ship readout — your arsenal, live</h2>
     <div class="gs-fin-readout">
-      <span>⚔ Firepower</span><b>${r.breachOk ? `${herald ? 'shatters the wards' : 'fells it'} in ${tune.shotsToKill} volleys` : herald ? 'cannot break the last ward' : 'cannot break its hide'}</b>
-      <span>🛡 Shields</span><b>absorb ${tune.lungesToBreak} ${tune.lungesToBreak === 1 ? 'strike' : 'strikes'} (veer to take none)</b>
-      <span>🚀 Engines</span><b>recharge a weapon cell in ${(tune.rechargeMs / 1000).toFixed(1)}s</b>
+      ${weaponRows}
+      <span>⚔ Assault</span><b>${
+        r.breachOk
+          ? `${herald ? 'wears the wards down' : 'brings it to bay'} in ~${Math.round(assaultS)}s of fire`
+          : herald
+            ? 'cannot break the last ward'
+            : 'cannot break its hide'
+      }</b>
+      <span>🛡 Shields</span><b>${lo.shieldCells} ${lo.shieldCells === 1 ? 'cell' : 'cells'} (the overwhelm costs ${FINALE_OVERWHELM_HITS})</b>
+      <span>🚀 Engines</span><b>flight speed ${lo.shipSpeed} · faster weapon recharge</b>
     </div>
-    <p class="gs-fin-hint" style="color:#9fb0c8;">Heavier weapons fell it in fewer volleys · deeper defence
-      weathers more hits · better engines cycle your guns faster. Every upgrade sharpens this readout.</p>`;
+    <p class="gs-fin-hint" style="color:#9fb0c8;">Heavier weapons shorten the assault · deeper defence adds
+      shield cells · better engines fly and recharge faster. Every phase still comes — arming up sharpens
+      the fight, it never skips the gauntlet.</p>`;
   // GS-story-quality (finding C): weapons + engines outfit aboard your ship; SHIELDS are stocked at ship-vendor
   // worlds you fly to — so the guidance names where the gap is actually filled, not the equip-only Hangar.
   const breachHint = herald
