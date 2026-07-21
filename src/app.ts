@@ -1770,8 +1770,12 @@ const ST_OPEN_ZOOM = 0.82;
  *  burns 1.5× the fuel-per-distance of NORMAL (so NORMAL lasts 1.5× further = well past a full traverse).
  *  FAST also cruises +25% faster. Fuel is app-layer feel state (never the sim / a save). */
 const ST_SPEED_FAST_MULT = 1.25;
-/** Fuel drained per chart-unit travelled at FAST — sized so a fast cruise empties over 0.75 × CHART_W. */
-const ST_FUEL_BURN_FAST = STAR_TOUR_FUEL_CAP / (0.75 * CHART_W);
+/** Global fuel-thirst dial (GS-star-tour-fuel-usage): every burn scales by this, so long hauls run the
+ *  tank dry sooner. 1.2 = +20% thirst (distances feel longer); the auto-fueller tanker still rescues you. */
+const ST_FUEL_BURN_SCALE = 1.2;
+/** Fuel drained per chart-unit travelled at FAST — sized so a fast cruise empties over 0.75 × CHART_W,
+ *  then scaled up by ST_FUEL_BURN_SCALE so the effective reach is shorter. */
+const ST_FUEL_BURN_FAST = (STAR_TOUR_FUEL_CAP / (0.75 * CHART_W)) * ST_FUEL_BURN_SCALE;
 /** NORMAL burns 1.5× LESS per distance than fast (the console fast-mode 1.5× thirst). */
 const ST_FUEL_BURN_NORMAL = ST_FUEL_BURN_FAST / 1.5;
 /** Coming to rest within this of a world / Earth / the spaceport tops the tank to full (a fuel stop). */
