@@ -506,7 +506,19 @@ export function spaceportSceneHTML(story: StoryState): string {
       ${hotspot({ type: 'openStoryMap' }, '🗺 Set course', { l: 28, t: 8, w: 34, h: 36 }, 'Set course — the star chart', 'top')}
       ${hotspot({ type: 'openStoryShipyard' }, `🚀 Hangar`, { l: 1, t: 12, w: 25, h: 36 }, `Hangar — fly your fleet (${shipName})`, 'top')}
       ${hotspot({ type: 'openStoryLocker' }, '🎒 Locker', { l: 1, t: 49, w: 25, h: 26 }, 'Locker — build your bag and gear', 'bottom')}
-      ${hotspot({ type: 'openStoryBar' }, `🍺 ${storyBarName(herald)}`, { l: 63, t: 10, w: 36, h: 40 }, `${storyBarName(herald)} — talk to the ${herald ? 'Crow' : 'Parrot'}`, 'top')}
+      ${(() => {
+        // GS-story-prologue-beats: the cinematic ends on "meet me at the bar — I'll tell you everything";
+        // until that first Chapter-1 visit happens, the bar hotspot carries a gold ❗ pull (the quest-marker
+        // idiom) so the promise is answered, not lost. Retired by `openStoryBar` (persisted).
+        const briefing = !herald && story.chapter <= 1 && !story.seenStoryBeats['story-bar-briefing'];
+        return hotspot(
+          { type: 'openStoryBar' },
+          `${briefing ? '<span class="gs-sclub-barpull">❗</span> ' : ''}🍺 ${storyBarName(herald)}`,
+          { l: 63, t: 10, w: 36, h: 40 },
+          briefing ? `${storyBarName(herald)} — the Parrot is waiting to tell you everything` : `${storyBarName(herald)} — talk to the ${herald ? 'Crow' : 'Parrot'}`,
+          'top',
+        );
+      })()}
       ${friendStandees}
       ${crewStandees}
       ${playerBtn}
@@ -641,6 +653,11 @@ const SPACEPORT_STYLE = `<style>
     filter:drop-shadow(0 0 5px #ffd23c) drop-shadow(0 1px 1px #000a);pointer-events:none;z-index:24;
     animation:gs-sclub-qbob 1.25s ease-in-out infinite;}
   @keyframes gs-sclub-qbob{0%,100%{transform:translate(-50%,0);}50%{transform:translate(-50%,-5px);}}
+  /* GS-story-prologue-beats: the "meet me at the bar" pull — an inline gold ❗ pulsing on the bar label. */
+  .gs-sclub-barpull{display:inline-block;color:#ffd23c;filter:drop-shadow(0 0 5px #ffd23c);
+    animation:gs-sclub-barpull 1.25s ease-in-out infinite;}
+  @keyframes gs-sclub-barpull{0%,100%{transform:translateY(0);}50%{transform:translateY(-2px);}}
+  @media(prefers-reduced-motion:reduce){.gs-sclub-barpull{animation:none;}}
   .gs-sclub-cplate{display:inline-block;margin-top:2px;padding:1px 7px;border-radius:10px;background:#0e141edd;
     border:1px solid #33465f;font-size:clamp(7px,1.8cqw,10px);font-weight:700;color:#cdd8ea;white-space:nowrap;position:relative;z-index:1;}
   .gs-sclub-caddy--on .gs-sclub-cplate{background:#231018ee;border-color:#6a3a52;color:#f0a8c8;}

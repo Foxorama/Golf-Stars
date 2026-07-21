@@ -575,6 +575,18 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   ONLY the World Tour final (no Coil/serpent/Sigils); the Parrot reveals the real quest at the Crow's Nest
   in a Chapter-1 briefing greeting (`parrotBar.ts` `greet-recruited`), and the recruitment cinematic bridges
   to it ("meet me at the bar — I'll tell you everything").
+- **GS-story-prologue-beats** — ✅ *shipped* (2026-07-21, the post-Earth-win timing pass; player report: "the
+  story beats and dialogue after beating the intro world tour feel off"). Two timing fixes: (1) the prologue
+  VICTORY recap used to quote the Parrot's whole recruitment line one screen BEFORE the cinematic typed the
+  same words — the reveal landed twice, flat both times. The recap now only TEASES (the cheering falters, the
+  shadow stops overhead, every face tilts up) and the cinematic DELIVERS the call; the "Answer the call ›" CTA
+  is unchanged (the browser smoke pins it). (2) the cinematic's closing promise ("meet me at the bar — I'll
+  tell you everything") had no follow-through in the clubhouse — the bar hotspot now wears a gold ❗ pull
+  (`.gs-sclub-barpull`, the quest-marker idiom, reduced-motion safe) until the first Chapter-1 bar visit;
+  `openStoryBar` records `seenStoryBeats['story-bar-briefing']` (persisted, no version bump, idempotent, never
+  written past Ch.1) so the pull survives a quit but retires once the briefing is heard. Render + one reducer
+  write; zero sim rng. Guarded in `tests/story-flow.test.ts` (the record/idempotence/Ch.2 no-write) +
+  `tests/story-spaceport.test.ts` (the pull shows/retires).
 - **GS-story-serpent** — ✅ *shipped* (`render/sigilCeremony.ts`, exported `paintSerpent`). The post-Sigil
   cutscene serpent was a string of gradient balls (a "worm"); it's now a MASSIVE scaled world-serpent — a
   continuous tapered body (one filled ribbon), overlapping crescent SCALES, and a lit dorsal ridge with

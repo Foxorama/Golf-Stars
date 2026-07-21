@@ -167,6 +167,20 @@ describe('Parrot Bar (GS-story-parrot-bar)', () => {
     const bar = reduce(hub, { type: 'openStoryBar' });
     expect(reduce(bar, { type: 'openStoryBar' })).toBe(bar); // already at the bar (screen guard)
   });
+
+  it('the first Chapter-1 visit answers the "meet me at the bar" briefing (GS-story-prologue-beats)', () => {
+    // Chapter 1, briefing unanswered → the visit records it (persisted; the clubhouse ❗ pull retires).
+    const hub1 = spaceHub(1);
+    expect(hub1.story!.seenStoryBeats['story-bar-briefing']).toBeUndefined();
+    const bar = reduce(hub1, { type: 'openStoryBar' });
+    expect(bar.story!.seenStoryBeats['story-bar-briefing']).toBe(true);
+    // a second visit is idempotent (no re-write — same story object)
+    const again = reduce({ ...bar, screen: 'story' as const }, { type: 'openStoryBar' });
+    expect(again.story).toBe(bar.story);
+    // past Chapter 1 the briefing beat never writes (the greeting has moved on)
+    const hub2 = spaceHub(2);
+    expect(reduce(hub2, { type: 'openStoryBar' }).story).toBe(hub2.story);
+  });
 });
 
 describe('Story dialogue beats (GS-story-beats)', () => {
