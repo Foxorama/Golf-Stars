@@ -7,6 +7,7 @@
 
 import { state } from './ctx';
 import { liveLeaderChip, matchHud, teamDuel, teamFormatLabel, teamPartnerChar } from './duelHud';
+import { storySigilMatchChip } from './storySigilHud';
 import { bearing, dist, type Hole } from '../sim/course/contract';
 import { lieInfo, roughLieOf } from '../sim/shot';
 import { playTotals } from '../sim/score';
@@ -207,6 +208,7 @@ export function mapTopInfo(v: ReturnType<typeof shotView>, opts: { shotNo: numbe
       <div class="gs-sub">${lieChip(v.lie)} ${windDescription(play.hole)}${lostRough}</div>
       ${scrambleLine}
       ${state.match ? `<div style="margin-top:5px;">${matchHud()}</div>` : ''}
+      ${!state.match && state.run.storyTournament ? (() => { const chip = storySigilMatchChip(); return chip ? `<div style="margin-top:5px;">${chip}</div>` : ''; })() : ''}
       ${holePips()}
     </div>`;
 }

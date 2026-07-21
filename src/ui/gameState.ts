@@ -329,6 +329,10 @@ export interface UiState {
     rivalGolferId?: string;
     rivalVoice?: 'confront' | 'corrupt';
     rivalCorrupted?: boolean;
+    /** GS-story-sigil-live: set on a MATCHPLAY Sigil — the halftime standing is the MATCH state (holes
+     *  up, from the same resolver streams as the finish); `playerThru`/`rivalThru` then carry holes WON
+     *  per side, not stroke counts. `team` = the 2v2 finale (label the sides as teams). */
+    match?: { holesUp: number; thru: number; team: boolean };
   };
   /** GS-story-yggdrasil: the finale recap payload (win/lose + which gate fell short). Transient. */
   lastStoryFinale?: { won: boolean; failReason?: 'firepower' | 'defence'; strike?: 'clean' | 'graze' };

@@ -86,12 +86,15 @@ function pairHoleCards(
   return cards;
 }
 
-/** A ghost PAIR's total over the pars, deterministic from the seed. */
-export function opposingPairTotal(pair: OpposingPair, seed: string, pars: readonly number[], format: StoryTeamFormat): number {
+/** A ghost PAIR's total over the pars, deterministic from the seed. `upto` (GS-story-sigil-live) caps the
+ *  holes counted — the SAME per-hole draws as the full total, so a running standing through N holes is
+ *  always consistent with the finish. Default = every hole (byte-identical). */
+export function opposingPairTotal(pair: OpposingPair, seed: string, pars: readonly number[], format: StoryTeamFormat, upto = pars.length): number {
   const formA = golferForm(pair.golferIds[0], `${seed}:pair:${pair.id}:${pair.golferIds[0]}`);
   const formB = golferForm(pair.golferIds[1], `${seed}:pair:${pair.id}:${pair.golferIds[1]}`);
+  const n = Math.max(0, Math.min(pars.length, upto));
   let total = 0;
-  for (let i = 0; i < pars.length; i++) total += teamHoleScore(pairHoleCards(pair, formA, formB, `${seed}:pair:${pair.id}`, i, pars[i]!, format));
+  for (let i = 0; i < n; i++) total += teamHoleScore(pairHoleCards(pair, formA, formB, `${seed}:pair:${pair.id}`, i, pars[i]!, format));
   return total;
 }
 
@@ -103,10 +106,11 @@ export interface PairStanding {
   total: number;
 }
 
-/** The opposing field, each pair's total computed and the list sorted low→high (the leader is first). */
-export function opposingField(pairs: readonly OpposingPair[], seed: string, pars: readonly number[], format: StoryTeamFormat): PairStanding[] {
+/** The opposing field, each pair's total computed and the list sorted low→high (the leader is first).
+ *  `upto` (GS-story-sigil-live) gives the running standings through N holes, consistent with the finish. */
+export function opposingField(pairs: readonly OpposingPair[], seed: string, pars: readonly number[], format: StoryTeamFormat, upto = pars.length): PairStanding[] {
   return pairs
-    .map((p) => ({ id: p.id, name: p.name, golferIds: p.golferIds, total: opposingPairTotal(p, seed, pars, format) }))
+    .map((p) => ({ id: p.id, name: p.name, golferIds: p.golferIds, total: opposingPairTotal(p, seed, pars, format, upto) }))
     .sort((a, b) => a.total - b.total);
 }
 
