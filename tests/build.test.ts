@@ -321,6 +321,52 @@ describe('build output (real browser)', () => {
     );
   }
 
+  // STAR/STORY TOUR skips the arc briefing (GS-story-tour). The strokeplay round intro used to open on the
+  // arc "Change golfer" lobby — an out-of-place extra step before a records chase / campaign round (and on
+  // the Story path "Change golfer" pointed at the wrong roster). It now opens straight on the HOLE step
+  // (map + Tee Off). This drives the honest golfer → map → pick-course flow and asserts the hole step
+  // mounts with "Tee Off" and NONE of the arc-step chrome ("Change golfer" / "Arc briefing" / "First Tee").
+  it.runIf(chromePath)(
+    'Star/Story Tour round intro opens on the hole step, not the arc "Change golfer" briefing (GS-story-tour)',
+    async () => {
+      const { chromium } = await import('playwright-core');
+      const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
+      try {
+        const page = await browser.newPage({ viewport: { width: 414, height: 896 } });
+        const errors: string[] = [];
+        page.on('pageerror', (e) => errors.push(e.message));
+        await page.goto('file://' + dist + '?screen=strokeintro&intro=0&seed=42', { waitUntil: 'load' });
+        await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', { timeout: 8000 });
+        const info = await page.evaluate(() => {
+          const app = document.getElementById('app')!;
+          const t = app.textContent || '';
+          return {
+            err: (window as unknown as { __gsErr?: string }).__gsErr ?? null,
+            hasHoleStep: !!app.querySelector('.gs-holeintro'),
+            hasTeeOff: t.includes('Tee Off'),
+            hasChangeGolfer: t.includes('Change golfer'),
+            hasArcBriefing: t.includes('Arc briefing'),
+            hasFirstTee: t.includes('First Tee'),
+            text: t,
+          };
+        });
+        expect(errors, `pageerror: ${errors[0] ?? ''}`).toEqual([]);
+        expect(info.err, 'recovered error').toBeNull();
+        expect(info.text).not.toContain('Choose your game'); // not bounced to title
+        // Opens on the HOLE step, ready to tee off.
+        expect(info.hasHoleStep, 'the hole step (.gs-holeintro) mounted').toBe(true);
+        expect(info.hasTeeOff, '"Tee Off" present').toBe(true);
+        // The removed arc briefing chrome must be gone.
+        expect(info.hasChangeGolfer, '"Change golfer" must NOT be shown').toBe(false);
+        expect(info.hasArcBriefing, '"Arc briefing" must NOT be shown').toBe(false);
+        expect(info.hasFirstTee, '"First Tee" (arc CTA) must NOT be shown').toBe(false);
+      } finally {
+        await browser.close();
+      }
+    },
+    60_000,
+  );
+
   // CHARACTER SELECT fits one mobile screen with no scroll (GS-select-onescreen). The roster locks to the
   // viewport (`.gs-main--fit`) so the whole golfer grid fits a phone with no vertical page scroll and no
   // horizontal overflow — the exact regression the bug report flagged (cards running off the bottom/edge).

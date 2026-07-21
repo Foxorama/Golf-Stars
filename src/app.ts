@@ -77,7 +77,7 @@ import {
   holeMatchProgressHTML,
 } from './app/duelHud';
 import { installView, titleScreen } from './app/titleScreens';
-import { endlessRoundSoFar, introFieldOverlay, introScreen, introTraitsOverlay, introView } from './app/introScreens';
+import { endlessRoundSoFar, introEntryStage, introFieldOverlay, introScreen, introTraitsOverlay, introView } from './app/introScreens';
 import { bossRewardScreen, gameoverScreen, resultScreen, victoryInfo } from './app/resultScreens';
 import { shopScreen, shopView, starmartScreen } from './app/shopScreens';
 import { MARKET_SECTION_IDS, marketView, tradeMarketScreen } from './app/marketScreens';
@@ -186,6 +186,11 @@ function applyDebugParams(): void {
   if (asgard) s = { ...s, screen: 'asgardMap', asgardReturn: snapshotRun(run) };
   // Jump straight to a between-stop / between-run screen for the layout smoke tests (GS-screen-deeplink).
   if (screen) s = jumpToScreen(title, s, screen);
+  // The deep-link boot uses setState directly, bypassing the dispatch wrapper that normally picks the
+  // intro entry sub-step — so a deep-linked intro (e.g. `?screen=strokeintro`) must set it here too, or
+  // it would render whatever stale `introView.stage` last held. Strokeplay opens on the hole step
+  // (GS-story-tour); the helper keeps this in lockstep with the live entry above.
+  if (s.screen === 'intro') introView.stage = introEntryStage(s.run.formatId, s.run.stopIndex);
   setState(s);
 }
 
@@ -233,6 +238,13 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const map = reduce(reduce(title, { type: 'openStarTour' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
       const intro = reduce(map, { type: 'pickStarTourCourse', courseId: 'verdant-18' });
       return reduce(intro, { type: 'play' });
+    }
+    case 'strokeintro': {
+      // GS-story-tour: the Star/Story Tour round briefing — mount it the honest way (golfer → map → pick a
+      // course), so the layout test can guard that a strokeplay round opens straight on the HOLE step (map
+      // + Tee Off), NOT the arc briefing / "Change golfer" lobby that was removed for this mode.
+      const map = reduce(reduce(title, { type: 'openStarTour' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      return reduce(map, { type: 'pickStarTourCourse', courseId: 'verdant-18' });
     }
     case 'story':
       // GS-story: mount the Story Mode hub the honest way — enter Story Mode (no save ⇒ new-game golfer
@@ -567,11 +579,13 @@ function dispatch(action: Action): void {
     // with the hazards popup closed (GS-intro-split) — never a stale sub-step from last stop. Past the
     // first tee EVERY format now skips straight to the HOLE step (map + Tee Off), so a route jump lands
     // one tap from teeing off instead of on a briefing/leaderboard the player just saw (GS-intro-endless
-    // for the Unending Universe; GS-intro-voyage extends the same skip to the Voyage). Stop 0 keeps the
-    // arc step — coming from character select it IS the mode lobby ("Change golfer"). The briefing stays
-    // one "‹ Briefing" tap away on the hole step.
+    // for the Unending Universe; GS-intro-voyage extends the same skip to the Voyage). Star/Story Tour
+    // (strokeplay) skips the arc entirely (GS-story-tour) — no "Change golfer" lobby before a records
+    // chase / campaign round. Stop 0 of a character-select format keeps the arc step — coming from
+    // character select it IS the mode lobby ("Change golfer"), and the briefing stays one "‹ Briefing"
+    // tap away on the hole step.
     if (state.screen === 'intro' && prevScreen !== 'intro') {
-      introView.stage = state.run.stopIndex > 0 ? 'hole' : 'arc';
+      introView.stage = introEntryStage(state.run.formatId, state.run.stopIndex);
       introView.traitsOpen = false;
       introView.fieldOpen = false;
     }

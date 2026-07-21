@@ -225,6 +225,18 @@ function strokeRecordsCard(): string {
     </div>`;
 }
 
+/**
+ * The intro sub-step to OPEN on when (re-)entering the stop briefing (GS-story-tour). Star/Story Tour
+ * rounds (strokeplay) have NO arc briefing — its "Change golfer" lobby doesn't fit a records chase or a
+ * campaign round (and on the Story path it points at the wrong roster) — so they open straight on the
+ * HOLE step (map + Tee Off). Past stop 0 every other format also skips the arc; stop 0 of a
+ * character-select format keeps the arc lobby. Called from BOTH the live dispatch entry and the
+ * deep-link boot (app.ts) so the two can never disagree on the entry step.
+ */
+export function introEntryStage(formatId: string, stopIndex: number): 'arc' | 'hole' {
+  return formatId === STROKEPLAY_FORMAT || stopIndex > 0 ? 'hole' : 'arc';
+}
+
 /** The stop briefing: the arc step or the hole step (GS-intro-split), chosen by view state. */
 export function introScreen(): string {
   return introView.stage === 'hole' ? holeIntroScreen() : arcIntroScreen();
@@ -404,10 +416,14 @@ function holeIntroScreen(): string {
           state.run.formatId === STROKEPLAY_FORMAT ? '' : btn('» Watch AI', { type: 'play' }, { variant: 'ghost' })
         }
         ${
-          // Past stop 0 the intro OPENED here (GS-intro-endless / GS-intro-voyage) for every format —
-          // there is no "back", but the arc briefing (field/leaderboard, round so far) stays one tap
-          // away. Stop 0 came from the arc step, so it keeps a plain "‹ Back".
-          state.run.stopIndex > 0
+          // Star/Story Tour (strokeplay) has NO arc briefing (GS-story-tour) — the hole preview IS the
+          // round's entry (you already picked the world + golfer on the star map), so there's nothing to
+          // go back to and no back button. For the other formats: past stop 0 the intro OPENED here
+          // (GS-intro-endless / GS-intro-voyage), but the arc briefing (field/leaderboard, round so far)
+          // stays one tap away. Stop 0 came from the arc step, so it keeps a plain "‹ Back".
+          state.run.formatId === STROKEPLAY_FORMAT
+            ? ''
+            : state.run.stopIndex > 0
             ? `<button class="gs-btn gs-btn--ghost gs-holeintro-back" data-intro-stage="arc">‹ Briefing</button>`
             : `<button class="gs-btn gs-btn--ghost gs-holeintro-back" data-intro-stage="arc">‹ Back</button>`
         }
