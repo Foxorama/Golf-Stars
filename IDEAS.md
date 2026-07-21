@@ -143,13 +143,19 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
   chart the identical galaxy). The bible's core replay engine — Warden void/crystal/frost vs Herald ocean/
   derelict/cetus. Add `alignment?` to Ch.4–5 rows + thread `storyWorldUnlocked`; shared shrine on both.
 - **GS-story-herald-finale** — the bible's Herald finale = fight the Ark + your former friends, then present
-  yourself (new battle art: Warden ships, the wyrm-ship as the player craft). This pass re-themed the copy as
-  the bridge; this is the full set-piece.
+  yourself (new battle art: Warden ships, the wyrm-ship as the player craft). GS-story-battle-2 delivered the
+  mechanical divergence (wards to shatter, blockade lances to dodge, the seal strike, the serpent waking as
+  the wards fall); still open: the Ark itself on screen with the NAMED friends at its helm + the wyrm-ship as
+  the drawn player craft.
 - **GS-story-penelope-placement** — Ch.4H rival should be a real roster friend; stand Dan + Penelope TOGETHER
   at the Ghost Harvest (the choice-screen "crush Dan & Penelope" promise is never delivered today; it also
   doubles the interlude "Severing" beat).
-- **GS-story-boss-juice** — Stage 1 of the boss is shallow ("hold your shields" but no defensive input);
-  add a dodgeable lunge telegraph + hit-sparks/shake + rising intensity (render-only, outcome unchanged).
+- **GS-story-boss-juice** — ✅ *shipped as GS-story-battle-2* (the final-battle overhaul): dodgeable
+  telegraphed strikes (tap-to-VEER), hit bursts, an enrage ramp, AND further than asked — the outcome now
+  has stakes (an armed ship that fights badly is REPELLED, a costless rematch), the whole fight is tuned
+  continuously by the arsenal (`finaleBattleTuning` — weapons→volleys, defence→shield pips, engines→recharge),
+  the battle serpent is the mythic teaser `paintSerpent`, and the Herald fights a genuinely different battle
+  (shatter the wards — the serpent WAKES as they fall — under blockade lances, then strike the brow seal).
 - **GS-story-shield-bay** — a `'shield'` room in the ship interior (shields are only at vendor worlds today,
   and one is mandatory for the survive gate — a forced detour). Plus the Ch.1 "Verdant Wood" prize is secretly
   a legendary-tier base; two path-agnostic strings assume you're a Warden on the Herald path.

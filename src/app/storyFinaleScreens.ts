@@ -11,6 +11,7 @@ import { state } from './ctx';
 import { getCharacter } from '../sim/rpg/characters';
 import {
   finaleResult,
+  finaleBattleTuning,
   FINALE_BREACH_NEED,
   FINALE_SURVIVE_NEED,
 } from '../sim/rpg/storyFinale';
@@ -63,13 +64,30 @@ export function storyFinaleScreen(): string {
     : `<p class="gs-fin-lore" style="color:#7fe0a0;">🦜 "This is it, ${who}. Two stages: first we break the
         serpent's guard — fire your guns, hold your shields — then, when it's reeling and bares its eye, you
         take the shot. Don’t miss."</p>`;
+  // GS-story-battle-2: TAP fires; a tap during the telegraphed warning VEERS instead (dodging the strike).
   const plan = herald
-    ? `<p class="gs-fin-battleplan">⚔ <b>Stage 1 — the Assault.</b> Fire your weapon (it holds a few charges
-        and recharges) to shatter the wards binding the serpent while your shields weather its waking throes.<br>
-        🎯 <b>Stage 2 — the Final Strike.</b> When the final seal lies bare, strike the ball home and break it.</p>`
-    : `<p class="gs-fin-battleplan">⚔ <b>Stage 1 — the Assault.</b> Fire your weapon (it holds a few charges and
-        recharges) to break the serpent's hide while your shields weather its lunges.<br>
-        🎯 <b>Stage 2 — the Final Strike.</b> When it's broken and its eye opens, strike the ball home.</p>`;
+    ? `<p class="gs-fin-battleplan">⚔ <b>Stage 1 — the Assault.</b> TAP to fire and shatter the three golden
+        wards binding the sleeping serpent — it WAKES as each one falls. The Warden blockade arrives to stop
+        you: when a lance locks on, <b>tap the warning to VEER</b> clear; every hit you eat costs a shield cell.<br>
+        🎯 <b>Stage 2 — the Final Strike.</b> When the final seal lies bare on its brow, strike the ball home
+        and break it.<br>
+        <span style="color:#8fb8ff;">Lose the fight and you are only driven off — re-engage at no cost.</span></p>`
+    : `<p class="gs-fin-battleplan">⚔ <b>Stage 1 — the Assault.</b> TAP to fire and break the serpent's hide.
+        When it rears to strike, <b>tap the warning to VEER</b> clear; every lunge you eat costs a shield cell.<br>
+        🎯 <b>Stage 2 — the Final Strike.</b> When it's broken and its eye opens, strike the ball home.<br>
+        <span style="color:#8fb8ff;">Lose the fight and you are only driven back — re-engage at no cost.</span></p>`;
+  // GS-story-battle-2: the LIVE battle readout — quoted straight from the same `finaleBattleTuning` the
+  // fight consumes, so the briefing IS the physics: every rating point past the floor shows up here.
+  const tune = finaleBattleTuning(r.weaponRating, r.defenceRating, r.engineRating);
+  const readout = `
+    <h2 class="gs-fin-sec">Ship readout</h2>
+    <div class="gs-fin-readout">
+      <span>⚔ Firepower</span><b>${r.breachOk ? `${herald ? 'shatters the wards' : 'fells it'} in ${tune.shotsToKill} volleys` : herald ? 'cannot break the last ward' : 'cannot break its hide'}</b>
+      <span>🛡 Shields</span><b>absorb ${tune.lungesToBreak} ${tune.lungesToBreak === 1 ? 'strike' : 'strikes'} (veer to take none)</b>
+      <span>🚀 Engines</span><b>recharge a weapon cell in ${(tune.rechargeMs / 1000).toFixed(1)}s</b>
+    </div>
+    <p class="gs-fin-hint" style="color:#9fb0c8;">Heavier weapons fell it in fewer volleys · deeper defence
+      weathers more hits · better engines cycle your guns faster. Every upgrade sharpens this readout.</p>`;
   // GS-story-quality (finding C): weapons + engines outfit aboard your ship; SHIELDS are stocked at ship-vendor
   // worlds you fly to — so the guidance names where the gap is actually filled, not the equip-only Hangar.
   const breachHint = herald
@@ -86,6 +104,7 @@ export function storyFinaleScreen(): string {
       ${guide}
 
       ${plan}
+      ${readout}
 
       <h2 class="gs-fin-sec">Battle readiness</h2>
       ${gateRow(herald ? 'Firepower — shatter the wards' : 'Firepower — breach the hide', r.weaponRating, FINALE_BREACH_NEED, breachHint)}
@@ -160,6 +179,37 @@ export function storyFinaleResultScreen(): string {
   // cinematic (app.ts) — but the finale is never a dead-end: the Parrot's foresight (and, later, the
   // pre-battle save) gives you the pass back to arm up and change this future.
   const herald = state.story?.alignment === 'herald';
+  // GS-story-battle-2: an ARMED loss (`repelled`) is its own recap — the ship was ready, the FIGHT beat you.
+  // No shipyard guidance (nothing to buy); steady the guns, veer the strikes, and re-engage at no cost.
+  if (r.failReason === 'repelled') {
+    const rTitle = herald ? '🛡 Driven Off the Root' : '🐍 Driven Back';
+    const rTag = herald
+      ? 'The blockade holds you off — this once. The wards you cracked already tremble.'
+      : 'The coils sweep you back into the dark — but your ship holds together.';
+    const rBody = herald
+      ? `<p>Your ship limps clear of the lances, shields spent — but the root remains open, and your arsenal is
+          every bit equal to the rite. Fire between their volleys, <b>veer when a lance locks on</b>, and the
+          last ward will fall.</p>
+         <p style="color:#b0e04f;">🐦‍⬛ "The ship was ready, Herald. Next time, so are you. Go again — the
+          serpent keeps no calendar."</p>`
+      : `<p>The serpent's coils battered your shields down before your guns could finish the work — but your
+          ship is sound and the campaign is saved at the root. Fire between its lunges, <b>veer when it rears
+          to strike</b>, and its hide will crack.</p>
+         <p style="color:#7fe0a0;">🦜 "The ship did its part — now we do ours. Breathe, champion. We go
+          straight back in."</p>`;
+    return `
+      <header class="gs-hero gs-storyres">
+        <h1 class="gs-hero-title">${rTitle}</h1>
+        <p class="gs-hero-tag">${rTag}</p>
+      </header>
+      <section style="max-width:520px;margin:14px auto 0;text-align:center;color:var(--gs-dim);font-size:14px;line-height:1.6;">
+        ${rBody}
+      </section>
+      <div style="max-width:420px;margin:18px auto 0;">
+        <button class="gs-btn" data-action='${JSON.stringify({ type: 'storyFinaleContinue' })}'>Back to the root ›</button>
+      </div>
+      ${FIN_STYLE}`;
+  }
   const title = herald ? '🦜 The Wardens Prevail' : '🐦‍⬛ The World-Eater is Free';
   const tag = herald
     ? 'The Parrot, Driver Dan and Penelope hold the root. Engines busted, you flee toward the dark zones.'
@@ -199,6 +249,9 @@ const FIN_STYLE = `
     .gs-fin-bar{height:7px;border-radius:5px;background:#1a2130;margin-top:7px;overflow:hidden;}
     .gs-fin-barfill{height:100%;border-radius:5px;transition:width .3s ease;}
     .gs-fin-hint{font-size:11.5px;color:#e0a07a;line-height:1.4;margin-top:6px;}
+    .gs-fin-readout{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;background:#0b0f18;border:1px solid #232b3b;
+      border-radius:11px;padding:9px 12px;font-size:12.5px;color:#cbd6e4;}
+    .gs-fin-readout b{color:var(--gs-ink,#eaf1fb);font-weight:700;text-align:right;}
     .gs-fin-verdict{text-align:center;font-size:13.5px;font-weight:700;margin-top:12px;line-height:1.5;}
     .gs-fin-battleplan{background:#0b0f18;border:1px solid #232b3b;border-left:3px solid #6a5320;border-radius:10px;
       padding:9px 12px;margin:2px 0 4px;font-size:12.5px;line-height:1.6;color:#cbd6e4;}

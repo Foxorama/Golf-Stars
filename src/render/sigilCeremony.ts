@@ -87,7 +87,22 @@ export function keystoneSubtitle(sigils: number, total: number): string {
  * proportionate slit-pupil eye set into the brow, and a forked tongue. `wake` 0..1 = how awake it is
  * (drowsy stir → eye wide open); `focusHead` 0..1 zooms in on the head for the final reveal.
  * Exported so `scripts/serpent-preview.mjs` can render the head eyes-on at any `wake`/`focusHead`.
+ *
+ * GS-story-battle-2: returns the head's ANCHORS (eye / brow, in the same design space) so the finale
+ * battle can aim its reticle, land its bolts, and hang the Herald's seal ON the drawn serpent — the
+ * graphic IS the target. Callers that only paint (the ceremony, the preview) ignore the return.
  */
+export interface SerpentAnchors {
+  eyeX: number;
+  eyeY: number;
+  eyeR: number;
+  browX: number;
+  browY: number;
+  /** Head unit + angle, for hanging extra geometry (the Herald's seal) proportionately. */
+  headH: number;
+  headAng: number;
+}
+
 export function paintSerpent(
   ctx: CanvasRenderingContext2D,
   CX: number,
@@ -95,7 +110,7 @@ export function paintSerpent(
   t: number,
   wake: number,
   focusHead: number,
-): void {
+): SerpentAnchors {
   const DWl = 1000;
   const DHl = 640;
   // eldritch haze
@@ -194,7 +209,7 @@ export function paintSerpent(
   // ── HEAD: a mythic world-serpent head — a horned crest, a deep-set reptilian eye under a shadowed brow,
   //    and a fanged maw that gapes wider as it wakes. Built in the local frame L(a,u): `a` forward from the
   //    neck, `u` along +normal (dorsal/up). ──
-  drawSerpentHead(ctx, pts[N]!, pts[N - 3]!, t, wake, focusHead);
+  return drawSerpentHead(ctx, pts[N]!, pts[N - 3]!, t, wake, focusHead);
 }
 
 /** Draw the world-serpent HEAD at the neck point. Split out so it stays legible; pure. */
@@ -205,7 +220,7 @@ function drawSerpentHead(
   t: number,
   wake: number,
   focusHead: number,
-): void {
+): SerpentAnchors {
   const fdx = neck.x - back.x;
   const fdy = neck.y - back.y;
   const flen = Math.hypot(fdx, fdy) || 1;
@@ -489,6 +504,9 @@ function drawSerpentHead(
   ctx.bezierCurveTo(L(HL * 0.1, H * 1.28).x, L(HL * 0.1, H * 1.28).y, b2.x, b2.y, L(HL * 0.62, H * 1.02).x, L(HL * 0.62, H * 1.02).y);
   ctx.quadraticCurveTo(s1.x, s1.y, tip.x, tip.y);
   ctx.stroke();
+
+  // GS-story-battle-2: hand the battle the drawn head's anchors (the graphic IS the target).
+  return { eyeX: hx, eyeY: hy, eyeR, browX: b2.x, browY: b2.y, headH: H, headAng };
 }
 
 export function mountSigilCeremony(opts: {
