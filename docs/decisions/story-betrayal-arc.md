@@ -206,8 +206,9 @@ the corrupted one; the former friends stay clean Warden.
   NOT kill Jörmungandr — the finisher **sings it back to SLEEP** (the ending cinematic settles the serpent:
   sway stills, body sinks, the burning eye slides shut under converging amber seal-rings — no more
   shattering), and the win is left ONE FRIEND SHORT: the betrayer and the Coil's remnant flee in the last
-  wyrm-ship past the edge of every chart into the **UNIVERSE UNENDING** — the NAMED unknown deep (a future
-  game mode; the name is deliberate and must be kept verbatim). Redeeming the friend will require flying
+  wyrm-ship past the edge of every chart to **THE DESTINATION** — the NAMED unknown deep (a future game
+  mode; the name is deliberate and must be kept verbatim — it was briefly "Universe Unending", renamed to
+  The Destination before it collided with the existing Unending Universe endless mode). Redeeming the friend will require flying
   further than any chart — the sequel hook the ending speaks aloud. Touched surfaces: `storyEnding.ts`
   ('good-win' copy + the sleep/seal/`coilShipFlees` cinematic — the wyrm-ship jets off-frame through the
   hold — plus flow-layout captions so long copy never overlaps), `storyFinaleScreens.ts` (the Reseal recap:

@@ -168,7 +168,7 @@ export function storyFinaleResultScreen(): string {
     // GS-story-finisher: the interactive strike's quality colours the win — a dead-centre CLEAN strike vs a
     // GRAZE that clipped the eye (the seal still takes; an armed champion always wins). GS-story-unending-
     // tease: the RESEAL never kills the serpent — it sings it to SLEEP — and the win is left one friend
-    // short: the betrayer and the Coil's remnant flee into the UNIVERSE UNENDING (the named unknown deep).
+    // short: the betrayer and the Coil's remnant flee to THE DESTINATION (the named unknown deep).
     const graze = r.strike === 'graze';
     const fled = state.story ? betrayerName(state.story) : 'your lost friend';
     const strikeLine = herald
@@ -192,12 +192,12 @@ export function storyFinaleResultScreen(): string {
           with no dreams in it. The Great Game is won — not with a killing blow, but with the truest shot
           ever struck: the one that sang the end of everything back to sleep.</p>
          <p>And yet the dawn came up one friend short. Ahead of the light, a single dark sail ran for open
-          night — <b>${fled}</b>, and what remains of the Coil, fleeing past the edge of every chart into
-          the <b>Universe Unending</b>. Whatever the whisper has left of them is out there still, in a deep
+          night — <b>${fled}</b>, and what remains of the Coil, fleeing past the edge of every chart for
+          <b>The Destination</b>. Whatever the whisper has left of them is out there still, in a deep
           no Warden has ever flown.</p>
          <p style="color:#7fe0a0;">🦜 "Let it sleep, champion. We saved everything… and I still count us one
-          short. Bringing ${fled} home will mean flying further than any chart we own — into the Universe
-          Unending itself. Not today. But when that door opens — you and I go through it together."</p>`;
+          short. Bringing ${fled} home will mean flying further than any chart we own — all the way to The
+          Destination itself. Not today. But when that door opens — you and I go through it together."</p>`;
     return `
       <header class="gs-hero gs-storyres">
         <h1 class="gs-hero-title">${title}</h1>
