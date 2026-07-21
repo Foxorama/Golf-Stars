@@ -14,6 +14,8 @@
 
 import type { BiomeArchetype } from '../course/themes';
 import type { ReputationByCharacter } from './factions';
+import { CHARACTERS } from './characters';
+import { betrayalDoubt, betrayalDistance } from './storyBetrayal';
 
 /** The persisted set of one-off lore events already seen — id → true. A JSON-friendly "set" (JSON has
  *  no native Set), the house style for the `*ByCharacter` maps. Absent ids simply haven't fired yet. */
@@ -58,6 +60,12 @@ export interface LoreContext {
    *  world round. The Chapter-1 opening omen gates on this so it fires at the Emerald Invitational (the Sigil
    *  moment) and leaves the early practice worlds teeing off clean (the GS-story-pacing feel). */
   storyTournament?: boolean;
+  /** GS-story-doubt: WHO the betrayal arc says will turn (`betrayerId(story)` — the odd one out of the
+   *  team-Sigil partner picks). Populated by the gate on every story-round arrival, but only MEANINGFUL
+   *  from Chapter 4 on (both picks locked); the doubt beats gate on chapter + path so the fallback value
+   *  of an early campaign never fires them. Lets a beat speak in the RIGHT friend's voice — the betrayer
+   *  and the competition rival can be different characters at any given point. */
+  storyBetrayerId?: string;
 }
 
 /**
@@ -184,11 +192,31 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
   },
 
   // ── GS-story-beats: Story-Tour NPC dialogue, gated on the campaign (never fires in Voyage/Unending).
-  // Escalation: the Parrot names the Coil (Ch.2) → Coilkeepers creep in (Ch.3) → Venoma confronts you after
-  // The Choice (Ch.4), her line branching on your path. Each fires ONCE, on a story-round arrival.
+  // Escalation (GS-story-early-beats deepened the pre-Choice trunk — the player report: "basically nothing
+  // happens till Sigil 3"): the Parrot teaches the true line (Ch.1) → names the Coil (Ch.2) → Venoma strides
+  // in uninvited at the Forge (Ch.2 Sigil) → the course itself goes wrong (Ch.2) → Coilkeepers ring the tee
+  // (Ch.3) → the Apostate shows himself (Ch.3) → after The Choice the Warden path runs the DOUBT thread (the
+  // vow → the betrayer's strange question → their drifting — GS-story-doubt) while Venoma's confrontation
+  // branches by path. Each fires ONCE, on a story-round arrival; order in this table IS the sequence.
+  {
+    id: 'story-true-line',
+    trigger: (c) => c.storyRound === true && c.storyChapter === 1 && !c.storyTournament,
+    speaker: 'The Prognostic Parrot',
+    portrait: 'prognostic-parrot',
+    kicker: 'The first lesson',
+    title: 'Feel the True Line',
+    accent: '#7fe0a0',
+    cta: 'Walk the fairway →',
+    lines: [
+      { kind: 'action', text: 'The Parrot rides your bag up the first fairway, one eye on your grip and the other on something much further away.' },
+      { kind: 'say', text: 'Forget the leaderboard a moment. Feel for the line UNDER the line — the one the fairway wants. Every course has one true way through it, laid down when the world was made.' },
+      { kind: 'say', text: "Walk it clean and hole out honest, and you'll feel the whole world breathe out. That's not poetry, champion. That's the job. That's why I pulled you off Earth." },
+      { kind: 'say', text: "Play this one true. I'll tell you the rest when you've felt it for yourself." },
+    ],
+  },
   {
     id: 'story-coil-named',
-    trigger: (c) => c.storyRound === true && c.storyChapter === 2,
+    trigger: (c) => c.storyRound === true && c.storyChapter === 2 && !c.storyTournament,
     speaker: 'The Prognostic Parrot',
     portrait: 'prognostic-parrot',
     kicker: 'A shadow over the tour',
@@ -200,6 +228,43 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
       { kind: 'say', text: "You've felt it too, haven't you? The galleries watching a beat too long. A ball that hisses." },
       { kind: 'say', text: "It's called the Coil — a cult that wants the world-serpent at Yggdrasil's root AWAKE. They think the end of everything is a kind of peace." },
       { kind: 'say', text: 'The Sigils you\'re winning are the only thing that can lock the root. So they will come for you. Win anyway.' },
+    ],
+  },
+  // GS-story-early-beats: Venoma's DEBUT — the bible's Forge Masters beat ("an uninvited golfer strides
+  // onto the tee"). Fires at the Chapter-2 Sigil tee-off, so the Viper's first appearance is a scene, not
+  // just a name on the lobby card.
+  {
+    id: 'story-venoma-debut',
+    trigger: (c) => c.storyRound === true && c.storyChapter === 2 && c.storyTournament === true,
+    speaker: 'Venoma "the Viper" Krait',
+    portrait: 'venoma',
+    kicker: 'An uninvited entry',
+    title: 'The Viper Strides In',
+    accent: '#c98adf',
+    cta: 'Meet her on the card →',
+    lines: [
+      { kind: 'action', text: 'The gallery parts. A golfer nobody invited walks the Forge tee like she owns the fire — and drops a ball that HISSES where it lands.' },
+      { kind: 'say', text: "So you're the one keeping the lights on. The Coil sent their best to take this Sigil off you. That's me — in case the entrance was unclear." },
+      { kind: 'say', text: 'Play your heart out, champion. I do so enjoy taking things from the hopeful.' },
+      { kind: 'action', text: 'Somewhere in the gallery, hooded figures bow their heads to her — then turn, all at once, to look at you.' },
+    ],
+  },
+  // GS-story-early-beats: the course itself goes WRONG — the bible's Ch.2 dread beat ("a hole goes wrong;
+  // the deep rough moves"). The first hooded stranger speaks, a chapter before the Coilkeepers ring the tee.
+  {
+    id: 'story-rough-moved',
+    trigger: (c) => c.storyRound === true && c.storyChapter === 2 && !c.storyTournament,
+    speaker: 'A Hooded Stranger',
+    portrait: 'coilkeeper',
+    kicker: 'The course goes wrong',
+    title: 'The Rough That Moved',
+    accent: '#9b6cc0',
+    cta: 'Tee off anyway →',
+    lines: [
+      { kind: 'action', text: 'Overnight the deep rough has crossed the fairway — fifty yards of it, moved like a tide — and not one groundskeeper will meet your eye.' },
+      { kind: 'say', text: 'You noticed. Good. The Game notices you too, champion — the serpent turns in its sleep wherever you hole out.' },
+      { kind: 'say', text: 'Keep winning, and the ground itself will start choosing sides. Ours already has.' },
+      { kind: 'action', text: 'By the time you look back from the tee, the stranger is gone — and the rough is somehow closer.' },
     ],
   },
   {
@@ -240,20 +305,72 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
       { kind: 'action', text: 'He turns to go, the smile of a man wholly at peace. A bead of something dark drips from the head of his black driver.' },
     ],
   },
+  // ── GS-story-doubt: the Warden-path Chapter-4 BETRAYAL FORESHADOW thread. The Choice is made, both
+  // partner picks are locked, so `betrayerId` is settled — and the whisper starts working on that exact
+  // friend, in their own voice, BEFORE the defection is revealed (the interlude after the Ch.4 major).
+  // Sequence across the chapter's arrivals: the Parrot's vow (naming who's gone quiet) → the friend's
+  // strange question → the friend drifting on the eve of the vigil. Per-character rows so the beat is
+  // always the RIGHT golfer — the betrayer and the tournament rival can be different people.
+  {
+    id: 'story-warden-vow',
+    trigger: (c) => c.storyRound === true && c.storyChapter === 4 && c.storyAlignment === 'warden' && !c.storyTournament,
+    speaker: 'The Prognostic Parrot',
+    portrait: 'prognostic-parrot',
+    kicker: 'After The Choice',
+    title: 'The Vow',
+    accent: '#54c8ff',
+    cta: 'Hold the line →',
+    lines: [
+      { kind: 'action', text: 'The crew gathers on the flight deck as the ship turns for the deep sky. Nobody has mentioned the storm-world since you left it.' },
+      { kind: 'say', text: "You chose the fairway, champion. I won't pretend I wasn't afraid — the Apostate's half-truths have swallowed better golfers than either of us." },
+      { kind: 'say', text: 'The others took it hard, each in their own way. Keep an eye on {betrayer}, will you? Barely a word out of them since the storm — and quiet is how it starts.' },
+      { kind: 'say', text: "Two Sigils left. We hold the line together — all of us. That's the vow." },
+    ],
+  },
+  ...CHARACTERS.map(
+    (ch): LoreEvent => ({
+      id: `story-doubt-${ch.id}`,
+      trigger: (c) =>
+        c.storyRound === true && c.storyChapter === 4 && c.storyAlignment === 'warden' && c.storyBetrayerId === ch.id && !c.storyTournament,
+      speaker: ch.shortName,
+      portrait: `golfer:${ch.id}`,
+      kicker: 'The whisper, working',
+      title: `${ch.shortName} Asks a Strange Question`,
+      accent: '#c98adf',
+      cta: 'Say nothing →',
+      lines: [...betrayalDoubt(ch.id)],
+    }),
+  ),
+  ...CHARACTERS.map(
+    (ch): LoreEvent => ({
+      id: `story-distance-${ch.id}`,
+      trigger: (c) => c.storyRound === true && c.storyChapter === 4 && c.storyAlignment === 'warden' && c.storyBetrayerId === ch.id,
+      speaker: ch.shortName,
+      portrait: `golfer:${ch.id}`,
+      kicker: 'The eve of the vigil',
+      title: `${ch.shortName}, Drifting`,
+      accent: '#b060c0',
+      cta: 'Watch them close →',
+      lines: [...betrayalDistance(ch.id)],
+    }),
+  ),
+  // GS-story-doubt reworked this beat (it used to be about Venoma's own crack of fear — "saving Venoma" —
+  // which crowded the chapter the BETRAYAL is supposed to be brewing in): the Viper now twists the knife
+  // about your own crew, feeding the doubt thread instead of her redemption arc.
   {
     id: 'story-venoma-warden',
     trigger: (c) => c.storyRound === true && (c.storyChapter ?? 0) >= 4 && c.storyAlignment === 'warden',
     speaker: 'Venoma "the Viper" Krait',
     portrait: 'venoma',
     kicker: 'The rival, up close',
-    title: 'You Chose Wrong',
+    title: "The Viper's Whisper",
     accent: '#c98adf',
     cta: 'We\'ll see →',
     lines: [
       { kind: 'action', text: 'Venoma leans on her driver, smile all teeth, eyes not quite matching it.' },
-      { kind: 'say', text: 'A Warden. To the end. How brave. How boring. You could have had the whole galaxy quiet and kind.' },
-      { kind: 'action', text: 'For just a second, the smile slips — something underneath it that might be fear.' },
-      { kind: 'say', text: "Don't look at me like that. I'm not the one who needs saving. …Am I. Just play, champion. Just play." },
+      { kind: 'say', text: 'A Warden. To the end. How noble. Tell me, champion — is that little crew of yours as true as you are?' },
+      { kind: 'say', text: "The Coil doesn't break doors down. It whispers through the one that's already open. Someone on that green ship of yours has been listening — ask {betrayer} what they hear in the quiet." },
+      { kind: 'action', text: 'She tees a hissing ball, and smiles wider at whatever just crossed your face.' },
     ],
   },
   {
@@ -381,4 +498,14 @@ export function pickLoreEvent(
 export function loreEventById(id: string | undefined): LoreEvent | undefined {
   if (!id) return undefined;
   return LORE_EVENTS.find((e) => e.id === id);
+}
+
+/**
+ * GS-story-doubt: resolve the `{betrayer}` story token in a beat's text (pure). Beat rows are static data,
+ * but WHO betrays is a per-campaign fact (`betrayerId`) — the render layer passes the resolved short-name
+ * (`betrayerName(story)`), so the same row always names the right friend. Non-story surfaces pass nothing
+ * and any stray token degrades to a generic read.
+ */
+export function resolveLoreTokens(text: string, betrayerShortName?: string): string {
+  return text.replaceAll('{betrayer}', betrayerShortName ?? 'your friend');
 }

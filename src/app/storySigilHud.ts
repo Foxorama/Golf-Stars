@@ -33,6 +33,12 @@ function currentSigil(): StoryTournament | undefined {
 }
 
 /** The live match state over a set of finished holes (matchplay Sigils only). */
+/** GS-story-sigil5-play: the 2v2 finale is PLAYED as an interactive scramble, so the played strokes are
+ *  already the side's team score — every live surface passes the same flag the final resolution uses. */
+function sigilMatchOpts(): { teamPlayed: boolean } {
+  return { teamPlayed: state.run.storyTeamFormat === 'scramble' };
+}
+
 function sigilMatchOver(played: readonly PlayedHole[]): SigilMatch | undefined {
   const t = currentSigil();
   if (!t) return undefined;
@@ -42,6 +48,7 @@ function sigilMatchOver(played: readonly PlayedHole[]): SigilMatch | undefined {
     played.map((p) => p.record.strokes),
     String(state.run.seed),
     state.course.holes.map((h) => h.par),
+    sigilMatchOpts(),
   );
 }
 
@@ -52,7 +59,7 @@ function sigilOpponentHoleScore(holeIndex: number): number | undefined {
   if (!t) return undefined;
   const played = (state.stopPlayed ?? []).map((p) => p.record.strokes);
   const probe = [...played.slice(0, holeIndex), 9]; // earlier holes + a dummy for the hole in play
-  const m = sigilMatchThrough(t, state.story, probe, String(state.run.seed), state.course.holes.map((h) => h.par));
+  const m = sigilMatchThrough(t, state.story, probe, String(state.run.seed), state.course.holes.map((h) => h.par), sigilMatchOpts());
   return m?.res.duels[holeIndex]?.bossStrokes;
 }
 

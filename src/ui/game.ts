@@ -82,7 +82,8 @@ import { claimCharacterQuest } from '../sim/rpg/characterQuests';
 import { acceptQuest, completeQuest, activeQuest, questWorld, startableQuestForWorld } from '../sim/rpg/storyQuests';
 import { isStoryShipId, buyStoryShip, equipStoryShip, worldIsShipVendor } from '../sim/rpg/storyShips';
 import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
-import { currentTournament, tournamentForChapter, tournamentRival, sigilMatchThrough, rivalTotalThrough, isTeamTournament, teamPartnerOrDefault } from '../sim/rpg/storyTournaments';
+import { currentTournament, tournamentForChapter, tournamentRival, sigilMatchThrough, rivalTotalThrough, isTeamTournament, isTeamMatchTournament, teamPartnerOrDefault } from '../sim/rpg/storyTournaments';
+import { finaleMatchup } from '../sim/rpg/storyBetrayal';
 import { finaleUnlocked, finaleResult, winFinale } from '../sim/rpg/storyFinale';
 import { interludeSeen, applyInterlude } from '../sim/rpg/storyInterlude';
 import type { GearSlot } from '../sim/rpg/story';
@@ -874,10 +875,19 @@ export function reduce(state: UiState, action: Action): UiState {
       const loadout = applyStoryClubEffects(applyStoryCaddy(applyStoryGear({ ...run0.loadout, bag }, state.story), state.story), state.story);
       // GS-story-partners: a TEAM Sigil (Scramble/Best-ball) carries your chosen partner onto the run so the
       // resolution folds their ghost in (defaulting to your first tour-mate if the picker was skipped).
-      const partner = isTeamTournament(t) ? teamPartnerOrDefault(state.story, state.storyPartnerPick) : undefined;
+      // GS-story-sigil5-play: the Ch.5 2v2 SCRAMBLE MATCHPLAY finale is a real scramble too — your side's
+      // partner is the finale ALLY (the loyal friend on Warden / the Coil champion on Herald), so the round
+      // plays the interactive best-of-two exactly like Sigil 1 (auto ≡ interactive via `scrambleOptsFor`;
+      // the resolution then scores the PLAYED team strokes, not a re-folded ally ghost).
+      const teamMatch = isTeamMatchTournament(t);
+      const partner = isTeamTournament(t)
+        ? teamPartnerOrDefault(state.story, state.storyPartnerPick)
+        : teamMatch
+        ? finaleMatchup(state.story, state.story.activeCaddyId).allyId
+        : undefined;
       // GS-story-sigil-play: a TEAM Sigil carries its co-op FORMAT so the round plays interactively — a
-      // SCRAMBLE arms the per-shot pick card, a BEST-BALL the per-hole reveal.
-      const teamFormat = isTeamTournament(t) ? (t.format as 'scramble' | 'bestball') : undefined;
+      // SCRAMBLE arms the per-shot pick card, a BEST-BALL the per-hole reveal (the 2v2 finale is a scramble).
+      const teamFormat = isTeamTournament(t) ? (t.format as 'scramble' | 'bestball') : teamMatch ? ('scramble' as const) : undefined;
       const run = {
         ...run0,
         loadout,
@@ -1403,7 +1413,9 @@ export function reduce(state: UiState, action: Action): UiState {
         const t = tournamentForChapter(state.run.storyTournament, state.story?.alignment);
         if (t) {
           const pars = state.course.holes.map((h) => h.par);
-          const m = sigilMatchThrough(t, state.story, stopPlayed.map((p) => p.record.strokes), String(state.run.seed), pars);
+          const m = sigilMatchThrough(t, state.story, stopPlayed.map((p) => p.record.strokes), String(state.run.seed), pars, {
+            teamPlayed: state.run.storyTeamFormat === 'scramble',
+          });
           if (m?.res.state.decided) return resolveStoryTournament({ ...state, stopPlayed }, stopPlayed);
         }
       }
@@ -1416,7 +1428,9 @@ export function reduce(state: UiState, action: Action): UiState {
           const rival = tournamentRival(t, state.story);
           // GS-story-sigil-live: a MATCHPLAY Sigil's halftime reads the MATCH (holes won, from the same
           // resolver streams as the finish), never a stroke count the format doesn't score by.
-          const m = sigilMatchThrough(t, state.story, stopPlayed.map((p) => p.record.strokes), String(state.run.seed), pars);
+          const m = sigilMatchThrough(t, state.story, stopPlayed.map((p) => p.record.strokes), String(state.run.seed), pars, {
+            teamPlayed: state.run.storyTeamFormat === 'scramble',
+          });
           if (m) {
             const wonHoles = m.res.duels.filter((d) => d.winner === 'player').length;
             const lostHoles = m.res.duels.filter((d) => d.winner === 'boss').length;

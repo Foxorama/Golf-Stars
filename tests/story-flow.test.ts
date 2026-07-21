@@ -7,6 +7,14 @@ import { effectWindMult } from '../src/sim/rpg/effects';
 import { playerHoleOpts } from '../src/sim/rpg/run';
 import { hasStory, loadStory, writeStory, clearStory, exportStory, importStory } from '../src/save/storyStore';
 import { storyWorldServicesHTML } from '../src/app/storyServices';
+import type { UiState } from '../src/ui/gameState';
+
+/** Dismiss any arrival lore beat(s) so a test can reach the intro — the GS-story-early-beats pass gave the
+ *  trunk chapters real arrival dialogue, so "tee off" no longer always lands straight on the intro. */
+function pastLore(s: UiState): UiState {
+  while (s.screen === 'lore') s = reduce(s, { type: 'dismissLore' });
+  return s;
+}
 
 describe('Story Mode entry flow (GS-story-save wiring)', () => {
   it('New campaign: title → openStory (no save) → pick golfer → hub with a fresh StoryState', () => {
@@ -129,7 +137,8 @@ describe('Story star map (GS-story-map)', () => {
   it('teeing off a charted world from the map builds a Story round on that course', () => {
     const story = { ...defaultStoryState('feather-fade'), chapter: 1 };
     const map = { ...initState('seed', {}, undefined, story), screen: 'starTour' as const };
-    const intro = reduce(map, { type: 'storyPlayWorld', courseId: 'verdant-18' });
+    // GS-story-early-beats: the first Chapter-1 arrival opens on the Parrot's true-line lesson.
+    const intro = pastLore(reduce(map, { type: 'storyPlayWorld', courseId: 'verdant-18' }));
     expect(intro.screen).toBe('intro');
     expect(intro.run.storyRound).toBe(true);
     expect(intro.run.staticCourseId).toBe('verdant-18');
@@ -199,22 +208,34 @@ describe('Story dialogue beats (GS-story-beats)', () => {
     expect(after.seenLore['story-coil-named']).toBe(true);
   });
 
-  it('Venoma\'s beat branches on the chosen path from Chapter 4', () => {
+  it('the Chapter-4 Warden qualifiers run the DOUBT thread (vow → the betrayer\'s strange question), Herald keeps Venoma (GS-story-doubt)', () => {
     const warden = { ...defaultStoryState('feather-fade'), chapter: 4, alignment: 'warden' as const };
     const mapW = { ...initState('seed', {}, undefined, warden), screen: 'starTour' as const };
-    expect(reduce(mapW, { type: 'storyPlayWorld', courseId: 'verdant-18' }).pendingLoreId).toBe('story-venoma-warden');
+    // First Warden arrival after The Choice: the Parrot's vow — naming who has gone quiet.
+    const vow = reduce(mapW, { type: 'storyPlayWorld', courseId: 'verdant-18' });
+    expect(vow.pendingLoreId).toBe('story-warden-vow');
+    // Next arrival: the betrayer's OWN strange question, in their voice (no picks → the fallback odd-one-out).
+    const after = reduce(vow, { type: 'dismissLore' });
+    const doubt = reduce({ ...after, screen: 'starTour' as const }, { type: 'storyPlayWorld', courseId: 'verdant-18' });
+    expect(doubt.pendingLoreId).toMatch(/^story-doubt-/);
 
     const herald = { ...defaultStoryState('feather-fade'), chapter: 4, alignment: 'herald' as const };
     const mapH = { ...initState('seed', {}, undefined, herald), screen: 'starTour' as const };
     expect(reduce(mapH, { type: 'storyPlayWorld', courseId: 'verdant-18' }).pendingLoreId).toBe('story-venoma-herald');
   });
 
-  it('a Chapter-1 story round tees off with no beat (nothing has stirred yet)', () => {
+  it('a Chapter-1 story round opens on the Parrot\'s true-line lesson, then tees off clean (GS-story-early-beats)', () => {
     const story = { ...defaultStoryState('feather-fade'), chapter: 1 };
     const map = { ...initState('seed', {}, undefined, story), screen: 'starTour' as const };
-    const intro = reduce(map, { type: 'storyPlayWorld', courseId: 'verdant-18' });
-    expect(intro.screen).toBe('intro');
-    expect(intro.pendingLoreId).toBeUndefined();
+    const beat = reduce(map, { type: 'storyPlayWorld', courseId: 'verdant-18' });
+    expect(beat.screen).toBe('lore');
+    expect(beat.pendingLoreId).toBe('story-true-line');
+    // Once taught, the next Chapter-1 arrival is clean (the omen waits at the Sigil tee-off).
+    const after = reduce(beat, { type: 'dismissLore' });
+    expect(after.screen).toBe('intro');
+    const again = reduce({ ...after, screen: 'starTour' as const }, { type: 'storyPlayWorld', courseId: 'verdant-18' });
+    expect(again.screen).toBe('intro');
+    expect(again.pendingLoreId).toBeUndefined();
   });
 });
 
@@ -306,7 +327,7 @@ describe('Story Pro Shop flow (GS-story-econ)', () => {
     });
     // Replay verdant-18 from the shop → the round's bag is the campaign's grown green bag (not the
     // golfer's normal common bag), so the bought Planet 3-Wood is in play.
-    const intro = reduce(bought, { type: 'storyPlayWorld', courseId: 'verdant-18' });
+    const intro = pastLore(reduce(bought, { type: 'storyPlayWorld', courseId: 'verdant-18' }));
     expect(intro.screen).toBe('intro');
     expect(intro.run.loadout.bag.some((c) => c.name === 'Planet 3-Wood')).toBe(true);
     // the lean green start: far fewer than a full 14-club common bag
@@ -336,8 +357,8 @@ describe('Story qualifying events (GS-story-qualifiers)', () => {
     const story = { ...defaultStoryState('feather-fade'), chapter: 1 };
     const map = { ...initState('qual-seed', {}, undefined, story), screen: 'starTour' as const };
     // verdant2-18 is a Chapter-1 world and NOT the Emerald venue (verdant-18) → a qualifying event.
-    const intro = reduce(map, { type: 'storyPlayWorld', courseId: 'verdant2-18' });
-    expect(intro.screen).toBe('intro'); // a plain world round, no lore beat (the Ch.1 omen is at the tournament)
+    const intro = pastLore(reduce(map, { type: 'storyPlayWorld', courseId: 'verdant2-18' }));
+    expect(intro.screen).toBe('intro'); // the Ch.1 arrival beat (if any) dismissed — the round itself is plain
     const done = reduce(intro, { type: 'play' });
     expect(done.screen).toBe('storyResult');
     const q = done.lastStoryRound!.qualifier!;
@@ -358,7 +379,7 @@ describe('Story qualifying events (GS-story-qualifiers)', () => {
   it('the Sigil VENUE itself is NOT a qualifier (it is played as the major)', () => {
     const story = { ...defaultStoryState('feather-fade'), chapter: 1 };
     const map = { ...initState('venue-seed', {}, undefined, story), screen: 'starTour' as const };
-    const done = reduce(reduce(map, { type: 'storyPlayWorld', courseId: 'verdant-18' }), { type: 'play' });
+    const done = reduce(pastLore(reduce(map, { type: 'storyPlayWorld', courseId: 'verdant-18' })), { type: 'play' });
     expect(done.lastStoryRound!.qualifier).toBeUndefined();
   });
 
@@ -585,7 +606,7 @@ describe('Story shipyard flow (GS-story-ships)', () => {
     const hub = reduce(bought, { type: 'exitStoryShipyard' });
     const creditsBefore = hub.story!.credits;
     // tee off + auto-play a charted world (chapter 1 opens verdant-18)
-    const intro = reduce({ ...hub, screen: 'story' as const }, { type: 'storyPlayWorld', courseId: 'verdant-18' });
+    const intro = pastLore(reduce({ ...hub, screen: 'story' as const }, { type: 'storyPlayWorld', courseId: 'verdant-18' }));
     const done = reduce(intro, { type: 'play' });
     const earned = done.story!.credits - creditsBefore;
     // base payout for the round × 1.25 (rounded) — always ≥ the floored base (100) × 1.25
@@ -598,14 +619,14 @@ describe('Story shipyard flow (GS-story-ships)', () => {
     // already cleared, so the credit ratio isolates the revisit top-up wiring in resolveStoryRound.
     const base = { ...defaultStoryState('feather-fade'), chapter: 1, credits: 0, clearedWorldIds: ['standrews-18'] };
     const firstState = { ...initState('econ-seed', {}, undefined, base), screen: 'story' as const };
-    const first = reduce(reduce(firstState, { type: 'storyPlayWorld', courseId: 'verdant-18' }), { type: 'play' });
+    const first = reduce(pastLore(reduce(firstState, { type: 'storyPlayWorld', courseId: 'verdant-18' })), { type: 'play' });
     const firstEarned = first.lastStoryRound!.credits;
 
     const revState = {
       ...initState('econ-seed', {}, undefined, { ...base, clearedWorldIds: ['standrews-18', 'verdant-18'] }),
       screen: 'story' as const,
     };
-    const revisit = reduce(reduce(revState, { type: 'storyPlayWorld', courseId: 'verdant-18' }), { type: 'play' });
+    const revisit = reduce(pastLore(reduce(revState, { type: 'storyPlayWorld', courseId: 'verdant-18' })), { type: 'play' });
     expect(revisit.lastStoryRound!.credits).toBeLessThan(firstEarned);
     expect(revisit.lastStoryRound!.credits / firstEarned).toBeCloseTo(REVISIT_CREDIT_MULT, 1);
   });
@@ -623,7 +644,7 @@ describe('Story shipyard flow (GS-story-ships)', () => {
     const withShip = reduce(e, { type: 'storyBuyShip', shipId: 'hauler-barge' });
     const hub = reduce(withShip, { type: 'exitStoryShipyard' });
     const before = hub.story!.credits;
-    const done = reduce(reduce({ ...hub, screen: 'story' as const }, { type: 'storyPlayWorld', courseId: 'verdant-18' }), { type: 'play' });
+    const done = reduce(pastLore(reduce({ ...hub, screen: 'story' as const }, { type: 'storyPlayWorld', courseId: 'verdant-18' })), { type: 'play' });
     const earned = done.story!.credits - before;
     expect(earned).toBeGreaterThanOrEqual(Math.round(100 * 1.25 * 1.05));
   });
@@ -796,11 +817,12 @@ describe('The Choice + alignment fork (GS-story-chapters)', () => {
       equippedBagIds: defaultStoryState().equippedBagIds.map((id) => (id === 'D' ? 'club:solar:D' : id)),
     };
     const hub = { ...initState('seed', {}, undefined, story), screen: 'story' as const };
-    // The Ch.4 arrival first fires Venoma's beat (GS-story-beats) — dismiss it, then play the round.
+    // The Ch.4 major arrival fires a Warden DOUBT-thread beat (GS-story-doubt — here the betrayer's
+    // eve-of-the-vigil drift, since the vigil tee-off is the first arrival) — dismiss it, then play.
     let round = reduce(reduce(hub, { type: 'openStoryTournament' }), { type: 'storyPlayTournament' });
     expect(round.screen).toBe('lore');
-    expect(round.pendingLoreId).toBe('story-venoma-warden');
-    round = reduce(round, { type: 'dismissLore' });
+    expect(round.pendingLoreId).toMatch(/^story-distance-/);
+    round = pastLore(round);
     const done = reduce(round, { type: 'play' });
     expect(done.screen).toBe('storyTournamentResult');
     // The ship is granted iff the major was won — gate the assertion on the actual outcome.

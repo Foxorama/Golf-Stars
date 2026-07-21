@@ -151,12 +151,19 @@ function partnerPickerHTML(t: StoryTournament, story: StoryState): string {
 /** A small golfer figure (their signature look, or corrupted Coil garb) for the finale matchup box. */
 function matchFigure(charId: string, corrupt: boolean, uid: string): string {
   const ch = getCharacter(charId);
-  if (!ch) return `<div class="gs-tourn-mfglyph">🐍</div>`;
+  if (!ch) return championFigure(charId);
   const opts = corrupt
     ? { ...corruptedLookOpts(ch), uid, w: 52, h: 140 }
     : { skin: ch.style.skin, shirtBase: ch.style.shirt, capColor: ch.style.cap, hair: ch.style.hair, uid, w: 52, h: 140 };
   const fig = golferPreviewSVG(undefined, undefined, undefined, opts);
   return `<span class="gs-tourn-mfig"${corrupt ? ` style="filter:${COIL_FIGURE_TINT};"` : ''}>${fig}</span>`;
+}
+
+/** GS-story-sigil5-look: a Coil CHAMPION in the matchup box is their real portrait bust (Venoma / Voss),
+ *  never a cute emoji — the player report: "Sigil 5 had a little snake icon instead of Venoma". */
+function championFigure(id: string): string {
+  const bust = rivalPortraitSVG(id);
+  return bust ? `<span class="gs-tourn-mport">${bust}</span>` : `<div class="gs-tourn-mfglyph">${rivalGlyph(id)}</div>`;
 }
 
 /** GS-story-betrayer: the Ch.5 2v2 best-ball MATCHPLAY matchup box — YOUR team (you + a loyal friend /
@@ -166,14 +173,13 @@ function finaleMatchupBox(story: StoryState): string {
   const m = finaleMatchup(story, story.activeCaddyId);
   const you = getCharacter(story.characterId);
   const youFig = you ? matchFigure(you.id, false, 'mfyou') : '';
-  // your partner: a friend (Warden) drawn as a figure, or a Coil champion (Herald) drawn as a glyph/portrait
-  const allyFig = m.allyIsChampion
-    ? `<div class="gs-tourn-mfglyph">${m.allyId === 'venoma' ? '🐍' : '🖤'}</div>`
-    : matchFigure(m.allyId, false, 'mfally');
-  // opponents: on the Warden path the first is the DEFECTOR (corrupted); a champion opponent is a glyph
+  // your partner: a friend (Warden) drawn as a figure, or a Coil champion (Herald) drawn as their portrait
+  const allyFig = m.allyIsChampion ? championFigure(m.allyId) : matchFigure(m.allyId, false, 'mfally');
+  // opponents: on the Warden path the first is the DEFECTOR (corrupted); a champion opponent is their
+  // real portrait bust (GS-story-sigil5-look — Venoma is VENOMA, never a snake emoji)
   const oppFig = (id: string, i: number) => {
     const isChampion = id === 'venoma' || id === 'voss';
-    if (isChampion) return `<div class="gs-tourn-mfglyph">${id === 'venoma' ? '🐍' : '🖤'}</div>`;
+    if (isChampion) return championFigure(id);
     const corrupt = !m.herald && id === m.betrayerGolferId; // the Warden-path defector wears Coil garb
     return matchFigure(id, corrupt, `mfopp${i}`);
   };
@@ -519,6 +525,9 @@ const TOURN_STYLE = `
     .gs-tourn-mfig{width:52px;filter:drop-shadow(0 4px 5px #0009);}
     .gs-tourn-mfig svg{width:100%;height:auto;display:block;}
     .gs-tourn-mfglyph{width:44px;height:80px;display:flex;align-items:center;justify-content:center;font-size:34px;filter:drop-shadow(0 3px 5px #000a);}
+    /* GS-story-sigil5-look: a Coil champion's portrait bust in the matchup box (Venoma/Voss, not an emoji) */
+    .gs-tourn-mport{width:58px;align-self:flex-end;filter:drop-shadow(0 3px 5px #000a);}
+    .gs-tourn-mport svg{width:100%;height:auto;display:block;}
     .gs-tourn-mnames{font-size:12.5px;font-weight:800;color:#dbe4f0;white-space:nowrap;}
     .gs-tourn-mvs{font-size:13px;font-weight:900;color:#7c8aa0;font-style:italic;padding:0 2px;}
     /* staggered entrance — the tournament "walks out" */

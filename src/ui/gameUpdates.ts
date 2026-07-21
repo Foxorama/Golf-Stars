@@ -54,6 +54,7 @@ import { storyGearCreditMult } from '../sim/rpg/storyGear';
 import { tournamentForChapter, tournamentRival, sigilMatchThrough, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS, isStoryQualifier, chapterQualifierEvents, isTeamTournament, isSinglesMatchTournament, isTeamMatchTournament, teamFieldPairs, teamPartnerOrDefault, TEAM_PARTNER_EDGE } from '../sim/rpg/storyTournaments';
 import { resolveStoryTeamStroke, opposingField } from '../sim/rpg/storyTeams';
 import { qualifierField, qualifierPlacement, recordQualifier, qualifiedCount, qualifyTop, QUALIFY_EVENTS_NEEDED } from '../sim/rpg/storyQualifiers';
+import { betrayerId } from '../sim/rpg/storyBetrayal';
 import { getCharacter } from '../sim/rpg/characters';
 import type { HolePlay } from '../sim/rpg/play';
 import type { MatchUi, UiState } from './gameState';
@@ -288,6 +289,9 @@ export function withLoreGate(next: UiState): UiState {
     storyChapter: next.story?.chapter,
     storyAlignment: next.story?.alignment,
     storyTournament: run.storyTournament != null,
+    // GS-story-doubt: who the betrayal arc says will turn — lets the Ch.4 Warden foreshadow beats speak
+    // in the RIGHT friend's voice (the doubt rows gate on chapter/path, so the early fallback never fires).
+    ...(run.storyRound === true && next.story ? { storyBetrayerId: betrayerId(next.story) } : {}),
   };
   const event = pickLoreEvent(ctx, next.seenLore);
   return event ? { ...next, screen: 'lore', pendingLoreId: event.id } : next;
@@ -536,7 +540,12 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
     // the Ch.5 2v2 scramble finale whose teams derive from your partner picks + path). One source —
     // `sigilMatchThrough` — feeds the live HUD, the per-hole reveal, the close-out check AND this final
     // resolution, so they always agree to the hole.
-    const match = sigilMatchThrough(t, base, played.map((p) => p.record.strokes), String(run.seed), pars)!;
+    // GS-story-sigil5-play: a 2v2 SCRAMBLE-MATCH round teed off with the interactive scramble armed
+    // (`storyTeamFormat: 'scramble'`) already contains the ally's best-of-two contribution in the played
+    // strokes — tell the resolver so it doesn't ALSO fold an ally ghost on top.
+    const match = sigilMatchThrough(t, base, played.map((p) => p.record.strokes), String(run.seed), pars, {
+      teamPlayed: run.storyTeamFormat === 'scramble',
+    })!;
     const res = match.res;
     won = res.playerAdvances; // win OR halve advances (the campaign's matchplay convention)
     playerGross = res.holesUp; // the match payload carries the real result; keep a number for the type
