@@ -121,10 +121,12 @@ describe('Galaxy Tournaments (GS-story-tournament)', () => {
     expect(w4.venueId).not.toBe(h4.venueId);
     expect(w4.sigilId).not.toBe(h4.sigilId);
     expect(w4.rivalName).toContain('Venoma');
-    expect(h4.rivalName).toBe('Penelope'); // a former ally, now your rival
+    // GS-story-sigil-rivals: the back-half rivals are DYNAMIC — people from the betrayal arc, not fixed NPCs.
+    expect(h4.dynamicRival).toBe('severed'); // the friend the Wardens send (and you then sever)
     const w5 = tournamentForChapter(5, 'warden')!;
     const h5 = tournamentForChapter(5, 'herald')!;
-    expect(h5.rivalName).toBe('Driver Dan'); // the Ghost Harvest — crush the old Warden road-caddy
+    expect(w5.dynamicRival).toBe('betrayer'); // the corrupted friend at the shrine
+    expect(h5.dynamicRival).toBe('heraldPair'); // the two former friend-partners at the Ghost Harvest
     expect(w5.sigilId).not.toBe(h5.sigilId);
     // GS-story-route-rewards: the Chapter-4 major grants the route's signature ship
     expect(w4.rewardShipId).toBe('warden-cruiser');

@@ -9,8 +9,8 @@
 import { state } from './ctx';
 import { getCharacter } from '../sim/rpg/characters';
 import { STORY_CHAPTER_COUNT, type StoryState } from '../sim/rpg/story';
-import { currentTournament, sigilCount, tournamentCompetitors, isTeamTournament, isSinglesMatchTournament, isTeamMatchTournament, teamPartnerPool, type StoryTournament } from '../sim/rpg/storyTournaments';
-import { finaleMatchup, corruptedLookOpts, COIL_FIGURE_TINT } from '../sim/rpg/storyBetrayal';
+import { currentTournament, sigilCount, tournamentCompetitors, tournamentRival, tournamentIntroLines, isTeamTournament, isSinglesMatchTournament, isTeamMatchTournament, teamPartnerPool, type StoryTournament } from '../sim/rpg/storyTournaments';
+import { finaleMatchup, corruptedLookOpts, friendRivalTaunt, friendRivalHalftime, COIL_FIGURE_TINT } from '../sim/rpg/storyBetrayal';
 import { golferPreviewSVG } from '../render/apparelArt';
 import { storyClubEffectLabel } from '../sim/rpg/storyClubEffects';
 import { shipUpgradeById, upgradeDetail } from '../sim/rpg/storyShipUpgrades';
@@ -46,6 +46,18 @@ function rivalPortraitSVG(rivalId: string): string {
     default:
       return '';
   }
+}
+
+/** GS-story-sigil-rivals: a FRIEND rival's portrait — their real golfer figure (corrupted Coil garb +
+ *  venom tint when they've fallen), sized for the rival-card slot. */
+function friendRivalFigure(golferId: string, corrupted: boolean, uid: string): string {
+  const ch = getCharacter(golferId);
+  if (!ch) return '';
+  const opts = corrupted
+    ? { ...corruptedLookOpts(ch), uid, w: 84, h: 220 }
+    : { skin: ch.style.skin, shirtBase: ch.style.shirt, capColor: ch.style.cap, hair: ch.style.hair, uid, w: 84, h: 220 };
+  const fig = golferPreviewSVG(undefined, undefined, undefined, opts);
+  return corrupted ? `<span style="display:block;filter:${COIL_FIGURE_TINT};">${fig}</span>` : fig;
 }
 
 /** GS-story-tournament-midpop: the halftime line — the rival BRAGS when they're ahead, or CURSES you when
@@ -192,14 +204,19 @@ export function storyTournamentScreen(): string {
   }
   const who = getCharacter(story.characterId)?.name ?? 'Champion';
   const whoShort = getCharacter(story.characterId)?.shortName ?? 'You';
-  const intro = t.intro.map((p) => `<p class="gs-tourn-lore">${p}</p>`).join('');
-  const portrait = rivalPortraitSVG(t.rivalId);
+  // GS-story-sigil-rivals: the rival is resolved from the player's OWN story — on the back-half Sigils
+  // it's the betrayal-arc friend (their real figure + their own voice), never a mismatched NPC.
+  const rival = tournamentRival(t, story);
+  const intro = tournamentIntroLines(t, story).map((p) => `<p class="gs-tourn-lore">${p}</p>`).join('');
+  const portrait = rival.golferId
+    ? friendRivalFigure(rival.golferId, !!rival.corrupted, 'trival')
+    : rivalPortraitSVG(rival.id);
   // GS-story-partners: a TEAM Sigil shows the partner PICKER (and tees off WITH them); a solo major shows
   // the friendly-rival field chips as before.
   const team = isTeamTournament(t);
   const partnerName = team ? getCharacter(selectedPartnerId(t, story))?.shortName ?? 'a friend' : '';
   // GS-story-tournament-field: the field you'll play — the rival, your three friends, and you.
-  const competitors = tournamentCompetitors(t, story.characterId);
+  const competitors = tournamentCompetitors(t, story.characterId, rival);
   const fieldChips = [
     ...competitors.map(
       (c) =>
@@ -209,7 +226,7 @@ export function storyTournamentScreen(): string {
   ].join('');
   const isTeamMatch = isTeamMatchTournament(t); // Ch.5 — 2v2 scramble matchplay (the betrayal finale)
   const isSinglesMatch = isSinglesMatchTournament(t); // Ch.3 — 1v1 singles matchplay vs the rival
-  const rivalFirst = t.rivalName.split(' ')[0];
+  const rivalFirst = rival.name.split(' ')[0];
   // A singles-match / solo strokeplay major both show the friendly-rival field; the 2v2 shows the matchup
   // box; a team-stroke major shows the partner picker.
   const fieldOrPicker = isTeamMatch
@@ -245,11 +262,15 @@ export function storyTournamentScreen(): string {
     </header>
     <section style="max-width:520px;margin:8px auto 0;">
       <div class="gs-tourn-card gs-tourn-in gs-tourn-in2">
-        <div class="gs-tourn-portrait">${portrait || `<div class="gs-tourn-emblem">${rivalGlyph(t.rivalId)}</div>`}</div>
+        <div class="gs-tourn-portrait">${portrait || `<div class="gs-tourn-emblem">${rivalGlyph(rival.id)}</div>`}</div>
         <div class="gs-tourn-cardbody">
-          <div class="gs-tourn-rivallabel">Your rival</div>
-          <div class="gs-tourn-rivalname">${t.rivalName}</div>
-          <p class="gs-tourn-taunt">${rivalTaunt(t.rivalId)}</p>
+          <div class="gs-tourn-rivallabel">${
+            // GS-story-sigil-rivals: name the relationship, not just "your rival" — the heartbroken friend
+            // barring your way (Herald) vs the friend the Coil is wearing (Warden Ch.5).
+            rival.voice === 'confront' ? 'Your friend — barring your way' : rival.voice === 'corrupt' ? 'Your friend — lost to the Coil' : 'Your rival'
+          }</div>
+          <div class="gs-tourn-rivalname">${rival.name}</div>
+          <p class="gs-tourn-taunt">${rival.golferId && rival.voice ? friendRivalTaunt(rival.golferId, rival.voice) : rivalTaunt(rival.id)}</p>
         </div>
       </div>
       ${fieldOrPicker}
@@ -281,7 +302,18 @@ export function storyTournamentPopScreen(): string {
   if (!p) {
     return `<div style="max-width:420px;margin:24px auto 0;"><button class="gs-btn" data-action='${JSON.stringify({ type: 'tournamentPopContinue' })}'>Play on ›</button></div>`;
   }
-  const portrait = rivalPortraitSVG(p.rivalId);
+  // GS-story-sigil-rivals: a FRIEND rival struts on as themselves — their real figure (corrupted on the
+  // Warden Ch.5 shrine) and their own betrayal-voice halftime line.
+  const portrait = p.rivalGolferId
+    ? friendRivalFigure(p.rivalGolferId, !!p.rivalCorrupted, 'tpop')
+    : rivalPortraitSVG(p.rivalId);
+  const halftime =
+    p.rivalGolferId && p.rivalVoice ? friendRivalHalftime(p.rivalGolferId, p.rivalVoice, p.brag) : rivalHalftimeLine(p.rivalId, p.brag);
+  const gloatLabel = p.rivalVoice
+    ? p.brag
+      ? p.rivalVoice === 'corrupt' ? 'Your fallen friend gloats' : 'Your friend pleads'
+      : p.rivalVoice === 'corrupt' ? 'Your fallen friend falters' : 'Your friend hopes'
+    : p.brag ? 'Your rival gloats' : 'Your rival seethes';
   const diff = p.playerThru - p.rivalThru;
   const standing = p.brag
     ? `${p.rivalName.split(' ')[0]} leads you by ${diff} through nine.`
@@ -297,9 +329,9 @@ export function storyTournamentPopScreen(): string {
       <div class="gs-tourn-card gs-tourn-in gs-tourn-in2" style="${p.brag ? '' : 'border-left-color:#4fe08a;'}">
         <div class="gs-tourn-portrait">${portrait || `<div class="gs-tourn-emblem">${rivalGlyph(p.rivalId)}</div>`}</div>
         <div class="gs-tourn-cardbody">
-          <div class="gs-tourn-rivallabel" style="${p.brag ? '' : 'color:#7fe0a0;'}">${p.brag ? 'Your rival gloats' : 'Your rival seethes'}</div>
+          <div class="gs-tourn-rivallabel" style="${p.brag ? '' : 'color:#7fe0a0;'}">${gloatLabel}</div>
           <div class="gs-tourn-rivalname">${p.rivalName}</div>
-          <p class="gs-tourn-taunt">${rivalHalftimeLine(p.rivalId, p.brag)}</p>
+          <p class="gs-tourn-taunt">${halftime}</p>
         </div>
       </div>
       <div class="gs-tourn-fieldbox gs-tourn-in gs-tourn-in3" style="text-align:center;">

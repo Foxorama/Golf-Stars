@@ -323,6 +323,12 @@ export interface UiState {
     brag: boolean;
     playerThru: number;
     rivalThru: number;
+    /** GS-story-sigil-rivals: set when the rival is one of the playable FRIENDS — their golfer id (draw
+     *  their real figure) + which betrayal-voice context they speak (`confront` = the heartbroken Warden
+     *  friend, `corrupt` = the Coil-garbed defector, who also wears the corrupted tint). */
+    rivalGolferId?: string;
+    rivalVoice?: 'confront' | 'corrupt';
+    rivalCorrupted?: boolean;
   };
   /** GS-story-yggdrasil: the finale recap payload (win/lose + which gate fell short). Transient. */
   lastStoryFinale?: { won: boolean; failReason?: 'firepower' | 'defence'; strike?: 'clean' | 'graze' };

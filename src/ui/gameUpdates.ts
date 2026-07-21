@@ -51,7 +51,7 @@ import { shipCreditMult, grantStoryAceShip, grantStoryShip } from '../sim/rpg/st
 import { recordCaddyRound } from '../sim/rpg/storyCaddies';
 import { upgradeCreditMult, grantShipUpgrade } from '../sim/rpg/storyShipUpgrades';
 import { storyGearCreditMult } from '../sim/rpg/storyGear';
-import { tournamentForChapter, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS, isStoryQualifier, chapterQualifierEvents, isTeamTournament, isSinglesMatchTournament, isTeamMatchTournament, teamFieldPairs, teamPartnerOrDefault, TEAM_PARTNER_EDGE } from '../sim/rpg/storyTournaments';
+import { tournamentForChapter, tournamentRival, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS, isStoryQualifier, chapterQualifierEvents, isTeamTournament, isSinglesMatchTournament, isTeamMatchTournament, teamFieldPairs, teamPartnerOrDefault, TEAM_PARTNER_EDGE } from '../sim/rpg/storyTournaments';
 import { resolveStoryTeamStroke, resolveStory2v2Match, resolveStorySinglesMatch, opposingField } from '../sim/rpg/storyTeams';
 import { finaleMatchup } from '../sim/rpg/storyBetrayal';
 import { qualifierField, qualifierPlacement, recordQualifier, qualifiedCount, qualifyTop, QUALIFY_EVENTS_NEEDED } from '../sim/rpg/storyQualifiers';
@@ -481,10 +481,13 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
 
   const pars = state.course.holes.map((h) => h.par);
   const playerName = getCharacter(base.characterId)?.shortName ?? 'You';
+  // GS-story-sigil-rivals: the back-half rivals are resolved from the player's OWN story (the betrayal
+  // arc), so the ghost, the recap name, and the dialogue all read one person.
+  const rival = tournamentRival(t, base);
 
   let won: boolean;
   let rivalGross: number;
-  let rivalName = t.rivalName;
+  let rivalName = rival.name;
   let playerGross = totals.gross;
   let matchPayload:
     | { kind: 'singles' | 'team'; scoreline: string; thru: number; holesUp: number; allyName?: string; oppNames?: [string, string]; herald?: boolean }
@@ -538,7 +541,7 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
     // GS-story-sigil-formats: the Ch.3 Storm Championship is a 1v1 SINGLES MATCHPLAY — just you vs the
     // Apostate, hole by hole, the lower score takes the hole (win OR halve the match → the Sigil). The
     // rival's per-hole cards ride the SAME strokes stream as `rivalTotal` (difficulty tracks `rivalEdge`).
-    const res = resolveStorySinglesMatch(played.map((p) => p.record.strokes), t.rivalId, t.rivalEdge, String(run.seed), pars);
+    const res = resolveStorySinglesMatch(played.map((p) => p.record.strokes), rival.id, t.rivalEdge, String(run.seed), pars);
     won = res.playerAdvances; // win OR halve advances (the campaign's matchplay convention)
     playerGross = res.holesUp; // the match payload carries the real result; keep a number for the type
     rivalGross = 0;
@@ -570,11 +573,11 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
     matchPayload = { kind: 'team', scoreline: res.scoreline, allyName: m.allyName, oppNames: m.oppNames, thru: res.thru, holesUp: res.holesUp, herald: m.herald };
     leaderboard = []; // no stroke leaderboard for matchplay (the recap shows the scoreline + teams)
   } else {
-    rivalGross = rivalTotal(t, String(run.seed), pars);
+    rivalGross = rivalTotal(t, String(run.seed), pars, rival);
     won = totals.gross <= rivalGross;
     // GS-story-tournament-field: the full "all competitors" leaderboard for the victory recap — the rival +
     // your three friendly-rival golfers + you, sorted low-gross-first. Display only; deterministic.
-    const field = tournamentField(t, String(run.seed), pars, base.characterId);
+    const field = tournamentField(t, String(run.seed), pars, base.characterId, rival);
     leaderboard = tournamentLeaderboard(field, playerName, totals.gross).map((g) => ({
       name: g.kind === 'player' ? 'You' : g.name,
       gross: g.gross,

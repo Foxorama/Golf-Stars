@@ -82,7 +82,7 @@ import { claimCharacterQuest } from '../sim/rpg/characterQuests';
 import { acceptQuest, completeQuest, activeQuest, questWorld, startableQuestForWorld } from '../sim/rpg/storyQuests';
 import { isStoryShipId, buyStoryShip, equipStoryShip, worldIsShipVendor } from '../sim/rpg/storyShips';
 import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
-import { currentTournament, tournamentForChapter, rivalTotalThrough, isTeamTournament, teamPartnerOrDefault } from '../sim/rpg/storyTournaments';
+import { currentTournament, tournamentForChapter, tournamentRival, rivalTotalThrough, isTeamTournament, teamPartnerOrDefault } from '../sim/rpg/storyTournaments';
 import { finaleUnlocked, finaleResult, winFinale } from '../sim/rpg/storyFinale';
 import { interludeSeen, applyInterlude } from '../sim/rpg/storyInterlude';
 import type { GearSlot } from '../sim/rpg/story';
@@ -1383,18 +1383,22 @@ export function reduce(state: UiState, action: Action): UiState {
         const t = tournamentForChapter(state.run.storyTournament, state.story?.alignment);
         if (t) {
           const pars = state.course.holes.map((h) => h.par);
-          const rivalThru = rivalTotalThrough(t, String(state.run.seed), pars, 9);
+          // GS-story-sigil-rivals: the pop speaks as the EFFECTIVE rival (the betrayal-arc friend on the
+          // back-half Sigils), with their figure + voice context carried on the payload.
+          const rival = tournamentRival(t, state.story);
+          const rivalThru = rivalTotalThrough(t, String(state.run.seed), pars, 9, rival);
           const playerThru = stopPlayed.reduce((s, p) => s + p.record.strokes, 0);
           return {
             ...state,
             stopPlayed,
             screen: 'storyTournamentPop',
             storyTournamentMidPop: {
-              rivalId: t.rivalId,
-              rivalName: t.rivalName,
+              rivalId: rival.id,
+              rivalName: rival.name,
               brag: rivalThru < playerThru, // rival ahead (fewer strokes) → they brag; else they curse you
               playerThru,
               rivalThru,
+              ...(rival.golferId ? { rivalGolferId: rival.golferId, rivalVoice: rival.voice, rivalCorrupted: rival.corrupted } : {}),
             },
           };
         }

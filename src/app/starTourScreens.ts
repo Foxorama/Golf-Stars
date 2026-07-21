@@ -26,6 +26,7 @@ import { bestStrokeFor, bestStrokeRounds } from '../sim/rpg/strokePlay';
 import { STORY_WORLDS, storyWorldUnlocked, STORY_CHAPTER_COUNT, worldCleared } from '../sim/rpg/story';
 import { storyWorldNav, storyWorldMarker, type StoryWorldNav } from '../sim/rpg/storyMapNav';
 import { qualifyTop } from '../sim/rpg/storyQualifiers';
+import { tournamentRival } from '../sim/rpg/storyTournaments';
 import { storyWorldShoppable, worldHasShop } from '../sim/rpg/storyShop';
 import { worldIsShipVendor } from '../sim/rpg/storyShips';
 import { ownedCategoryCount } from '../sim/rpg/storyShipUpgrades';
@@ -415,7 +416,8 @@ function storyNavSectionsHTML(w: StarTourWorld, nav: StoryWorldNav | undefined):
   if (nav.venue) {
     const v = nav.venue;
     const t = v.tournament;
-    const rival = t.rivalName.split(' ')[0];
+    // GS-story-sigil-rivals: name the EFFECTIVE rival (the betrayal-arc friend on the back-half Sigils).
+    const rival = tournamentRival(t, state.story).name.split(' ')[0];
     if (v.ready) {
       out += `
         <div class="gs-st-rec" style="margin-top:10px;padding:10px 12px;background:linear-gradient(180deg,#2a2410,#1c1808);border:1px solid #6a5320;border-radius:10px;">
