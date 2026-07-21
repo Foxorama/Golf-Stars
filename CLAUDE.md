@@ -1259,7 +1259,14 @@ these systems** — each bullet is the tip of a documented iceberg.
     format opens on the `'hole'` step (map + Tee Off), so a route jump lands one tap from teeing off
     instead of on a briefing/leaderboard the player just saw (GS-intro-endless for the Unending
     Universe, GS-intro-voyage for the Voyage); the briefing stays one `‹ Briefing` tap away. Stop 0
-    (from character select) keeps the `'arc'` step — it's the mode lobby with `Change golfer`.
+    (from character select) keeps the `'arc'` step — it's the mode lobby with `Change golfer`. STAR /
+    STORY TOUR (strokeplay) SKIPS the arc entirely (GS-story-tour): a records chase / campaign round has
+    NO "Change golfer" lobby (on the Story path it pointed at the wrong roster — you've already committed
+    to your champion + course on the star map), so every strokeplay launch (`pickStarTourCourse` /
+    `storyPlayWorld` / `playStoryQuest` / `storyStartQuest` / `storyPlayTournament`) opens straight on the
+    `'hole'` step with NO back-to-arc button. The entry sub-step is chosen by the shared `introEntryStage`
+    (used by BOTH the live dispatch entry and the `?screen=strokeintro` deep-link so they never disagree);
+    guarded by a `tests/build.test.ts` browser smoke (hole step + Tee Off, no arc chrome).
   - The post-stop recap (`resultScreen`) is a pure render off `state` — rarity-framed panel, stat
     tiles, clickable hole-by-hole strip.
   - The title is a hero wordmark + THREE GAME tiles (GS-star-tour) reusing the doorway component
