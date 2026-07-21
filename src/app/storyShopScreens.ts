@@ -22,7 +22,10 @@ import {
   storyCardOwned,
   storyCardEquipped,
   canBuyStoryCard,
+  storyShopSlotView,
   WORLD_SHOP_INTRO,
+  type StorySlotView,
+  type SlotRelation,
 } from '../sim/rpg/storyShop';
 
 /**
@@ -70,8 +73,10 @@ function proShopSceneHTML(archetype: BiomeArchetype, worldName: string): string 
       <rect x="0" y="120" width="400" height="10" fill="#8a6034"/>
       <rect x="0" y="130" width="400" height="20" fill="url(#sshs-counter)"/>
     </svg>
-    <span class="gs-sshop-pro" title="${worldName}'s club pro">${proAvatarSVG(archetype, 66, 78)}</span>
-    <span class="gs-sshop-proplate">${worldName} pro</span>
+    <span class="gs-sshop-procorner">
+      <span class="gs-sshop-pro" title="${worldName}'s club pro">${proAvatarSVG(archetype, 66, 78)}</span>
+      <span class="gs-sshop-proplate">${worldName} pro</span>
+    </span>
   </div>`;
 }
 
@@ -121,9 +126,7 @@ export function storyShopScreen(): string {
     </header>
     <section style="max-width:560px;margin:2px auto 0;">
       ${proShopSceneHTML(archetype, courseName)}
-      <p style="text-align:center;color:var(--gs-dim);font-size:13px;line-height:1.5;margin:8px 0 10px;">
-        <em>${intro}</em>
-      </p>
+      <p class="gs-sshop-intro">“<em>${intro}</em>”</p>
       ${body}
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:16px auto 0;">
@@ -134,10 +137,14 @@ export function storyShopScreen(): string {
     <style>
       .gs-sshop-scene{position:relative;width:100%;aspect-ratio:400/150;max-height:160px;border-radius:14px;
         overflow:hidden;border:1px solid #3a2f1f;margin:6px 0 2px;box-shadow:0 6px 20px -12px #000a;}
-      .gs-sshop-pro{position:absolute;right:14%;bottom:6px;width:20%;max-width:70px;filter:drop-shadow(0 4px 6px #000a);}
+      .gs-sshop-procorner{position:absolute;right:10px;bottom:4px;display:flex;flex-direction:column;
+        align-items:center;gap:2px;filter:drop-shadow(0 4px 6px #000a);}
+      .gs-sshop-pro{width:60px;}
       .gs-sshop-pro svg{width:100%;height:auto;display:block;}
-      .gs-sshop-proplate{position:absolute;right:8%;bottom:4px;font-size:10px;font-weight:700;color:#e8dcc0;
+      .gs-sshop-proplate{font-size:10px;font-weight:700;color:#e8dcc0;
         background:#2a1c10cc;border:1px solid #5a4326;border-radius:8px;padding:1px 6px;white-space:nowrap;}
+      .gs-sshop-intro{text-align:center;color:var(--gs-dim,#9fb0c8);font-size:13px;line-height:1.5;
+        margin:10px auto 12px;max-width:460px;}
       .gs-sshop-sec{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gs-dim,#9fb0c8);
         margin:12px 0 8px;padding-bottom:4px;border-bottom:1px solid #232b3b;}
       .gs-sshop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
@@ -149,6 +156,10 @@ export function storyShopScreen(): string {
       .gs-sshop-art svg{width:100%;height:100%;}
       .gs-sshop-name{font-size:13.5px;font-weight:700;color:var(--gs-ink,#eaf1fb);line-height:1.2;}
       .gs-sshop-blurb{font-size:11px;color:var(--gs-dim,#9fb0c8);line-height:1.3;min-height:2.2em;}
+      .gs-sshop-slot{display:inline-block;max-width:100%;font-size:10.5px;font-weight:700;line-height:1.2;
+        padding:2px 7px;border-radius:999px;border:1px solid #2a3346;background:#0b0f18cc;
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .gs-sshop-card--have{opacity:0.82;}
       .gs-sshop-price{font-size:13px;font-weight:800;color:var(--gs-gold,#e9c46a);}
       .gs-sshop-price--no{color:#c86a6a;}
       .gs-sshop-empty{text-align:center;color:var(--gs-dim,#9fb0c8);font-size:13px;
@@ -156,17 +167,43 @@ export function storyShopScreen(): string {
     </style>`;
 }
 
-/** One rack card (art + name + blurb + price). Tapping opens the lore card. Works for any rack id. */
+/** GS-story-shop-slots: the per-relation chip colour + label — so a glance tells you Equipped / Owned /
+ *  Upgrade / Sidegrade / Lower-tier / New, and what's in the slot now, without opening the locker. */
+const REL_STYLE: Record<SlotRelation, { col: string; icon: string; word: string }> = {
+  equipped: { col: '#7fe0a0', icon: '✓', word: 'Equipped' },
+  owned: { col: '#9fb0c8', icon: '✓', word: 'Owned' },
+  upgrade: { col: '#e9c46a', icon: '↑', word: 'Upgrade' },
+  sidegrade: { col: '#6ab6ff', icon: '↔', word: 'Sidegrade' },
+  downgrade: { col: '#b08a5a', icon: '↓', word: 'Lower tier' },
+  new: { col: '#8fe6c0', icon: '✦', word: 'New' },
+};
+
+/** The slot-state line for a rack card / the lore card: what fills the slot now + the upgrade relation. */
+function slotLineHTML(v: StorySlotView): string {
+  const s = REL_STYLE[v.relation];
+  let text: string;
+  if (v.relation === 'equipped') text = `${s.icon} Equipped now`;
+  else if (v.relation === 'owned') text = `${s.icon} Owned · benched`;
+  else if (v.relation === 'new') text = `${s.icon} New ${v.slotWord}`;
+  else text = `${s.icon} ${s.word} · now ${v.equippedName ?? '—'}`;
+  return `<span class="gs-sshop-slot" style="color:${s.col};border-color:${s.col}44;">${text}</span>`;
+}
+
+/** One rack card (art + name + blurb + slot/upgrade state + price). Tapping opens the lore card. */
 function rackCard(id: string): string {
   const card = storyCardFor(id);
   if (!card) return '';
   const afford = state.story ? state.story.credits >= card.price : false;
   const ac = rarCol(card.rarity);
+  const v = state.story ? storyShopSlotView(state.story, id) : undefined;
+  const slot = v ? slotLineHTML(v) : '';
+  const dim = v && (v.relation === 'owned' || v.relation === 'equipped') ? ' gs-sshop-card--have' : '';
   return `
-    <div class="gs-sshop-card" style="--ac:${ac};" data-action='${JSON.stringify({ type: 'storyInspectItem', itemId: id })}'>
+    <div class="gs-sshop-card${dim}" style="--ac:${ac};" data-action='${JSON.stringify({ type: 'storyInspectItem', itemId: id })}'>
       <span class="gs-sshop-art" aria-hidden="true">${cardArt(id)}</span>
       <span class="gs-sshop-name">${card.name}</span>
       <span class="gs-sshop-blurb">${card.blurb}</span>
+      ${slot}
       <span class="gs-sshop-price${afford ? '' : ' gs-sshop-price--no'}">✦ ${card.price}</span>
     </div>`;
 }
@@ -179,6 +216,21 @@ function inspectOverlay(itemId: string): string {
   const owned = storyCardOwned(story, itemId);
   const equipped = storyCardEquipped(story, itemId);
   const equippedWord = card.kind === 'club' ? 'in your bag' : 'equipped';
+  // GS-story-shop-slots: a comparison line at the top of the card's detail, so you see what this replaces
+  // and whether it's an upgrade before you buy — no need to close the shop and open the locker.
+  const v = storyShopSlotView(story, itemId);
+  const compare: string[] = [];
+  if (v && !v.equipped) {
+    if (v.relation === 'owned') {
+      compare.push('✓ Owned — benched in your locker.');
+    } else if (v.equippedName) {
+      const rel = REL_STYLE[v.relation];
+      compare.push(`In your ${v.slotWord} now: ${v.equippedName} — this is ${rel.icon} ${rel.word.toLowerCase()}.`);
+    } else {
+      compare.push(`Fills an empty ${v.slotWord} — you carry nothing here yet.`);
+    }
+  }
+  const detail = [...compare, ...card.detail];
   let footer: string;
   if (owned) {
     footer = `<div class="gs-sshop-owned">✓ Owned${equipped ? ` · ${equippedWord}` : ' · in the locker'}</div>`;
@@ -193,7 +245,7 @@ function inspectOverlay(itemId: string): string {
       name: card.name,
       tag: card.tag,
       accent: rarCol(card.rarity),
-      detail: card.detail,
+      detail,
       lore: card.lore,
       footerHTML: footer,
       closeAttr: 'data-story-item-close="1"',

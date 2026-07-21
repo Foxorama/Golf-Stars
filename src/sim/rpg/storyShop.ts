@@ -18,7 +18,7 @@
 import type { Rarity } from '../course/contract';
 import { clubById } from '../clubs';
 import { clubSetById, buildRewardClub, isDistanceType, type ClubSet } from './economy';
-import { addCredits, equipStoryClub, worldCleared, type StoryState } from './story';
+import { addCredits, equipStoryClub, worldCleared, resolveStoryClub, storyClubType, type StoryState } from './story';
 import {
   STORY_GEAR_STOCK,
   storyGearById,
@@ -357,6 +357,75 @@ export function buyStoryCard(story: StoryState, id: string): StoryState {
   }
   const g = storyGearById(id);
   return g ? buyStoryGear(story, g) : story;
+}
+
+// ── Slot / upgrade view (GS-story-shop-slots) — so the Pro Shop can show, per item, WHAT you have in that
+// slot and whether the item is an UPGRADE, without leaving the shop to open the locker. Pure; the screen
+// renders a badge off it.
+
+const RARITY_RANK: Record<Rarity, number> = { common: 0, rare: 1, epic: 2, legendary: 3 };
+
+/** How a rack item relates to what you currently have in its slot / bag-type. */
+export type SlotRelation = 'equipped' | 'owned' | 'upgrade' | 'sidegrade' | 'downgrade' | 'new';
+
+/** The at-a-glance slot state for a rack item — what fills its slot now + whether this is an upgrade. */
+export interface StorySlotView {
+  /** The slot's human word: a gear slot ("Glove"/"Sponsor Bag") or a club-type name ("3-Wood"). */
+  slotWord: string;
+  /** The name of what currently fills the slot / that bag-type (undefined = the slot is empty). */
+  equippedName?: string;
+  /** Do you already own this exact item? */
+  owned: boolean;
+  /** Is this exact item the one equipped/carried right now? */
+  equipped: boolean;
+  /** Relation of THIS item to what's equipped (by rarity tier — the game's power ordering). */
+  relation: SlotRelation;
+}
+
+/** Compare two rarities as an upgrade/sidegrade/downgrade (the tier is the game's own power proxy). */
+function relByRarity(a: Rarity, b: Rarity): SlotRelation {
+  const d = RARITY_RANK[a] - RARITY_RANK[b];
+  return d > 0 ? 'upgrade' : d < 0 ? 'downgrade' : 'sidegrade';
+}
+
+/**
+ * The slot/upgrade view for any rack id (club or gear), so the shop can render "in your Glove now:
+ * Vice-Grip · ↔ Sidegrade" without opening the locker. Gear compares against the item equipped in its
+ * SLOT; a club compares against the club of the same TYPE carried in the bag. Undefined for a bad id.
+ */
+export function storyShopSlotView(story: StoryState, id: string): StorySlotView | undefined {
+  const card = storyCardFor(id);
+  if (!card) return undefined;
+  if (id.startsWith('gear:')) {
+    const g = storyGearById(id);
+    if (!g) return undefined;
+    const equippedId = story.equippedGear[g.slot];
+    const equippedItem = equippedId ? storyGearById(equippedId) : undefined;
+    const owned = story.ownedGearIds.includes(id);
+    const equipped = equippedId === id;
+    const relation: SlotRelation = equipped
+      ? 'equipped'
+      : owned
+        ? 'owned'
+        : !equippedItem
+          ? 'new'
+          : relByRarity(card.rarity, equippedItem.rarity);
+    return { slotWord: GEAR_SLOT_WORD[g.slot] ?? 'Gear', equippedName: equippedItem?.name, owned, equipped, relation };
+  }
+  // A club: compare against the club of the same TYPE already in the bag (upgrade-in-place).
+  const type = storyClubType(id);
+  const equippedBid = story.equippedBagIds.find((bid) => storyClubType(bid) === type);
+  const equippedClub = equippedBid ? resolveStoryClub(equippedBid) : undefined;
+  const owned = story.ownedClubIds.includes(id);
+  const equipped = story.equippedBagIds.includes(id);
+  const relation: SlotRelation = equipped
+    ? 'equipped'
+    : owned
+      ? 'owned'
+      : !equippedClub
+        ? 'new'
+        : relByRarity(card.rarity, equippedClub.rarity ?? 'common');
+  return { slotWord: clubById(type)?.name ?? type, equippedName: equippedClub?.name, owned, equipped, relation };
 }
 
 /** The gear rack for a world (re-exported so the screen imports one module). */
