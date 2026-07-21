@@ -273,6 +273,13 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
   let solarStream: { x: number; y: number; spd: number; len: number; ph: number }[] = [];
   let darkBlobs: { x: number; y: number; r: number; spd: number; ph: number; col: number }[] = [];
   let radiantSun: { x: number; y: number; r: number } | null = null;
+  // GS-weather-depth showpieces, each on its OWN seeded stream (rng5) — the storm skies gain a rolling
+  // CLOUD BANK with real body, the ion storm a driving charged rain, and the new acid-rain sky its
+  // slanting downpour + ground sizzles. Same "own stream" rule as rng2/rng3/rng4: adding these leaves
+  // every earlier scatter byte-identical.
+  let stormClouds: { x: number; y: number; r: number; spd: number; ph: number; puffs: { ox: number; oy: number; rr: number }[] }[] = [];
+  let rainDrops: { x: number; y: number; spd: number; len: number; ph: number }[] = [];
+  let sizzles: { x: number; y: number; off: number; s: number }[] = [];
 
   function build(): void {
     const rng = mulberry32(o.seed);
@@ -401,6 +408,34 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
     }));
     // Radiant: ONE brilliant star high in the sky, the source of the god-rays + the still bright wash.
     radiantSun = { x: W * (0.2 + rng4() * 0.6), y: H * (0.08 + rng4() * 0.14), r: Math.max(14, Math.min(W, H) * 0.05) };
+    // GS-weather-depth showpiece scatters — a FIFTH independent stream (see the declarations above).
+    const rng5 = mulberry32((o.seed ^ 0x94d049bb) >>> 0);
+    // Storm cloud bank: a few heavy multi-puff thunderheads rolling across the top of the sky — the
+    // BODY the storm skies were missing (a vignette + sparks reads thin; a cloud bank reads WEATHER).
+    stormClouds = Array.from({ length: 5 }, () => {
+      const r = Math.min(W, H) * (0.16 + rng5() * 0.12);
+      const puffs = Array.from({ length: 4 }, () => ({
+        ox: (rng5() * 2 - 1) * r * 1.1,
+        oy: (rng5() * 2 - 1) * r * 0.3,
+        rr: r * (0.45 + rng5() * 0.4),
+      }));
+      return { x: rng5() * W, y: H * (0.02 + rng5() * 0.14), r, spd: 3 + rng5() * 5, ph: rng5() * Math.PI * 2, puffs };
+    });
+    // Driving rain (ion storm + acid rain): fast slanted streaks in two depth weights.
+    rainDrops = Array.from({ length: 85 }, () => ({
+      x: rng5() * (W + 80),
+      y: rng5() * (H + 80),
+      spd: 0.75 + rng5() * 0.8,
+      len: 9 + rng5() * 15,
+      ph: rng5() * Math.PI * 2,
+    }));
+    // Acid-rain ground sizzles: fixed splash points that fizz on their own phase, biased low in the view.
+    sizzles = Array.from({ length: 26 }, () => ({
+      x: rng5() * W,
+      y: H * (0.35 + rng5() * 0.6),
+      off: rng5(),
+      s: 0.7 + rng5() * 0.9,
+    }));
     // The world's ambient air (GS-biome-feel): count scales with area like the starfield.
     const amb = AMBIENT[o.archetype];
     if (amb) {
@@ -513,6 +548,14 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
       g.addColorStop(0, 'rgba(26,16,48,0.36)');
       g.addColorStop(0.55, 'rgba(30,20,54,0.18)');
       g.addColorStop(1, 'rgba(24,16,44,0.06)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+    } else if (effect === 'acidRain') {
+      // A sickly caustic pall pressing down out of the storm bank — green-tinged, heaviest at the sky.
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, 'rgba(46,82,30,0.30)');
+      g.addColorStop(0.55, 'rgba(52,90,38,0.13)');
+      g.addColorStop(1, 'rgba(40,72,30,0.04)');
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, W, H);
     }
@@ -822,6 +865,81 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
     ctx.restore();
   }
 
+  /**
+   * The rolling storm CLOUD BANK (GS-weather-depth): heavy multi-puff thunderheads drifting across
+   * the top of the sky, occluding the stars — the physical BODY every storm sky was missing (an edge
+   * vignette + sparks read as a filter, not weather). `body` is the cloud's dark fill rgb triplet,
+   * `rim` the lit under-edge rgb; `lit` (0..1) flashes the whole bank brighter while lightning is up
+   * so the clouds visibly BACK-LIGHT. Kept to the top ~fifth of the view so the course stays clear.
+   */
+  function drawCloudBank(ctx: CanvasRenderingContext2D, now: number, body: string, rim: string, lit: number): void {
+    ctx.save();
+    for (const c of stormClouds) {
+      const x = wrap(c.x + now * 0.001 * c.spd, W + c.r * 3) - c.r * 1.5;
+      const y = c.y + Math.sin(now * 0.0003 + c.ph) * 6;
+      // The cloud MASS: a filled, softly-fading blob per puff — its tint sits LIGHTER than the deep
+      // sky so the bank reads as solid weather, never a hollow ring outline.
+      for (const p of c.puffs) {
+        const rr = p.rr * (1 + 0.05 * Math.sin(now * 0.0006 + c.ph + p.ox));
+        const g = ctx.createRadialGradient(x + p.ox, y + p.oy, 0, x + p.ox, y + p.oy, rr);
+        g.addColorStop(0, `rgba(${body},${(0.62 + 0.2 * lit).toFixed(3)})`);
+        g.addColorStop(0.55, `rgba(${body},${(0.42 + 0.16 * lit).toFixed(3)})`);
+        g.addColorStop(1, `rgba(${body},0)`);
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x + p.ox, y + p.oy, rr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Back-lit while lightning is up: an additive underglow bloom inside the mass, so a strike
+      // visibly lights its cloud from within instead of ringing it.
+      if (lit > 0.04) {
+        ctx.globalCompositeOperation = 'lighter';
+        for (const p of c.puffs) {
+          const g = ctx.createRadialGradient(x + p.ox, y + p.oy, 0, x + p.ox, y + p.oy, p.rr * 0.9);
+          g.addColorStop(0, `rgba(${rim},${(0.2 * lit).toFixed(3)})`);
+          g.addColorStop(1, `rgba(${rim},0)`);
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(x + p.ox, y + p.oy, p.rr * 0.9, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalCompositeOperation = 'source-over';
+      }
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Driving RAIN (GS-weather-depth): fast streaks slanting DOWN the view, leaning with the wind — a
+   * downpour, unmistakably distinct from the horizontal wind streaks. `col` is the drop rgb triplet;
+   * `surge` (0..1) scales density/speed so a gusting storm's rain visibly drives harder.
+   */
+  function drawRain(ctx: CanvasRenderingContext2D, now: number, col: string, surge: number): void {
+    const [wx] = windUnit(0.5, 0);
+    // Mostly down, leaning into the wind's horizontal push.
+    const dl = Math.hypot(wx * 0.55, 1);
+    const ux = (wx * 0.55) / dl;
+    const uy = 1 / dl;
+    ctx.save();
+    ctx.lineCap = 'round';
+    const count = Math.round(rainDrops.length * (0.6 + 0.4 * surge));
+    for (let i = 0; i < count; i++) {
+      const d = rainDrops[i]!;
+      const drift = now * 0.28 * d.spd * (0.7 + 0.5 * surge);
+      const x = wrap(d.x + ux * drift, W + 80) - 40;
+      const y = wrap(d.y + uy * drift, H + 80) - 40;
+      const len = d.len * (0.8 + 0.5 * surge);
+      const a = 0.16 + 0.22 * (0.5 + 0.5 * Math.sin(now * 0.004 + d.ph));
+      ctx.strokeStyle = `rgba(${col},${a.toFixed(3)})`;
+      ctx.lineWidth = d.spd > 1.1 ? 1.3 : 0.9;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - ux * len, y - uy * len);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   function drawSolarStorm(ctx: CanvasRenderingContext2D, now: number): void {
     // A red EDGE vignette (centre clear so the course reads), a pulsing corner flare, and crackling
     // arcs that flash on a seeded cadence with a bloom.
@@ -851,26 +969,29 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
     ctx.beginPath();
     ctx.arc(fx, fy, fr * 0.8, 0, Math.PI * 2);
     ctx.fill();
-    // Crackle: 3 arcs, each flashing for a slice of its own cycle.
+    ctx.restore();
+    // The angry ember thunderheads (GS-weather-depth) — flash-lit while a bolt is up, so the crackle
+    // reads as a STORM CELL discharging, not sparks in empty air.
+    let maxFlash = 0;
+    const fams: { cyc: number; phase: number; flash: number; k: number }[] = [];
     for (let k = 0; k < 3; k++) {
       const cyc = 1400 + k * 520;
       const phase = ((now + k * 470) % cyc) / cyc;
       const flash = phase < 0.12 ? 1 - phase / 0.12 : 0;
-      if (flash <= 0.02) continue;
-      const seed = mulberry32((o.seed ^ (k * 2654435761) ^ Math.floor(now / cyc)) >>> 0);
-      let x = seed() * W;
-      let y = seed() * H * 0.45;
-      ctx.strokeStyle = `rgba(255,170,110,${(0.7 * flash).toFixed(3)})`;
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      const segs = 4 + Math.floor(seed() * 3);
-      for (let s = 0; s < segs; s++) {
-        x += (seed() - 0.5) * 40;
-        y += 12 + seed() * 22;
-        ctx.lineTo(x, y);
-      }
-      ctx.stroke();
+      fams.push({ cyc, phase, flash, k });
+      maxFlash = Math.max(maxFlash, flash);
+    }
+    drawCloudBank(ctx, now, '78,40,36', '255,150,90', maxFlash);
+    // Crackle: 3 bolt families off the cloud bank, each a real glow-cored FORK with a warm sky flash.
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const f of fams) {
+      if (f.flash <= 0.02) continue;
+      // Whole-sky charge flash under the bolt — the red half-light of a flare storm.
+      ctx.fillStyle = `rgba(255,140,90,${(0.06 * f.flash).toFixed(3)})`;
+      ctx.fillRect(0, 0, W, H);
+      const seed = mulberry32((o.seed ^ (f.k * 2654435761) ^ Math.floor(now / f.cyc)) >>> 0);
+      drawFork(ctx, seed, seed() * W, H * 0.04 + seed() * H * 0.12, '255,170,110', f.flash, 1.6);
     }
     ctx.restore();
   }
@@ -925,6 +1046,19 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
     ctx.fillStyle = vig;
     ctx.fillRect(0, 0, W, H);
     ctx.restore();
+    // The storm cells themselves (GS-weather-depth): a violet thunderhead bank that back-lights on
+    // every strike, with a charged rain driving down out of it — the gustiest sky finally LOOKS it.
+    let maxFlash = 0;
+    const fams: { cyc: number; flash: number; k: number }[] = [];
+    for (let k = 0; k < 3; k++) {
+      const cyc = 1050 + k * 560;
+      const phase = ((now + k * 517) % cyc) / cyc;
+      const flash = phase < 0.11 ? 1 - phase / 0.11 : 0;
+      fams.push({ cyc, flash, k });
+      maxFlash = Math.max(maxFlash, flash);
+    }
+    drawCloudBank(ctx, now, '46,52,96', '150,175,255', maxFlash);
+    drawRain(ctx, now, '165,190,255', 0.5 + 0.5 * Math.sin(now * 0.0007));
     // Charged sparks riding the gusts — small bright motes with a glow, drifting fast.
     const sprite = glowSprite();
     ctx.save();
@@ -944,19 +1078,17 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
       ctx.fill();
     }
     ctx.restore();
-    // Forked lightning, two independent families — busier and brighter than the tempest flicker.
+    // Forked lightning, three independent families — busier and brighter than the tempest flicker,
+    // striking DOWN OUT of the cloud bank with a hard whole-sky charge flash.
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    for (let k = 0; k < 2; k++) {
-      const cyc = 1150 + k * 640;
-      const phase = ((now + k * 517) % cyc) / cyc;
-      const flash = phase < 0.11 ? 1 - phase / 0.11 : 0;
-      if (flash <= 0.02) continue;
+    for (const f of fams) {
+      if (f.flash <= 0.02) continue;
       // Whole-sky charge flash under the bolt.
-      ctx.fillStyle = `rgba(190,205,255,${(0.08 * flash).toFixed(3)})`;
+      ctx.fillStyle = `rgba(190,205,255,${(0.11 * f.flash).toFixed(3)})`;
       ctx.fillRect(0, 0, W, H);
-      const seed = mulberry32((o.seed ^ (k * 40503) ^ Math.floor(now / cyc) * 2654435761) >>> 0);
-      drawFork(ctx, seed, seed() * W, H * 0.02 + seed() * H * 0.12, '185,205,255', flash, 1.8);
+      const seed = mulberry32((o.seed ^ (f.k * 40503) ^ Math.floor(now / f.cyc) * 2654435761) >>> 0);
+      drawFork(ctx, seed, seed() * W, H * 0.04 + seed() * H * 0.14, '185,205,255', f.flash, 2.0);
     }
     ctx.restore();
   }
@@ -1457,6 +1589,55 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
     ctx.restore();
   }
 
+  // Acid rain (GS-weather-depth): the Hydra Mire's sky — a caustic green downpour driving out of a
+  // sickly storm bank, fizzing where it hits the ground. The corrosive acid POOLS it leaves on the
+  // turf are the matching physics half (the 'acid' ground patches); a rare acid-green fork cracks the
+  // bank so the mire keeps a flicker of its serpent-storm menace.
+  function drawAcidRain(ctx: CanvasRenderingContext2D, now: number): void {
+    // One slow lightning family — the flash is rarer and dimmer than the ion storm's (rain is the show).
+    const cyc = 4200;
+    const phase = ((now + (o.seed % 1231)) % cyc) / cyc;
+    const flash = phase < 0.09 ? 1 - phase / 0.09 : 0;
+    drawCloudBank(ctx, now, '42,62,34', '150,230,110', flash * 0.8);
+    const surge = 0.5 + 0.5 * Math.sin(now * 0.0006);
+    drawRain(ctx, now, '150,235,110', surge);
+    if (flash > 0.02) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `rgba(160,235,120,${(0.07 * flash).toFixed(3)})`;
+      ctx.fillRect(0, 0, W, H);
+      const seed = mulberry32((o.seed ^ Math.floor(now / cyc) * 2654435761) >>> 0);
+      drawFork(ctx, seed, seed() * W, H * 0.04 + seed() * H * 0.1, '150,235,110', flash * 0.8, 1.5);
+      ctx.restore();
+    }
+    // Ground SIZZLES: drops fizzing where they land — a quick bloom + a couple of rising gas motes,
+    // each splash point cycling on its own phase so the fizz crackles all over the low view.
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const z of sizzles) {
+      const t = wrap(z.off + now / 1900, 1);
+      if (t > 0.4) continue; // each point fizzes for a slice of its loop, then rests
+      const f = t / 0.4;
+      const fade = (1 - f) * (0.5 + 0.5 * surge);
+      // The splash ring blooming out flat on the ground.
+      ctx.strokeStyle = `rgba(170,240,130,${(0.4 * fade).toFixed(3)})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(z.x, z.y, z.s * (2 + 7 * f), z.s * (0.8 + 2.6 * f), 0, 0, Math.PI * 2);
+      ctx.stroke();
+      // A couple of caustic gas motes rising off the fizz.
+      for (let i = 0; i < 2; i++) {
+        const my = z.y - f * (7 + i * 5) * z.s;
+        const mx = z.x + Math.sin(f * 6 + i * 2.6) * 2.4;
+        ctx.fillStyle = `rgba(190,250,150,${(0.5 * fade).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(mx, my, 0.9 + z.s * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
   // --- Meteor STRIKES (GS-meteor-strikes) -----------------------------------------------------
   // One strike per STRIKE_PERIOD: pick a crater (seeded off the cycle index — deterministic in the
   // clock, no shared stream), dive a fireball into it along the sky lanes' fall direction, then an
@@ -1600,6 +1781,9 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
         break;
       case 'darkMatter':
         drawDarkMatter(ctx, now);
+        break;
+      case 'acidRain':
+        drawAcidRain(ctx, now);
         break;
       default:
         break;

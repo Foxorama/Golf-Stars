@@ -20,10 +20,10 @@
 
 import { state } from './ctx';
 import { STATIC_COURSES, staticCourseSpec } from '../sim/course/staticCourses';
-import { COURSE_EFFECTS, type CourseEffectId } from '../sim/rpg/effects';
+import { COURSE_EFFECTS, effectCarryMult, effectWindMult, type CourseEffectId } from '../sim/rpg/effects';
 import { starTourMapSVG, SHIP_DOCK_HEADING, YGGDRASIL_REALMS, type StarTourWorld } from '../render/starTourMap';
 import { bestStrokeFor, bestStrokeRounds } from '../sim/rpg/strokePlay';
-import { STORY_WORLDS, storyWorldUnlocked, STORY_CHAPTER_COUNT, worldCleared } from '../sim/rpg/story';
+import { STORY_WORLDS, storyWorldUnlocked, storyWorldEffect, STORY_CHAPTER_COUNT, worldCleared } from '../sim/rpg/story';
 import { storyWorldNav, storyWorldMarker, type StoryWorldNav } from '../sim/rpg/storyMapNav';
 import { qualifyTop } from '../sim/rpg/storyQualifiers';
 import { tournamentRival } from '../sim/rpg/storyTournaments';
@@ -177,17 +177,28 @@ export function starTourShipHovers(): boolean {
   return ship?.look.fly === 'hover';
 }
 
-/** The weather skies offered on the star map — atmospheric choices (the trade-camp / mechanic effects
- *  are excluded so a record round is never decided by a tent bounce). Ordered calm → wild. */
+/** The weather skies offered on the star map — the full atmospheric palette, GROUND-mark skies
+ *  included (GS-weather-depth: patches/craters are seeded off the hole geometry, so a chosen sky is
+ *  the same fair, repeatable test every round — a record under acid rain is comparable to every other
+ *  acid-rain round). Only the trade camp is excluded: a record decided by a tent bounce reads as a
+ *  gimmick, not weather. Ordered calm → wild. */
 export const STAR_TOUR_WEATHERS: readonly CourseEffectId[] = [
   'none',
   'moonlight',
   'nebula',
+  'eclipse',
   'aurora',
   'radiant',
+  'comet',
   'solarWind',
   'gravityWell',
+  'darkMatter',
+  'frostfall',
+  'spaceJunk',
+  'meteorShower',
   'dustStorm',
+  'solarStorm',
+  'acidRain',
   'ionStorm',
   'blizzard',
 ];
@@ -385,6 +396,24 @@ function stHud(): string {
     </div>`;
 }
 
+/** A read-only weather INFO line (GS-weather-depth): the sky's icon + name + its PLAY consequence —
+ *  wind/carry chips computed off the SAME physics tables the sim reads (so they can never drift) plus
+ *  the geometric play hook (craters / patches / tents). Makes a world's weather a READABLE part of the
+ *  test instead of an invisible multiplier — the Story dossier's designed-sky row and the free-roam
+ *  picker's selected-sky readout both use it. '' for clear skies. */
+function weatherInfoHTML(effectId: string): string {
+  const e = COURSE_EFFECTS[effectId as CourseEffectId];
+  if (!e || e.id === 'none') return '';
+  const chips: string[] = [];
+  const wind = effectWindMult(e.id);
+  const carry = effectCarryMult(e.id);
+  if (wind !== 1) chips.push(wind > 1 ? `💨 winds +${Math.round((wind - 1) * 100)}%` : `🍃 still air −${Math.round((1 - wind) * 100)}%`);
+  if (carry !== 1) chips.push(carry > 1 ? `🎈 shots fly +${Math.round((carry - 1) * 100)}%` : `⚓ shots fly −${Math.round((1 - carry) * 100)}%`);
+  if (e.play) chips.push(`🎯 ${e.play}`);
+  const detail = chips.length ? `<br><span style="opacity:.85;">${chips.join(' &nbsp;·&nbsp; ')}</span>` : '';
+  return `<div class="gs-st-rec" style="margin-top:6px;display:block;">${e.icon} <b>${e.label}</b> — <span style="opacity:.8;">${e.blurb}</span>${detail}</div>`;
+}
+
 /** The weather-picker chip row for the dossier. */
 function weatherPicker(): string {
   const chips = STAR_TOUR_WEATHERS.map((id) => {
@@ -479,8 +508,9 @@ function storyNavSectionsHTML(w: StarTourWorld, nav: StoryWorldNav | undefined):
 }
 
 /** The bottom dossier for a selected world — flavour, difficulty, your record, weather + play. In STORY
- *  mode (GS-story-map) it reads the campaign's own best, drops the weather picker (story worlds play their
- *  designed sky), and tees off into the campaign (`storyPlayWorld`) instead of a records round. */
+ *  mode (GS-story-map) it reads the campaign's own best, swaps the weather PICKER for a read-only row
+ *  showing the world's DESIGNED sky + its play consequence (GS-weather-depth), and tees off into the
+ *  campaign (`storyPlayWorld`) instead of a records round. */
 function dossier(w: StarTourWorld): string {
   const spec = staticCourseSpec(w.id);
   const story = inStoryTour();
@@ -547,8 +577,9 @@ function dossier(w: StarTourWorld): string {
       </div>
       <p class="gs-st-sheet__blurb">${spec?.blurb ?? ''}</p>
       ${recordLine}
+      ${story ? weatherInfoHTML(storyWorldEffect(w.id)) : ''}
       ${navSections}
-      ${story ? '' : `<div class="gs-st-sheet__wxlabel">Weather sky</div>${weatherPicker()}`}
+      ${story ? '' : `<div class="gs-st-sheet__wxlabel">Weather sky</div>${weatherPicker()}${weatherInfoHTML(starTourView.effect)}`}
       <button class="gs-st-play" data-action='${JSON.stringify(playAction)}'>▸ ${playLabel}</button>
       ${shopBtn}
       ${yardBtn}

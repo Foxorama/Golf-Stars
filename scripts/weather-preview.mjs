@@ -58,6 +58,7 @@ const CASES = [
   { effect: 'dustStorm', archetype: 'desert' },
   { effect: 'solarWind', archetype: 'inferno' },
   { effect: 'darkMatter', archetype: 'void' },
+  { effect: 'acidRain', archetype: 'swamp' },
 ];
 
 const html = `<!doctype html><meta charset="utf8">

@@ -37,7 +37,7 @@ import { lieAt } from './shot';
 import { greenRadius, centrelinePoint, SCORCHABLE } from './scorch';
 
 /** The patch families a course effect can scatter (see EFFECT_PATCH in rpg/effects.ts). */
-export type PatchKind = 'stardust' | 'frost' | 'junk' | 'tar';
+export type PatchKind = 'stardust' | 'frost' | 'junk' | 'tar' | 'acid';
 
 export interface GroundPatch {
   /** Patch centre (course space). */
@@ -65,6 +65,7 @@ export const PATCH_SPECS: Record<PatchKind, PatchSpec> = {
   frost: { lie: 'ice', max: 6, minR: 4, maxR: 7 },
   junk: { lie: 'junk', max: 5, minR: 3.5, maxR: 6 },
   tar: { lie: 'tar', max: 4, minR: 4, maxR: 6.5 }, // fewer, bigger sinks — you can steer around them
+  acid: { lie: 'acid', max: 6, minR: 4, maxR: 6.5 }, // the downpour pools everywhere — a wet, biting scatter
 };
 
 /** Lies a patch can settle on — soft turf ONLY, the same set the scorch craters use: a green/tee/

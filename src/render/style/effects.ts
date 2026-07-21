@@ -98,6 +98,8 @@ export function styleScorch(marks: readonly ScorchMark[], proj: Projector): Prim
  *   • frost    — an icy rime disc with crystalline spokes: reads slick.
  *   • junk     — half-buried scrap slabs with a warning blink: reads snagged.
  *   • tar      — a glossy black gravitic sink with a violet sheen and sunk bubbles: reads sticky.
+ *   • acid     — a glowing caustic pool with an etched rim and fizzing motes: reads corrosive
+ *                (the acid-rain sky's ground half, in the Toxic Mire's neon acid palette).
  */
 export function stylePatches(kind: PatchKind, patches: readonly GroundPatch[], proj: Projector): Prim[] {
   const out: Prim[] = [];
@@ -161,6 +163,21 @@ export function stylePatches(kind: PatchKind, patches: readonly GroundPatch[], p
         const d = rr * (0.15 + h(i + 41) * 0.55);
         const br = rr * (0.08 + h(i + 51) * 0.1);
         out.push({ t: 'circle', c: [x + Math.cos(a) * d, y + Math.sin(a) * d], r: br, fill: 'rgba(60,40,90,0.7)' });
+      }
+    } else if (kind === 'acid') {
+      // Acid-rain pool — a luminous caustic puddle: an emissive halo, a neon-green body over a
+      // darker etched bed, a lighter rippled core, and a few fizzing gas motes on the surface.
+      // Matches the Toxic Mire's TOXIC_LIQ acid palette so the sky's pools read as the same stuff.
+      out.push({ t: 'glow', c: [x, y], r: rr * 1.7, col: 'rgba(96,255,150,0.2)' });
+      out.push({ t: 'poly', pts: blob, fill: 'rgba(34,74,32,0.85)', stroke: 'rgba(170,255,130,0.9)', sw: 1.3 });
+      out.push({ t: 'circle', c: [x + rr * 0.06, y + rr * 0.08], r: rr * 0.62, fill: 'rgba(90,215,110,0.85)' });
+      out.push({ t: 'circle', c: [x - rr * 0.16, y - rr * 0.14], r: rr * 0.3, fill: 'rgba(195,255,165,0.65)' });
+      const motes = 2 + Math.floor(h(1) * 3);
+      for (let i = 0; i < motes; i++) {
+        const a = h(i + 31) * Math.PI * 2;
+        const d = rr * (0.15 + h(i + 41) * 0.6);
+        const br = rr * (0.06 + h(i + 51) * 0.08);
+        out.push({ t: 'circle', c: [x + Math.cos(a) * d, y + Math.sin(a) * d], r: br, fill: 'rgba(200,255,170,0.8)' });
       }
     } else {
       // Wreckage half-buried in the grass — a dark scorched bed, grey scrap slabs, one blinking light.

@@ -18,7 +18,7 @@ import { eventDescFor } from './travelScreens';
 import { difficultyPips, zoneProfile } from '../sim/course/zones';
 import { archetypeFor, themeById } from '../sim/course/themes';
 import { rarCol } from '../sim/rpg/loot';
-import { routeClubFind } from '../sim/rpg/effects';
+import { COURSE_EFFECTS, effectCarryMult, effectWindMult, routeClubFind, type CourseEffectId } from '../sim/rpg/effects';
 import { ascensionCutBonus, canWarpStop, currentBoss, effectiveCut, endlessHoleNumber, holeGateArmed } from '../sim/rpg/run';
 import { getFormat, isMatchplayBoss, isTeamDuelBoss, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
 import { endlessSetGateOverPar, endlessSetLabel, endlessSetToPar, formatToPar, toParColour } from '../sim/rpg/endless';
@@ -120,6 +120,24 @@ function introShared(): {
        <b style="font-size:13px;">${ev.label}</b>
        <div style="font-size:12.5px;opacity:.82;margin-top:1px;">${eventDescFor(ev.desc)}</div>
      </div>`);
+  // The pinned SKY of a static round (GS-weather-depth): a Story world's designed weather / the Star
+  // Tour's chosen sky, stated with its play consequence — wind/carry chips off the SAME physics
+  // tables the sim reads, plus the ground-mark hook — so the round's conditions are readable before
+  // the tee shot. Journey stops already state theirs on the route card (and `ev` above), so this is
+  // static-only; 'none' (the Earth prologue / a calm pick) stays silent.
+  const wx = state.run.staticCourseId ? COURSE_EFFECTS[(state.run.staticEffect ?? 'none') as CourseEffectId] : undefined;
+  if (wx && wx.id !== 'none') {
+    const chips: string[] = [];
+    const windM = effectWindMult(wx.id);
+    const carryM = effectCarryMult(wx.id);
+    if (windM !== 1) chips.push(windM > 1 ? `💨 winds +${Math.round((windM - 1) * 100)}%` : `🍃 still air −${Math.round((1 - windM) * 100)}%`);
+    if (carryM !== 1) chips.push(carryM > 1 ? `🎈 shots fly +${Math.round((carryM - 1) * 100)}%` : `⚓ shots fly −${Math.round((1 - carryM) * 100)}%`);
+    if (wx.play) chips.push(`🎯 ${wx.play}`);
+    notes.push(`<div style="margin-top:8px;padding:7px 11px;border-left:3px solid #7fd8ff;border-radius:8px;background:#ffffff08;">
+       <b style="font-size:13px;">${wx.icon} ${wx.label}</b>
+       <div style="font-size:12.5px;opacity:.82;margin-top:1px;">${wx.blurb}${chips.length ? `<br><span style="opacity:.95;">${chips.join(' · ')}</span>` : ''}</div>
+     </div>`);
+  }
   // The SALVAGE gamble pays off (GS-salvage-mystery): if this stop arrived via a salvage lane, reveal
   // the club the blind roll actually landed — the "you looted X" moment the tier-only route card held
   // back. `state.salvageReveal` is the transient find computed at travel from the pre-jump bag. Kept as
@@ -341,6 +359,12 @@ function holeIntroScreen(): string {
   const bossRibbon = boss
     ? `<div class="gs-holeintro-boss" style="border-color:${boss.final ? '#ffce54' : '#c0392b'};color:${boss.final ? '#ffce54' : '#ff6b6b'};">${boss.final ? '★ FINAL BOSS' : '⚔ BOSS STOP'} · ${boss.name}</div>`
     : '';
+  // The static round's pinned sky (GS-weather-depth), compact at the tee — the arc step carries the
+  // full note; this ribbon keeps the conditions visible on the step you actually tee off from.
+  const wx = state.run.staticCourseId ? COURSE_EFFECTS[(state.run.staticEffect ?? 'none') as CourseEffectId] : undefined;
+  const wxRibbon = wx && wx.id !== 'none'
+    ? `<div class="gs-holeintro-boss" style="border-color:#2f5a7a;color:#7fd8ff;">${wx.icon} ${wx.label}${wx.play ? ` · ${wx.play}` : ''}</div>`
+    : '';
   return `
     ${header()}
     <article class="gs-panel gs-holeintro" style="border-color:${col}66;">
@@ -356,6 +380,7 @@ function holeIntroScreen(): string {
         </div>
       </div>
       ${bossRibbon}
+      ${wxRibbon}
       ${salvageNote}
       <div class="gs-holeintro-map">${map}</div>
       <button class="gs-traits-bar" data-introtraits="open" aria-label="Show hazards and benefits">

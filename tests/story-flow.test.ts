@@ -4,6 +4,7 @@ import { DEFAULT_CHARACTER_ID } from '../src/sim/rpg/characters';
 import { defaultStoryState, REVISIT_CREDIT_MULT } from '../src/sim/rpg/story';
 import { questOfferable, questBeatPending } from '../src/sim/rpg/storyQuests';
 import { effectWindMult } from '../src/sim/rpg/effects';
+import { playerHoleOpts } from '../src/sim/rpg/run';
 import { hasStory, loadStory, writeStory, clearStory, exportStory, importStory } from '../src/save/storyStore';
 import { storyWorldServicesHTML } from '../src/app/storyServices';
 
@@ -371,7 +372,7 @@ describe('Story qualifying events (GS-story-qualifiers)', () => {
     const played = reduce(intro, { type: 'play' });
     // Visiting it BEFORE reaching its chapter is a plain exploration clear — no out-of-chapter qualifier board.
     expect(played.lastStoryRound!.qualifier).toBeUndefined();
-    expect(played.run.staticEffect).toBe('ionStorm'); // but it still plays at its Chapter-5 difficulty
+    expect(played.run.staticEffect).toBe('spaceJunk'); // but it still plays under its Chapter-5 sky (wreckage patches)
     expect(played.story!.clearedWorldIds).toContain('derelict-18');
     // Recruit Dan from the world-clear recap — with room left to do his quest before the final battle.
     const hired = reduce(played, { type: 'hireStoryCaddy', worldId: 'derelict-18', caddyId: 'driver-dan' });
@@ -486,17 +487,23 @@ describe('Story shop/vendor ACCESS — per-world, never a clubhouse buy-anything
     expect(intro.run.loadout.perks).toContain('sandy-sandsaver');
   });
 
-  it('a deep world plays under a stiffer sky (fair physics) and still resolves (GS-story-weather-variety)', () => {
+  it('a deep world plays under a stormy sky with real teeth and still resolves (GS-weather-depth)', () => {
     const story = { ...defaultStoryState('feather-fade'), chapter: 5, credits: 500, clearedWorldIds: ['standrews-18'] };
     const hub = { ...initState('wind-seed', {}, undefined, story), screen: 'story' as const };
-    // A Ch.1 world plays a CALM sky (no wind bump — the new-player fix); a Ch.5 world blows the wildest storm.
+    // A Ch.1 world plays a CALM sky (no wind bump — the new-player fix); the Storm chapter's own
+    // Draco Gale blows the wildest lightning, and the Hydra Mire rains ACID (a ground-patch sky).
     const early = reduce(hub, { type: 'storyPlayWorld', courseId: 'verdant-18' });
     expect(early.run.staticEffect).toBe('moonlight'); // calm, atmospheric — not a gale
     expect(effectWindMult(early.run.staticEffect)).toBeLessThanOrEqual(1);
+    const gale = reduce(hub, { type: 'storyPlayWorld', courseId: 'tempest-18' });
+    expect(gale.run.staticEffect).toBe('ionStorm'); // Draco Gale IS the tempest
     const intro = reduce(hub, { type: 'storyPlayWorld', courseId: 'swamp-18' });
-    expect(intro.run.staticEffect).toBe('ionStorm');
-    expect(intro.course.meta.effect).toBe('ionStorm'); // stamped so the render/HUD show the storm
-    // The wind is real course data (auto ≡ interactive), and the auto round still finishes cleanly.
+    expect(intro.run.staticEffect).toBe('acidRain');
+    expect(intro.course.meta.effect).toBe('acidRain'); // stamped so the render/HUD show the downpour
+    // The acid-rain sky arms its ground patches for the HEADLESS sim exactly as the interactive
+    // driver does (auto ≡ interactive, GS-weather-depth playerHoleOpts fix).
+    expect(playerHoleOpts(intro.run).groundPatch).toBe('acid');
+    // The weather is real course data, and the auto round still finishes cleanly.
     const done = reduce(intro, { type: 'play' });
     expect(done.screen).toBe('storyResult');
     expect(Number.isFinite(done.lastStoryRound!.strokes)).toBe(true);

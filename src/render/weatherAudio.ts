@@ -156,6 +156,12 @@ export const WEATHER_AMBIENCE: Record<CourseEffectId, WeatherAmbience> = {
     bed: 'drone', bedGain: 0.09, bedFreq: 42, gust: 0.3, gustHz: 0.04,
     event: 'none', eventChance: 0, eventGain: 0, gain: 0.12,
   },
+  acidRain: {
+    // A caustic downpour — a squally mid-band rain hiss with a frequent soft fizzing CRACKLE where
+    // the drops eat the turf.
+    bed: 'wind', bedGain: 0.1, bedFreq: 1400, gust: 0.6, gustHz: 0.2,
+    event: 'crackle', eventChance: 0.14, eventGain: 0.035, gain: 0.13,
+  },
 };
 
 // --- Engine state ------------------------------------------------------------------------------

@@ -170,15 +170,19 @@ describe('story-state model (GS-story-save)', () => {
       expect(storyWorldChapter('not-a-world')).toBe(1);
     });
 
-    it('storyWorldEffect gives each world a varied, PURE-PHYSICS sky — calm early, stormy deep (GS-story-weather-variety)', () => {
-      // Every world's sky is a valid CourseEffect, keyed to the WORLD (stable across revisits → records-safe).
+    it('storyWorldEffect gives each world a UNIQUE, thematic sky with a REAL play hook — calm early, stormy deep (GS-weather-depth)', () => {
+      // Every world's sky is a valid CourseEffect, keyed to the WORLD (stable across revisits →
+      // records-safe: ground patches/craters are seeded off the hole geometry, so the same world +
+      // sky is the identical test every round).
       for (const w of STORY_WORLDS) {
         const e = storyWorldEffect(w.courseId) as CourseEffectId;
         expect(COURSE_EFFECTS[e], `${w.courseId} → ${e} is a real effect`).toBeTruthy();
-        // PURE PHYSICS only — no ground-patch / tent effect that would alter the layout or fairness.
-        expect(EFFECT_PATCH[e], `${e} scatters no ground patches`).toBeUndefined();
+        // Every sky carries a FELT gameplay consequence — a wind/carry lever or a ground mark
+        // (patches / meteor scorch). The tent gimmick stays out of the campaign.
+        const hooked =
+          effectWindMult(e) !== 1 || effectCarryMult(e) !== 1 || EFFECT_PATCH[e] !== undefined || e === 'meteorShower';
+        expect(hooked, `${w.courseId} → ${e} carries a real play hook`).toBe(true);
         expect(e).not.toBe('tradeMarket');
-        expect(e).not.toBe('meteorShower');
       }
       // The Earth prologue (off-chart) plays clear skies.
       expect(storyWorldEffect(PROLOGUE_COURSE_ID)).toBe('none');
@@ -187,24 +191,40 @@ describe('story-state model (GS-story-save)', () => {
 
       const windOf = (id: string) => effectWindMult(storyWorldEffect(id));
       const carryOf = (id: string) => effectCarryMult(storyWorldEffect(id));
+      const groundOf = (id: string) => {
+        const e = storyWorldEffect(id) as CourseEffectId;
+        return EFFECT_PATCH[e] !== undefined || e === 'meteorShower';
+      };
       const inChapter = (ch: number) => STORY_WORLDS.filter((w) => w.unlockChapter === ch);
 
-      // (1) NEW-PLAYER FIX: every Chapter 1–2 world is CALM — wind at or below neutral, carry never dragged.
+      // (1) NEW-PLAYER FIX: every Chapter 1–2 world is CALM — wind at or below neutral, carry never
+      // dragged; Chapter 1 carries no ground marks at all (pure sky-dressing to learn under).
       for (const w of [...inChapter(1), ...inChapter(2)]) {
         expect(windOf(w.courseId), `${w.courseId} early wind ≤ 1`).toBeLessThanOrEqual(1);
         expect(carryOf(w.courseId), `${w.courseId} early carry ≥ 1`).toBeGreaterThanOrEqual(1);
       }
-      // (2) VARIETY: the campaign is not a wind ladder — plenty of distinct skies, several with NO wind bump.
-      const skies = new Set(STORY_WORLDS.map((w) => storyWorldEffect(w.courseId)));
-      expect(skies.size).toBeGreaterThanOrEqual(6);
+      for (const w of inChapter(1)) expect(groundOf(w.courseId), `${w.courseId} Ch.1 has no ground marks`).toBe(false);
+      // (2) VARIETY: every charted world's sky is UNIQUE — no two worlds feel the same.
+      const skies = STORY_WORLDS.map((w) => storyWorldEffect(w.courseId));
+      expect(new Set(skies).size).toBe(STORY_WORLDS.length);
       const nonWind = STORY_WORLDS.filter((w) => windOf(w.courseId) <= 1);
       expect(nonWind.length).toBeGreaterThanOrEqual(6);
-      // (3) DIFFICULTY RAMP: the deep worlds blow the wildest skies; the early ones the calmest.
+      // (3) IMPACT: several worlds carry a GROUND mark (the sky leaves something you must play around).
+      expect(STORY_WORLDS.filter((w) => groundOf(w.courseId)).length).toBeGreaterThanOrEqual(5);
+      // (4) DIFFICULTY RAMP: the opening cluster never blows harder than neutral; the storm chapters
+      // (3–5) blow the campaign's wildest skies, and every Chapter-5 reach is stormy — a gale or a
+      // ground hazard, never plain dressing.
       const maxWind = (ch: number) => Math.max(...inChapter(ch).map((w) => windOf(w.courseId)));
-      expect(maxWind(5)).toBeGreaterThan(maxWind(1));
-      expect(maxWind(5)).toBeGreaterThanOrEqual(maxWind(3));
-      expect(maxWind(1)).toBeLessThanOrEqual(1); // the opening cluster never blows harder than neutral
-      expect(storyWorldEffect('swamp-18')).toBe('ionStorm'); // the Ch.5 shrine still blows the wildest sky
+      expect(maxWind(1)).toBeLessThanOrEqual(1);
+      expect(Math.max(maxWind(3), maxWind(4), maxWind(5))).toBeGreaterThanOrEqual(1.3);
+      for (const w of inChapter(5)) {
+        const stormy = windOf(w.courseId) > 1 || groundOf(w.courseId);
+        expect(stormy, `${w.courseId} Ch.5 is stormy`).toBe(true);
+      }
+      // (5) THE HEADLINERS read true: Draco Gale IS the tempest (the wildest lightning sky), and the
+      // Hydra Mire rains ACID onto the serpent's bog.
+      expect(storyWorldEffect('tempest-18')).toBe('ionStorm');
+      expect(storyWorldEffect('swamp-18')).toBe('acidRain');
     });
 
     it('completeStoryRound clears the world, pays, keeps best, and advances the prologue chapter', () => {
@@ -265,7 +285,7 @@ describe('story-state model (GS-story-save)', () => {
       // …but their TOURNAMENT tier is UNCHANGED — still Chapter 5 (difficulty/weather/qualifier/payout read this).
       expect(storyWorldChapter('derelict-18')).toBe(5);
       expect(storyWorldChapter('swamp-18')).toBe(5);
-      expect(storyWorldEffect('derelict-18')).toBe('ionStorm'); // still braves the wildest sky
+      expect(storyWorldEffect('derelict-18')).toBe('spaceJunk'); // still braves a serpent-reach sky (wreckage tangles the deck)
       // cetus-18 (no caddy) is left alone — it still charts only at Chapter 5.
       const cetus = storyWorldById('cetus-18')!;
       expect(storyWorldUnlocked(cetus, 4)).toBe(false);
