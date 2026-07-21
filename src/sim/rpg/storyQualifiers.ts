@@ -52,7 +52,9 @@ export function qualifierFieldSize(chapter: number): number {
 /**
  * The qualifying events of a chapter = the chapter's worlds EXCEPT the Sigil VENUE (which is played as the
  * major itself). `venueId` is passed in so this module never imports `storyTournaments` (the venue depends
- * on alignment — the caller resolves it). There are always exactly two (a chapter has three worlds).
+ * on alignment — the caller resolves it). GS-story-world-variety: a chapter now charts FOUR worlds, so
+ * this returns THREE qualifying events — but you still only need to QUALIFY in `QUALIFY_EVENTS_NEEDED`
+ * (two) of them, so the extra event is a CHOICE of road, not more required grind.
  */
 export function qualifierEventsForChapter(chapter: number, venueId: string | undefined): string[] {
   return STORY_WORLDS.filter((w) => w.unlockChapter === chapter && w.courseId !== venueId).map((w) => w.courseId);

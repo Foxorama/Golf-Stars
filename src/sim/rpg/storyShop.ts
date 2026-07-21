@@ -63,22 +63,27 @@ export const STORY_SHOP: Record<string, readonly string[]> = {
   'verdant-18': ['club:tour:3W', 'club:pro:putter'],
   'verdant2-18': ['club:tour:5W', 'club:pro:7i'],
   'desert-18': ['club:tour:D', 'club:pro:9i'],
+  'frost2-18': ['club:tour:3H', 'club:pro:6i'], // GS-story-world-variety — the extra Ch.1 qualifier's rack
   // Chapter 2 — the first Phoenix Flames pieces sit beside Planet stock.
   'inferno-18': ['club:masters:D', 'club:pro:5i'],
   'inferno2-18': ['club:masters:3W', 'club:pro:3i'],
   'frost-18': ['club:masters:5W', 'club:pro:7i'],
+  'metal2-18': ['club:masters:4H', 'club:pro:8i'], // GS-story-world-variety — the extra Ch.2 qualifier's rack
   // Chapter 3 — the full Phoenix Flames line.
   'tempest-18': ['club:masters:2H', 'club:masters:4H', 'club:masters:5i'],
   'crystal-18': ['club:masters:3i', 'club:masters:7i', 'club:masters:putter'],
   'fungal-18': ['club:masters:D', 'club:masters:9i', 'club:pro:putter'],
+  'ocean2-18': ['club:masters:5W', 'club:masters:6i', 'club:pro:8i'], // GS-story-world-variety — the extra Ch.3 qualifier's rack
   // Chapter 4 — the first Solar Storm apex clubs appear.
   'ocean-18': ['club:solar:D', 'club:masters:3W', 'club:masters:4H'],
   'void2-18': ['club:solar:3W', 'club:masters:2H', 'club:masters:5i'],
   'crystal2-18': ['club:solar:5W', 'club:masters:3i', 'club:masters:putter'],
+  'desert2-18': ['club:solar:5W', 'club:masters:6i', 'club:masters:5H'], // GS-story-world-variety — the extra Ch.4 qualifier's rack
   // Chapter 5 — the serpent's reaches: the legendary Solar Storm line.
   'swamp-18': ['club:solar:2H', 'club:solar:4H', 'club:solar:putter'],
   'derelict-18': ['club:solar:3i', 'club:solar:5i', 'club:solar:7i'],
   'cetus-18': ['club:solar:D', 'club:solar:9i', 'club:solar:putter'],
+  'metal-18': ['club:solar:3W', 'club:solar:6i', 'club:solar:8i'], // GS-story-world-variety — the extra Ch.5 qualifier's rack
 };
 
 /** Parse a club item id (`club:<set>:<type>`) into a `StoryShopItem`, validating both halves resolve. */
@@ -234,6 +239,12 @@ export const WORLD_SHOP_INTRO: Record<string, string> = {
   'swamp-18': 'The rack sits on stilts above the acid. The Coil trades here too — watch your back.',
   'derelict-18': 'A shop bolted into a dead ship’s hold. Half the stock is salvage; all of it works.',
   'cetus-18': 'A stall on the lip of a star-waterfall, the whale-song rattling the clubs on their hooks.',
+  // GS-story-world-variety — the extra qualifier worlds each get their own shopkeeper voice.
+  'frost2-18': 'A shed dug into the twin glaciers; the shafts hang frosted, steadier for the cold — they swear.',
+  'metal2-18': 'A compass-shop tumbling with the scrap belt — every stick on the rack is salvage, re-machined true.',
+  'ocean2-18': 'A floating tackle-shop riding the dolphin tides — clubs sold sealed, balls that ride the swell.',
+  'desert2-18': 'A lion-shaded stall out on the savannah dust — long clubs for a long, windward world.',
+  'metal-18': 'The great scrapworks foundry-shop — the heaviest, hungriest sticks in the galaxy, poured from dead hulls.',
 };
 
 /** Whether a cleared world's dossier should offer the "revisit → Pro Shop" action (has a rack). */

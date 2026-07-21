@@ -931,17 +931,23 @@ export const STORY_GEAR_STOCK: Record<string, readonly string[]> = {
   'verdant-18': ['gear:glove:worn', 'gear:shaft:stiff', 'gear:ball:range', 'gear:bag:sponsor'],
   'verdant2-18': ['gear:hat:reader', 'gear:hat:visor', 'gear:glove:antislice', 'gear:shoes:turf'],
   'desert-18': ['gear:shoes:spikes', 'gear:shoes:balance', 'gear:hat:range', 'gear:shaft:power'],
+  // GS-story-world-variety — the extra Ch.1 qualifier (Gemini Ice): reading + footing for slick, exposed ice.
+  'frost2-18': ['gear:hat:reader', 'gear:shoes:balance', 'gear:glove:sweet'],
 
   // ── Chapter 2 — BLUES + the first PURPLES (the fire-worlds + the frozen links). Themed: MAGMA balls at
   // the lava, the whippy power shaft where you need to bomb it, the WIND ball on the exposed frost links.
   'inferno-18': ['gear:ball:magma', 'gear:glove:tacky', 'gear:shaft:woods'],
   'inferno2-18': ['gear:shaft:overdrive', 'gear:ball:soft', 'gear:bag:lucky'],
   'frost-18': ['gear:ball:wind', 'gear:hat:spin', 'gear:glove:sweet'],
+  // GS-story-world-variety — the extra Ch.2 qualifier (Pyxis Foundry): low-grav bomber's kit + an economy bag.
+  'metal2-18': ['gear:shaft:power', 'gear:glove:tacky', 'gear:bag:lucky'],
 
   // ── Chapter 3 — the PURPLE line fills in (the gale, the crystal precision greens, the spore-jungle rough).
   'tempest-18': ['gear:ball:wind', 'gear:glove:vice', 'gear:shaft:irons'],
   'crystal-18': ['gear:hat:computer', 'gear:glove:vice', 'gear:bag:tour'],
   'fungal-18': ['gear:shoes:gravlock', 'gear:hat:focus', 'gear:ball:zip'],
+  // GS-story-world-variety — the extra Ch.3 qualifier (Delphinus Tides): the FLOATER ball early, sea-storm kit.
+  'ocean2-18': ['gear:ball:floater', 'gear:ball:wind', 'gear:shoes:gravlock'],
 
   // ── Chapter 4 — PURPLES everywhere, the ROUTE RELICS (alignment-gated), and the first LEGENDARIES. Themed:
   // FLOATER balls on the drowned atolls, VOID-WALKER balls + the Nova bomb at the abyss, the Power Glove +
@@ -949,12 +955,16 @@ export const STORY_GEAR_STOCK: Record<string, readonly string[]> = {
   'ocean-18': ['gear:ball:floater', 'gear:shoes:gravlock', 'gear:glove:shed', 'gear:glove:grace'],
   'void2-18': ['gear:ball:void', 'gear:shaft:nova', 'gear:glove:master'],
   'crystal2-18': ['gear:hat:oracle', 'gear:glove:power', 'gear:ball:venom', 'gear:ball:blessed'],
+  // GS-story-world-variety — the extra Ch.4 qualifier (Leo Savannah): sand stance + power for the long, windy dust.
+  'desert2-18': ['gear:shoes:spikes', 'gear:shaft:power', 'gear:hat:oracle'],
 
   // ── Chapter 5 — the LEGENDARY apex + the last route relics, in the serpent's reaches. The Comet ball, the
   // Void-Anchor boots, the Seer's Circlet, the Cosmic bag — the grail rack of the campaign.
   'swamp-18': ['gear:ball:comet', 'gear:shoes:anchor', 'gear:shoes:coil', 'gear:shoes:hallowed'],
   'derelict-18': ['gear:hat:seer', 'gear:ball:void', 'gear:bag:cosmic'],
   'cetus-18': ['gear:ball:comet', 'gear:shaft:nova', 'gear:glove:power'],
+  // GS-story-world-variety — the extra Ch.5 qualifier (Antlia Scrapworks): the grail low-grav bomber's rack.
+  'metal-18': ['gear:shaft:nova', 'gear:bag:cosmic', 'gear:glove:power'],
 };
 
 /** Look up a gear item by id. */

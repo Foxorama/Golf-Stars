@@ -69,8 +69,8 @@ describe('Galaxy Tournaments (GS-story-tournament)', () => {
 
   it('unlocks only once you QUALIFY (top-N) in two of the chapter’s events, and only while unwon (GS-story-qualifiers)', () => {
     const s0 = { ...defaultStoryState('feather-fade'), chapter: 1 };
-    const events = chapterQualifierEvents(1, undefined); // Ch.1 qualifiers (the two non-venue worlds)
-    expect(events.length).toBe(2);
+    const events = chapterQualifierEvents(1, undefined); // Ch.1 qualifiers (the non-venue worlds)
+    expect(events.length).toBe(3); // GS-story-world-variety: three qualifiers offered, two required
     expect(tournamentUnlocked(s0)).toBe(false); // nothing qualified
 
     // Clearing BOTH events is no longer enough — you must actually place top-N.
