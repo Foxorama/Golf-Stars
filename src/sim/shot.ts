@@ -413,6 +413,11 @@ export const LIE_INFO: Record<string, LieInfo> = {
   // but it comes out dead STRAIGHT — the sticky inverse of ice's wild skid. Worse than rough, never a
   // stroke. Only reached via the rest-lie conversion, armed by the dark-matter route (sim/patches.ts).
   tar: { carryMult: 0.78, dispersionMult: 1.05, label: 'Tar pit' },
+  // Acid-rain pools (GS-weather-depth): the downpour collects in corrosive puddles that etch the ball
+  // and eat the strike — distance robbed AND sprayed wide (between junk's snag and ice's skid). Worse
+  // than rough, never a stroke. Only reached via the rest-lie conversion, armed by the acid-rain sky
+  // (sim/patches.ts).
+  acid: { carryMult: 0.88, dispersionMult: 1.35, label: 'Acid pool' },
 };
 
 /** Default lie when a point is off every polygon (native / out-of-frame): rough. */

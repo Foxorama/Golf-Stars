@@ -683,6 +683,12 @@ export function foresightChance(run: Run): number | undefined {
 /** The player's `playHole`/`playCourse` options from their loadout — shared by the auto sim and the
  *  matchplay duel so the player's own ball plays identically with or without a boss alongside. */
 export function playerHoleOpts(run: Run): PlayHoleOptions {
+  // The stop's SKY: a journey stop's comes off the chosen route's pending event; a STATIC round
+  // (Story Tour world / Star Tour record chase) plays its pinned `staticEffect` (GS-weather-depth —
+  // the headless sim used to read only the pending event, so a static round's patch/scorch/tent sky
+  // armed interactively but NOT in the auto sim, breaking auto ≡ interactive for those skies; journey
+  // runs never set `staticCourseId`, so their arming is byte-for-byte unchanged).
+  const effect = run.staticCourseId ? run.staticEffect ?? 'none' : routeEffect(run.pendingEvent);
   return {
     bag: run.loadout.bag,
     dispersionMult: netDispersion(run.loadout),
@@ -707,13 +713,13 @@ export function playerHoleOpts(run: Run): PlayHoleOptions {
     // Trade-camp tents (GS-tents): the trade-market route arms a ring of collidable tents around the
     // green. Derived from the SAME pending-event effect `currentCourse` stamps on the meta, so the sim
     // collision and the renderer agree on when tents exist.
-    tradeTents: routeEffect(run.pendingEvent) === 'tradeMarket',
+    tradeTents: effect === 'tradeMarket',
     // Meteor-strike scorch marks (GS-meteor-scorch): the meteor-shower route chars craters into the
     // turf — same effect-derived gate, so the sim's lie conversion and the drawn craters agree.
-    meteorScorch: routeEffect(run.pendingEvent) === 'meteorShower',
+    meteorScorch: effect === 'meteorShower',
     // Effect ground patches (GS-journey-fx-2): comet stardust / frostfall ice / debris wreckage —
     // same effect-derived gate, so the sim's lie conversion and the drawn patches agree.
-    groundPatch: effectPatchKind(routeEffect(run.pendingEvent)),
+    groundPatch: effectPatchKind(effect),
     scramble: scrambleOptsFor(run),
     // Prognostic Parrot foresight (GS-caddy-parrot): the parrot's per-shot second-swing proc, applied
     // by playHole with the player's OWN golfer as the partner. Undefined without the parrot ⇒ no draw.

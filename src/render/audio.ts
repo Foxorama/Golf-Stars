@@ -157,6 +157,7 @@ export type LandVoice =
   | 'scorch' // meteor crater — ash whump + ember fizz
   | 'stardust' // comet patch — a charged shimmer
   | 'junk' // debris patch — rattled scrap
+  | 'acid' // acid-rain pool — a corrosive fizzing sizzle
   | 'tree'; // the canopy — voiced per world by `treeVoiceOf`
 
 export function landVoiceOf(lie: string, penalty?: string): LandVoice | null {
@@ -171,6 +172,7 @@ export function landVoiceOf(lie: string, penalty?: string): LandVoice | null {
   if (lie === 'scorch') return 'scorch';
   if (lie === 'stardust') return 'stardust';
   if (lie === 'junk') return 'junk';
+  if (lie === 'acid') return 'acid';
   if (lie === 'trees') return 'tree';
   return null;
 }
@@ -501,6 +503,11 @@ export const sfx = {
         tone(720, 0.09, { type: 'square', gain: 0.05, sweepTo: 500 }); // ringing scrap
         noise(0.04, { gain: 0.12, type: 'bandpass', freq: 900, q: 2, t: 0.09 }); // settling rattle
         noise(0.03, { gain: 0.08, type: 'bandpass', freq: 1600, q: 2, t: 0.16 });
+        break;
+      case 'acid':
+        noise(0.06, { gain: 0.14, type: 'lowpass', freq: 700 }); // the wet plop
+        noise(0.45, { gain: 0.09, type: 'highpass', freq: 3600, t: 0.04 }); // corrosive fizz
+        tone(340, 0.12, { type: 'sine', gain: 0.06, sweepTo: 180, t: 0.02 }); // sinking gloop
         break;
       case null:
         break;

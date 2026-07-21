@@ -46,6 +46,7 @@ const cases = [
   { kind: 'frost', biome: 'verdant-station', themeId: 'crux', label: 'Frostfall ice (slick lie)' },
   { kind: 'junk', biome: 'dust-belt', themeId: 'vela', label: 'Debris wreckage (snag lie)' },
   { kind: 'tar', biome: 'verdant-station', themeId: 'crux', label: 'Dark-matter tar (sticky lie)' },
+  { kind: 'acid', biome: 'toxic-mire', themeId: 'hydra', label: 'Acid-rain pools (corrosive lie)' },
 ];
 
 let cards = '';

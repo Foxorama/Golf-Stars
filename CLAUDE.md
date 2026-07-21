@@ -529,8 +529,10 @@ these systems** — each bullet is the tip of a documented iceberg.
     a single 18-hole STROKE-PLAY round on a player-CHOSEN static course, ranked into personal course-record
     leaderboards. `Run.staticCourseId`/`staticEffect` pin the course + weather; `currentCourse` branches on
     `staticCourseId` (which NO other format sets → generated path byte-for-byte unchanged) to serve
-    `buildStaticCourse(id)` and apply the chosen weather sky as PURE physics (`applyEffectPhysics` — wind/
-    carry only, NO geometry change, so records stay comparable across weather). The round is resolved like
+    `buildStaticCourse(id)` and apply the chosen weather sky: `applyEffectPhysics` (wind/carry, NO geometry
+    change) + the sky's GROUND MARKS (GS-weather-depth — scorch craters / stardust-ice-junk-tar-acid patches,
+    seeded off the HOLE geometry so the same course+sky is the identical repeatable test; `playerHoleOpts`
+    keys the headless arming off `staticEffect` for static rounds so auto ≡ interactive). The round is resolved like
     Asgard (a bespoke reducer path, not the Stableford-cut/travel flow) — the single stop IS the whole run.
     Records live in `sim/rpg/strokePlay.ts` (`StrokePlayBest` = courseId → best round, a MAP so a course's
     all-time best is never evicted; ranked by TO-PAR asc, ties → fewer strokes): two boards, per-course best

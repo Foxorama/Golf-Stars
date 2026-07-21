@@ -512,6 +512,8 @@ export function mountPlayView(
       burst(10, ['150,164,188', '96,106,124', '255,120,80'], { up: 0.9, spread: 1.2, grav: 0.07 }); // rattled scrap + a spark
     } else if (lie === 'tar') {
       burst(9, ['40,26,60', '90,60,140', '20,14,30'], { up: 0.4, spread: 0.6, grav: 0.12 }); // heavy tar glob — plugs, no run
+    } else if (lie === 'acid') {
+      burst(13, ['96,255,150', '190,250,150', '38,224,110'], { up: 1.2, spread: 0.9, grav: 0.08 }); // caustic fizz splash
     } else if (lie === 'trees') {
       spawnLeaves(at); // rattled the canopy on arrival
     }

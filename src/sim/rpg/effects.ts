@@ -51,7 +51,8 @@ export type CourseEffectId =
   | 'radiant' //      a brilliant star bathes the course — still bright air LIFTS the ball (carry up, wind down)
   | 'dustStorm' //    a rolling wall of grit — gusty wind UP + thick air DRAGS the ball (carry down)
   | 'solarWind' //    a steady stream of solar particles — a stiff, constant breeze (wind up)
-  | 'darkMatter'; //  an unseen mass warps the starlight, stills the air — gravitic TAR pools on the turf
+  | 'darkMatter' //  an unseen mass warps the starlight, stills the air — gravitic TAR pools on the turf
+  | 'acidRain'; //    a caustic green downpour — squally wind, heavy wet air, corrosive ACID pools on the turf
 
 export interface CourseEffectInfo {
   id: CourseEffectId;
@@ -86,6 +87,7 @@ export const COURSE_EFFECTS: Record<CourseEffectId, CourseEffectInfo> = {
   dustStorm: { id: 'dustStorm', label: 'Dust storm', icon: '🏜️', blurb: 'A rolling wall of grit sweeps in — the air gusts and drags at once.' },
   solarWind: { id: 'solarWind', label: 'Solar wind', icon: '🌬️', blurb: 'A steady stream of solar particles streaks past — a stiff, constant breeze.' },
   darkMatter: { id: 'darkMatter', label: 'Dark-matter drift', icon: '🌑', blurb: 'An unseen mass warps the starlight and stills the air — dark matter pools on the ground.', play: 'Gravitic tar pools on the turf — sticky lies that kill your distance' },
+  acidRain: { id: 'acidRain', label: 'Acid rain', icon: '🌧️', blurb: 'A caustic green downpour drives out of a sickly storm bank, fizzing where it lands.', play: 'Acid pools collect on the turf — corrosive lies that etch the strike' },
 };
 
 /**
@@ -109,6 +111,7 @@ export const EFFECT_WIND: Partial<Record<CourseEffectId, number>> = {
   dustStorm: 1.25, // grit that gusts hard (and drags the ball down — see EFFECT_CARRY)
   radiant: 0.82, // brilliant, dead-still air — the calm half of the bomber's-paradise sky
   darkMatter: 0.78, // the mass swallows the wind — an eerie, unnatural stillness
+  acidRain: 1.1, // a squally, gusting downpour — stormy, but the real bite is on the ground
 };
 
 /** Wind speed ceiling (mph) after an effect multiplier — the generator's own max band. */
@@ -132,6 +135,7 @@ export const EFFECT_CARRY: Partial<Record<CourseEffectId, number>> = {
   gravityWell: 0.92, // the giant's pull hangs on the ball — everything falls a touch short
   radiant: 1.06, // thin, bright, still air — the ball flies far and true (a bomber's paradise)
   dustStorm: 0.94, // thick grit hangs on the ball — the gritty half of the gust-and-drag sky
+  acidRain: 0.95, // heavy, rain-soaked air hangs on the ball — everything flies a touch short
 };
 
 /** The carry multiplier a course effect applies (1 = none). */
@@ -152,6 +156,7 @@ export const EFFECT_PATCH: Partial<Record<CourseEffectId, PatchKind>> = {
   spaceJunk: 'junk',
   blizzard: 'frost', // the blizzard freezes the same ice patches as frostfall — but under a gale
   darkMatter: 'tar', // gravitic pools that grab the ball and kill its run (the sticky inverse of ice)
+  acidRain: 'acid', // the downpour collects in corrosive pools that etch the ball and eat the strike
 };
 
 /** The ground-patch family a course effect scatters (undefined = none). */
@@ -204,6 +209,7 @@ export const EFFECT_BIOME_AFFINITY: Partial<Record<CourseEffectId, readonly Biom
   solarWind: ['void', 'tempest', 'metal', 'derelict'], //  a stiff particle breeze streams through open space + the derelict belt/wreck
   darkMatter: ['void', 'cetus', 'derelict'], //    an unseen mass warps the starlight of the deep dark worlds + the drifting wreck
   gravityWell: ['void', 'metal', 'derelict'], //   a giant's pull hangs heavy over the low-gravity worlds + the tumbling hulk
+  acidRain: ['swamp', 'fungal'], //    a caustic downpour belongs over the acid mire + the spore hollows
 };
 
 /**
@@ -261,6 +267,7 @@ export function routeEffect(ev: RouteEvent | undefined): CourseEffectId {
   // 'solar-wind' must beat the bare 'solar' storm. Each requires a specific token so it never steals an
   // existing event (e.g. 'stardust' stays a comet, 'stellar-tailwind' stays moonlight).
   if (/dark-?matter|dark-?nebula|umbral|phantom-?mass|void-?fog/.test(id)) return 'darkMatter';
+  if (/acid-?rain|acid-?squall|caustic|corrosive|venom-?rain|toxic-?downpour/.test(id)) return 'acidRain';
   if (/blizzard|whiteout|snowstorm|snow-?squall|ice-?storm/.test(id) || /🌨/.test(icon)) return 'blizzard';
   if (/dust-?storm|sandstorm|sirocco|haboob|grit-?storm/.test(id) || /🏜/.test(icon)) return 'dustStorm';
   if (/solar-?wind|stellar-?wind|helios|particle-?wind/.test(id)) return 'solarWind';

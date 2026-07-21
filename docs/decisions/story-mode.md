@@ -955,6 +955,37 @@ each shop a place you're *excited* to reach. Shipped as focused, auto-merged PRs
   `tests/story-flow.test.ts` (shop↔shipyard↔caddy, loop-free returns, the services fragment offers only the
   other two).
 
+- **GS-weather-depth** — ✅ *shipped* (the "weather is just wind" fix, three passes in one PR). Player
+  point: "almost all the weather on every planet graphically displays as wind — none of the other
+  effects really show up or have any impact; storms/lightning feel shallow; make the weather fit each
+  world." (1) **Impact:** story-world skies may now be GROUND-MARK effects, not only pure wind/carry —
+  the old "pure physics only" rule (GS-story-worlddiff → weather-variety) was dropped because
+  patches/craters are **records-safe by construction** (seeded off the hole geometry on private
+  streams, so the same world+sky is the identical repeatable test; generation + fairness validators
+  untouched). The real bug this exposed: `playerHoleOpts` armed tents/scorch/patches off
+  `routeEffect(run.pendingEvent)` ONLY, so a static (Story/Star-Tour) round's patch sky armed
+  interactively but **not headlessly** — it now keys off `staticEffect` when `staticCourseId` is set
+  (journey runs byte-identical), restoring auto ≡ interactive. A new **acidRain** effect landed with
+  full plumbing (`COURSE_EFFECTS` + wind 1.1/carry 0.95 + the new `acid` PatchKind → `acid` lie
+  0.88/1.35 + `routeEffect` regex + swamp/fungal affinity + `WEATHER_AMBIENCE` row + land voice/FX +
+  patch art + weather showpiece) — the checklist for any future effect+patch pair. (2) **Visuals**
+  (`render/weather.ts`, rng5 stream): the storm skies gained a rolling CLOUD BANK (filled
+  thunderheads that back-light on every strike — never hollow rings, the first draft's bug), the ion
+  storm a third fork family + driving charged RAIN, the solar storm real glow-cored forks + sky
+  flashes, and acid rain its slanting neon downpour + ground sizzles. (3) **Fit:** every
+  `STORY_WORLDS.weather` is now UNIQUE and thematic (machine-checked distinct) — headline rows:
+  tempest-18 **Draco Gale = ionStorm** (the tempest ask), swamp-18 **Hydra Mire = acidRain**,
+  derelict-18 Ghost Wreck = spaceJunk, cetus-18 = blizzard, inferno2-18 Scorpius Sting =
+  meteorShower, frost-18 = frostfall, crystal-18 = aurora, fungal-18 = darkMatter, ocean-18 =
+  solarStorm, crystal2-18 = comet. Ramp preserved: Ch.1 pure calm dressing → Ch.2 first gentle ground
+  marks under calm winds → Ch.3–5 storms (guarded in `tests/story-state.test.ts`). The weather is now
+  READABLE: the story dossier shows the world's designed sky + its play chips (read-only
+  `weatherInfoHTML`), the free-roam picker (widened to the full palette minus the tent gimmick) shows
+  the selected sky's chips, and the static-round intro carries a weather note (arc step) + ribbon
+  (hole step). Guarded by `tests/patches.test.ts` (the `acid` family auto-covered: placement,
+  conversion, no-death-spiral), `tests/journey-effects.test.ts`, `tests/audio.test.ts`, and the
+  updated story-state/story-flow weather blocks.
+
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.
 - **"Gather your friends"** — single protagonist (per the design call); the other three golfers are
