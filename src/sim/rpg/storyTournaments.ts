@@ -18,8 +18,14 @@
 import { ghostHoleStrokes, golferForm } from './competition';
 import { CHARACTERS, getCharacter } from './characters';
 import { otherGolferIds } from './storyCast';
-import { betrayerId, heraldOpponentIds, heraldSeveredId, type FriendRivalVoice } from './storyBetrayal';
-import type { OpposingPair } from './storyTeams';
+import { betrayerId, heraldOpponentIds, heraldSeveredId, finaleMatchup, type FinaleMatchup, type FriendRivalVoice } from './storyBetrayal';
+import {
+  resolveStorySinglesMatch,
+  resolveStory2v2Match,
+  type OpposingPair,
+  type StorySinglesMatchResult,
+  type StoryMatchResult,
+} from './storyTeams';
 import {
   STORY_WORLDS,
   STORY_CHAPTER_COUNT,
@@ -483,6 +489,51 @@ export function isSinglesMatchTournament(t: StoryTournament): boolean {
 /** Is this Sigil a 2v2 SCRAMBLE MATCHPLAY (Ch.5 finale — you + an ally share a ball vs an opposing pair)? */
 export function isTeamMatchTournament(t: StoryTournament): boolean {
   return t.format === 'scramble-match';
+}
+
+// ── The LIVE match state of a matchplay Sigil (GS-story-sigil-live) ────────────────────────────────────
+
+/** GS-story-betrayer: the Ch.5 finale ally's per-hole edge — a modest ~par help (NOT the team-major
+ *  helper), so YOUR round decides the match. (Moved here from the reducer so the live HUD, the halftime
+ *  pop, the close-out check and the final resolution all read ONE source.) */
+export const FINALE_ALLY_EDGE = -0.1;
+/** The 2v2 opponents play as a scramble PAIR — far stronger than a lone rival — so their per-golfer edge
+ *  is scaled DOWN from the row's `rivalEdge`. */
+export const FINALE_OPP_EDGE_SCALE = 0.5;
+
+/** The live/final state of a MATCHPLAY Sigil (singles Ch.3 / 2v2 Ch.5), one shape for both. */
+export interface SigilMatch {
+  kind: 'singles' | 'team';
+  res: StorySinglesMatchResult | StoryMatchResult;
+  /** The featured rival (singles: the opponent; team: the lead opposing face). */
+  rival: EffectiveRival;
+  /** 2v2 only: the full finale matchup (ally + opposing pair). */
+  matchup?: FinaleMatchup;
+}
+
+/**
+ * The match state of a matchplay Sigil through the holes played so far (GS-story-sigil-live, pure).
+ * Feeds the SAME resolvers the final resolution uses on the SAME streams, so the live HUD, the per-hole
+ * reveal, the halftime pop, the mid-round close-out AND the finished recap always agree to the hole.
+ * `undefined` for a non-matchplay Sigil. Pass every played hole's strokes in order.
+ */
+export function sigilMatchThrough(
+  t: StoryTournament,
+  story: StoryState | undefined,
+  playerHoleStrokes: readonly number[],
+  seed: string,
+  pars: readonly number[],
+): SigilMatch | undefined {
+  const rival = tournamentRival(t, story);
+  if (isSinglesMatchTournament(t)) {
+    return { kind: 'singles', rival, res: resolveStorySinglesMatch(playerHoleStrokes, rival.id, t.rivalEdge, seed, pars) };
+  }
+  if (isTeamMatchTournament(t) && story) {
+    const m = finaleMatchup(story, story.activeCaddyId);
+    const res = resolveStory2v2Match(playerHoleStrokes, m.allyId, FINALE_ALLY_EDGE, m.oppIds, t.rivalEdge * FINALE_OPP_EDGE_SCALE, seed, pars, 'scramble');
+    return { kind: 'team', rival, res, matchup: m };
+  }
+  return undefined;
 }
 
 /** The partners you may pick for a team Sigil — your three friend golfers (id + short name). */

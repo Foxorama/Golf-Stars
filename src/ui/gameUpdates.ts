@@ -51,9 +51,8 @@ import { shipCreditMult, grantStoryAceShip, grantStoryShip } from '../sim/rpg/st
 import { recordCaddyRound } from '../sim/rpg/storyCaddies';
 import { upgradeCreditMult, grantShipUpgrade } from '../sim/rpg/storyShipUpgrades';
 import { storyGearCreditMult } from '../sim/rpg/storyGear';
-import { tournamentForChapter, tournamentRival, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS, isStoryQualifier, chapterQualifierEvents, isTeamTournament, isSinglesMatchTournament, isTeamMatchTournament, teamFieldPairs, teamPartnerOrDefault, TEAM_PARTNER_EDGE } from '../sim/rpg/storyTournaments';
-import { resolveStoryTeamStroke, resolveStory2v2Match, resolveStorySinglesMatch, opposingField } from '../sim/rpg/storyTeams';
-import { finaleMatchup } from '../sim/rpg/storyBetrayal';
+import { tournamentForChapter, tournamentRival, sigilMatchThrough, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS, isStoryQualifier, chapterQualifierEvents, isTeamTournament, isSinglesMatchTournament, isTeamMatchTournament, teamFieldPairs, teamPartnerOrDefault, TEAM_PARTNER_EDGE } from '../sim/rpg/storyTournaments';
+import { resolveStoryTeamStroke, opposingField } from '../sim/rpg/storyTeams';
 import { qualifierField, qualifierPlacement, recordQualifier, qualifiedCount, qualifyTop, QUALIFY_EVENTS_NEEDED } from '../sim/rpg/storyQualifiers';
 import { getCharacter } from '../sim/rpg/characters';
 import type { HolePlay } from '../sim/rpg/play';
@@ -465,11 +464,6 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
  * advances the chapter (unlocking the next worlds). Win OR lose you still played the round, so credits +
  * the venue best bank as usual (with the ship/upgrade credit multipliers). Lands on the tournament recap.
  */
-/** GS-story-betrayer: the Ch.5 finale ally's per-hole edge — a modest ~par help (NOT the team-major helper),
- *  so YOUR round decides the match. Negative = plays a touch over par, enough to cover a stray hole without
- *  carrying a blow-up to a halve. Tuned in GS-story-betrayal-polish. */
-const FINALE_ALLY_EDGE = -0.1;
-
 export function resolveStoryTournament(state: UiState, played: PlayedHole[]): UiState {
   const run = state.run;
   const chapter = run.storyTournament ?? 1;
@@ -537,41 +531,34 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
       teamPayload = { partnerName, format: 'bestball', playerSolo: totals.gross, partnerCountedHoles: res.partnerCountedHoles };
     }
     base = setSigilPartner(base, t.chapter, partnerId);
-  } else if (isSinglesMatchTournament(t)) {
-    // GS-story-sigil-formats: the Ch.3 Storm Championship is a 1v1 SINGLES MATCHPLAY — just you vs the
-    // Apostate, hole by hole, the lower score takes the hole (win OR halve the match → the Sigil). The
-    // rival's per-hole cards ride the SAME strokes stream as `rivalTotal` (difficulty tracks `rivalEdge`).
-    const res = resolveStorySinglesMatch(played.map((p) => p.record.strokes), rival.id, t.rivalEdge, String(run.seed), pars);
+  } else if (isSinglesMatchTournament(t) || isTeamMatchTournament(t)) {
+    // GS-story-sigil-formats / GS-story-sigil-live: the MATCHPLAY Sigils (Ch.3 singles vs the Apostate;
+    // the Ch.5 2v2 scramble finale whose teams derive from your partner picks + path). One source —
+    // `sigilMatchThrough` — feeds the live HUD, the per-hole reveal, the close-out check AND this final
+    // resolution, so they always agree to the hole.
+    const match = sigilMatchThrough(t, base, played.map((p) => p.record.strokes), String(run.seed), pars)!;
+    const res = match.res;
     won = res.playerAdvances; // win OR halve advances (the campaign's matchplay convention)
     playerGross = res.holesUp; // the match payload carries the real result; keep a number for the type
     rivalGross = 0;
-    matchPayload = { kind: 'singles', scoreline: res.scoreline, thru: res.thru, holesUp: res.holesUp };
+    matchPayload =
+      match.kind === 'team' && match.matchup
+        ? {
+            kind: 'team',
+            scoreline: res.scoreline,
+            allyName: match.matchup.allyName,
+            oppNames: match.matchup.oppNames,
+            thru: res.thru,
+            holesUp: res.holesUp,
+            herald: match.matchup.herald,
+          }
+        : { kind: 'singles', scoreline: res.scoreline, thru: res.thru, holesUp: res.holesUp };
+    if (match.kind === 'team' && match.matchup) rivalName = match.matchup.oppNames.join(' & ');
     leaderboard = []; // no stroke leaderboard for matchplay (the recap shows the scoreline)
-  } else if (isTeamMatchTournament(t)) {
-    // GS-story-sigil-formats: the Ch.5 2v2 SCRAMBLE MATCHPLAY finale. Teams derive from your partner picks +
-    // path (finaleMatchup): WARDEN = you + a loyal friend vs (the betrayer + Venoma); HERALD = you + the
-    // Coil champion who isn't your guide vs your two former friends. Both sides SCRAMBLE (share a ball, best
-    // of every bite); fewer TEAM strokes wins each hole.
-    const m = finaleMatchup(base, base.activeCaddyId);
-    // The opponents play as a scramble PAIR — far stronger than a lone rival — so their per-golfer edge is
-    // scaled DOWN from `rivalEdge`. Your ally plays ~PAR (a modest help edge) so YOUR round still leads the
-    // team. (Final tuning is GS-story-betrayal-polish.)
-    const res = resolveStory2v2Match(
-      played.map((p) => p.record.strokes),
-      m.allyId,
-      FINALE_ALLY_EDGE,
-      m.oppIds,
-      t.rivalEdge * 0.5,
-      String(run.seed),
-      pars,
-      'scramble',
-    );
-    won = res.playerAdvances; // win OR halve advances (the campaign's matchplay convention)
-    playerGross = res.holesUp; // the match payload carries the real result; keep a number for the type
-    rivalGross = 0;
-    rivalName = m.oppNames.join(' & ');
-    matchPayload = { kind: 'team', scoreline: res.scoreline, allyName: m.allyName, oppNames: m.oppNames, thru: res.thru, holesUp: res.holesUp, herald: m.herald };
-    leaderboard = []; // no stroke leaderboard for matchplay (the recap shows the scoreline + teams)
+    // GS-story-sigil-live: a match CLOSES OUT the moment it's decided, so only the holes it actually ran
+    // are banked — the interactive close-out and the headless full-round resolve then bank identically
+    // (auto ≡ interactive on the purse too).
+    if (res.thru < played.length) played = played.slice(0, res.thru);
   } else {
     rivalGross = rivalTotal(t, String(run.seed), pars, rival);
     won = totals.gross <= rivalGross;
@@ -587,13 +574,18 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
 
   // Bank the round (credits + best) exactly like a world clear, PLUS the Sigil milestone bonus on a first
   // win (GS-story-balance): the majors fund the escalating bag/ship/finale spend.
+  // GS-story-sigil-live: a closed-out match banks only the holes it ran — recompute over the (possibly
+  // truncated) played list, and never let a partial round clobber the 18-hole `worldBest` record (the
+  // quest-round pattern).
+  const bank = playTotals(played.map((p) => p.record));
+  const fullRound = played.length >= pars.length;
   const alreadyWon = base.trophyIds.includes(t.sigilId);
   const winBonus = won && !alreadyWon ? SIGIL_WIN_BONUS : 0;
   // GS-story-econ2: a major pays at its VENUE's difficulty tier (later majors pay more), always full-rate
   // (never a revisit top-up) — the tournaments are the campaign's paydays (the Sigil bonus rides on top).
   const credits =
     Math.round(
-      storyRoundCredits(totals.toPar, { chapter: storyWorldChapter(t.venueId) }) *
+      storyRoundCredits(bank.toPar, { chapter: storyWorldChapter(t.venueId) }) *
         shipCreditMult(base) *
         upgradeCreditMult(base) *
         storyGearCreditMult(base),
@@ -601,8 +593,9 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
   let story = recordWorldClear(
     base,
     t.venueId,
-    { toPar: totals.toPar, strokes: totals.gross, par: totals.totalPar, seed: String(run.seed) },
+    { toPar: bank.toPar, strokes: bank.gross, par: bank.totalPar, seed: String(run.seed) },
     credits,
+    fullRound,
   );
   if (won) {
     story = winTournament(story, t);

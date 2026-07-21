@@ -314,12 +314,19 @@ export function storyTournamentPopScreen(): string {
       ? p.rivalVoice === 'corrupt' ? 'Your fallen friend gloats' : 'Your friend pleads'
       : p.rivalVoice === 'corrupt' ? 'Your fallen friend falters' : 'Your friend hopes'
     : p.brag ? 'Your rival gloats' : 'Your rival seethes';
-  const diff = p.playerThru - p.rivalThru;
-  const standing = p.brag
-    ? `${p.rivalName.split(' ')[0]} leads you by ${diff} through nine.`
-    : diff === 0
-      ? `You’re level with ${p.rivalName.split(' ')[0]} through nine.`
-      : `You lead ${p.rivalName.split(' ')[0]} by ${-diff} through nine.`;
+  // GS-story-sigil-live: a MATCHPLAY Sigil's halftime standing is the MATCH (holes up), never strokes.
+  const rivalFirstName = p.rivalName.split(' ')[0];
+  const standing = p.match
+    ? p.match.holesUp === 0
+      ? `All square${p.match.team ? ' between the teams' : ` with ${rivalFirstName}`} through nine.`
+      : p.match.holesUp > 0
+        ? `You${p.match.team ? 'r side is' : ' are'} ${p.match.holesUp} UP through nine.`
+        : `${p.match.team ? `${rivalFirstName}’s side is` : `${rivalFirstName} is`} ${-p.match.holesUp} UP through nine.`
+    : p.brag
+      ? `${rivalFirstName} leads you by ${p.playerThru - p.rivalThru} through nine.`
+      : p.playerThru === p.rivalThru
+        ? `You’re level with ${rivalFirstName} through nine.`
+        : `You lead ${rivalFirstName} by ${p.rivalThru - p.playerThru} through nine.`;
   return `
     <header class="gs-hero gs-storyres">
       <h1 class="gs-hero-title gs-tourn-in gs-tourn-in1">⛳ The turn</h1>
@@ -335,9 +342,9 @@ export function storyTournamentPopScreen(): string {
         </div>
       </div>
       <div class="gs-tourn-fieldbox gs-tourn-in gs-tourn-in3" style="text-align:center;">
-        <div class="gs-tourn-fieldlabel">Standing · through 9</div>
+        <div class="gs-tourn-fieldlabel">${p.match ? 'The match · holes won through 9' : 'Standing · through 9'}</div>
         <div style="font-size:16px;font-weight:800;color:${p.brag ? '#e6a6d6' : '#9dffce'};">
-          You ${p.playerThru} · ${p.rivalName.split(' ')[0]} ${p.rivalThru} — <span style="color:var(--gs-ink,#eaf1fb);">${standing}</span>
+          ${p.match ? `You${p.match.team ? 'rs' : ''} ${p.playerThru} · ${rivalFirstName}${p.match.team ? '’s' : ''} ${p.rivalThru}` : `You ${p.playerThru} · ${rivalFirstName} ${p.rivalThru}`} — <span style="color:var(--gs-ink,#eaf1fb);">${standing}</span>
         </div>
       </div>
     </section>

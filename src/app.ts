@@ -32,6 +32,7 @@ import { holeResult } from './sim/rpg/play';
 import type { PlayedHole } from './sim/round';
 import { betterPlayedHole } from './sim/rpg/match';
 import { storyPartnerBestBallScore } from './sim/rpg/storyTeams';
+import { storySigilProgressHTML } from './app/storySigilHud';
 import { TEAM_PARTNER_EDGE } from './sim/rpg/storyTournaments';
 import { ACE_SHIP_ID } from './sim/rpg/ships';
 import { bagTierRank, type BagTier } from './sim/rpg/bag';
@@ -1117,7 +1118,13 @@ function playingBody(animating: boolean): string {
           <div style="font-size:10px;opacity:.55;letter-spacing:.05em;margin-top:3px;">${isAsgard ? `GROSS · ${toParTag(toParSoFar)}` : 'STOP PTS'}</div>
         </div>
       </div>`;
-    const progress = state.run.formatId === STROKEPLAY_FORMAT
+    // GS-story-sigil-live: a Sigil round shows its COMPETITION live every hole — the running match
+    // (scoreline + W/L/½ pips on the matchplay Sigils, with the close-out call) or the team standings
+    // vs the opposing pairs (scramble/best-ball) — from the SAME resolver streams as the finish.
+    const sigilLive = state.run.storyTournament ? storySigilProgressHTML(playedSoFar) : '';
+    const progress = sigilLive
+      ? `${sigilLive}<div style="margin-top:10px;">${strokePlayProgressHTML(playedSoFar)}</div>`
+      : state.run.formatId === STROKEPLAY_FORMAT
       ? // Star Tour (GS-star-tour): a solo records chase — show the running stroke scorecard, not the
         // voyage's ghost competitor board (there is no field to place against).
         strokePlayProgressHTML(playedSoFar)

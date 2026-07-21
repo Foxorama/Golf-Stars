@@ -82,7 +82,7 @@ import { claimCharacterQuest } from '../sim/rpg/characterQuests';
 import { acceptQuest, completeQuest, activeQuest, questWorld, startableQuestForWorld } from '../sim/rpg/storyQuests';
 import { isStoryShipId, buyStoryShip, equipStoryShip, worldIsShipVendor } from '../sim/rpg/storyShips';
 import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
-import { currentTournament, tournamentForChapter, tournamentRival, rivalTotalThrough, isTeamTournament, teamPartnerOrDefault } from '../sim/rpg/storyTournaments';
+import { currentTournament, tournamentForChapter, tournamentRival, sigilMatchThrough, rivalTotalThrough, isTeamTournament, teamPartnerOrDefault } from '../sim/rpg/storyTournaments';
 import { finaleUnlocked, finaleResult, winFinale } from '../sim/rpg/storyFinale';
 import { interludeSeen, applyInterlude } from '../sim/rpg/storyInterlude';
 import type { GearSlot } from '../sim/rpg/story';
@@ -1379,6 +1379,18 @@ export function reduce(state: UiState, action: Action): UiState {
       // they're ahead / CURSES you if you're beating them. Interactive-only (this per-hole `holeComplete`
       // path; the headless `play` resolves the whole round without it, so auto ≡ interactive + every
       // `{type:'play'}` test is unaffected). Fires exactly once at the nine-hole boundary.
+      // GS-story-sigil-live: a MATCHPLAY Sigil (Ch.3 singles / Ch.5 2v2) CLOSES OUT the moment it's
+      // decided — up by more than the holes that remain — exactly like real matchplay. The resolution
+      // banks only the holes the match ran (and never writes a partial `worldBest`), and the headless
+      // auto path truncates to the same `thru` in `resolveStoryTournament`, so auto ≡ interactive holds.
+      if (state.run.storyTournament && nextIdx < total) {
+        const t = tournamentForChapter(state.run.storyTournament, state.story?.alignment);
+        if (t) {
+          const pars = state.course.holes.map((h) => h.par);
+          const m = sigilMatchThrough(t, state.story, stopPlayed.map((p) => p.record.strokes), String(state.run.seed), pars);
+          if (m?.res.state.decided) return resolveStoryTournament({ ...state, stopPlayed }, stopPlayed);
+        }
+      }
       if (state.run.storyTournament && total === 18 && nextIdx === 9) {
         const t = tournamentForChapter(state.run.storyTournament, state.story?.alignment);
         if (t) {
@@ -1386,6 +1398,27 @@ export function reduce(state: UiState, action: Action): UiState {
           // GS-story-sigil-rivals: the pop speaks as the EFFECTIVE rival (the betrayal-arc friend on the
           // back-half Sigils), with their figure + voice context carried on the payload.
           const rival = tournamentRival(t, state.story);
+          // GS-story-sigil-live: a MATCHPLAY Sigil's halftime reads the MATCH (holes won, from the same
+          // resolver streams as the finish), never a stroke count the format doesn't score by.
+          const m = sigilMatchThrough(t, state.story, stopPlayed.map((p) => p.record.strokes), String(state.run.seed), pars);
+          if (m) {
+            const wonHoles = m.res.duels.filter((d) => d.winner === 'player').length;
+            const lostHoles = m.res.duels.filter((d) => d.winner === 'boss').length;
+            return {
+              ...state,
+              stopPlayed,
+              screen: 'storyTournamentPop',
+              storyTournamentMidPop: {
+                rivalId: rival.id,
+                rivalName: rival.name,
+                brag: m.res.holesUp < 0, // the rival's side leads the match → they brag
+                playerThru: wonHoles,
+                rivalThru: lostHoles,
+                match: { holesUp: m.res.holesUp, thru: m.res.thru, team: m.kind === 'team' },
+                ...(rival.golferId ? { rivalGolferId: rival.golferId, rivalVoice: rival.voice, rivalCorrupted: rival.corrupted } : {}),
+              },
+            };
+          }
           const rivalThru = rivalTotalThrough(t, String(state.run.seed), pars, 9, rival);
           const playerThru = stopPlayed.reduce((s, p) => s + p.record.strokes, 0);
           return {

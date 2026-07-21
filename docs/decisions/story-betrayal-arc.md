@@ -142,6 +142,24 @@ the corrupted one; the former friends stay clean Warden.
   (`friendRivalTaunt`/`friendRivalHalftime`, coverage machine-checked). Intros carry `{rival}`/`{opponents}`
   tokens resolved by `tournamentIntroLines(t, story)` (screens must never read `t.intro` raw; a test proves
   no token survives). Trunk + Ch.4W rows have no `dynamicRival` → byte-identical; no save bump.
+- **GS-story-sigil-live** — ✅ (2026-07-21) the Sigil competitions play INTERACTIVELY THROUGHOUT (player
+  report: "only a 9-hole pop and a closing screen — the duo formats should be interactive throughout").
+  ONE pure source, `sigilMatchThrough(t, story, playerStrokes, seed, pars)` (`storyTournaments.ts`, wrapping
+  the SAME `resolveStorySinglesMatch`/`resolveStory2v2Match` streams the finish uses, with
+  `FINALE_ALLY_EDGE`/`FINALE_OPP_EDGE_SCALE` moved there from the reducer), feeds FIVE surfaces so live ≡
+  final to the hole: (1) a live MATCH CHIP on the play HUD (`app/storySigilHud.ts storySigilMatchChip` —
+  scoreline/thru + the opponent's known card on the current hole, real-matchplay style, the boss-duel
+  `matchHud` idiom); (2) a per-hole MATCH PANEL on the end-of-hole screen (W/L/½ pips, this hole's duel,
+  and the close-out call the moment it's decided); (3) running TEAM STANDINGS vs the opposing pairs on the
+  scramble/best-ball Sigils (`opposingField`/`opposingPairTotal` gained an `upto` param — default
+  byte-identical, prefix-consistent with the finish); (4) a MATCH-AWARE halftime pop (holes won + holes-up
+  standing on the payload's `match` field — never a stroke count the format doesn't score by); (5) a
+  mid-round CLOSE-OUT: `holeComplete` resolves the tournament the moment the match is decided (up > holes
+  remaining), and `resolveStoryTournament` banks ONLY the holes the match ran (truncating the headless
+  full-round path to the same `thru`, so auto ≡ interactive holds on the purse too) and SKIPS `worldBest`
+  on a partial round (the quest-round rule — a 12-hole close-out can never clobber the 18-hole record).
+  Render + reducer only, zero sim rng, no save bump. Guarded by `tests/story-sigil-live.test.ts`
+  (prefix-consistency, live≡final duels, close-out banking + worldBest skip, the interactive reducer flow).
 - **GS-story-betrayal-polish** — balance re-tune (the finale + team-major edges), any dialogue-depth follow-up,
   constitution/roadmap docs.
 
