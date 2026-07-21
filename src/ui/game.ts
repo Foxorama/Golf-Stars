@@ -713,9 +713,16 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'openStoryBar': {
       // GS-story-parrot-bar: enter the Parrot's cantina from the spaceport clubhouse; the chatter starts
-      // on the greeting (talk 0). Purely cosmetic — no story write, no rng.
+      // on the greeting (talk 0). GS-story-prologue-beats: the FIRST Chapter-1 visit answers the
+      // cinematic's "meet me at the bar — I'll tell you everything" — record it (persisted in
+      // `seenStoryBeats`, no version bump) so the clubhouse ❗ pull retires; a quit before visiting
+      // keeps the pull alive. No rng.
       if (state.screen !== 'story' || !state.story) return state;
-      return { ...state, screen: 'storyBar', storyBarTalk: 0 };
+      const story =
+        state.story.chapter <= 1 && !state.story.seenStoryBeats['story-bar-briefing']
+          ? { ...state.story, seenStoryBeats: { ...state.story.seenStoryBeats, 'story-bar-briefing': true as const } }
+          : state.story;
+      return { ...state, story, screen: 'storyBar', storyBarTalk: 0 };
     }
 
     case 'exitStoryBar': {

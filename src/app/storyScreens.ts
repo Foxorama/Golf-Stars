@@ -459,8 +459,12 @@ export function storyResultScreen(): string {
                }
              </div>`
           : r.wasPrologue
-            ? `<p><em>As the gallery roars, a shadow falls across the 18th green. Something vast is descending from the sky…</em></p>
-             <p style="color:#7fe0a0;">🦜 "Golfer — the Universe needs you. Gather friends and allies, and follow me!"</p>`
+            ? // GS-story-prologue-beats: the recap TEASES — the cheering dies, the shadow falls — and lets
+              // the recruitment cinematic DELIVER the call. (It used to quote the Parrot's whole line here,
+              // one screen before the cinematic typed the same words — the reveal landed twice, flat both times.)
+              `<p><em>The cheering falters mid-roar. The light on the 18th green turns the colour of deep water
+               as something vast slides across the sun — and stops, directly overhead.</em></p>
+             <p style="color:#9fb0c8;"><em>Every face in the gallery tilts up. Yours too.</em></p>`
             : q
               ? qualifierRecapHTML(q)
               : `<p>Credits banked. The Coil is not resting — nor is the serpent.</p>`

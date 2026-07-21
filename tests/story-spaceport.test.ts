@@ -18,6 +18,18 @@ describe('spaceport clubhouse scene (GS-story-crew-scene)', () => {
     expect(html).not.toContain('storyInspectAlly'); // nobody recruited yet ⇒ no ally standees
   });
 
+  it('carries the "meet me at the bar" ❗ pull until the Chapter-1 briefing is heard (GS-story-prologue-beats)', () => {
+    // Chapter 1, briefing unanswered → the bar hotspot wears the gold pull.
+    const mark = '<span class="gs-sclub-barpull">'; // the marker span (the CSS rule is always present)
+    const fresh = { ...defaultStoryState(), chapter: 1 };
+    expect(spaceportSceneHTML(fresh)).toContain(mark);
+    // heard → the pull retires
+    const heard = { ...fresh, seenStoryBeats: { 'story-bar-briefing': true as const } };
+    expect(spaceportSceneHTML(heard)).not.toContain(mark);
+    // deeper chapters never show it (the greeting has moved on)
+    expect(spaceportSceneHTML({ ...defaultStoryState(), chapter: 3 })).not.toContain(mark);
+  });
+
   it('renders a tappable standee for each recruited ally, the active one marked', () => {
     const story = {
       ...defaultStoryState(),
