@@ -989,3 +989,61 @@ describe('Ally side quests (GS-story-quests)', () => {
     expect(questOfferable(played.story!, 'sandy-sandsaver')).toBe(true);
   });
 });
+
+describe('Story star-map navigation (GS-story-map-nav)', () => {
+  it('accepts + tees off an ally quest STRAIGHT from the star-map world dossier', () => {
+    // Sandy's quest is offerable (recruited, carried a round, flown on) at Chapter 2.
+    const story = {
+      ...defaultStoryState('feather-fade'),
+      chapter: 2,
+      hiredCaddyIds: ['sandy-sandsaver'],
+      activeCaddyId: 'sandy-sandsaver',
+      caddiedRoundIds: ['sandy-sandsaver'],
+      clearedWorldIds: ['standrews-18', 'verdant-18'],
+    };
+    expect(questOfferable(story, 'sandy-sandsaver')).toBe(true);
+    const map = { ...initState('nav-seed', {}, undefined, story), screen: 'starTour' as const };
+    // Tap "Accept & play" on the desert-18 dossier — accepts the quest AND builds its round in one action.
+    const res = reduce(map, { type: 'storyStartQuest', courseId: 'desert-18' });
+    expect(res.story!.activeQuestId).toBe('quest-sandy');
+    expect(res.run.storyRound).toBe(true);
+    expect(res.run.storyQuest).toBe('quest-sandy');
+    expect(res.run.staticCourseId).toBe('desert-18');
+    expect(res.screen === 'intro' || res.screen === 'lore').toBe(true);
+  });
+
+  it('storyStartQuest is a no-op for a world with no offerable/active quest', () => {
+    const story = { ...defaultStoryState('feather-fade'), chapter: 1, clearedWorldIds: ['standrews-18'] };
+    const map = { ...initState('nav-seed', {}, undefined, story), screen: 'starTour' as const };
+    const res = reduce(map, { type: 'storyStartQuest', courseId: 'verdant-18' });
+    expect(res).toBe(map); // unchanged (no quest plays here yet)
+  });
+
+  it('enters the Sigil tournament DIRECTLY from the star map, and backing out returns to the map', () => {
+    // Chapter 1, qualified in both events → the Emerald Invitational is unlocked.
+    const story = {
+      ...defaultStoryState('feather-fade'),
+      chapter: 1,
+      clearedWorldIds: ['standrews-18'],
+      qualifierResults: { 'verdant2-18': { place: 1, field: 16 }, 'desert-18': { place: 1, field: 16 } },
+    };
+    const map = { ...initState('nav-seed', {}, undefined, story), screen: 'starTour' as const };
+    const lobby = reduce(map, { type: 'openStoryTournament' });
+    expect(lobby.screen).toBe('storyTournament');
+    expect(lobby.storyTournamentReturn).toBe('starTour');
+    // Backing out returns to the star map (not the clubhouse).
+    const back = reduce(lobby, { type: 'exitStoryTournament' });
+    expect(back.screen).toBe('starTour');
+
+    // From the clubhouse the lobby still returns to the clubhouse (byte-identical behaviour).
+    const fromHub = reduce({ ...map, screen: 'story' as const }, { type: 'openStoryTournament' });
+    expect(fromHub.storyTournamentReturn).toBe('story');
+    expect(reduce(fromHub, { type: 'exitStoryTournament' }).screen).toBe('story');
+  });
+
+  it('openStoryTournament from the star map is refused when no tournament is unlocked', () => {
+    const story = { ...defaultStoryState('feather-fade'), chapter: 1, clearedWorldIds: ['standrews-18'] };
+    const map = { ...initState('nav-seed', {}, undefined, story), screen: 'starTour' as const };
+    expect(reduce(map, { type: 'openStoryTournament' })).toBe(map);
+  });
+});

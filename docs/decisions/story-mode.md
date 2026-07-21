@@ -744,6 +744,35 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   **service badges** (`starTourMap.ts serviceBadges`) — 🚀 on the 5 ship-vendor SHIPYARD worlds (the key
   differentiator for finding where to arm up), 🛒 on any PRO SHOP world — so you can read where to shop
   straight off the chart. All render/data + a reducer guard; no save/rng/`_gs*` hooks.
+- **GS-story-map-nav** — ✅ *shipped* (`sim/rpg/storyMapNav.ts` + `render/starTourMap.ts` +
+  `app/starTourScreens.ts` + reducer). Player ask: the campaign's three between-round pulls — ally SIDE
+  QUESTS, chapter QUALIFYING EVENTS, and the Sigil TOURNAMENT — were ALL funnelled through the spaceport
+  clubhouse (a banner, an ally card), so the star map couldn't tell you which world hosted a quest, which
+  were qualifiers, or where the Sigil major was: "unclear and confusing, you can't find anything easily on
+  the star map". The fix surfaces all three ON the chart, identifiable AND actionable, without a clubhouse
+  detour. A pure `storyWorldNav(story, courseId)` composes the existing progression predicates
+  (`storyQuests`/`storyQualifiers`/`storyTournaments`) into one per-world status (quest / qualifier / venue);
+  a leaf module (nothing in the sim imports it) so there's no cycle. The star map reads it two ways: (1) a
+  MARKER PILL above each world glyph (`storyWorldMarker` picks the primary — a Sigil VENUE outranks a QUEST
+  outranks a QUALIFIER): 🏆 SIGIL (gold + pulse + a gold call-ring when you're qualified to enter, dim when
+  still locked, green ✓ when the Sigil's won), ❗ QUEST (gold to accept / violet "GO" for your active quest,
+  each with a matching call-ring, a faint 🎒 SOON when the ally's holding a beat), 🏁 QUALIFIER (cyan ○ /
+  green ✓), plus a small qualifier bottom flag so status still reads when a quest pill tops the glyph. (2)
+  the world DOSSIER gains actionable SECTIONS: an offerable/active quest → **Accept & play with <ally> — 9
+  holes** (`storyStartQuest` accepts if needed AND tees off the quest round in one action, straight from the
+  map — mirrors `playStoryQuest`'s loadout build); the current chapter's VENUE → **Enter <Sigil>** when
+  qualified (`openStoryTournament` now opens from `starTour` too, recording `storyTournamentReturn` so
+  backing out returns to the MAP, not always the clubhouse), a "🔒 qualify in N more events" note when
+  locked, a "🏆 won" note when taken (the plain world round relabels to "Practice round — no Sigil"); and a
+  QUALIFIER status line — the top-N bar (finish top N of the field) + your best-place verdict (✓ qualified /
+  not yet / replay to improve) — with the play button relabelled "…tee off — qualifying event". Marker + venue
+  + qualifier gate to the player's CURRENT chapter (the live objective) so the chart stays focused; quests
+  span chapters (gather-early). The clubhouse banners/cards are UNCHANGED (still work), this is an ADDITIONAL
+  surface. Pure render/data + two reducer additions (`storyStartQuest`, `openStoryTournament` from the map) +
+  one transient `storyTournamentReturn` UiState field; ZERO sim rng, no save bump, no `_gs*`/URL hook (no
+  test-hub wiring). Guarded by `tests/story-mapnav.test.ts` (the pure per-world status + marker precedence)
+  and the star-map nav flow in `tests/story-flow.test.ts` (accept-&-fly a quest, enter-the-Sigil-and-return-
+  to-the-map, the no-op guards).
 - **GS-story-gather-early** — ✅ *shipped* (`story.ts` + `gameUpdates.ts`). Player ask: two Warden friends —
   Driver Dan (the derelict, his old rig) and Mystic Mole (the Hydra Mire) — waited at **Chapter-5** worlds, so
   by the game flow there was no time to fly out, recruit them, and complete their personal quests before the

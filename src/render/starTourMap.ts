@@ -44,6 +44,21 @@ export interface StarTourWorld {
   hasShipyard?: boolean;
   /** GS-star-map-services (story mode): this world has a PRO SHOP (clubs/gear) — drawn with a 🛒 badge. */
   hasProShop?: boolean;
+  /** GS-story-map-nav (story mode): the primary campaign MARKER for this world — the top pill that makes
+   *  quests / qualifiers / the Sigil venue findable on the chart. Undefined ⇒ no marker (an ordinary world).
+   *  A Sigil venue outranks a quest, which outranks a qualifier (`storyWorldMarker`). */
+  storyMarker?:
+    | 'venue-ready'
+    | 'venue-locked'
+    | 'venue-won'
+    | 'quest'
+    | 'quest-active'
+    | 'quest-pending'
+    | 'qualifier'
+    | 'qualified';
+  /** GS-story-map-nav: this world is a QUALIFYING EVENT this chapter — a small bottom flag (○ open / ✓ done)
+   *  so qualifier STATUS is visible even when a quest pill occupies the top of the glyph. */
+  qualifierFlag?: 'open' | 'qualified';
 }
 
 export interface StarTourMapOpts {
@@ -1200,6 +1215,43 @@ function serviceBadges(w: { hasShipyard?: boolean; hasProShop?: boolean }, r: nu
   return out;
 }
 
+/** GS-story-map-nav: the campaign MARKER pill above a world — the top-centre call-to-action that makes the
+ *  three campaign pulls findable straight off the chart: a Sigil VENUE (🏆, gold+pulse when ready to enter,
+ *  dim when still locked, green ✓ when won), an ally QUEST (❗ gold to accept / go, faint when the ally is
+ *  holding a beat), or a QUALIFYING event (🏁 cyan / green ✓). Drawn in open sky above the name so it never
+ *  collides with the tier dot / record star / service badges. Pure geometry, byte-stable. */
+function storyMarkerPill(marker: NonNullable<StarTourWorld['storyMarker']>, r: number): string {
+  const specs: Record<NonNullable<StarTourWorld['storyMarker']>, { text: string; col: string; bg: string; pulse?: boolean }> = {
+    'venue-ready': { text: '🏆 SIGIL — PLAY', col: '#ffe6a6', bg: '#3a2c08', pulse: true },
+    'venue-locked': { text: '🏆 SIGIL · LOCKED', col: '#c8b98a', bg: '#241d0c' },
+    'venue-won': { text: '🏆 SIGIL ✓', col: '#9dffce', bg: '#0f2318' },
+    quest: { text: '❗ QUEST', col: '#f0d089', bg: '#2a1e08', pulse: true },
+    'quest-active': { text: '❗ QUEST — GO', col: '#e2d4ff', bg: '#22163a', pulse: true },
+    'quest-pending': { text: '🎒 SOON', col: '#9a8fb8', bg: '#181322' },
+    qualifier: { text: '🏁 QUALIFIER', col: '#8fdcff', bg: '#0c2230' },
+    qualified: { text: '🏁 QUALIFIED', col: '#9dffce', bg: '#0f2318' },
+  };
+  const s = specs[marker];
+  const y = -r - 32;
+  const halfW = 3.4 + s.text.length * 3.5;
+  const pulse = s.pulse
+    ? `<animate attributeName="opacity" values="1;0.55;1" dur="1.8s" repeatCount="indefinite"/>`
+    : '';
+  return `<g transform="translate(0,${y.toFixed(1)})">
+    <rect x="${(-halfW).toFixed(1)}" y="-9" width="${(halfW * 2).toFixed(1)}" height="17" rx="8.5" fill="${s.bg}" stroke="${s.col}" stroke-width="1" opacity="0.94">${pulse}</rect>
+    <text x="0" y="3.4" font-size="9.5" text-anchor="middle" fill="${s.col}" font-weight="800" letter-spacing="0.02em">${s.text}</text>
+  </g>`;
+}
+
+/** GS-story-map-nav: the small QUALIFIER status flag at the bottom of a world glyph — shown alongside the
+ *  service badges so qualifier status reads even when a quest pill sits on top. ○ = still to qualify,
+ *  ✓ = qualified. Suppressed when the top pill already IS the qualifier (no redundancy). */
+function qualifierFlagBadge(flag: NonNullable<StarTourWorld['qualifierFlag']>, r: number, offset: number): string {
+  const done = flag === 'qualified';
+  const col = done ? '#7fe0a0' : '#8fdcff';
+  return `<g transform="translate(${offset.toFixed(1)},${(r * 0.92).toFixed(1)})"><circle r="7.6" fill="#0a0d1c"/><circle r="7.6" fill="none" stroke="${col}" stroke-width="1.1" opacity="0.9"/><text x="0" y="3.1" font-size="8.5" text-anchor="middle" fill="${col}">${done ? '✓' : '🏁'}</text></g>`;
+}
+
 /** One tappable destination + label. The body EMITS its own glow so it blends into the star field — no
  *  hard tier ring or dark halo bubble. Tier is a small luminous BEACON dot top-left; a record ★ sits
  *  top-right; the name floats above. Diffuse bodies (galaxy/nebula/…) draw larger via the signature. */
@@ -1218,18 +1270,42 @@ function worldGlyph(w: StarTourWorld, selected: boolean): string {
       ? `<text x="0" y="${r + 30}" font-size="12" text-anchor="middle" fill="${w.bestToPar < 0 ? '#5fd45a' : w.bestToPar === 0 ? '#cdd3df' : '#ffce54'}" font-weight="700">${toParLabel(w.bestToPar)}</text>`
       : '';
   const tierDot = `<g transform="translate(${rr(-r * 0.92)},${rr(-r * 0.92)})"><circle r="4.4" fill="${tierCol}" opacity="0.28"/><circle r="2.4" fill="${tierCol}"/><circle r="2.4" fill="none" stroke="#0a0d1c" stroke-width="0.7"/></g>`;
+  // GS-story-map-nav: a bright PULSE ring flags a world with a live campaign call (an enterable Sigil or an
+  // accept-now / go-play quest) even when it isn't the selected world — so the objective jumps out of the
+  // chart. Its colour matches the pill (gold Sigil / violet quest). Skipped when the world is selected
+  // (the selection ring already rings it) or the marker is a quiet status (locked / pending / qualifier).
+  const callCol =
+    w.storyMarker === 'venue-ready'
+      ? '#ffd77a'
+      : w.storyMarker === 'quest' || w.storyMarker === 'quest-active'
+      ? '#c9a6ff'
+      : '';
+  const callRing =
+    callCol && !selected
+      ? `<circle r="${r + 6}" fill="none" stroke="${callCol}" stroke-width="2" opacity="0.7"><animate attributeName="r" values="${r + 5};${r + 11};${r + 5}" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.7;0.2;0.7" dur="2s" repeatCount="indefinite"/></circle>`
+      : '';
   const ring = selected
     ? `<circle r="${r + 9}" fill="none" stroke="#7fe0ff" stroke-width="2.5" opacity="0.9"><animate attributeName="r" values="${r + 7};${r + 12};${r + 7}" dur="2.4s" repeatCount="indefinite"/></circle>`
     : '';
+  const marker = w.storyMarker ? storyMarkerPill(w.storyMarker, r) : '';
+  // The qualifier bottom flag shows only when a quest pill (or nothing else) tops the glyph — never doubled
+  // up with a qualifier top pill. Bottom-centre, clear of the corner service badges.
+  const qualFlag =
+    w.qualifierFlag && w.storyMarker !== 'qualifier' && w.storyMarker !== 'qualified'
+      ? qualifierFlagBadge(w.qualifierFlag, r, 0)
+      : '';
   return `
     <g class="gs-st-world" data-startour-course="${w.id}" role="button" tabindex="0" transform="translate(${x.toFixed(1)},${y.toFixed(1)})" style="cursor:pointer;">
+      ${callRing}
       ${ring}
       ${celestialBody(w, r, look, sig)}
       ${tierDot}
       ${record}
       ${serviceBadges(w, r)}
+      ${qualFlag}
       <text x="0" y="${-r - 8}" font-size="13" text-anchor="middle" fill="#e6ecf5" font-weight="700" style="paint-order:stroke;stroke:#0a0d1c;stroke-width:3px;">${w.name}</text>
       ${best}
+      ${marker}
     </g>`;
 }
 
