@@ -196,6 +196,25 @@ the corrupted one; the former friends stay clean Warden.
   - **The Choice is blind**: the alignment cards are two in-fiction voices (the Parrot's creed vs the
     Apostate's kind offer) with NO mechanical spoilers — no world lists, no "win her back", no "crush
     Driver Dan & Penelope", no ending names. What each road costs is for the road to reveal.
+- **GS-story-ambiguous-fate** — ✅ (2026-07-21) the shrine's redemption PROMISE is withdrawn (player call:
+  "reword the lines so the friend's fate is ambiguous" — the old copy promised winning would "break the
+  whisper's hold" on the betrayer, and nothing ever paid it off). The Defection interlude (the Parrot's
+  brief + the outcome line) and the Serpent's Vigil intro now promise only the CONFRONTATION — the Parrot's
+  foresight "goes dark in the mire", and what winning leaves of the friend is explicitly unknowable. The
+  fate resolves in the ENDING instead (below).
+- **GS-story-unending-tease** — ✅ (2026-07-21) the Warden ending reworked (player design): the Reseal does
+  NOT kill Jörmungandr — the finisher **sings it back to SLEEP** (the ending cinematic settles the serpent:
+  sway stills, body sinks, the burning eye slides shut under converging amber seal-rings — no more
+  shattering), and the win is left ONE FRIEND SHORT: the betrayer and the Coil's remnant flee in the last
+  wyrm-ship past the edge of every chart into the **UNIVERSE UNENDING** — the NAMED unknown deep (a future
+  game mode; the name is deliberate and must be kept verbatim). Redeeming the friend will require flying
+  further than any chart — the sequel hook the ending speaks aloud. Touched surfaces: `storyEnding.ts`
+  ('good-win' copy + the sleep/seal/`coilShipFlees` cinematic — the wyrm-ship jets off-frame through the
+  hold — plus flow-layout captions so long copy never overlaps), `storyFinaleScreens.ts` (the Reseal recap:
+  "Not a kill. A lullaby.", the fleeing sail, the Parrot's "when that door opens — you and I go through it
+  together"), `storyGuide.ts` (the completed-campaign line). The ending names the actual betrayer:
+  `mountStoryEnding` gained `betrayerName` (the `{betrayer}` token), passed from `app.ts` via the shared
+  `betrayerName(story)` seam. Render/copy only — no reducer/save/rng impact; Herald surfaces untouched.
 - **GS-story-betrayal-polish** — balance re-tune (the finale + team-major edges), any dialogue-depth follow-up,
   constitution/roadmap docs.
 

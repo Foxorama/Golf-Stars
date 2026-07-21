@@ -83,6 +83,18 @@ default). One focused, tested, auto-merged PR each:
   heavy) — realistically Sandy/Chipinski/Sam/Penelope, the caddies reachable before The Choice, never the
   Ch.5-only Dan/Mole. The friend's per-character farewell. Four distinct betrayal voices (`BETRAYAL_VOICE`).
 - **GS-story-betrayal-polish** — balance, dialogue depth, costume polish, docs.
+- **GS-universe-unending** — the FUTURE game mode the Warden ending now names: the Coil's remnant (and the
+  betrayed friend) fled "past the edge of every chart" into the **Universe Unending** — an unknown-deep
+  voyage mode where redeeming the friend is the quest. The ending, the mission log, and the story bible all
+  seed the name verbatim (GS-story-unending-tease), so the mode ships into an already-told promise. Design
+  TBD (player-planned).
+- **GS-story-ambiguous-fate + GS-story-unending-tease** — ✅ *shipped* (the Warden ending rework, player
+  design): the shrine no longer promises redemption ("break the whisper's hold" → the Parrot's foresight
+  goes dark in the mire; the friend's fate is unknowable), and the Reseal ending resolves it instead —
+  Jörmungandr is SUNG TO SLEEP (never shattered: the cinematic settles the serpent, closes its eye under
+  amber seal-rings) while the betrayer + the Coil's last wyrm-ship jet off-frame into the **Universe
+  Unending**; the recap + the Parrot's last line vow the unknown-deep voyage to bring them home. Ending
+  names the real betrayer (`mountStoryEnding.betrayerName`).
 - **GS-story-early-beats + GS-story-doubt + GS-story-choice-blind + GS-story-sigil5-play/-look** — ✅
   *shipped* (the story-beats correctness pass, player report): (1) the pre-Choice trunk gained real arrival
   beats (Ch.1 true-line lesson, Ch.2 Venoma DEBUT at the Forge tee-off + the rough-that-moved dread) so the

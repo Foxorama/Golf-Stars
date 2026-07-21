@@ -100,6 +100,7 @@ import { storyBarScreen } from './app/storyBarScreens';
 import { mountStoryBattle } from './render/storyBattle';
 import { mountSigilCeremony } from './render/sigilCeremony';
 import { mountStoryEnding, endingVariant } from './render/storyEnding';
+import { betrayerName } from './sim/rpg/storyBetrayal';
 import { finaleResult, finaleBattleTuning } from './sim/rpg/storyFinale';
 import { loreScreen } from './app/loreScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
@@ -2627,7 +2628,12 @@ function render(): void {
       const go = (strike: 'clean' | 'graze', outcome: 'won' | 'lost'): void => {
         const repelled = won && outcome === 'lost';
         dispatch({ type: 'engageStoryFinale', strike, outcome }); // resolves → the recap screen mounts behind us
-        if (!repelled) mountStoryEnding({ variant: endingVariant(alignment, won) });
+        // GS-story-unending-tease: the Warden ending names the fleeing friend — the campaign's actual betrayer.
+        if (!repelled)
+          mountStoryEnding({
+            variant: endingVariant(alignment, won),
+            betrayerName: state.story ? betrayerName(state.story) : undefined,
+          });
       };
       if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
         // Reduced motion: skip both the battle AND the ending — straight to the recap (the gate verdict).
