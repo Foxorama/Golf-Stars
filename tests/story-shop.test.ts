@@ -19,6 +19,7 @@ import {
   storyCardFor,
   storyItemKind,
   buyStoryCard,
+  storyShopSlotView,
 } from '../src/sim/rpg/storyShop';
 import {
   STORY_GEAR,
@@ -419,6 +420,41 @@ describe('the deep catalogue (GS-story-shop-depth)', () => {
     expect(storyGearCreditMult(s)).toBeCloseTo(1.15, 5);
     s = buyStoryGear(addCredits(s, 3000), storyGearById('gear:bag:cosmic')!); // ×1.6, replaces the slot
     expect(storyGearCreditMult(s)).toBeCloseTo(1.6, 5);
+  });
+});
+
+describe('the shop slot/upgrade view (GS-story-shop-slots)', () => {
+  it('gear: empty slot → new; equipped → equipped; higher tier → upgrade; owned bench → owned', () => {
+    let s = addCredits(defaultStoryState(), 5000);
+    // nothing in the glove slot yet
+    expect(storyShopSlotView(s, 'gear:glove:tacky')!.relation).toBe('new');
+    expect(storyShopSlotView(s, 'gear:glove:tacky')!.slotWord).toBe('Glove');
+    // buy the rare tacky glove → it's equipped
+    s = buyStoryGear(s, storyGearById('gear:glove:tacky')!);
+    expect(storyShopSlotView(s, 'gear:glove:tacky')!.relation).toBe('equipped');
+    // the legendary master glove now reads as an UPGRADE over the equipped rare, and names it
+    const up = storyShopSlotView(s, 'gear:glove:master')!;
+    expect(up.relation).toBe('upgrade');
+    expect(up.equippedName).toBe('Tacky Tour Glove');
+    // buy the epic vice glove (now equipped); the benched tacky reads OWNED
+    s = buyStoryGear(s, storyGearById('gear:glove:vice')!);
+    expect(storyShopSlotView(s, 'gear:glove:tacky')!.relation).toBe('owned');
+    // a same-tier epic in the SAME slot is a sidegrade (shed is an epic glove)
+    expect(storyShopSlotView({ ...s, alignment: 'herald' }, 'gear:glove:shed')!.relation).toBe('sidegrade');
+  });
+
+  it('club: an in-bag type reads upgrade/equipped; a new type reads new', () => {
+    const s = addCredits(defaultStoryState(), 5000); // green bag carries a plain putter, no 3W
+    // the themed Planet putter upgrades the plain putter you carry
+    const putt = storyShopSlotView(s, 'club:pro:putter')!;
+    expect(putt.relation).toBe('upgrade');
+    expect(putt.equippedName).toBe('Putter');
+    // a 3-Wood is a NEW bag type (the lean green bag has none)
+    expect(storyShopSlotView(s, 'club:tour:3W')!.relation).toBe('new');
+    expect(storyShopSlotView(s, 'club:tour:3W')!.slotWord).toBe('3-Wood');
+    // once bought + equipped, it reads equipped
+    const bought = buyStoryCard(s, 'club:tour:3W');
+    expect(storyShopSlotView(bought, 'club:tour:3W')!.relation).toBe('equipped');
   });
 });
 

@@ -889,6 +889,18 @@ each shop a place you're *excited* to reach. Shipped as focused, auto-merged PRs
   `equippedGear`'s partial record; no `STORY_VERSION` bump). Guarded by the deep-catalogue coverage in
   `tests/story-shop.test.ts` (every purchasable item is stocked; six slots + a green→legendary ladder; the
   distance/power/hazard levers fold; the economy multiplier). Voyage/Unending untouched (Story-only fold).
+- **GS-story-shop-slots** — ✅ *shipped* (`sim/rpg/storyShop.ts storyShopSlotView` + `app/storyShopScreens.ts`).
+  Player point: you couldn't see what you had equipped in a slot or whether an item was an upgrade, so you had
+  to close the shop and open the locker to compare. Now each rack card carries a colour-coded SLOT/UPGRADE
+  chip — **✓ Equipped now** / **✓ Owned · benched** / **↑ Upgrade · now `<what you carry>`** / **↔ Sidegrade**
+  / **↓ Lower tier** / **✦ New `<slot>`** — computed by the pure `storyShopSlotView(story, id)` (gear compares
+  against the item in its SLOT; a club against the club of the same bag-TYPE; the relation is by rarity tier,
+  the game's own power ordering). The lore-card overlay leads with the same comparison ("In your Glove now:
+  Tacky Tour Glove — this is ↑ upgrade"), and an owned/equipped card dims so the rack reads at a glance. Also
+  a small SCENE polish (the "intro feels bad" note): the world pro + their nameplate stack cleanly in the
+  corner instead of overlapping, and the shopkeeper's intro line reads as a quote. Pure model + render; no
+  save/sim/rng touch, no `_gs*`/URL hook. Guarded by `storyShopSlotView` coverage in `tests/story-shop.test.ts`
+  (new/equipped/owned/upgrade/sidegrade for gear + clubs) + the existing `?screen=storyshop` browser smoke.
 
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.
