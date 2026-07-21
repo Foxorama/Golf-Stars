@@ -952,18 +952,27 @@ export function reduce(state: UiState, action: Action): UiState {
     }
 
     case 'engageStoryFinale': {
-      // GS-story-yggdrasil: whether you CAN win is the deterministic arm-up floor (`finaleResult`, the two
-      // gates). GS-story-finisher: the KILL is an interactive golf strike played by app.ts before this
-      // dispatches; its quality (`strike`) colours the ending but NEVER decides win/lose (an armed player
-      // always wins). A win marks the campaign complete (`completed` → Star Tour unlocks).
+      // GS-story-yggdrasil: whether you CAN win is still the deterministic arm-up floor (`finaleResult`,
+      // the two gates) — a gate-lost ship can NEVER win, whatever the battle reports (no soft-lock, the
+      // briefing never lies). GS-story-battle-2: an ARMED ship can now LOSE the live fight (shields down →
+      // `outcome: 'lost'`) — it is merely REPELLED (`failReason: 'repelled'`): the campaign is saved at the
+      // root and it re-engages at no cost, so the fight has real stakes without ever walling progress.
+      // Default (no `outcome`) = the gate verdict, byte-for-byte the classic resolution. GS-story-finisher:
+      // the strike quality (`strike`) colours a win but never decides it.
       if (state.screen !== 'storyFinale' || !state.story) return state;
       const res = finaleResult(state.story);
-      const story = res.won ? winFinale(state.story) : state.story;
+      const repelled = res.won && action.outcome === 'lost';
+      const won = res.won && !repelled;
+      const story = won ? winFinale(state.story) : state.story;
       return {
         ...state,
         story,
         screen: 'storyFinaleResult',
-        lastStoryFinale: { won: res.won, failReason: res.failReason, strike: res.won ? action.strike ?? 'clean' : undefined },
+        lastStoryFinale: {
+          won,
+          failReason: won ? undefined : repelled ? 'repelled' : res.failReason,
+          strike: won ? action.strike ?? 'clean' : undefined,
+        },
       };
     }
 

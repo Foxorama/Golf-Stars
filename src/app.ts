@@ -100,7 +100,7 @@ import { storyBarScreen } from './app/storyBarScreens';
 import { mountStoryBattle } from './render/storyBattle';
 import { mountSigilCeremony } from './render/sigilCeremony';
 import { mountStoryEnding, endingVariant } from './render/storyEnding';
-import { finaleResult } from './sim/rpg/storyFinale';
+import { finaleResult, finaleBattleTuning } from './sim/rpg/storyFinale';
 import { loreScreen } from './app/loreScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
@@ -2600,31 +2600,35 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-story-finale-engage]').forEach((el) => {
     el.addEventListener('click', () => {
       resumeAudio();
-      // GS-story-battle: "Engage" plays the INTERACTIVE two-stage battle — Stage 1 you fire your weapon
-      // (charges + recharge) to drop the serpent while your shields weather its lunges; Stage 2 is the golf
-      // FINAL STRIKE into the eye. Whether you CAN win is still the deterministic arm-up verdict (`won`, the
-      // two gates), so an armed player always wins and an under-armed one always loses — skill sets the FEEL,
-      // the strike quality (clean/graze) colours the ending, but neither decides win/lose (no soft-lock).
+      // GS-story-battle-2: "Engage" plays the INTERACTIVE two-stage battle — Stage 1 you FIRE (tap) between
+      // the serpent's telegraphed strikes and VEER (tap the telegraph) to dodge them; Stage 2 is the golf
+      // FINAL STRIKE (the eye / the Herald's seal). Whether you CAN win is still the deterministic arm-up
+      // verdict (`won`, the two gates — an under-armed ship can't drop it, the hide holds by construction),
+      // but an ARMED ship that fights badly can now LOSE the live fight — it is merely REPELLED (a costless
+      // rematch), so the battle has stakes without ever walling progress. The whole fight is tuned by the
+      // pure `finaleBattleTuning` (weapons → volleys to kill, engines+shields → strikes absorbed, engines →
+      // recharge speed), so every upgrade past the floor measurably improves the real fight.
       const fr = state.story ? finaleResult(state.story) : undefined;
       const won = fr?.won ?? false;
       // GS-story-endings: after the battle resolves, play the path+outcome ENDING cinematic (good/cult ×
-      // win/lose) over the recap. The alignment is read off the live story (unchanged by the resolution).
+      // win/lose) over the recap — but NOT on a mere repel (the grand endings dramatise the gate verdict;
+      // an armed setback just lands on its "driven back, re-engage" recap).
       const alignment = state.story?.alignment;
-      const go = (strike: 'clean' | 'graze'): void => {
-        dispatch({ type: 'engageStoryFinale', strike }); // resolves → the recap screen mounts behind us
-        mountStoryEnding({ variant: endingVariant(alignment, won) });
+      const go = (strike: 'clean' | 'graze', outcome: 'won' | 'lost'): void => {
+        const repelled = won && outcome === 'lost';
+        dispatch({ type: 'engageStoryFinale', strike, outcome }); // resolves → the recap screen mounts behind us
+        if (!repelled) mountStoryEnding({ variant: endingVariant(alignment, won) });
       };
       if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-        // Reduced motion: skip both the battle AND the ending — straight to the recap.
+        // Reduced motion: skip both the battle AND the ending — straight to the recap (the gate verdict).
         dispatch({ type: 'engageStoryFinale', strike: 'clean' });
         return;
       }
       mountStoryBattle({
         won,
-        weaponRating: fr?.weaponRating ?? 0,
-        defenceRating: fr?.defenceRating ?? 0,
+        tuning: finaleBattleTuning(fr?.weaponRating ?? 0, fr?.defenceRating ?? 0, fr?.engineRating ?? 0),
         interactive: true,
-        herald: alignment === 'herald', // GS-story-quality: re-theme the fight for the chosen path
+        herald: alignment === 'herald', // GS-story-battle-2: the Herald fights a genuinely different battle
         onDone: go,
       });
     });

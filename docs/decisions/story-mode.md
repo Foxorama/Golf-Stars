@@ -393,6 +393,43 @@ Ordered so each ships something playable and nothing lands before its foundation
   vision: the **two alignment endings** (Warden "Reseal" vs Herald "Long Rest") land with the alignment
   fork; an **interactive** finisher shot is a later polish.
 
+- **GS-story-battle-2** — ✅ *shipped* (the final-battle overhaul; player report: "the serpent does not look
+  as cool as the teasers, the battle kinda sucks — no challenge, no need to buy weapons/shields, and the two
+  sides are exactly the same"). Four fixes in one seam:
+  1. **The battle serpent IS the teaser serpent.** `storyBattle.ts` dropped its bead-string worm for the
+     ceremony's mythic `paintSerpent` (sigilCeremony.ts), which now RETURNS its drawn head ANCHORS
+     (`SerpentAnchors` — eye/brow/head-unit) so the reticle sweeps the drawn eye, bolts land on the drawn
+     head, and the Herald's seal sits on the drawn brow (graphic ≡ target; the ceremony/preview callers
+     ignore the return). The aim/climax reveal EASES the live undulation into a HELD pose (`POSE_T`) — at
+     reveal girth the live bob swings the swollen head off-frame and makes the eye untargetable.
+  2. **The arsenal is consumed continuously.** The pure `finaleBattleTuning(weapon, defence, engine)`
+     (storyFinale.ts) drives the whole fight AND the briefing's new "Ship readout" (one source — the
+     briefing IS the physics): weapons → volleys to fell it (13 at the breach floor → 5 maxed), engines +
+     shields → shield PIPS (10 at the survive floor → 24), engines alone → weapon recharge (1.0s → 0.56s).
+     Every upgrade past the gate floor measurably improves the real fight — the "no need to buy high-tier
+     arms" answer. Below the breach gate the hide/last ward HOLDS by construction (ground to a sliver,
+     never dropped) so the deterministic gate verdict is never contradicted; machine-checked in
+     `tests/story-finale.test.ts` (monotonic tuning, bounded, hopeless-under-gate, and the
+     winnable-by-construction margin: kill time ×1.6 < shield-collapse time for EVERY armed arsenal, vs the
+     exported `FINALE_ATTACK_PERIOD_MS` cadence the battle imports).
+  3. **Skill is real — with stakes but never a wall.** TAP fires; a tap during the telegraphed warning
+     VEERS (dodges the strike); the cadence ENRAGES past 18s so stalemates resolve. An armed ship that
+     idles or eats every strike loses its shields and is REPELLED — `engageStoryFinale` gained an optional
+     `outcome: 'won'|'lost'` (absent = the classic gate verdict, byte-for-byte) CLAMPED under the gates: a
+     gate-lost ship can never battle-win, and an armed battle-loss resolves `failReason: 'repelled'` — its
+     own recap (ship intact, steady the guns, re-engage at no cost; no shipyard guidance) and NO grand
+     ending cinematic (those dramatise the gate verdict). Skip stays a clean armed win (never a punishment).
+  4. **The paths fight different battles.** WARDEN: the wide-awake serpent — break its hide, dodge its
+     whip-lunges, strike the bared EYE. HERALD: the serpent lies BOUND and sleeping under three golden
+     rune-WARDS (chained rings pinning the body) — shatter them (it visibly WAKES as each falls, the
+     `wake` param as payoff), dodge the Warden blockade's gold LANCES, then strike the final ouroboros
+     SEAL on its brow; the win-climax is the maw gaping as the stars go out. Briefing plan/readout copy,
+     prompts, HUD bar and defeat/repel captions all follow the path.
+  Eyes-on via the new `scripts/battle-preview.mjs` (non-interactive auto-pilot, both paths, four states).
+  Render + pure-sim tuning + one reducer param; no save bump, no sim rng, no `_gs*`/URL hook (no test-hub
+  wiring). Guarded by the extended `tests/story-finale.test.ts` + the repelled/clamp flow in
+  `tests/story-flow.test.ts` + the existing finale browser smoke (mount → interactive hold → skip → win).
+
 **Phase G — Polish**
 - **GS-story-beats** — ✅ *shipped* (the story-round dialogue beats). Campaign NPC scenes threaded through
   the EXISTING generic LORE machinery (`sim/rpg/lore.ts`), so a beat is a DATA ROW and the gate/screen/

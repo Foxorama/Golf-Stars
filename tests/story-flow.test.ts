@@ -901,6 +901,31 @@ describe('Story finale flow (GS-story-yggdrasil)', () => {
     expect(lost.lastStoryFinale!.won).toBe(false);
     expect(lost.lastStoryFinale!.strike).toBeUndefined();
   });
+
+  // GS-story-battle-2: the live fight has real stakes — an ARMED ship that loses it is REPELLED (a
+  // costless setback, re-engage), and a gate-lost ship can never battle-win (clamped, no soft-lock lie).
+  it('an armed ship can LOSE the live fight — repelled, costless, and the finale re-opens', () => {
+    const briefing = reduce(armedKey(true), { type: 'openStoryFinale' });
+    const repelled = reduce(briefing, { type: 'engageStoryFinale', strike: 'clean', outcome: 'lost' });
+    expect(repelled.screen).toBe('storyFinaleResult');
+    expect(repelled.lastStoryFinale!.won).toBe(false);
+    expect(repelled.lastStoryFinale!.failReason).toBe('repelled');
+    expect(repelled.lastStoryFinale!.strike).toBeUndefined();
+    expect(repelled.story!.completed).toBe(false); // NOT complete — the campaign is saved at the root
+    // back to the clubhouse; the finale re-opens (nothing lost, nothing to re-buy)
+    const back = reduce(repelled, { type: 'storyFinaleContinue' });
+    expect(back.screen).toBe('story');
+    expect(reduce(back, { type: 'openStoryFinale' }).screen).toBe('storyFinale');
+    // an explicit battle WIN on an armed ship resolves exactly like the default
+    const won = reduce(briefing, { type: 'engageStoryFinale', strike: 'graze', outcome: 'won' });
+    expect(won.lastStoryFinale!.won).toBe(true);
+    expect(won.story!.completed).toBe(true);
+    // a GATE-lost ship can never battle-win — the verdict stays the gates (and its reason, not 'repelled')
+    const cheat = reduce(reduce(armedKey(false), { type: 'openStoryFinale' }), { type: 'engageStoryFinale', outcome: 'won' });
+    expect(cheat.lastStoryFinale!.won).toBe(false);
+    expect(cheat.lastStoryFinale!.failReason).toBe('firepower');
+    expect(cheat.story!.completed).toBe(false);
+  });
 });
 
 describe('storyStore persistence (GS-story-save wiring)', () => {
