@@ -4,7 +4,7 @@
  * OUTCOME (win / lose):
  *   'good-win'  — the Wardens win (THE RESEAL): the serpent is sung back to SLEEP — it settles, the seal
  *                 takes, its eye slides shut — while dawn breaks across every world saved… and the Coil's
- *                 last wyrm-ship (the lost friend aboard) jets away into the Universe Unending
+ *                 last wyrm-ship (the lost friend aboard) jets away to THE DESTINATION
  *                 (GS-story-unending-tease — the named unknown deep a future mode will open).
  *   'good-lose' — the Wardens fall: the CROW — the Coil's true prophet — reveals it let you win all along so
  *                 you'd free the World-Eater with the Keystone; the maw opens and swallows the stars.
@@ -48,16 +48,16 @@ const ENDING_COPY: Record<StoryEndingVariant, { title: string; sub: string; voic
   'good-win': {
     // GS-story-unending-tease: the Reseal does not KILL the World-Eater — it sings it back to SLEEP. And
     // the victory is left one friend short: the betrayer and the Coil's remnant flee past every chart,
-    // into the UNIVERSE UNENDING (the named unknown deep — a future mode's front door), so redeeming them
-    // is a voyage the galaxy cannot yet make.
+    // to THE DESTINATION (the named unknown deep — a future mode's front door), so redeeming them is a
+    // voyage the galaxy cannot yet make.
     title: 'The Reseal',
     sub:
       'Jörmungandr does not die. It sleeps — resealed beneath the root, dreaming of nothing, while dawn breaks ' +
       'across every world you crossed. And ahead of the dawn one dark sail runs for open night: {betrayer}, and ' +
-      'what remains of the Coil, fleeing into the Universe Unending.',
+      'what remains of the Coil, fleeing for The Destination.',
     voice:
       '🦜 "Let it sleep, champion. We saved everything… and I still count us one short. {betrayer} is out past ' +
-      'every chart I can read now — the Universe Unending, the deep with no fairways in it yet. When you\'re ' +
+      'every chart I can read now — gone to The Destination, the deep with no fairways in it yet. When you\'re ' +
       'ready to fly that far to bring a friend home — so am I."',
     voiceCol: '#8fffbe',
   },
@@ -244,7 +244,7 @@ export function mountStoryEnding(opts: {
   }
 
   /** GS-story-unending-tease: the Coil's last wyrm-ship, running dark ahead of the dawn — a small
-   *  serpent-hulled craft streaking up and out of frame toward the Universe Unending, venom-green engine
+   *  serpent-hulled craft streaking up and out of frame toward The Destination, venom-green engine
    *  trail fading behind it. `p` 0..1 sweeps the whole flight. */
   function coilShipFlees(t: number, p: number): void {
     if (!ctx || p <= 0) return;
@@ -479,7 +479,7 @@ export function mountStoryEnding(opts: {
       // GS-story-unending-tease — THE RESEAL: dawn sweeps up from the bottom while the serpent is sung
       // back to SLEEP (it settles, the sway stills, the burning eye slides shut — it never shatters);
       // golden seal-rings tighten over it, worlds brighten… and the Coil's last wyrm-ship runs dark
-      // ahead of the dawn, jetting off-frame toward the Universe Unending with the lost friend aboard.
+      // ahead of the dawn, jetting off-frame toward The Destination with the lost friend aboard.
       const dawn = ctx.createLinearGradient(0, DH, 0, 0);
       dawn.addColorStop(0, `rgba(255,${180 + sp * 40},120,${0.25 + sp * 0.35})`);
       dawn.addColorStop(0.5, `rgba(120,180,255,${0.1 + sp * 0.2})`);

@@ -60,8 +60,8 @@ export function storyObjective(story: StoryState): StoryObjective {
         story.alignment === 'herald'
           ? 'The Long Rest has fallen — every fairway still at last. Free-roam Star Tour is now unlocked from the title.'
           : // GS-story-unending-tease: the Reseal put the serpent to SLEEP — and the Coil fled with your
-            // friend into the Universe Unending (the unknown deep a future voyage will open).
-            'The serpent sleeps and the Universe is saved. Free-roam Star Tour is unlocked from the title — and somewhere past every chart, the Universe Unending holds a friend still worth saving.',
+            // friend to The Destination (the unknown deep a future voyage will open).
+            'The serpent sleeps and the Universe is saved. Free-roam Star Tour is unlocked from the title — and somewhere past every chart, The Destination holds a friend still worth saving.',
     };
   }
   // Prologue: you haven't won Earth yet (the recruitment hasn't happened).

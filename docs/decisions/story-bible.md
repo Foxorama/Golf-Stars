@@ -348,9 +348,9 @@ gear hits harder but you're frailer.
   back down the root to dream of nothing. Dawn breaks across all the re-consecrated worlds at once; the Parrot
   weeps; you are crowned **Champion of the Great Game**, and the fairway endures another age. But the victory
   is left ONE FRIEND SHORT (GS-story-unending-tease): ahead of the dawn, the betrayer and the Coil's remnant
-  flee in the last wyrm-ship past the edge of every chart — into the **UNIVERSE UNENDING**, the named unknown
-  deep (a future game mode's front door). Redeeming them will take a voyage no Warden has yet flown; the
-  ending cinematic closes on that dark sail jetting into open night.
+  flee in the last wyrm-ship past the edge of every chart — to **THE DESTINATION**, the named unknown deep
+  (a future game mode's front door; keep the name verbatim). Redeeming them will take a voyage no Warden has
+  yet flown; the ending cinematic closes on that dark sail jetting into open night.
 - **HERALD ending — "The Long Rest."** You bring the Key to *unseal* it — but the Ark and your former friends
   arrive to stop you. Defeat the Warden fleet, then present yourself. The serpent accepts you as its **Herald**,
   and the universe comes, gently and horribly, to **rest** — every ball, everywhere, still at last; a serene,
@@ -359,7 +359,7 @@ gear hits harder but you're frailer.
 - **LOSS is path-specific too (GS-story-endings).** There are **four** ending cinematics — path × outcome:
   - *good-win* → **The Reseal / The Universe is Saved** (the serpent SLEEPS — settled, resealed, its eye
     closed — dawn breaks across the worlds, and the Coil's last wyrm-ship flees with the betrayed friend
-    toward the Universe Unending).
+    toward The Destination).
   - *good-lose* → **The World-Eater is Free** — the **Crow** reveals it let you win all along so you'd carry
     the Keystone and open the cage; the maw swallows the stars.
   - *cult-win* → **Ragnarök** — the serpent uncoils, the lights go out one by one, the Universe devoured.
