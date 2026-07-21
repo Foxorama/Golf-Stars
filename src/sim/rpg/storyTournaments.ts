@@ -368,8 +368,9 @@ export function worldsClearedInChapter(story: StoryState, chapter: number): numb
 
 /**
  * GS-story-qualifiers: a chapter's QUALIFYING EVENTS — its worlds MINUS the Sigil venue (which is played as
- * the major). The venue depends on the chosen path, so this resolves it via `tournamentForChapter`. Always
- * two events (a chapter has three worlds).
+ * the major). The venue depends on the chosen path, so this resolves it via `tournamentForChapter`.
+ * GS-story-world-variety: a chapter charts FOUR worlds now, so this returns THREE events — you still only
+ * need `QUALIFY_EVENTS_NEEDED` (two) top-N finishes to unlock the Sigil, so the third is a choice of road.
  */
 export function chapterQualifierEvents(chapter: number, alignment?: StoryAlignment): string[] {
   return qualifierEventsForChapter(chapter, tournamentForChapter(chapter, alignment)?.venueId);

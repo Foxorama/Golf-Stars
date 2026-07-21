@@ -826,8 +826,10 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   Driver Dan (the derelict, his old rig) and Mystic Mole (the Hydra Mire) — waited at **Chapter-5** worlds, so
   by the game flow there was no time to fly out, recruit them, and complete their personal quests before the
   finale (the quest loop needs a fly-out-and-back). Their homes are FIXED by canon (Dan↔"the Long Haul",
-  Mole↔"the Mire" are their quest narratives) and their worlds can't change chapter (the qualifier system
-  hard-assumes exactly two qualifiers per chapter = three worlds), so the fix DECOUPLES a world's **chart
+  Mole↔"the Mire" are their quest narratives) and their worlds can't change chapter (a world's chapter is
+  its qualifier grouping + difficulty + payout tier — moving it would re-tier it; note GS-story-world-variety
+  later ADDED a fourth world per chapter, so a chapter now offers three qualifiers, still needing two), so
+  the fix DECOUPLES a world's **chart
   reachability** from its **tournament tier**: a new optional `StoryWorld.chartChapter` (defaults to
   `unlockChapter` → every other world byte-identical) sets when a world first appears on the star chart to
   VISIT (recruit / quest / clear), while `unlockChapter` still governs its qualifier grouping, difficulty/
@@ -1022,6 +1024,38 @@ each shop a place you're *excited* to reach. Shipped as focused, auto-merged PRs
   (hole step). Guarded by `tests/patches.test.ts` (the `acid` family auto-covered: placement,
   conversion, no-death-spiral), `tests/journey-effects.test.ts`, `tests/audio.test.ts`, and the
   updated story-state/story-flow weather blocks.
+
+## Phase L — world variety (GS-story-world-variety)
+Player ask: "add a few more worlds for each chapter … so players have options on where to go and aren't
+just on a single line path of play, every world, to the end of the game" — the extra worlds should add
+qualifier VARIETY for each Sigil "while not increasing the 2-qualifier requirement," with their own pro
+shops / stock.
+- **GS-story-world-variety** — ✅ *shipped* (`story.ts` STORY_WORLDS + `storyShop.ts` + `storyGear.ts`).
+  Each chapter now charts **FOUR** worlds, not three — the Sigil venue plus **three** qualifying events
+  (was two). The gate is UNCHANGED: `QUALIFY_EVENTS_NEEDED` stays **2**, so the extra event is a genuine
+  **choice of road** (qualify in any two of three), not more required grind — the single-line path becomes
+  a fork. Each chapter's fourth world deliberately brings a DIFFERENT archetype/playstyle to that tier so
+  the choice is real, not a reskin: **Ch.1** a calm ICE links (Gemini Ice, `frost2-18`, eclipse) beside the
+  parkland+dunes; **Ch.2** a scrap FOUNDRY (Pyxis Foundry, `metal2-18`, moonlight) among the fire-worlds;
+  **Ch.3** a SEA storm (Delphinus Tides, `ocean2-18`, solarStorm) in the gale chapter; **Ch.4** a windy
+  SAVANNAH (Leo Savannah, `desert2-18`, solarWind) — a non-abyss hard option beside the void; **Ch.5** a
+  meteor-lashed SCRAPYARD (Antlia Scrapworks, `metal-18`, meteorShower) in the serpent's reaches. All five
+  are EXISTING, contract-valid static courses (already proven by `tests/static-courses.test.ts`), reused as
+  Story destinations — no new generator work, no new biome. Each gets its own Pro-Shop **club rack** +
+  **gear rack** (tiered by chapter, leaning into the world's identity — the FLOATER ball a chapter early on
+  the tides, the low-grav bomber's shafts at the foundry/scrapworks, reading+footing on the slick ice) and
+  a shopkeeper voice (`WORLD_SHOP_INTRO`), so a new world is a place you're glad to reach, not an empty
+  qualifier. Qualifiers resolve through the existing per-world round path automatically
+  (`qualifierEventsForChapter` = chapter worlds minus venue → now three), and the star-map markers/dossier
+  (`storyWorldNav`) surface them with no new plumbing. **Weather** relaxed from GLOBAL uniqueness to
+  **per-chapter** uniqueness (a chapter's four-world cluster still never repeats a sky; across chapters a
+  calm/storm sky may recur, worlds played hours apart) — the fuller rotation needs it, and the calm-early /
+  stormy-deep ramp + Ch.1-no-ground-marks rules are unchanged. Caddies + ship vendors are **untouched**
+  (the six named caddies keep their homes; the five chapter vendors keep their stock) — this pass is worlds
+  + shops only. Pure data/model; no save bump (`STORY_WORLDS` is a table, owned/qualifier state already
+  keyed by course id), no sim rng, no `_gs*`/URL hook (no test-hub wiring). Guarded by the updated
+  qualifier-count assertions (`tests/story-qualifiers.test.ts`, `tests/story-tournament.test.ts` — three
+  offered, two required) and the per-chapter weather-uniqueness + ramp checks in `tests/story-state.test.ts`.
 
 ## Open questions / deferred (revisit as chunks land)
 - **Round length** per world / qualifying (9?) vs tournament final (18?) — tune in GS-story-tournament.

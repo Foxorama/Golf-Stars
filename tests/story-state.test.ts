@@ -204,9 +204,13 @@ describe('story-state model (GS-story-save)', () => {
         expect(carryOf(w.courseId), `${w.courseId} early carry ≥ 1`).toBeGreaterThanOrEqual(1);
       }
       for (const w of inChapter(1)) expect(groundOf(w.courseId), `${w.courseId} Ch.1 has no ground marks`).toBe(false);
-      // (2) VARIETY: every charted world's sky is UNIQUE — no two worlds feel the same.
-      const skies = STORY_WORLDS.map((w) => storyWorldEffect(w.courseId));
-      expect(new Set(skies).size).toBe(STORY_WORLDS.length);
+      // (2) VARIETY: within a CHAPTER, every world's sky is UNIQUE — a chapter's four-world cluster never
+      // repeats a sky (GS-story-world-variety relaxed the old global rule; across chapters a calm/storm sky
+      // may recur, as worlds are played hours apart).
+      for (let ch = 1; ch <= STORY_CHAPTER_COUNT; ch++) {
+        const chSkies = inChapter(ch).map((w) => storyWorldEffect(w.courseId));
+        expect(new Set(chSkies).size, `chapter ${ch} skies unique`).toBe(chSkies.length);
+      }
       const nonWind = STORY_WORLDS.filter((w) => windOf(w.courseId) <= 1);
       expect(nonWind.length).toBeGreaterThanOrEqual(6);
       // (3) IMPACT: several worlds carry a GROUND mark (the sky leaves something you must play around).

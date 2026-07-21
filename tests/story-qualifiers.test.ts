@@ -20,13 +20,16 @@ import { chapterQualifierEvents, tournamentForChapter } from '../src/sim/rpg/sto
  * deterministic, so the qualifying bar is provable and can never silently wall a competent round.
  */
 describe('story qualifiers (GS-story-qualifiers) — field + placement', () => {
-  it('thresholds tighten by chapter and there are always two events per chapter', () => {
+  it('thresholds tighten by chapter; a chapter offers MORE qualifiers than it requires (GS-story-world-variety)', () => {
     expect(QUALIFY_TOP).toEqual([10, 8, 6, 4, 4]);
     expect(QUALIFY_EVENTS_NEEDED).toBe(2);
     for (let ch = 1; ch <= STORY_CHAPTER_COUNT; ch++) {
-      // A chapter's qualifier events = its three worlds minus the Sigil venue → exactly two.
+      // A chapter's qualifier events = its worlds minus the Sigil venue. Every chapter now charts four
+      // worlds, so there are THREE qualifiers — but you still only need to QUALIFY in two, so the extra
+      // event is a CHOICE of road, never more required grind (the whole point of the variety pass).
       const events = qualifierEventsForChapter(ch, tournamentForChapter(ch)?.venueId);
-      expect(events.length, `chapter ${ch}`).toBe(2);
+      expect(events.length, `chapter ${ch} qualifiers`).toBe(3);
+      expect(events.length, `chapter ${ch} offers more than it needs`).toBeGreaterThan(QUALIFY_EVENTS_NEEDED);
       expect(events).not.toContain(tournamentForChapter(ch)!.venueId);
     }
   });

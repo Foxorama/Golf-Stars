@@ -69,27 +69,41 @@ export interface StoryWorld {
   weather?: CourseEffectId;
 }
 export const STORY_WORLDS: readonly StoryWorld[] = [
+  // GS-story-world-variety — each chapter now charts FOUR worlds, not three: the Sigil venue plus THREE
+  // qualifying events (was two). You still only need to QUALIFY in TWO of them (`QUALIFY_EVENTS_NEEDED`),
+  // so the extra world is CHOICE, not more grind — a real fork in the road instead of a single line of
+  // play, and each chapter's fourth world brings a DIFFERENT archetype/playstyle to that tier (a calm ice
+  // links in the parkland-and-dunes opener, a scrap foundry among the fire-worlds, a sea storm in the gale
+  // chapter, a windy savannah in the abyssal deep, a meteor-lashed scrapyard in the serpent's reaches).
+  // Weather stays UNIQUE WITHIN A CHAPTER (a chapter's cluster never repeats a sky); across chapters a calm
+  // or storm sky may recur (they are played hours apart), which the fuller rotation now requires.
+  //
   // Chapter 1 — the gentle opening cluster: CALM, non-wind skies so a new player isn't hammered.
   { courseId: 'verdant-18', unlockChapter: 1, weather: 'moonlight' }, // Lyra Meadows — a still silver night
   { courseId: 'verdant2-18', unlockChapter: 1, weather: 'nebula' }, // Centaurus Fairways — drifting colour fog
   { courseId: 'desert-18', unlockChapter: 1, weather: 'radiant' }, // Vela Dunes — bright STILL air tames the dune gale (+carry, fun not tight)
+  { courseId: 'frost2-18', unlockChapter: 1, weather: 'eclipse' }, // Gemini Ice — a black sun over the twin glaciers, dead-still air (calm ice links)
   // Chapter 2 — the Forge opens up: winds stay calm, but the sky starts leaving MARKS on the ground.
   { courseId: 'inferno-18', unlockChapter: 2, weather: 'eclipse' }, // Orion Forge — a black sun, dead-still air
   { courseId: 'inferno2-18', unlockChapter: 2, weather: 'meteorShower' }, // Scorpius Sting — meteors char scorch craters into the ember turf
   { courseId: 'frost-18', unlockChapter: 2, weather: 'frostfall' }, // Cygnus Links — frost sifts down, ICE patches freeze the links
+  { courseId: 'metal2-18', unlockChapter: 2, weather: 'moonlight' }, // Pyxis Foundry — a quiet moonlit scrap belt (low-grav bombs over dead machines)
   // Chapter 3 — the Storm chapter: the first real weather arrives, capped by the gale world itself.
   { courseId: 'tempest-18', unlockChapter: 3, weather: 'ionStorm' }, // Draco Gale — the TEMPEST: forked lightning, the wildest winds in the sky
   { courseId: 'crystal-18', unlockChapter: 3, weather: 'aurora' }, // Coronae Prism — charged ribbons refract over the spires (+carry breather)
   { courseId: 'fungal-18', unlockChapter: 3, weather: 'darkMatter' }, // Vulpecula Hollows — an eerie stillness, gravitic TAR pools in the hollows
-  // Chapter 4 — the deep sky: hard, still varied (a sea storm, a black-hole pull, a stardust hunt).
+  { courseId: 'ocean2-18', unlockChapter: 3, weather: 'solarStorm' }, // Delphinus Tides — a charged storm crackles over the dolphin sea
+  // Chapter 4 — the deep sky: hard, still varied (a sea storm, a black-hole pull, a stardust hunt, a savannah gale).
   { courseId: 'ocean-18', unlockChapter: 4, weather: 'solarStorm' }, // Eridanus Atolls — a charged storm crackles over the sea
   { courseId: 'void2-18', unlockChapter: 4, weather: 'gravityWell' }, // Sagittarius Core — the galactic black hole's pull
   { courseId: 'crystal2-18', unlockChapter: 4, weather: 'comet' }, // Triangulum Wedge — a grand comet sheds STARDUST among the spires (bonus lies worth hunting)
+  { courseId: 'desert2-18', unlockChapter: 4, weather: 'solarWind' }, // Leo Savannah — a stiff particle breeze streams over the lion dust (a non-abyss hard option)
   // Chapter 5 — the serpent's reaches: brutal skies as the galaxy frays. Two host a Ch.5 caddy (Mole, Dan)
   // but chart at Ch.4 (GS-story-gather-early); their tournament tier stays Chapter 5.
   { courseId: 'swamp-18', unlockChapter: 5, chartChapter: 4, weather: 'acidRain' }, // Hydra Mire — caustic ACID RAIN pools on the serpent's bog
   { courseId: 'derelict-18', unlockChapter: 5, chartChapter: 4, weather: 'spaceJunk' }, // The Ghost Wreck — a debris field, WRECKAGE tangles on the deck
   { courseId: 'cetus-18', unlockChapter: 5, weather: 'blizzard' }, // Cetus Shelf — a howling whiteout, ICE freezes the tide-shelf in a gale
+  { courseId: 'metal-18', unlockChapter: 5, weather: 'meteorShower' }, // Antlia Scrapworks — meteors rain scorch craters over the low-gravity graveyard
 ];
 
 /** Is this world charted (available to travel to) at the given chapter? Reads `chartChapter` (when it
@@ -150,9 +164,11 @@ export function storyWorldChapter(courseId: string): number {
  * `validateFairness`/`Crossings` are untouched, and `playerHoleOpts` keys the headless sim off the SAME
  * `staticEffect` the interactive driver reads (auto ≡ interactive). The ramp: Chapter 1 pure calm dressing →
  * Chapter 2 first gentle ground marks under calm winds → Chapters 3–5 storms (the Storm chapter's own Draco
- * Gale blows the wildest ionStorm sky; the Hydra Mire rains ACID). Every charted sky is UNIQUE (no two worlds
- * share a weather — machine-checked), keyed by the WORLD so it's stable across revisits. Off-chart (the Earth
- * prologue) plays 'none' (clear skies). Returns a `CourseEffectId` the sim reads through `run.staticEffect`.
+ * Gale blows the wildest ionStorm sky; the Hydra Mire rains ACID). Every sky is UNIQUE WITHIN ITS CHAPTER
+ * (a chapter's four-world cluster never repeats a sky — machine-checked); across chapters a calm or storm
+ * sky may recur (worlds played hours apart), which the fuller GS-story-world-variety rotation requires. Keyed
+ * by the WORLD so it's stable across revisits. Off-chart (the Earth prologue) plays 'none' (clear skies).
+ * Returns a `CourseEffectId` the sim reads through `run.staticEffect`.
  */
 export function storyWorldEffect(courseId: string): string {
   return storyWorldById(courseId)?.weather ?? 'none';
