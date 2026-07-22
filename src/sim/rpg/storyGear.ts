@@ -607,6 +607,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:shaft:stiff',
     slot: 'shaft',
     name: 'Stiff Tour Shaft',
+    avatar: { shape: 'clubskin', color: '#b0b6c2' },
     rarity: 'common',
     price: 80,
     blurb: 'Tighter distances — no more coming up short.',
@@ -623,6 +624,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:shaft:power',
     slot: 'shaft',
     name: 'Graphite Power Shaft',
+    avatar: { shape: 'clubskin', color: '#3a6ea5', accent: '#7fd0ff' },
     rarity: 'rare',
     price: 160,
     blurb: 'Real free yards — +12 and steadier.',
@@ -644,6 +646,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:shaft:woods',
     slot: 'shaft',
     name: 'Matched Fairway Woods',
+    avatar: { shape: 'clubskin', color: '#8a5a2a', accent: '#caa15a' },
     rarity: 'rare',
     price: 140,
     blurb: 'Long woods that land where you aim.',
@@ -660,6 +663,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:shaft:irons',
     slot: 'shaft',
     name: 'Blueprint Iron Set',
+    avatar: { shape: 'clubskin', color: '#8a94a6', accent: '#d6e0ee' },
     rarity: 'epic',
     price: 210,
     blurb: 'Approaches that hold their number.',
@@ -680,6 +684,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:shaft:overdrive',
     slot: 'shaft',
     name: 'Speed-Whip Shaft',
+    avatar: { shape: 'clubskin', color: '#c0402a', accent: '#ff8a5a' },
     rarity: 'epic',
     price: 200,
     blurb: 'Swing PAST 100% — +20% carry.',
@@ -697,6 +702,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:shaft:nova',
     slot: 'shaft',
     name: 'Nova Long Shaft',
+    avatar: { shape: 'clubskin', color: '#c8b0ff', accent: '#ffffff', glow: '#b070ff' },
     rarity: 'legendary',
     price: 400,
     blurb: 'A straight bomb — +24 and tighter.',
@@ -1131,8 +1137,8 @@ export interface StoryAvatarLooks {
   bag?: ApparelLook;
   glove?: ApparelLook;
   shoes?: ApparelLook;
-  /** The cosmetic club skin (from the equipped shaft). */
-  driver?: ApparelLook;
+  /** The cosmetic club skin — the equipped SHAFT recolours the club the golfer swings. */
+  clubSkin?: ApparelLook;
 }
 
 /** Map each equipped-gear SLOT to the golfer-render slot its `avatar` look drives. Only slots that have a
@@ -1142,7 +1148,7 @@ const GEAR_AVATAR_SLOT: Partial<Record<GearSlot, keyof StoryAvatarLooks>> = {
   bag: 'bag',
   glove: 'glove',
   shoes: 'shoes',
-  shaft: 'driver',
+  shaft: 'clubSkin',
 };
 
 /**

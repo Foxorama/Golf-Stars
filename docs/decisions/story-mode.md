@@ -1189,8 +1189,8 @@ shops / stock.
   plumbing. No save bump, no sim rng. Guarded by the extended vendor-coverage + fleet tests in
   `tests/story-ships.test.ts`.
 
-- **GS-story-avatar** — ✅ *shipped (PR1: seam + hats & bags; PR2: gloves & shoes)* (`sim/rpg/storyGear.ts`
-  + `app/helpers.ts` + `render/golferArt.ts` + `sim/rpg/apparel.ts`).
+- **GS-story-avatar** — ✅ *shipped (PR1: seam + hats & bags; PR2: gloves & shoes; PR3: club skin)*
+  (`sim/rpg/storyGear.ts` + `app/helpers.ts` + `render/golferArt.ts` + `sim/rpg/apparel.ts`).
   Player ask: in Story Tour the on-course avatar was showing the GLOBAL clubhouse cosmetics (the main-save
   wardrobe picks); it should instead wear the **DEFAULT colour-coded outfit** and only change with the
   **equipment gathered + equipped IN the campaign** (the Story gear). Every other mode keeps the clubhouse
@@ -1213,8 +1213,15 @@ shops / stock.
   the avatar isn't part of the sim), no save bump (`equippedGear` already persists), no `_gs*`/URL hook (no
   test-hub wiring). Eyeball via `scripts/story-avatar-preview.mjs` (the canvas golfer wearing each piece, the
   SVG previews can't show it). Guarded by `tests/story-avatar.test.ts` (worn-slot coverage + resolver).
-  **Remaining follow-ups:** the shaft → club-skin and ball → flight-trail cosmetics (the effect-only slots that
-  don't yet show on the avatar).
+  **PR3** adds the SHAFT → CLUB SKIN: the equipped Story shaft recolours the club the golfer swings (a new
+  `GolferLook.clubSkin` + `ClubShape` marker in `apparel.ts`, read in `drawGolfer`'s club block — the shaft
+  always, and the HEAD too when no themed `gear` set already claims its glow; a legendary shaft lays a soft
+  aura down the shaft). Every shaft gear row gets a `clubskin` avatar (steel/graphite/wood/chrome/speed-red/
+  nova-glow); `storyGearAvatar` maps `shaft → clubSkin`. So the on-course avatar now reflects the WHOLE worn/
+  wielded kit — default outfit + themed clubs (glow) + hat/glove/shoes/bag + club skin + the story caddy
+  (`caddyId` was already story-aware). **Deferred:** the BALL → flight-TRAIL cosmetic — the ball is the one
+  remaining effect-only slot, and its cosmetic home is an in-flight trail in the shot-animation path
+  (`playView`/trajectory), a hot render path best done as its own focused pass, not an avatar-outfit rider.
 
 ## Open questions / deferred (revisit as chunks land)
 - **A genuinely-new gas-giant BIOME** (play on gas cloud-tops) — the player's optional "if we need to add
