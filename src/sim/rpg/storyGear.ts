@@ -15,6 +15,7 @@
  */
 
 import type { Rarity } from '../course/contract';
+import type { ApparelLook } from './apparel';
 import type { PlayerLoadout } from './economy';
 import { boostDistanceClubs, addFamilyMinCarry } from './economy';
 import { combineShapeMods } from '../shot';
@@ -42,6 +43,13 @@ export interface StoryGearItem {
   lore: string[];
   /** Fold this item's effect onto the round loadout (pure). */
   apply: (loadout: PlayerLoadout) => PlayerLoadout;
+  /** GS-story-avatar: the WORN cosmetic look this piece gives the on-course golfer in a Story round —
+   *  a hat silhouette, a staff-bag colourway, a glove/shoe tint, a club skin. Absent = the piece is
+   *  effect-only and shows nothing on the avatar (the default outfit stands). The equipped Story gear is
+   *  the ONLY cosmetic source in Story Tour (the clubhouse wardrobe is ignored there); Voyage/Unending
+   *  never read this. Reuses `ApparelLook` so the same `drawGolfer` painters render it — what you equip in
+   *  the campaign is what you wear on the course. */
+  avatar?: ApparelLook;
   /** GS-story-route-rewards: route-GATED relic — only revealed/buyable on this path (a Herald cursed
    *  shedding or a Warden grace piece). Absent = an ordinary item, available to any path. */
   alignment?: StoryAlignment;
@@ -95,6 +103,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:hat:visor',
     slot: 'hat',
     name: 'Polarised Tour Visor',
+    avatar: { shape: 'visor', color: '#1b6f6a', accent: '#0d3b38' },
     rarity: 'rare',
     price: 200,
     blurb: 'A cleaner read — holes more putts.',
@@ -111,6 +120,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:hat:focus',
     slot: 'hat',
     name: 'Focus Crown',
+    avatar: { shape: 'crown', color: '#2b2f45', accent: '#8fa0d8' },
     rarity: 'epic',
     price: 380,
     blurb: 'Total focus — holes far more putts.',
@@ -236,6 +246,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:hat:oracle',
     slot: 'hat',
     name: 'Oracle’s Circlet',
+    avatar: { shape: 'starburst', color: '#cbd6ff', accent: '#7f9bff', glow: '#9fb4ff' },
     rarity: 'legendary',
     price: 720,
     blurb: 'Every line, laid bare.',
@@ -353,6 +364,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:hat:reader',
     slot: 'hat',
     name: 'Green-Reader’s Cap',
+    avatar: { shape: 'cap', color: '#3b6b3f', accent: '#e8dca0' },
     rarity: 'common',
     price: 70,
     blurb: 'Reads the break further — a few more putts.',
@@ -373,6 +385,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:hat:range',
     slot: 'hat',
     name: 'Rangefinder Visor',
+    avatar: { shape: 'visor', color: '#2b3550', accent: '#ff5a4a' },
     rarity: 'common',
     price: 90,
     blurb: 'Yardages on tap — a suggested club.',
@@ -389,6 +402,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:hat:spin',
     slot: 'hat',
     name: 'Spin-Read Cap',
+    avatar: { shape: 'cap', color: '#274b6b', accent: '#7fd0ff' },
     rarity: 'rare',
     price: 140,
     blurb: 'See the check — approaches read truer.',
@@ -409,6 +423,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:hat:computer',
     slot: 'hat',
     name: 'Trajectory Crown',
+    avatar: { shape: 'crown', color: '#20304a', accent: '#66e0c8' },
     rarity: 'epic',
     price: 220,
     blurb: 'The WHOLE roll, read — check and curl.',
@@ -429,6 +444,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:hat:seer',
     slot: 'hat',
     name: 'The Seer’s Circlet',
+    avatar: { shape: 'supernova', color: '#dfe8ff', accent: '#b0c4ff', glow: '#cfe0ff' },
     rarity: 'legendary',
     price: 700,
     blurb: 'The break, read FOR you — just judge the pace.',
@@ -695,6 +711,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:bag:sponsor',
     slot: 'bag',
     name: 'Sponsor’s Satchel',
+    avatar: { shape: 'staffbag', color: '#5a7a4a', accent: '#d8c88a' },
     rarity: 'common',
     price: 90,
     blurb: 'A first sponsor — +15% credits earned.',
@@ -711,6 +728,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:bag:lucky',
     slot: 'bag',
     name: 'Fortune Cartel Bag',
+    avatar: { shape: 'staffbag', color: '#b0202a', accent: '#e6c24a' },
     rarity: 'rare',
     price: 160,
     blurb: 'Ride the Cartel’s luck — +25% credits.',
@@ -727,6 +745,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:bag:tour',
     slot: 'bag',
     name: 'Tour Pro’s Staff Bag',
+    avatar: { shape: 'staffbag', color: '#f0f0f4', accent: '#1c2c50' },
     rarity: 'epic',
     price: 280,
     blurb: 'A full sponsor roster — +40% credits.',
@@ -743,6 +762,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:bag:cosmic',
     slot: 'bag',
     name: 'Cosmic Sponsor’s Bag',
+    avatar: { shape: 'staffbag', color: '#3a1c6a', accent: '#c088ff', glow: '#b070ff' },
     rarity: 'legendary',
     price: 440,
     blurb: 'The galaxy backs you — +60% credits.',
@@ -883,6 +903,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:hat:dowser',
     slot: 'hat',
     name: "The Dowser's Circlet",
+    avatar: { shape: 'crown', color: '#4a3b2a', accent: '#caa15a', glow: '#e0b878' },
     rarity: 'legendary',
     price: 720,
     acquire: 'reward',
@@ -901,6 +922,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:hat:cowl',
     slot: 'hat',
     name: "The Whisperer's Cowl",
+    avatar: { shape: 'bucket', color: '#3a3340', accent: '#7fe0a0', glow: '#7fe0a0' },
     rarity: 'legendary',
     price: 720,
     acquire: 'reward',
@@ -1080,4 +1102,46 @@ export function storyGearCreditMult(story: StoryState): number {
     comebackCredit: 0,
   } as PlayerLoadout;
   return applyStoryGear(unit, story).creditMult;
+}
+
+/**
+ * GS-story-avatar: the WORN cosmetic looks the equipped Story gear gives the on-course golfer, keyed by
+ * the golfer-render slot. In Story Tour the campaign gear is the ONLY cosmetic source — the clubhouse
+ * wardrobe is ignored — so the golfer wears their DEFAULT outfit plus whatever gear they've gathered and
+ * equipped. Each field is an `ApparelLook` the shared `drawGolfer` painters already render.
+ */
+export interface StoryAvatarLooks {
+  hat?: ApparelLook;
+  bag?: ApparelLook;
+  glove?: ApparelLook;
+  shoes?: ApparelLook;
+  /** The cosmetic club skin (from the equipped shaft). */
+  driver?: ApparelLook;
+}
+
+/** Map each equipped-gear SLOT to the golfer-render slot its `avatar` look drives. Only slots that have a
+ *  visible avatar representation appear; effect-only slots (e.g. `ball`) are omitted. */
+const GEAR_AVATAR_SLOT: Partial<Record<GearSlot, keyof StoryAvatarLooks>> = {
+  hat: 'hat',
+  bag: 'bag',
+  glove: 'glove',
+  shoes: 'shoes',
+  shaft: 'driver',
+};
+
+/**
+ * Resolve the equipped Story gear into the golfer's worn cosmetic looks (pure). Skips gear with no
+ * `avatar` look and slots with no avatar mapping, so an un-geared campaign returns `{}` (the plain default
+ * outfit). Voyage/Unending never call this; it's read only on a Story round (`run.storyRound`).
+ */
+export function storyGearAvatar(story: StoryState): StoryAvatarLooks {
+  const out: StoryAvatarLooks = {};
+  for (const slot of Object.keys(story.equippedGear) as GearSlot[]) {
+    const target = GEAR_AVATAR_SLOT[slot];
+    if (!target) continue;
+    const id = story.equippedGear[slot];
+    const item = id ? storyGearById(id) : undefined;
+    if (item?.avatar) out[target] = item.avatar;
+  }
+  return out;
 }
