@@ -40,7 +40,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 41; // GS-variety-4: deep-stop straight change-of-pace on shapeWeights worlds + wider, still-strategic desert
+export const GENERATOR_VERSION = 42; // GS-green-flare: fairways FLARE into varied, asymmetric green complexes (fan/punchbowl/runoff/tongue/diagonal/shelf)
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -1102,63 +1102,106 @@ function generateHole(
     // The apron must MELT into the corridor, not sit on it as a rectangular shelf (the "section around
     // the green that doesn't fit"). On a tight/wild hole the old constant-width apron was far wider than
     // the narrow corridor, so its flat tee-side cut showed as a hard step behind the green. Fix: START
-    // the apron at the CORRIDOR's own half-width at the green (a flush join — nothing protrudes), swell
-    // only enough to WRAP the green, then taper to a soft point past it, with BOTH ends rounded so there
-    // is no flat cut anywhere. More points → a smooth, organic blend rather than a slab.
+    // the apron at the CORRIDOR's own half-width at the green (a flush join — nothing protrudes) and
+    // FLARE out from there, with BOTH ends rounded so there is no flat cut anywhere.
     const corrHW = (leftHW[leftHW.length - 1]! + rightHW[rightHW.length - 1]!) / 2;
-    const back = greenR + 14;
-    const baseTail = greenR * 1.6 + 16;
-    const baseWrap = Math.max(greenR + 9, corrHW); // wraps the green, never narrower than the corridor here
-    // GREEN-COMPLEX archetype (GS-green-end): the apron used to be ONE fixed tapering wrap on EVERY hole
-    // — the "tapered snake head" that made every hole-END read the same. Now a per-hole archetype varies
-    // the apron shape BEHIND + AROUND the green — the part the corridor (which ends AT the green) doesn't
-    // reach, so it genuinely reads: a perched SHELF (no tail, rough behind), a gathering PUNCHBOWL (wide
-    // wrap, stub tail), a long RUNOFF collection, a narrow TONGUE promontory, or the classic OPEN wedge.
-    // Drawn from a DEDICATED side stream (`${seed}:greencomplex:`, the pin/slope pattern), so it perturbs
-    // ZERO main-`rng` draws — terrain, hazards, pin, slope, greenside guards all byte-identical; only the
-    // apron POLYGON shape shifts. Each archetype seeds its own jitter so no two hole-ends match.
+    const back = greenR + 16;
+    // GREEN-FLARE complex (GS-green-flare, superseding the GS-green-end tapered wraps): the apron used
+    // to fan to a symmetric rounded blob that STARTED at the corridor width and swelled evenly around
+    // the green — so every hole-END read as the same "tapered snake head + lollipop green", and a small
+    // green sat as a dot inside a round patch (the player report). Now the fairway genuinely FLARES into
+    // the green like a real approach: it widens to a broad, often ASYMMETRIC fan whose widest point sits
+    // AT/just short of the green (a proper flared approach, not a point), leaning to a seeded side so no
+    // two complexes mirror, with a distinct per-hole silhouette (broad FAN, gathering PUNCHBOWL, narrow
+    // TONGUE, long RUNOFF ramp, angled DIAGONAL cape, perched SHELF). Built from asymmetric L/R
+    // half-width arrays + a small lateral skew of the apron centreline, so the fan is directional, never
+    // a lollipop. Drawn from a DEDICATED side stream (`${seed}:greencomplex:`, the pin/slope pattern),
+    // so it perturbs ZERO main-`rng` draws — terrain, hazards, pin, slope, greenside guards all
+    // byte-identical; only the apron POLYGON shifts (a fairway lie change near the green — auto sim
+    // outcomes reflow, so GENERATOR_VERSION is bumped). The green always stays inside the fan (skews are
+    // capped well under a half-width) so it never floats on rough.
     const gcRng = new Rng(`${rng.seed}:greencomplex:${holeIndex}`);
-    const front: Vec = [green[0] - dx * back, green[1] - dy * back];
-    const front2: Vec = [green[0] - dx * back * 0.4, green[1] - dy * back * 0.4];
-    const pastGreen = (f: number): Vec => [green[0] + dx * baseTail * f, green[1] + dy * baseTail * f];
+    const perp: Vec = [-dy, dx]; // lateral (left of the approach)
+    const sk = gcRng.bool() ? 1 : -1; // which side the complex leans
+    const wrap = Math.max(greenR + 11, corrHW * 1.02); // wraps the green, never narrower than the corridor
+    // A station along the apron centreline: forward distance from the green centre (− = corridor side),
+    // lateral offset (× perp), and left/right half-widths (asymmetric → a leaning, non-mirrored fan).
+    type St = { f: number; lat: number; l: number; r: number };
+    const build = (sts: St[]): void => {
+      const line = sts.map((s): Vec => [green[0] + dx * s.f + perp[0] * s.lat, green[1] + dy * s.f + perp[1] * s.lat]);
+      features.push({ kind: 'fairway', poly: ribbon(line, sts.map((s) => s.l), sts.map((s) => s.r), true, true) });
+    };
     const g = gcRng.float();
-    let apronLine: Vec[];
-    let apronHW: number[];
-    if (g < 0.22) {
-      // SHELF — the fairway approaches and STOPS at the green; nothing wraps behind it (a perched green,
-      // rough/runoff long). A sharp, distinctive hole-end — no snake tail at all; going long is punished.
-      const wrap = baseWrap * gcRng.range(0.95, 1.12);
-      apronLine = [front, front2, green];
-      apronHW = [corrHW, (corrHW + wrap) / 2, wrap];
+    if (g < 0.26) {
+      // FAN — the headline flare: the fairway fans WIDE just in front of the green and stays broad
+      // around it, leaning to one side, then a short tail. A green set in an open flared approach.
+      const flare = wrap * gcRng.range(1.35, 1.7);
+      const asym = gcRng.range(0.58, 0.82); // the off-lean side pulls in
+      const lgt = sk > 0 ? 1 : asym; // lean-side gets the full flare
+      const rgt = sk > 0 ? asym : 1;
+      build([
+        { f: -back, lat: 0, l: corrHW, r: corrHW },
+        { f: -greenR * 0.35, lat: sk * greenR * 0.22, l: flare * lgt, r: flare * rgt },
+        { f: 0, lat: sk * greenR * 0.14, l: wrap * 1.06 * lgt, r: wrap * 1.06 * rgt },
+        { f: greenR * gcRng.range(0.8, 1.1), lat: sk * greenR * 0.1, l: wrap * 0.44, r: wrap * 0.44 },
+      ]);
     } else if (g < 0.44) {
-      // PUNCHBOWL — a wide, full gathering wrap; the green sits in a bowl of fairway with a stubby full
-      // tail, so the whole complex reads round and receptive rather than a pointed wedge.
-      const wrap = baseWrap * gcRng.range(1.16, 1.42);
-      apronLine = [front, front2, green, pastGreen(gcRng.range(0.55, 0.8))];
-      apronHW = [corrHW, wrap * 0.82, wrap, wrap * 0.58];
-    } else if (g < 0.63) {
-      // RUNOFF — a long tapering collection flows well PAST the green (a generous back apron), so a bold
-      // approach that flies the flag runs down a long ramp instead of into instant rough.
-      const wrap = baseWrap * gcRng.range(0.95, 1.15);
-      const tf = gcRng.range(1.55, 2.2);
-      apronLine = [front, front2, green, pastGreen(tf * 0.5), pastGreen(tf)];
-      apronHW = [corrHW, (corrHW + wrap) / 2, wrap, wrap * 0.52, wrap * 0.2];
-    } else if (g < 0.81) {
+      // PUNCHBOWL — a wide, full gathering wrap; the green sits in a bowl of fairway. Oval + slightly
+      // offset (not a perfect circle) so it still reads distinct from the fan.
+      const wr = wrap * gcRng.range(1.2, 1.46);
+      build([
+        { f: -back, lat: 0, l: corrHW, r: corrHW },
+        { f: -greenR * 0.2, lat: sk * greenR * 0.1, l: wr * 0.92, r: wr * 0.88 },
+        { f: 0, lat: 0, l: wr, r: wr * 0.94 },
+        { f: greenR * gcRng.range(0.6, 0.9), lat: 0, l: wr * 0.6, r: wr * 0.58 },
+      ]);
+    } else if (g < 0.6) {
+      // RUNOFF — a broad approach flare that flows well PAST the green as a long tapering collection
+      // ramp, so a bold shot over the flag runs down a long apron instead of into instant rough.
+      const wr = wrap * gcRng.range(1.05, 1.28);
+      const tf = greenR * gcRng.range(2.0, 2.9);
+      build([
+        { f: -back, lat: 0, l: corrHW, r: corrHW },
+        { f: -greenR * 0.3, lat: 0, l: (corrHW + wr) / 2, r: (corrHW + wr) / 2 },
+        { f: 0, lat: 0, l: wr, r: wr },
+        { f: tf * 0.5, lat: sk * greenR * 0.15, l: wr * 0.5, r: wr * 0.5 },
+        { f: tf, lat: sk * greenR * 0.3, l: wr * 0.2, r: wr * 0.2 },
+      ]);
+    } else if (g < 0.74) {
       // TONGUE — the green sits at the tip of a NARROW promontory poking past the corridor: a thin, long
-      // tail so the hole-end reads as a finger of fairway, not a fat wedge.
-      const wrap = baseWrap * gcRng.range(0.82, 0.98);
-      const tf = gcRng.range(1.15, 1.7);
-      const tip = wrap * gcRng.range(0.28, 0.42);
-      apronLine = [front, front2, green, pastGreen(tf * 0.55), pastGreen(tf)];
-      apronHW = [corrHW, (corrHW + wrap) / 2, wrap, tip * 1.3, tip];
+      // tail curling to a side so the hole-end reads as a finger of fairway, not a fat wedge.
+      const wr = wrap * gcRng.range(0.86, 1.02);
+      const tf = greenR * gcRng.range(1.5, 2.1);
+      const tip = wr * gcRng.range(0.3, 0.45);
+      build([
+        { f: -back, lat: 0, l: corrHW, r: corrHW },
+        { f: -greenR * 0.3, lat: 0, l: (corrHW + wr) / 2, r: (corrHW + wr) / 2 },
+        { f: 0, lat: 0, l: wr, r: wr },
+        { f: tf * 0.55, lat: sk * greenR * 0.28, l: tip * 1.35, r: tip * 1.35 },
+        { f: tf, lat: sk * greenR * 0.55, l: tip, r: tip },
+      ]);
+    } else if (g < 0.88) {
+      // DIAGONAL — an angled cape finish: the fairway flares hard to ONE side as it reaches the green,
+      // so the approach reads as arriving on a diagonal into a corner, the green tucked to the flank.
+      const wr = wrap * gcRng.range(1.1, 1.36);
+      const lgt = sk > 0 ? 1 : 0.6;
+      const rgt = sk > 0 ? 0.6 : 1;
+      build([
+        { f: -back, lat: 0, l: corrHW, r: corrHW },
+        { f: -greenR * 0.4, lat: sk * greenR * 0.34, l: wr * 0.95 * lgt, r: wr * 0.95 * rgt },
+        { f: 0, lat: sk * greenR * 0.3, l: wr * lgt, r: wr * rgt },
+        { f: greenR * gcRng.range(0.55, 0.85), lat: sk * greenR * 0.16, l: wr * 0.42, r: wr * 0.42 },
+      ]);
     } else {
-      // OPEN — the classic soft wedge, kept as ONE of several (no longer the only shape), with jitter.
-      const wrap = baseWrap * gcRng.range(0.95, 1.1);
-      const tf = gcRng.range(0.9, 1.15);
-      apronLine = [front, front2, green, pastGreen(tf * 0.55), pastGreen(tf)];
-      apronHW = [corrHW, (corrHW + wrap) / 2, wrap, wrap * 0.62, wrap * 0.3];
+      // SHELF — the fairway flares up to and STOPS at the green; nothing wraps behind (a perched green,
+      // rough/runoff long). A sharp, distinctive hole-end — no tail; going long is punished.
+      const wr = wrap * gcRng.range(1.02, 1.22);
+      build([
+        { f: -back, lat: 0, l: corrHW, r: corrHW },
+        { f: -greenR * 0.25, lat: sk * greenR * 0.12, l: wr * 1.06, r: wr * 0.9 },
+        { f: 0, lat: 0, l: wr, r: wr * 0.96 },
+      ]);
     }
-    features.push({ kind: 'fairway', poly: ribbon(apronLine, apronHW, apronHW, true, true) });
   }
   features.push(teeBox, greenF);
   const hazards: Feature[] = [];
