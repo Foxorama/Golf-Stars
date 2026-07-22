@@ -47,6 +47,8 @@ export type ItemArtKind =
   | 'putter'
   | 'shoes'
   | 'hat'
+  | 'jacket'
+  | 'pants'
   | 'rangefinder'
   | 'wedge'
   | 'coach'
@@ -132,6 +134,8 @@ export function itemArtKind(id: string): ItemArtKind {
     if (slot === 'hat') return variant === 'range' ? 'rangefinder' : 'hat';
     if (slot === 'shaft') return 'shaft';
     if (slot === 'bag') return 'coin'; // the economy slot → a credit-coin emblem
+    if (slot === 'jacket') return 'jacket'; // GS-story-clothing: a tailored jacket
+    if (slot === 'pants') return 'pants'; // GS-story-clothing: trousers
   }
   // Story-Tour ship upgrades (`upg:<category>:<variant>`, GS-story-ship-upgrades): a weapon turret, an
   // engine (reuses the thruster art), a deflector shield.
@@ -770,6 +774,47 @@ function drawHat(col: string, seed: string): string {
   );
 }
 
+/** A tailored JACKET (GS-story-clothing, the `jacket` slot): a torso coat with peaked lapels, a button
+ *  placket + a collar badge. Deterministic; the rarity tint colours the body + trim. */
+function drawJacket(col: string, seed: string): string {
+  const body = mix(col, '#2b3140', 0.18);
+  const shade = mix(col, '#0e1118', 0.32);
+  const trim = mix(col, '#f0f3f8', 0.35);
+  return frame(
+    `${sparkles(seed, col, 4)}
+     <g transform="translate(75 50)">
+       <path d="M -32 -22 q -8 2 -12 12 l -4 30 q -1 6 6 6 l 12 0 l 0 -34 z" fill="${shade}" stroke="#0e1118" stroke-width="2" stroke-linejoin="round"/>
+       <path d="M 32 -22 q 8 2 12 12 l 4 30 q 1 6 -6 6 l -12 0 l 0 -34 z" fill="${shade}" stroke="#0e1118" stroke-width="2" stroke-linejoin="round"/>
+       <path d="M -32 -22 q 12 -8 22 -8 l 20 0 q 10 0 22 8 l 4 44 q 1 6 -6 6 l -60 0 q -7 0 -6 -6 z" fill="${body}" stroke="#0e1118" stroke-width="2" stroke-linejoin="round"/>
+       <path d="M -10 -30 l 12 20 l -18 2 z" fill="${shade}" stroke="#0e1118" stroke-width="2" stroke-linejoin="round"/>
+       <path d="M 10 -30 l -12 20 l 18 2 z" fill="${shade}" stroke="#0e1118" stroke-width="2" stroke-linejoin="round"/>
+       <path d="M 0 -10 l 0 34" stroke="#0e1118" stroke-width="2"/>
+       <g fill="${trim}"><circle cx="0" cy="-2" r="2.4"/><circle cx="0" cy="8" r="2.4"/><circle cx="0" cy="18" r="2.4"/></g>
+       <circle cx="-9" cy="-18" r="3.2" fill="${trim}"/>
+     </g>`,
+    col,
+  );
+}
+
+/** TROUSERS (GS-story-clothing, the `pants` slot): a waistband over two tapered legs with a centre crease.
+ *  Deterministic; the rarity tint colours the cloth + belt. */
+function drawTrousers(col: string, seed: string): string {
+  const body = mix(col, '#2b3140', 0.2);
+  const shade = mix(col, '#0e1118', 0.3);
+  const belt = mix(col, '#f0f3f8', 0.32);
+  return frame(
+    `${sparkles(seed, col, 4)}
+     <g transform="translate(75 30)">
+       <rect x="-28" y="-6" width="56" height="11" rx="3.5" fill="${belt}" stroke="#0e1118" stroke-width="2"/>
+       <path d="M -28 5 l 24 0 l -3 46 q 0 4 -4 4 l -12 0 q -4 0 -4 -4 z" fill="${body}" stroke="#0e1118" stroke-width="2" stroke-linejoin="round"/>
+       <path d="M 4 5 l 24 0 l -1 46 q 0 4 -4 4 l -12 0 q -4 0 -4 -4 z" fill="${body}" stroke="#0e1118" stroke-width="2" stroke-linejoin="round"/>
+       <path d="M -16 8 l -2 44 M 16 8 l 0 44" stroke="${shade}" stroke-width="1.6"/>
+       <circle cx="-3" cy="0" r="1.8" fill="${shade}"/>
+     </g>`,
+    col,
+  );
+}
+
 function drawRangefinder(col: string, seed: string): string {
   const body = mix(col, '#2a2f3a', 0.25);
   return frame(
@@ -1129,6 +1174,12 @@ export function itemArtSVG(id: string, rarity: Rarity, setTheme?: string): strin
       break;
     case 'hat':
       base = drawHat(col, seed);
+      break;
+    case 'jacket':
+      base = drawJacket(col, seed);
+      break;
+    case 'pants':
+      base = drawTrousers(col, seed);
       break;
     case 'rangefinder':
       base = drawRangefinder(col, seed);

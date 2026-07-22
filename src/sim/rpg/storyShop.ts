@@ -280,6 +280,7 @@ function clubKindWord(clubType: string): string {
 }
 const GEAR_SLOT_WORD: Record<string, string> = {
   glove: 'Glove', hat: 'Cap', shoes: 'Shoes', ball: 'Ball', shaft: 'Shaft', bag: 'Sponsor Bag',
+  jacket: 'Jacket', pants: 'Pants',
 };
 
 /** The everything-the-card-needs view of a rack item (club or gear), or undefined for a bad id. */

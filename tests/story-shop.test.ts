@@ -270,6 +270,27 @@ describe('Story gear (GS-story-gear)', () => {
     expect(out.backspinBoost).toBeCloseTo(0.08, 5);
   });
 
+  it('GS-story-clothing: a jacket + pants fold their effects, and a Coil relic carries its curse', () => {
+    const base: PlayerLoadout = {
+      bag: [], handicap: 0, dispersionMult: 1, creditMult: 1, perks: [], shapeMod: {},
+      minCarryBoost: 0, wedgeWindow: 0, distanceClubBonus: 0, puttBoost: 0, birdieCredit: 0, eagleCredit: 0, comebackCredit: 0,
+    };
+    // A windbreaker adds wind resistance; tour trousers raise the min-carry base.
+    let s = addCredits(defaultStoryState(), 3000);
+    s = buyStoryGear(s, storyGearById('gear:jacket:windbreak')!); // windResist +0.2
+    s = buyStoryGear(s, storyGearById('gear:pants:tour')!); // minCarryBoost +0.06
+    const out = applyStoryGear(base, s);
+    expect(out.windResist).toBeCloseTo(0.2, 5);
+    expect(out.minCarryBoost).toBeCloseTo(0.06, 5);
+    // The Coil Vestment is a herald relic: tight dispersion (×0.85) AND a credit tithe (×0.92) — the curse.
+    const coil = storyGearById('gear:jacket:coil')!;
+    expect(coil.alignment).toBe('herald');
+    expect(coil.curse).toBeTruthy();
+    const cursed = coil.apply(base);
+    expect(cursed.dispersionMult).toBeCloseTo(0.85, 5);
+    expect(cursed.creditMult).toBeCloseTo(0.92, 5);
+  });
+
   it('the unified card layer resolves both clubs and gear', () => {
     const club = storyCardFor('club:tour:3W');
     expect(club?.kind).toBe('club');
@@ -388,9 +409,9 @@ describe('the deep catalogue (GS-story-shop-depth)', () => {
     }
   });
 
-  it('the catalogue spans all six slots and a green→legendary rarity ladder', () => {
+  it('the catalogue spans all eight slots and a green→legendary rarity ladder', () => {
     const slots = new Set(STORY_GEAR.map((g) => g.slot));
-    for (const s of ['glove', 'hat', 'shoes', 'ball', 'shaft', 'bag'] as const) expect(slots.has(s), `${s} has gear`).toBe(true);
+    for (const s of ['glove', 'hat', 'shoes', 'ball', 'shaft', 'bag', 'jacket', 'pants'] as const) expect(slots.has(s), `${s} has gear`).toBe(true);
     const rarities = new Set(STORY_GEAR.map((g) => g.rarity));
     for (const r of ['common', 'rare', 'epic', 'legendary'] as const) expect(rarities.has(r), `${r} gear exists`).toBe(true);
     // green + blue variety exists EARLY (a common item sits on a Chapter-1 world)

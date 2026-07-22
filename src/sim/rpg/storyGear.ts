@@ -970,6 +970,280 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     ],
     apply: (m) => ({ ...m, puttBoost: (m.puttBoost ?? 0) + 0.22, puttReadBonus: (m.puttReadBonus ?? 0) + 12 }),
   },
+
+  // ════════════════════════════════════════════════════════════════════════════════════════════════
+  // GS-story-clothing — the APPAREL slots: a JACKET (upper body) + PANTS (legwear), worn clothing that BOTH
+  // changes the on-course avatar (the jacket → the golfer's torso shirt shape/colour, the pants → their
+  // legs) AND folds a real effect. Deeper pool, more reward variety, and a home for THEMED outfits: a
+  // clean Warden set and a cursed Coil (herald) set that route-gate like the sheddings. Effects reuse the
+  // proven no-op-default levers (wind for outerwear; stance/mobility for legwear; sponsor credits), so an
+  // un-clothed campaign is byte-for-byte the plain loadout. Avatar looks reuse the existing ShirtShape /
+  // PantsShape silhouettes `drawGolfer` already renders.
+
+  // ── JACKET (upper body → wind / steadiness / economy) ──────────────────────────────────────────────
+  {
+    id: 'gear:jacket:windbreak',
+    slot: 'jacket',
+    name: 'Tour Windbreaker',
+    avatar: { shape: 'jersey', color: '#2b3550', accent: '#7fd0ff' },
+    rarity: 'common',
+    price: 80,
+    blurb: 'Cuts the breeze — a touch less wind.',
+    detail: ['20% less wind impact — a light shell that takes the edge off a gust.'],
+    lore: [
+      'A packable tour shell in a hopeful sponsor’s colours, thin enough to swing in and just enough to ' +
+        'stop a stiff breeze stealing the shot off the top of your backswing. Every travelling pro owns one; ' +
+        'most own three.',
+      'The first thing you reach for when the flags start to flutter.',
+    ],
+    apply: (m) => ({ ...m, windResist: Math.min(0.6, (m.windResist ?? 0) + 0.2) }),
+  },
+  {
+    id: 'gear:jacket:rain',
+    slot: 'jacket',
+    name: 'All-Weather Shell',
+    avatar: { shape: 'spacesuit', color: '#1f5a3a', accent: '#bfead0' },
+    rarity: 'rare',
+    price: 170,
+    blurb: 'Bores through the gale — much less wind.',
+    detail: ['35% less wind impact — a sealed storm shell for the gale-worlds.'],
+    lore: [
+      'A fully-taped storm jacket rated for the wind-worlds, where the breeze is the whole defence. It seals ' +
+        'at the cuffs and throat so nothing gets in and nothing slows your arms, and the ball stops ballooning ' +
+        'into a headwind that used to eat two clubs.',
+      'When the forecast is “survivable”, this is why.',
+    ],
+    apply: (m) => ({ ...m, windResist: Math.min(0.6, (m.windResist ?? 0) + 0.35) }),
+  },
+  {
+    id: 'gear:jacket:compression',
+    slot: 'jacket',
+    name: 'Compression Tour Jacket',
+    avatar: { shape: 'polo', color: '#b23140', accent: '#f0c8cc' },
+    rarity: 'rare',
+    price: 160,
+    blurb: 'A quieter swing — tighter shots.',
+    detail: ['Dispersion ×0.95 — a compressive fit that steadies the turn.'],
+    lore: [
+      'A second-skin compression layer that gently braces the core and shoulders through the swing, so the ' +
+        'big muscles fire in the right order and the club keeps arriving square. It won’t make you longer — it ' +
+        'makes you repeat, which on a tight driving hole is worth more.',
+      'Feels like a coach’s hand on your back, every swing.',
+    ],
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.95 }),
+  },
+  {
+    id: 'gear:jacket:sponsor',
+    slot: 'jacket',
+    name: 'Sponsored Tour Jacket',
+    avatar: { shape: 'blazer', color: '#f0f0f4', accent: '#1c2c50' },
+    rarity: 'rare',
+    price: 180,
+    blurb: 'Logos that pay — +20% credits.',
+    detail: ['+20% credits from every world clear and major — a jacket that earns its keep.'],
+    lore: [
+      'A crisp tour jacket stitched with a modest roster of sponsor crests — a chain of fuel depots, a ' +
+        'ball-marker company, a systems bank that likes your odds. Every logo pays for the airtime, and the ' +
+        'airtime is you, walking up the last with a lead.',
+      'Wear the badges. Cash the cheques.',
+    ],
+    apply: (m) => ({ ...m, creditMult: m.creditMult * 1.2 }),
+  },
+  {
+    id: 'gear:jacket:thermal',
+    slot: 'jacket',
+    name: 'Thermal Storm Jacket',
+    avatar: { shape: 'spacesuit', color: '#c0542a', accent: '#ffce9a' },
+    rarity: 'epic',
+    price: 260,
+    blurb: 'Warm and unbothered — heavy wind cut.',
+    detail: ['45% less wind impact — a heated shell that swings like a base layer.'],
+    lore: [
+      'A powered storm jacket with heating filament woven through the lining, cut so full-motion you forget ' +
+        'you’re wearing armour against the weather. On the frozen links and the gale-scoured shelves it keeps ' +
+        'the hands warm and the ball on its line when everyone else is fighting the sky.',
+      'The pros who win the cold majors are never cold.',
+    ],
+    apply: (m) => ({ ...m, windResist: Math.min(0.6, (m.windResist ?? 0) + 0.45) }),
+  },
+  {
+    id: 'gear:jacket:warden',
+    slot: 'jacket',
+    name: "Warden's Mantle",
+    avatar: { shape: 'blazer', color: '#eef2ff', accent: '#caa15a', glow: '#ffe9a8' },
+    rarity: 'epic',
+    price: 440,
+    alignment: 'warden',
+    blurb: 'Consecrated calm — clean and tight.',
+    detail: ['Dispersion ×0.9 — a Warden’s steady shoulders, no strings.'],
+    lore: [
+      'A ceremonial mantle consecrated by the Fairway Wardens, worn over the shoulders of those who keep the ' +
+        'Great Game honest. It settles a strange quiet over the wearer — the gallery, the wind, the whisper of ' +
+        'the Coil all fall away, and there is only the shot. Grace asks nothing back.',
+      'The calm it lends is your own, kept safe.',
+    ],
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.9 }),
+  },
+  {
+    id: 'gear:jacket:coil',
+    slot: 'jacket',
+    name: 'Coil Vestment',
+    avatar: { shape: 'cosmic', color: '#4a1f6a', accent: '#7fe0a0', glow: '#7fe0a0' },
+    rarity: 'epic',
+    price: 300,
+    alignment: 'herald',
+    blurb: 'The serpent’s poise — tight, at a tithe.',
+    detail: ['Dispersion ×0.85 — the stillest shoulders on the dark path.'],
+    curse: 'The Coil takes its tithe — credits earned −8%.',
+    lore: [
+      'A hooded vestment sewn from shed serpent-silk in Sister Ecdysis’ reliquary, cold to the touch and ' +
+        'starless-dark but for the acid sigils crawling its hem. It stills the swing to something inhuman — and ' +
+        'the Coil’s mark on the collar skims a little off every purse. Power on the dark path is never free.',
+    ],
+    apply: (m) => ({ ...m, dispersionMult: m.dispersionMult * 0.85, creditMult: m.creditMult * 0.92 }),
+  },
+  {
+    id: 'gear:jacket:champion',
+    slot: 'jacket',
+    name: "Galaxy Champion's Jacket",
+    avatar: { shape: 'blazer', color: '#caa15a', accent: '#fff3c8', glow: '#ffd873' },
+    rarity: 'legendary',
+    price: 520,
+    blurb: 'The winner’s coat — pays AND steadies the gale.',
+    detail: ['+40% credits from every clear/major AND 20% less wind — the jacket of a galaxy champion.'],
+    lore: [
+      'The gold jacket they drape over the shoulders of the golfer who saves a system — every civilisation you ' +
+        'kept from the World-Eater’s mouth stitched its sigil into the weave, and every one of them pays to be ' +
+        'seen on you. It’s heavy with gratitude and cut like a tour shell, so it earns AND holds you steady in ' +
+        'the wind.',
+      'You didn’t buy the jacket. You earned the right to wear it.',
+    ],
+    apply: (m) => ({ ...m, creditMult: m.creditMult * 1.4, windResist: Math.min(0.6, (m.windResist ?? 0) + 0.2) }),
+  },
+
+  // ── PANTS (legwear → stance / lie relief / distance base) ────────────────────────────────────────────
+  {
+    id: 'gear:pants:tour',
+    slot: 'pants',
+    name: 'Tour Trousers',
+    avatar: { shape: 'trousers', color: '#3a4048', accent: '#20242a' },
+    rarity: 'common',
+    price: 70,
+    blurb: 'A planted base — steadier distances.',
+    detail: ['Raises the MIN carry on driver / woods / irons — a solid base makes your distances repeat.'],
+    lore: [
+      'Plain, tough tour trousers with a touch of stretch through the seat and knee, cut so the lower body can ' +
+        'brace and turn without a fight. Nothing flashy — just a base you can push off, so the ball flies the ' +
+        'number instead of ten yards short.',
+      'The unglamorous upgrade every scoring golfer makes.',
+    ],
+    apply: (m) => ({ ...m, minCarryBoost: m.minCarryBoost + 0.06 }),
+  },
+  {
+    id: 'gear:pants:flex',
+    slot: 'pants',
+    name: 'Flex-Stance Trousers',
+    avatar: { shape: 'trousers', color: '#2b3550', accent: '#6a86b0' },
+    rarity: 'rare',
+    price: 150,
+    blurb: 'Stand and deliver — better from bad lies.',
+    detail: ['Lie relief — awkward stances (rough / sand / slopes) cost you less.'],
+    lore: [
+      'Four-way-stretch trousers with reinforced knees that let you get low, wide, and weird — the stance a ' +
+        'buried lie or a steep bank demands without the fabric fighting you. You can plant on a downslope in the ' +
+        'sand and still make a swing you trust.',
+      'The rough stops being a sentence and starts being a puzzle.',
+    ],
+    apply: (m) => ({ ...m, lieRelief: Math.max(m.lieRelief ?? 0, 0.3) }),
+  },
+  {
+    id: 'gear:pants:knickers',
+    slot: 'pants',
+    name: 'Classic Plus-Fours',
+    avatar: { shape: 'knickers', color: '#c9a86a', accent: '#8a5a2a' },
+    rarity: 'rare',
+    price: 150,
+    blurb: 'Old-school poise — straighter misses.',
+    detail: ['Trims both the SLICE and the HOOK — a classic, balanced setup that straightens the two-way miss.'],
+    lore: [
+      'Argyle plus-fours and long socks, the uniform of the game’s golden age — and worn, oddly, they work: the ' +
+        'slightly-bound knee forces the old, quiet, balanced footwork the modern lunge forgot, and the ball stops ' +
+        'leaking both ways off the tee. The gallery smiles. Then they see your fairways hit.',
+      'Style that happens to be substance.',
+    ],
+    apply: (m) => ({ ...m, shapeMod: combineShapeMods(m.shapeMod, { sliceR: -0.04, hookL: -0.04 }) }),
+  },
+  {
+    id: 'gear:pants:power',
+    slot: 'pants',
+    name: 'Power-Drive Trousers',
+    avatar: { shape: 'trousers', color: '#7a2a2a', accent: '#e0a060' },
+    rarity: 'epic',
+    price: 230,
+    blurb: 'Drive off the ground — real base distance.',
+    detail: ['Strongly raises the MIN carry on your distance clubs — a powerful, repeatable base.'],
+    lore: [
+      'Weighted, articulated trousers that drop your centre of gravity and lock the drive through the ground, ' +
+        'so every long club delivers the same speed from the same braced base. The mishits climb toward the good ' +
+        'ones, and the good ones hold — distance you can finally count on.',
+      'Speed starts at the feet. This is where you find it.',
+    ],
+    apply: (m) => ({ ...m, minCarryBoost: m.minCarryBoost + 0.12 }),
+  },
+  {
+    id: 'gear:pants:warden',
+    slot: 'pants',
+    name: "Warden's Greaves",
+    avatar: { shape: 'greaves', color: '#eef2ff', accent: '#caa15a', glow: '#ffe9a8' },
+    rarity: 'epic',
+    price: 440,
+    alignment: 'warden',
+    blurb: 'Stand firm anywhere — clean.',
+    detail: ['Strong lie relief — a Warden holds their stance on any ground, no cost.'],
+    lore: [
+      'Blessed leg-guards the Fairway Wardens wear onto ground no one should have to stand on — cold void, ' +
+        'drowned atoll, dead deck — and stay upright, and stay honest. They root the stance to whatever you’re ' +
+        'called to defend, and they ask nothing but that you keep standing for the right side.',
+      'A clean footing on terrible ground is grace made wearable.',
+    ],
+    apply: (m) => ({ ...m, lieRelief: Math.max(m.lieRelief ?? 0, 0.5) }),
+  },
+  {
+    id: 'gear:pants:coil',
+    slot: 'pants',
+    name: 'Coilscale Leggings',
+    avatar: { shape: 'riftgreaves', color: '#4a1f6a', accent: '#7fe0a0', glow: '#7fe0a0' },
+    rarity: 'epic',
+    price: 300,
+    alignment: 'herald',
+    blurb: 'Rooted anywhere — but restless.',
+    detail: ['Huge lie relief — plant and swing from any lie in the galaxy.'],
+    curse: 'The serpent never rests — putt make-window −5%.',
+    lore: [
+      'Leggings scaled like a shed serpent’s belly, gripping acid, void and bare rock alike so no lie can stop ' +
+        'you. But the restlessness in the scales creeps up from the ground into the hands, and the greens never ' +
+        'quite go still under you again. The Coil calls that the price of never falling.',
+    ],
+    apply: (m) => ({ ...m, lieRelief: Math.max(m.lieRelief ?? 0, 0.6), puttBoost: (m.puttBoost ?? 0) - 0.05 }),
+  },
+  {
+    id: 'gear:pants:cosmic',
+    slot: 'pants',
+    name: 'Starfield Trousers',
+    avatar: { shape: 'nebula', color: '#3a1c6a', accent: '#c088ff', glow: '#b070ff' },
+    rarity: 'legendary',
+    price: 500,
+    blurb: 'A cosmic base — long AND tight.',
+    detail: ['Raises the MIN carry on your distance clubs AND 5% tighter dispersion — a champion’s base.'],
+    lore: [
+      'Trousers woven with a thread of real nebula, so light they seem to fall upward, so strong they never ' +
+        'crease — the drive loads into a base that feels like standing on the floor of the galaxy itself. Long, ' +
+        'repeatable, and quietly straighter, they’re the legwear of a golfer with nothing left to prove and a ' +
+        'universe left to save.',
+      'The stars themselves, holding you steady over the ball.',
+    ],
+    apply: (m) => ({ ...m, minCarryBoost: m.minCarryBoost + 0.12, dispersionMult: m.dispersionMult * 0.95 }),
+  },
 ];
 
 /** Per-world gear stock (content-as-data) — a curated 1–2 items per world, tiered by chapter, so travel
@@ -983,22 +1257,23 @@ export const STORY_GEAR_STOCK: Record<string, readonly string[]> = {
 
   // ── Chapter 1 — GREENS & BLUES, the staples (home parkland + the dunes). Start the economy engine + the
   // distance/reading basics here so an early credit has an exciting, lasting home.
-  'verdant-18': ['gear:glove:worn', 'gear:shaft:stiff', 'gear:ball:range', 'gear:bag:sponsor'],
-  'verdant2-18': ['gear:hat:reader', 'gear:hat:visor', 'gear:glove:antislice', 'gear:shoes:turf'],
-  'desert-18': ['gear:shoes:spikes', 'gear:shoes:balance', 'gear:hat:range', 'gear:shaft:power'],
+  // GS-story-clothing: the CLOTHING staples start here too — a windbreaker + tour trousers on the home parkland.
+  'verdant-18': ['gear:glove:worn', 'gear:shaft:stiff', 'gear:ball:range', 'gear:bag:sponsor', 'gear:jacket:windbreak', 'gear:pants:tour'],
+  'verdant2-18': ['gear:hat:reader', 'gear:hat:visor', 'gear:glove:antislice', 'gear:shoes:turf', 'gear:jacket:compression'],
+  'desert-18': ['gear:shoes:spikes', 'gear:shoes:balance', 'gear:hat:range', 'gear:shaft:power', 'gear:pants:flex'],
   // GS-story-world-variety — the extra Ch.1 qualifier (Gemini Ice): reading + footing for slick, exposed ice.
-  'frost2-18': ['gear:hat:reader', 'gear:shoes:balance', 'gear:glove:sweet'],
+  'frost2-18': ['gear:hat:reader', 'gear:shoes:balance', 'gear:glove:sweet', 'gear:jacket:rain'],
 
   // ── Chapter 2 — BLUES + the first PURPLES (the fire-worlds + the frozen links). Themed: MAGMA balls at
   // the lava, the whippy power shaft where you need to bomb it, the WIND ball on the exposed frost links.
-  'inferno-18': ['gear:ball:magma', 'gear:glove:tacky', 'gear:shaft:woods'],
-  'inferno2-18': ['gear:shaft:overdrive', 'gear:ball:soft', 'gear:bag:lucky'],
+  'inferno-18': ['gear:ball:magma', 'gear:glove:tacky', 'gear:shaft:woods', 'gear:pants:knickers'],
+  'inferno2-18': ['gear:shaft:overdrive', 'gear:ball:soft', 'gear:bag:lucky', 'gear:jacket:sponsor'],
   'frost-18': ['gear:ball:wind', 'gear:hat:spin', 'gear:glove:sweet'],
   // GS-story-world-variety — the extra Ch.2 qualifier (Pyxis Foundry): low-grav bomber's kit + an economy bag.
-  'metal2-18': ['gear:shaft:power', 'gear:glove:tacky', 'gear:bag:lucky'],
+  'metal2-18': ['gear:shaft:power', 'gear:glove:tacky', 'gear:bag:lucky', 'gear:jacket:thermal'],
 
   // ── Chapter 3 — the PURPLE line fills in (the gale, the crystal precision greens, the spore-jungle rough).
-  'tempest-18': ['gear:ball:wind', 'gear:glove:vice', 'gear:shaft:irons'],
+  'tempest-18': ['gear:ball:wind', 'gear:glove:vice', 'gear:shaft:irons', 'gear:pants:power'],
   'crystal-18': ['gear:hat:computer', 'gear:glove:vice', 'gear:bag:tour'],
   'fungal-18': ['gear:shoes:gravlock', 'gear:hat:focus', 'gear:ball:zip'],
   // GS-story-world-variety — the extra Ch.3 qualifier (Delphinus Tides): the FLOATER ball early, sea-storm kit.
@@ -1007,16 +1282,18 @@ export const STORY_GEAR_STOCK: Record<string, readonly string[]> = {
   // ── Chapter 4 — PURPLES everywhere, the ROUTE RELICS (alignment-gated), and the first LEGENDARIES. Themed:
   // FLOATER balls on the drowned atolls, VOID-WALKER balls + the Nova bomb at the abyss, the Power Glove +
   // the Oracle where precision is everything.
-  'ocean-18': ['gear:ball:floater', 'gear:shoes:gravlock', 'gear:glove:shed', 'gear:glove:grace'],
+  // GS-story-clothing: the THEMED OUTFIT relics gate here — a Coil vestment vs a Warden mantle (jackets) on
+  // the drowned atolls, a Coil vs Warden legwear on the crystal greens. Alignment-filtered like the sheddings.
+  'ocean-18': ['gear:ball:floater', 'gear:shoes:gravlock', 'gear:glove:shed', 'gear:glove:grace', 'gear:jacket:coil', 'gear:jacket:warden'],
   'void2-18': ['gear:ball:void', 'gear:shaft:nova', 'gear:glove:master'],
-  'crystal2-18': ['gear:hat:oracle', 'gear:glove:power', 'gear:ball:venom', 'gear:ball:blessed'],
+  'crystal2-18': ['gear:hat:oracle', 'gear:glove:power', 'gear:ball:venom', 'gear:ball:blessed', 'gear:pants:coil', 'gear:pants:warden'],
   // GS-story-world-variety — the extra Ch.4 qualifier (Leo Savannah): sand stance + power for the long, windy dust.
   'desert2-18': ['gear:shoes:spikes', 'gear:shaft:power', 'gear:hat:oracle'],
 
   // ── Chapter 5 — the LEGENDARY apex + the last route relics, in the serpent's reaches. The Comet ball, the
   // Void-Anchor boots, the Seer's Circlet, the Cosmic bag — the grail rack of the campaign.
-  'swamp-18': ['gear:ball:comet', 'gear:shoes:anchor', 'gear:shoes:coil', 'gear:shoes:hallowed'],
-  'derelict-18': ['gear:hat:seer', 'gear:ball:void', 'gear:bag:cosmic'],
+  'swamp-18': ['gear:ball:comet', 'gear:shoes:anchor', 'gear:shoes:coil', 'gear:shoes:hallowed', 'gear:jacket:champion'],
+  'derelict-18': ['gear:hat:seer', 'gear:ball:void', 'gear:bag:cosmic', 'gear:pants:cosmic'],
   'cetus-18': ['gear:ball:comet', 'gear:shaft:nova', 'gear:glove:power'],
   // GS-story-world-variety — the extra Ch.5 qualifier (Antlia Scrapworks): the grail low-grav bomber's rack.
   'metal-18': ['gear:shaft:nova', 'gear:bag:cosmic', 'gear:glove:power'],
@@ -1152,6 +1429,10 @@ export interface StoryAvatarLooks {
   clubSkin?: ApparelLook;
   /** The cosmetic ball tracer — the equipped BALL's in-flight trail colour + style. */
   ballTracer?: ApparelLook;
+  /** The cosmetic JACKET — the equipped upper-body garment recolours/reshapes the golfer's torso. */
+  shirtStyle?: ApparelLook;
+  /** The cosmetic PANTS — the equipped legwear recolours/reshapes the golfer's legs. */
+  pantsStyle?: ApparelLook;
 }
 
 /** Map each equipped-gear SLOT to the golfer-render slot its `avatar` look drives. Only slots that have a
@@ -1163,6 +1444,8 @@ const GEAR_AVATAR_SLOT: Partial<Record<GearSlot, keyof StoryAvatarLooks>> = {
   shoes: 'shoes',
   shaft: 'clubSkin',
   ball: 'ballTracer',
+  jacket: 'shirtStyle',
+  pants: 'pantsStyle',
 };
 
 /**

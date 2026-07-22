@@ -28,9 +28,10 @@ function findChromium() {
 const entry = `
 import { drawGolfer } from './src/render/golferArt';
 import { STORY_GEAR } from './src/sim/rpg/storyGear';
+import { itemArtSVG } from './src/render/itemArt';
 
 const BASE = { cap: '#19b2a6', shirt: '#138f86', skin: '#6b4a32', build: 1 };
-const SLOT_KEY = { hat: 'hat', bag: 'bag', glove: 'glove', shoes: 'shoes', shaft: 'clubSkin' };
+const SLOT_KEY = { hat: 'hat', bag: 'bag', glove: 'glove', shoes: 'shoes', shaft: 'clubSkin', jacket: 'shirtStyle', pants: 'pantsStyle' };
 
 function tile(look, label, poses) {
   const wrap = document.createElement('div');
@@ -79,7 +80,7 @@ for (const id of ['gear:hat:cowl', 'gear:glove:shed', 'gear:shoes:coil', 'gear:b
 row0.appendChild(tile(kitB, 'Herald cursed kit', POSES));
 document.body.appendChild(row0);
 
-for (const slot of ['hat', 'glove', 'shoes', 'bag', 'shaft']) {
+for (const slot of ['jacket', 'pants', 'hat', 'glove', 'shoes', 'bag', 'shaft']) {
   section(slot.toUpperCase());
   const row = document.createElement('div'); row.style.display = 'flex'; row.style.flexWrap = 'wrap';
   for (const g of STORY_GEAR) {
@@ -88,6 +89,22 @@ for (const slot of ['hat', 'glove', 'shoes', 'bag', 'shaft']) {
   }
   document.body.appendChild(row);
 }
+
+// CLOTHING SHOP-CARD ART — the bespoke jacket/pants rack glyphs.
+section('CLOTHING SHOP-CARD ART (jacket + pants)');
+const irow = document.createElement('div'); irow.style.display = 'flex'; irow.style.flexWrap = 'wrap';
+for (const g of STORY_GEAR) {
+  if (g.slot !== 'jacket' && g.slot !== 'pants') continue;
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:inline-block;text-align:center;margin:5px;width:150px;';
+  wrap.innerHTML = itemArtSVG(g.id, g.rarity);
+  const cap = document.createElement('div');
+  cap.style.cssText = 'font-family:sans-serif;color:#eee;font-size:11px;margin-top:3px;';
+  cap.textContent = g.name + ' · ' + g.rarity;
+  wrap.appendChild(cap);
+  irow.appendChild(wrap);
+}
+document.body.appendChild(irow);
 
 // BALL TRACERS — a sample flight arc per equipped ball, mirroring playView's flight-trail render.
 section('BALL TRACER (sample flight arc)');
