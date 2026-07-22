@@ -410,7 +410,7 @@ export function createCetusFlow(hole: Hole): CetusFlowHandle {
 }
 
 /** The fall height (screen px) the curtain drops — mirrors the static build: the cliff face under the
- *  spill is `clamp(34,190, projectedPlatformWidth*0.44)` (platformCliffs) + 22 (cetusRiver), so the
+ *  spill is `clamp(44,190, min(projectedW, projectedH)*0.6)` (platformCliffs) + 22 (cetusRiver), so the
  *  animated curtain reaches the same foot the map's does. Falls back to a channel-width default when
  *  the spill isn't over a known platform. */
 function fallLenFor(line: Vec[], land: Vec[][], proj: Projector, avgHwPx: number): number {
@@ -419,11 +419,15 @@ function fallLenFor(line: Vec[], land: Vec[][], proj: Projector, avgHwPx: number
   if (!home) return Math.max(26, avgHwPx * 5) + 20;
   let minX = Infinity;
   let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
   for (const pt of home) {
     const s = proj.project(pt);
     if (s[0] < minX) minX = s[0];
     if (s[0] > maxX) maxX = s[0];
+    if (s[1] < minY) minY = s[1];
+    if (s[1] > maxY) maxY = s[1];
   }
-  const cliffH = Math.max(34, Math.min(190, (maxX - minX) * 0.44));
+  const cliffH = Math.max(44, Math.min(190, Math.min(maxX - minX, maxY - minY) * 0.6));
   return cliffH + 22;
 }
