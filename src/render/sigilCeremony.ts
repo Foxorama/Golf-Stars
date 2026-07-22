@@ -221,6 +221,28 @@ export function paintSerpent(
     pts[i]!.nx = -dy / len; // unit normal
     pts[i]!.ny = dx / len;
   }
+  // NECK SHEATH (GS-story-serpent-2 round 3): the flesh continues INTO the skull — tapering collar
+  // segments extend past the head anchor along the head's forward line, carrying the same cel bands /
+  // scales / starfield, so the skull always sits ON the body. (The earlier flat cap disc read as a
+  // decapitation cross-section — the "pre-decapitated" bug.)
+  const fdxq = pts[N]!.x - pts[N - 3]!.x;
+  const fdyq = pts[N]!.y - pts[N - 3]!.y;
+  const flq = Math.hypot(fdxq, fdyq) || 1;
+  const fux = fdxq / flq;
+  const fuy = fdyq / flq;
+  const chain: Pt[] = [...pts];
+  for (let j = 1; j <= 5; j++) {
+    const base = pts[N]!;
+    chain.push({
+      u: 1,
+      x: base.x + fux * base.r * 0.34 * j,
+      y: base.y + fuy * base.r * 0.34 * j,
+      r: base.r * (1 - j * 0.09),
+      nx: base.nx,
+      ny: base.ny,
+    });
+  }
+  const M = chain.length - 1;
 
   // ── BODY: per-segment painter, tail → head, so the coil correctly crosses OVER its own far side
   //    (a single ribbon fill can't self-overlap). Each segment lays a slightly WIDER dark halo under
@@ -243,13 +265,13 @@ export function paintSerpent(
     ctx.closePath();
   };
   const quad = (a: Pt, b: Pt, e: number): void => band(a, b, 1, -1, e);
-  for (let i = 0; i < N; i++) {
-    const a = pts[i]!;
-    const b = pts[i + 1]!;
+  for (let i = 0; i < M; i++) {
+    const a = chain[i]!;
+    const b = chain[i + 1]!;
     quad(a, b, 3.5);
     ctx.fillStyle = 'rgba(3,12,9,0.85)'; // lateral occlusion halo
     ctx.fill();
-    const glint = 0.5 + 0.5 * Math.sin(t * 2.1 * spd + i * 0.5);
+    const glint = 0.5 + 0.5 * Math.sin(t * 2.1 * spd + Math.min(i, N) * 0.5);
     const rr = Math.round(11 + wake * 11 + glint * 6 + a.u * 8);
     const gg = Math.round(46 + wake * 26 + glint * 16 + a.u * 30);
     const bb = Math.round(38 + wake * 7 + glint * 9 + a.u * 9);
@@ -265,29 +287,19 @@ export function paintSerpent(
     ctx.fillStyle = `rgb(${Math.round(6 + wake * 5)},${Math.round(26 + wake * 12)},${Math.round(21 + wake * 4)})`;
     ctx.fill();
   }
-  // NECK CAP — a rounded joint capping the body's flat end cross-section so the skull always overlaps
-  // flesh, never a seam of empty space (the head-gap fix, GS-story-serpent-2). Part of the body union
-  // below, so the starfield/scales/shading dress it as flesh, not a smooth ball.
-  const neckP = pts[N]!;
-  // colour-matched to the mid-glint head-end segment fill so the cap rim never shows
-  ctx.fillStyle = `rgb(${Math.round(22 + wake * 11)},${Math.round(84 + wake * 26)},${Math.round(51 + wake * 7)})`;
-  ctx.beginPath();
-  ctx.arc(neckP.x, neckP.y, neckP.r * 1.02, 0, 6.283);
-  ctx.fill();
   // The full-body union path (nonzero winding fills overlapping quads as one region) — the clip for
-  // everything painted INSIDE the beast.
+  // everything painted INSIDE the beast. Includes the neck sheath, so the interior dressing runs
+  // unbroken under the skull.
   const bodyPath = new Path2D();
-  for (let i = 0; i < N; i++) {
-    const a = pts[i]!;
-    const b = pts[i + 1]!;
+  for (let i = 0; i < M; i++) {
+    const a = chain[i]!;
+    const b = chain[i + 1]!;
     bodyPath.moveTo(a.x + a.nx * a.r, a.y + a.ny * a.r);
     bodyPath.lineTo(b.x + b.nx * b.r, b.y + b.ny * b.r);
     bodyPath.lineTo(b.x - b.nx * b.r, b.y - b.ny * b.r);
     bodyPath.lineTo(a.x - a.nx * a.r, a.y - a.ny * a.r);
     bodyPath.closePath();
   }
-  bodyPath.moveTo(neckP.x + neckP.r * 1.02, neckP.y);
-  bodyPath.arc(neckP.x, neckP.y, neckP.r * 1.02, 0, 6.283);
 
   ctx.save();
   ctx.clip(bodyPath);
@@ -319,8 +331,8 @@ export function paintSerpent(
   // INTERIOR STARFIELD — fixed seed, so the sky inside the serpent is byte-stable every frame;
   // only the twinkle rides t.
   const srng = mulberry32(0x7a3e11);
-  for (let i = 2; i < N; i += 2) {
-    const p = pts[i]!;
+  for (let i = 2; i < M; i += 2) {
+    const p = chain[i]!;
     const nStars = 1 + (i % 3 === 0 ? 1 : 0);
     for (let j = 0; j < nStars; j++) {
       const off = (srng() * 2 - 1) * 0.78;
@@ -337,8 +349,8 @@ export function paintSerpent(
   // SCALES: dense crescent rows over the starfield — the beast is still flesh over the sky. Lit hard
   // toward the DORSAL edge (+normal, where the ridge runs): the top rows are bright pale-green plates,
   // the belly rows sink to faint dark seams (the cel read).
-  for (let i = 2; i < N - 2; i += 2) {
-    const p = pts[i]!;
+  for (let i = 2; i < M - 1; i += 2) {
+    const p = chain[i]!;
     const shimmer = 0.5 + 0.5 * Math.sin(t * 2.2 * spd + i * 0.7);
     for (let j = -2; j <= 2; j++) {
       const off = (j / 2.4) * p.r;
@@ -554,7 +566,7 @@ function drawSerpentHead(
   const hg = ctx.createLinearGradient(b2.x, b2.y, gapeC.x, gapeC.y);
   hg.addColorStop(0, `rgba(${litR},${litG},124,1)`); // lit brow / dorsal
   hg.addColorStop(0.5, `rgba(30,${104 + wake * 30},76,1)`);
-  hg.addColorStop(1, 'rgba(8,32,24,1)'); // shadowed cheek
+  hg.addColorStop(1, `rgba(16,${56 + wake * 14},42,1)`); // shadowed cheek — kept near the body's tones so the head-body boundary never reads as a cut
   ctx.fillStyle = hg;
   ctx.fill();
 
