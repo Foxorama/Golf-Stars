@@ -1189,7 +1189,8 @@ shops / stock.
   plumbing. No save bump, no sim rng. Guarded by the extended vendor-coverage + fleet tests in
   `tests/story-ships.test.ts`.
 
-- **GS-story-avatar** — ✅ *shipped (PR1: the seam + hats & bags)* (`sim/rpg/storyGear.ts` + `app/helpers.ts`).
+- **GS-story-avatar** — ✅ *shipped (PR1: seam + hats & bags; PR2: gloves & shoes)* (`sim/rpg/storyGear.ts`
+  + `app/helpers.ts` + `render/golferArt.ts` + `sim/rpg/apparel.ts`).
   Player ask: in Story Tour the on-course avatar was showing the GLOBAL clubhouse cosmetics (the main-save
   wardrobe picks); it should instead wear the **DEFAULT colour-coded outfit** and only change with the
   **equipment gathered + equipped IN the campaign** (the Story gear). Every other mode keeps the clubhouse
@@ -1202,12 +1203,18 @@ shops / stock.
   what you equip in the campaign is what you wear), so a hat gear item wears its silhouette (visor/crown/
   circlet/…) and a bag gear item props its colourway beside the golfer; effect-only slots (ball/shaft/…) and
   un-avatared gear show nothing (the default outfit stands). `storyGearAvatar` is a pure resolver keyed by
-  `GEAR_AVATAR_SLOT` (gear slot → golfer-render slot). Pure render + data — ZERO sim rng (determinism /
-  auto≡interactive untouched — the avatar isn't part of the sim), no save bump (`equippedGear` already
-  persists), no `_gs*`/URL hook (no test-hub wiring). Guarded by `tests/story-avatar.test.ts`. **Follow-ups
-  (later PRs):** glove + shoes worn looks (new `GolferLook` glove/shoe fields + `drawGolfer` rendering), the
-  shaft → club-skin and ball → flight-trail cosmetics, and more per-item silhouette variety — the "quite a few
-  cosmetics" the ask anticipated, each a `storyGear` row + (where a new look is needed) a `drawGolfer` painter.
+  `GEAR_AVATAR_SLOT` (gear slot → golfer-render slot). **PR2** extends the worn set to GLOVES + SHOES: two new
+  `GolferLook` fields (`glove`/`shoes`) painted by new `drawGolfer` helpers (`drawGlove` at the grip hands with
+  a forearm cuff — plain `glove` / armoured `gauntlet` / the toy `powerglove`; `drawShoe` at each planted foot —
+  `shoe` / `boot` / spiked `spikes`), and two new `ApparelLook` shape families (`GloveShape`/`ShoeShape` in
+  `apparel.ts`, story-worn only — never reach `drawHat`). Every glove + shoe gear row gets a rarity-tinted
+  `avatar` (legendaries glow). So an equipped campaign kit now reads head-to-toe: hat, glove, shoes, propped
+  bag, over the default outfit. Pure render + data — ZERO sim rng (determinism / auto≡interactive untouched —
+  the avatar isn't part of the sim), no save bump (`equippedGear` already persists), no `_gs*`/URL hook (no
+  test-hub wiring). Eyeball via `scripts/story-avatar-preview.mjs` (the canvas golfer wearing each piece, the
+  SVG previews can't show it). Guarded by `tests/story-avatar.test.ts` (worn-slot coverage + resolver).
+  **Remaining follow-ups:** the shaft → club-skin and ball → flight-trail cosmetics (the effect-only slots that
+  don't yet show on the avatar).
 
 ## Open questions / deferred (revisit as chunks land)
 - **A genuinely-new gas-giant BIOME** (play on gas cloud-tops) — the player's optional "if we need to add

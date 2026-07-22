@@ -49,23 +49,48 @@ describe('GS-story-avatar: equipped Story gear → worn cosmetic looks', () => {
     expect(Object.keys(av)).toHaveLength(0);
   });
 
-  it('every hat and bag gear item carries a slot-appropriate avatar look (coverage)', () => {
-    const HAT_SHAPES = new Set([
-      'cap', 'bucket', 'visor', 'tophat', 'crown', 'helmet',
-      'starburst', 'solarCrown', 'supernova', 'baggy', 'wingedHelm', 'tricorn',
-    ]);
+  it('an equipped glove is worn on the grip hand', () => {
+    const story = grantStoryGear(defaultStoryState(), 'gear:glove:power');
+    const av = storyGearAvatar(story);
+    expect(av.glove).toBeDefined();
+    expect(av.glove!.shape).toBe('powerglove');
+  });
+
+  it('equipped shoes are worn on the feet', () => {
+    const story = grantStoryGear(defaultStoryState(), 'gear:shoes:anchor');
+    const av = storyGearAvatar(story);
+    expect(av.shoes).toBeDefined();
+    expect(av.shoes!.shape).toBe('boot');
+    expect(av.shoes!.glow).toBeTruthy(); // the legendary void-anchor boots glow
+  });
+
+  it('every worn slot (hat/bag/glove/shoes) carries a slot-appropriate avatar look (coverage)', () => {
+    const SHAPES: Record<string, Set<string>> = {
+      hat: new Set([
+        'cap', 'bucket', 'visor', 'tophat', 'crown', 'helmet',
+        'starburst', 'solarCrown', 'supernova', 'baggy', 'wingedHelm', 'tricorn',
+      ]),
+      bag: new Set(['staffbag']),
+      glove: new Set(['glove', 'gauntlet', 'powerglove']),
+      shoes: new Set(['shoe', 'boot', 'spikes']),
+    };
     for (const g of STORY_GEAR) {
-      if (g.slot !== 'hat' && g.slot !== 'bag') continue;
+      const allowed = SHAPES[g.slot];
+      if (!allowed) continue; // effect-only slots (ball / shaft) wear nothing
       expect(g.avatar, `${g.id} should define an avatar look`).toBeDefined();
-      if (g.slot === 'hat') expect(HAT_SHAPES.has(g.avatar!.shape), `${g.id} hat shape`).toBe(true);
-      if (g.slot === 'bag') expect(g.avatar!.shape).toBe('staffbag');
+      expect(allowed.has(g.avatar!.shape), `${g.id} shape ${g.avatar!.shape}`).toBe(true);
     }
   });
 
-  it('equipping cosmetic-bearing gear does not disturb its effect (avatar is orthogonal)', () => {
-    // The Tacky Tour Glove has no avatar look yet — it must still exist and carry its effect.
-    const glove = storyGearById('gear:glove:tacky');
-    expect(glove).toBeDefined();
-    expect(glove!.avatar).toBeUndefined();
+  it('effect-only slots (ball / shaft) carry no worn look', () => {
+    for (const g of STORY_GEAR) {
+      if (g.slot === 'ball' || g.slot === 'shaft') {
+        expect(g.avatar, `${g.id} is effect-only and should not be worn`).toBeUndefined();
+      }
+    }
+    // and a Story ball resolves to no worn cosmetic
+    const story = grantStoryGear(defaultStoryState(), 'gear:ball:comet');
+    expect(storyGearAvatar(story)).toEqual({});
+    expect(storyGearById('gear:ball:comet')).toBeDefined();
   });
 });

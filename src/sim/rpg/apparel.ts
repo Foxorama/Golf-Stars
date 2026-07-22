@@ -80,10 +80,17 @@ export type BagShape = 'staffbag';
 /** Driver-club silhouettes the drawer renders (the cosmetic DRIVER slot, GS-thor): the club head the
  *  golfer swings. `thorHammer` is the mythic warhammer with crackling lightning. */
 export type DriverShape = 'thorHammer';
+/** Glove silhouettes the on-course golfer's grip hand wears (GS-story-avatar): a plain `glove`, an
+ *  armoured `gauntlet` (exo-brace), the toy `powerglove`. Story-gear worn looks only — there is no
+ *  glove apparel SLOT, so these reach `drawGolfer` via `GolferLook.glove`, never `drawHat`. */
+export type GloveShape = 'glove' | 'gauntlet' | 'powerglove';
+/** Shoe silhouettes the on-course golfer's feet wear (GS-story-avatar): a `shoe`, a chunky `boot`, or
+ *  spiked `spikes`. Story-gear worn looks only (`GolferLook.shoes`), no shoe apparel slot. */
+export type ShoeShape = 'shoe' | 'boot' | 'spikes';
 
 /** The vector look a garment renders as — a shape family + palette + optional aura for the top tiers. */
 export interface ApparelLook {
-  shape: HatShape | ShirtShape | PantsShape | BagShape | DriverShape;
+  shape: HatShape | ShirtShape | PantsShape | BagShape | DriverShape | GloveShape | ShoeShape;
   /** Primary fabric colour. */
   color: string;
   /** Secondary trim / brim / stripe colour. */
