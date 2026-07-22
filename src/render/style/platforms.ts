@@ -197,44 +197,25 @@ export function cetusRiverPath(
   return { line, hw, spillAtEdge: down.hit };
 }
 
-/** Convex hull (Andrew's monotone chain) of screen-space points, returned as a closed ring. */
-function convexHull(pts: Vec[]): Vec[] {
-  const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  if (p.length < 3) return p;
-  const cross = (o: Vec, a: Vec, b: Vec) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
-  const lower: Vec[] = [];
-  for (const q of p) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2]!, lower[lower.length - 1]!, q) <= 0) lower.pop();
-    lower.push(q);
-  }
-  const upper: Vec[] = [];
-  for (let i = p.length - 1; i >= 0; i--) {
-    const q = p[i]!;
-    while (upper.length >= 2 && cross(upper[upper.length - 2]!, upper[upper.length - 1]!, q) <= 0) upper.pop();
-    upper.push(q);
-  }
-  lower.pop();
-  upper.pop();
-  return lower.concat(upper);
-}
-
 /**
- * The FRONT (screen-down) silhouette of a hull: the chain of its edge from the leftmost to the
- * rightmost vertex that runs along the BOTTOM (larger screen-y). This is the plateau edge the eye
- * reads as facing the viewer — the lip we extrude a cliff down from (GS-cetus-3). Returned L→R.
+ * The FRONT (screen-down) silhouette of a simple polygon: the chain of its edge from the leftmost to
+ * the rightmost vertex that runs along the BOTTOM (larger screen-y). This is the plateau edge the eye
+ * reads as facing the viewer — the lip we extrude a cliff down from (GS-cetus-3). Passed the platform's
+ * REAL polygon (not its convex hull) since GS-void-cetus-cliffs, so the chain hugs concave bays + the
+ * lower flanks of a narrow island rather than chording across them. Returned L→R.
  */
-function frontEdge(hull: Vec[]): Vec[] {
-  if (hull.length < 2) return hull;
+function frontEdge(poly: Vec[]): Vec[] {
+  if (poly.length < 2) return poly;
   let li = 0;
   let ri = 0;
-  for (let i = 1; i < hull.length; i++) {
-    if (hull[i]![0] < hull[li]![0]) li = i;
-    if (hull[i]![0] > hull[ri]![0]) ri = i;
+  for (let i = 1; i < poly.length; i++) {
+    if (poly[i]![0] < poly[li]![0]) li = i;
+    if (poly[i]![0] > poly[ri]![0]) ri = i;
   }
   const walk = (dir: 1 | -1): Vec[] => {
     const out: Vec[] = [];
-    for (let i = li; ; i = (i + dir + hull.length) % hull.length) {
-      out.push(hull[i]!);
+    for (let i = li; ; i = (i + dir + poly.length) % poly.length) {
+      out.push(poly[i]!);
       if (i === ri) break;
     }
     return out;
@@ -264,7 +245,10 @@ export interface CliffLook {
   contact: string; // contact shadow tucked under the lip
 }
 export const CETUS_CLIFF: CliffLook = {
-  strata: ['#5a9db8', '#3f7f9c', '#296079', '#1a4459', '#0f2d40', '#071a28'],
+  // A bold TEAL → BLUE → DEEP-BLUE → BLACK plunge (GS-void-cetus-cliffs): the strata were greyed and
+  // read washed-out against the dark deep, flattening the side-on face; saturated + widened so the
+  // clifftop's descent to the abyss pops with the world's cyan identity.
+  strata: ['#4fc6d6', '#2f9ac2', '#2168a0', '#164674', '#0c2a48', '#061826'],
   deepMix: '#03080f',
   lipA: 'rgba(150,232,255,0.9)',
   lipB: 'rgba(232,252,255,0.7)',
@@ -276,7 +260,10 @@ export const CETUS_CLIFF: CliffLook = {
   contact: 'rgba(3,10,18,0.34)',
 };
 export const VOID_CLIFF: CliffLook = {
-  strata: ['#4a3f80', '#392f66', '#2b234e', '#1e183a', '#130d28', '#090619'],
+  // A vivid VIOLET → BLACK asteroid underside (GS-void-cetus-cliffs): the old strata sat as a greyed
+  // lavender that washed out against the abyss; pushed toward a saturated cosmic purple descending to
+  // near-black so the floating rock reads as solid, luminous void-stone.
+  strata: ['#6b4fcf', '#5138a6', '#3c277d', '#291a54', '#180d33', '#0a0619'],
   deepMix: '#050210',
   lipA: 'rgba(176,126,255,0.85)',
   lipB: 'rgba(224,205,255,0.72)',
@@ -446,13 +433,19 @@ export function platformCliffs(
   const dk = Math.min(0.24, Math.max(0, deepen - 1) * 0.24);
   const strata = look.strata.map((c, i) => mixHex(c, look.deepMix, dk * (i / 5)));
   for (const plat of platforms) {
-    const hull = convexHull(plat);
-    if (hull.length < 3) continue;
-    const top = frontEdge(hull);
+    if (plat.length < 3) continue;
+    // Extrude from the platform's OWN lower silhouette (GS-void-cetus-cliffs) — leftmost→rightmost
+    // walked the down-screen way along the REAL edge, NOT the convex hull. The hull chorded across
+    // every concave bay + the sides of a narrow vertical island, so the supporting cliff appeared only
+    // along the bottom bulge ("pillars only visible in some places"). The true silhouette wraps the
+    // whole lower perimeter (concave bays + both lower flanks), so the landmass reads walled all round.
+    const top = frontEdge(plat);
     if (top.length < 2) continue;
     const bb = bboxOf(plat);
     const cx = (bb.minX + bb.maxX) / 2;
-    const cliffH = Math.max(34, Math.min(190, (bb.maxX - bb.minX) * 0.44));
+    // Height keys off the SMALLER span so a narrow, tall island still gets a substantial wall rather
+    // than a sliver (its width alone barely cleared the old floor); floored higher for a solid read.
+    const cliffH = Math.max(44, Math.min(190, Math.min(bb.maxX - bb.minX, bb.maxY - bb.minY) * 0.6));
     faces.push({ top, height: cliffH });
     // Drop the lip down (a slight outward splay so the block reads solid, base roughened into rubble).
     const dropped = (t: number): Vec[] =>

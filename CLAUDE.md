@@ -1025,6 +1025,16 @@ these systems** — each bullet is the tip of a documented iceberg.
     a pinched waist, not a manky pile of individual stickers. Bodies keep their exact size (only a neck is
     added → graphic ≈ physics); a lone hazard is untouched. Render-only, zero rng — sim penalty polys
     (fairness/carry/aim) are unchanged, so no balance impact.
+  - A lost-rough platform's side-on CLIFF (`platformCliffs`, cetus/void/rainbow) extrudes from the
+    platform's REAL lower silhouette (`frontEdge(plat)`), NOT its convex hull (GS-void-cetus-cliffs): the
+    hull chorded across concave bays + the flanks of a narrow vertical island, so the supporting wall
+    showed only along the bottom bulge ("pillars only visible in some places") — the real edge wraps the
+    whole lower perimeter so the landmass reads walled all round. Height keys off `min(w,h)` (floor 44) so
+    a tall skinny island still gets a substantial wall. `CETUS_CLIFF`/`VOID_CLIFF` strata are SATURATED
+    (teal→blue→deep-blue→black / violet→black), not the old greyed ramp that washed out against the deep;
+    the animated `cetusFlow.fallLenFor` MIRRORS the cliff-height formula so the moving waterfall reaches
+    the same foot. Pure geometry, zero rng, camera-proof; the lit `lipA` is unchanged (guarded by
+    `tests/cetus.test.ts`).
   - A crossing river/lava flow/crevice's DRAWN bank is roughened so it reads as a natural hazard,
     not a uniform band-aid (GS-hazard-edges, `roughenHazardEdge`): course-space, `posHash`-derived,
     MEAN-ZERO about the true edge + amplitude-capped (≤40% of the body's narrow span) → RENDER-ONLY,
