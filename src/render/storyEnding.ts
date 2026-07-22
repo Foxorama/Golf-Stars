@@ -18,6 +18,8 @@
  * mulberry32 for the cinematic scatter), no save, no reducer impact — the outcome is already resolved.
  */
 
+import { paintSerpent } from './sigilCeremony';
+
 export type StoryEndingVariant = 'good-win' | 'good-lose' | 'cult-win' | 'cult-lose';
 
 export interface StoryEndingHandle {
@@ -188,58 +190,14 @@ export function mountStoryEnding(opts: {
     }
   }
 
-  /** The coiled serpent (the ceremony/finale style), `wake`/`rear` shape it. `sleep` 0..1
-   *  (GS-story-unending-tease) settles it: the sway stills, the body sinks, and the burning eye slides
-   *  shut — the Reseal sings it back to sleep, it never shatters. */
+  /** The world-serpent — the SAME mythic constellation beast the teasers and the battle draw
+   *  (GS-story-serpent-2: one painter everywhere, no more bead-chain stand-in). `sleep` 0..1
+   *  (GS-story-unending-tease) settles it: the sway stills, the body sinks, the eye + jaw slide shut
+   *  and the constellation dims — the Reseal sings it back to sleep, it never shatters. */
   function serpent(t: number, cx: number, cy: number, spread: number, wake: number, dim: number, sleep = 0): void {
     if (!ctx) return;
     ctx.globalAlpha = 1 - dim;
-    const sway = 1 - sleep * 0.85; // stillness takes the body
-    const spd = 1 - sleep * 0.7; // and the movement slows
-    const sink = sleep * 70; // it settles down toward the root
-    const segs = 30;
-    for (let i = segs; i >= 0; i--) {
-      const u = i / segs;
-      const x = cx - spread / 2 + u * spread;
-      const y = cy + sink + Math.sin(u * 6 + t * (0.6 + wake) * spd) * (60 + wake * 30) * (0.4 + u * 0.7) * sway;
-      const r = lerp(8, 40, u);
-      const corr = (0.5 + 0.5 * Math.sin(t * 2.4 * spd + u * 5)) * (1 - sleep * 0.6);
-      const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.2, x, y, r);
-      g.addColorStop(0, `rgba(${34 + corr * 40},${80 + corr * 90 + wake * 30},${58 + corr * 30},1)`);
-      g.addColorStop(1, `rgba(8,${22 + corr * 18},18,1)`);
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, 6.283);
-      ctx.fill();
-    }
-    // head + eye
-    const hx = cx + spread / 2;
-    const hy = cy + sink + Math.sin(6 + t * (0.6 + wake) * spd) * (60 + wake * 30) * 1.1 * sway;
-    const hr = 44;
-    const hg = ctx.createRadialGradient(hx - hr * 0.3, hy - hr * 0.3, hr * 0.2, hx, hy, hr);
-    hg.addColorStop(0, `rgba(50,${110 + wake * 40},80,1)`);
-    hg.addColorStop(1, 'rgba(8,26,20,1)');
-    ctx.fillStyle = hg;
-    ctx.beginPath();
-    ctx.arc(hx, hy, hr, 0, 6.283);
-    ctx.fill();
-    // the sclera dims as the lid comes down; the burning slit fades to nothing
-    ctx.fillStyle = `rgba(210,255,225,${0.95 * (1 - sleep * 0.85)})`;
-    ctx.beginPath();
-    ctx.arc(hx, hy, hr * 0.5, 0, 6.283);
-    ctx.fill();
-    ctx.fillStyle = `rgba(255,140,60,${(0.7 + 0.3 * Math.sin(t * 6)) * (1 - sleep)})`;
-    ctx.beginPath();
-    ctx.ellipse(hx, hy, hr * 0.1, hr * 0.4, 0, 0, 6.283);
-    ctx.fill();
-    if (sleep > 0.45) {
-      // the closed eye — a soft lid-line where the burning slit was
-      ctx.strokeStyle = `rgba(20,44,32,${clamp01((sleep - 0.45) / 0.55)})`;
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.arc(hx, hy - hr * 0.06, hr * 0.42, 0.35, Math.PI - 0.35);
-      ctx.stroke();
-    }
+    paintSerpent(ctx, cx, cy, t, wake, 0, { spread, sleep });
     ctx.globalAlpha = 1;
   }
 

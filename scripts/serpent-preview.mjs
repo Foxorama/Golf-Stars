@@ -24,13 +24,17 @@ figure{margin:0;position:relative;}</style>
 <div id="app"></div>
 <script type="module">
   import { paintSerpent } from '/src/render/sigilCeremony.ts';
+  const CEREMONY = { spread: 700 }; // the ceremony wrapper's framing
   const states = [
-    { wake: 0.2, focus: 0, label: 'Sigil 1 · wake 0.2 (eye sealed)' },
-    { wake: 0.4, focus: 0, label: 'Sigil 2 · wake 0.4 (a sliver)' },
-    { wake: 0.6, focus: 0, label: 'Sigil 3 · wake 0.6 (eye cracks open)' },
-    { wake: 0.8, focus: 0, label: 'Sigil 4 · wake 0.8 (looking back at you)' },
-    { wake: 1.0, focus: 0.55, label: 'Sigil 5 · zooming to head' },
-    { wake: 1.0, focus: 1.0, label: 'Sigil 5 · FINAL reveal (eye wide)' },
+    { wake: 0.2, focus: 0, opts: CEREMONY, label: 'Sigil 1 · wake 0.2 (eye sealed)' },
+    { wake: 0.4, focus: 0, opts: CEREMONY, label: 'Sigil 2 · wake 0.4 (a sliver)' },
+    { wake: 0.6, focus: 0, opts: CEREMONY, label: 'Sigil 3 · wake 0.6 (eye cracks open)' },
+    { wake: 0.8, focus: 0, opts: CEREMONY, label: 'Sigil 4 · wake 0.8 (looking back at you)' },
+    { wake: 1.0, focus: 0.55, opts: CEREMONY, label: 'Sigil 5 · zooming to head' },
+    { wake: 1.0, focus: 1.0, opts: CEREMONY, label: 'Sigil 5 · FINAL reveal (eye wide)' },
+    { wake: 1.0, focus: 0, cx: 950, cy: 200, t: 1.5, label: 'FINAL BATTLE framing (CX 950 · pose t)' },
+    { wake: 1.0, focus: 0, cx: 950, cy: 200, t: 1.5, opts: { rage: 1 }, label: 'FINAL BATTLE · spitting (rage 1)' },
+    { wake: 0.3, focus: 0, opts: { spread: 500, sleep: 0.85 }, cy: 300, label: 'Reseal ending · sung to sleep' },
   ];
   const app = document.getElementById('app');
   const DW = 1000, DH = 640;
@@ -44,7 +48,7 @@ figure{margin:0;position:relative;}</style>
     const g = ctx.createRadialGradient(500, 320, 30, 500, 320, 620);
     g.addColorStop(0, '#08120e'); g.addColorStop(0.6, '#040a08'); g.addColorStop(1, '#020403');
     ctx.fillStyle = g; ctx.fillRect(0, 0, DW, DH);
-    paintSerpent(ctx, 500, 320, 1.2, s.wake, s.focus);
+    paintSerpent(ctx, s.cx ?? 500, s.cy ?? 320, s.t ?? 1.2, s.wake, s.focus, s.opts);
   }
   window.__done = true;
 </script></body>`;

@@ -683,7 +683,29 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   red throat + curved white fangs top & bottom, gaping wider as it wakes), a DEEP-SET reptilian eye (mottled
   sclera, bloodshot veins, a slit pupil, a cold glint) under a shadowed brow (a cast-occlusion socket),
   directionally-lit head SCALES, a nostril slit, and a green RIM-LIGHT along the top silhouette. The maw +
-  eye + horns all animate open with `wake`/`focusHead`. **Deferred
+  eye + horns all animate open with `wake`/`focusHead`.
+- **GS-story-serpent-2** — ✅ *shipped* (`render/sigilCeremony.ts` `paintSerpent` + `SerpentOpts`). The
+  BODY rebuilt as Jörmungandr with an eldritch CONSTELLATION flare (the player ask: close the head-body
+  gap, longer + more serpentine + coiled, star-ified). The spine is now MARCHED tail-ward from a FIXED
+  head anchor (a turtle-graphics heading integral, ~2.4× the old sine's arc length): a near-straight neck
+  leaving the skull (so the head attaches by construction — plus a NECK-CAP joint inside the body union
+  that the extended skull rear always overlaps, killing the old seam), one full 2π COIL right behind the
+  skull (the classic "rearing out of its own coils" pose — placed early so it stays ON-CANVAS in the
+  battle's off-centre framing; `storyBattle.ts` `SERPENT_CX/CY` pulled to 950/200 to show it), long
+  travelling waves, and a tightening tail SPIRAL. Rendered per-SEGMENT tail→head (a single ribbon fill
+  can't self-overlap) with a lateral occlusion halo per segment, so the coil correctly crosses OVER its
+  own far side. The STAR-IFICATION: the body interior (clipped to the union `Path2D`, nonzero winding) is
+  a torn ribbon of night sky — a fixed-seed interior STARFIELD + nebula hearts (kept OFF the coil so the
+  loop stays flesh-dark) under sparse crescent scales — and a CONSTELLATION FIGURE is inscribed along the
+  spine: glowing star nodes joined by faint chord lines, twinkling, continued onto the head at the horn
+  tips + snout. The focus zoom UNWINDS the coil (`coilAmt`) — girth swells past the loop radius there, so
+  a wound knot would degenerate into a smear. `SerpentOpts` adds `spread` (ceremony sprawls 700; battle
+  keeps the 620 default) and `sleep` (the Reseal's lullaby: sway stills, eye + jaw slide shut, the
+  constellation dims) — and `storyEnding.ts`'s bead-chain stand-in was DELETED: the endings now delegate
+  to `paintSerpent`, so ONE painter draws every serpent appearance (teasers, battle, endings). Still pure
+  Canvas2D, zero rng (fixed-seed mulberry32 for the interior stars), anchors contract unchanged (the
+  battle's reticle/seal/bolts land on the drawn head). Preview: `scripts/serpent-preview.mjs` (now also
+  renders the battle framing + the asleep Reseal state) + `scripts/battle-preview.mjs`. **Deferred
   (GS-story-serpent-beat):** moving the next-chapter Coil/parrot lore beat to fire IMMEDIATELY after the
   cutscene (instead of on the next world arrival) — the arrival beats are authored for the round-arrival lore
   gate, so relocating them cleanly is a lore-flow redesign, left for a focused follow-up rather than risking

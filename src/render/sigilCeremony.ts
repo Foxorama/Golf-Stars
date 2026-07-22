@@ -81,12 +81,16 @@ export function keystoneSubtitle(sigils: number, total: number): string {
 }
 
 /**
- * Paint the waking world-serpent (GS-story-serpent) into `ctx`, centred on (CX, CY) in the ceremony's
- * 1000×640 design space. A MASSIVE scaled serpent, not a string of beads: a continuous tapered body with
- * overlapping crescent scales + a lit dorsal ridge, capped by a proper wedge HEAD — brow, snout, jaw, a
- * proportionate slit-pupil eye set into the brow, and a forked tongue. `wake` 0..1 = how awake it is
- * (drowsy stir → eye wide open); `focusHead` 0..1 zooms in on the head for the final reveal.
- * Exported so `scripts/serpent-preview.mjs` can render the head eyes-on at any `wake`/`focusHead`.
+ * Paint the waking world-serpent (GS-story-serpent / GS-story-serpent-2) into `ctx`, centred on
+ * (CX, CY) in the ceremony's 1000×640 design space. Jörmungandr with an ELDRITCH CONSTELLATION flare:
+ * a long marched spine that rears the horned head out of a full COIL of its own body and trails away
+ * through deep serpentine waves to a curling tail — and the beast is simultaneously drawn IN STARS.
+ * The body is a torn ribbon of night sky (an interior starfield + nebula hearts under the scales),
+ * with a constellation FIGURE inscribed along the spine: glowing star nodes joined by chord lines,
+ * twinkling, continued onto the head at the horn tips. The coil sits right behind the skull so the
+ * iconic pose survives the battle framing (where most of the trailing body runs off-canvas).
+ * `wake` 0..1 = how awake it is (drowsy stir → eye wide open); `focusHead` 0..1 zooms in on the head
+ * for the final reveal. Exported so `scripts/serpent-preview.mjs` can render it at any state.
  *
  * GS-story-battle-2: returns the head's ANCHORS (eye / brow, in the same design space) so the finale
  * battle can aim its reticle, land its bolts, and hang the Herald's seal ON the drawn serpent — the
@@ -114,6 +118,18 @@ export function serpentEyeOpen(wake: number, focusHead: number): number {
   return clamp01(focusHead * 1.05 + Math.max(0, wake - 0.3) * 1.0);
 }
 
+/** Optional shaping for `paintSerpent` (GS-story-serpent-2) — every field defaults to the classic call. */
+export interface SerpentOpts {
+  /** Horizontal span of the body at focusHead 0 (design px). Default 620 — the battle framing. */
+  spread?: number;
+  /** 0..1 — the Reseal's lullaby (GS-story-unending-tease): the sway stills, the body settles, the
+   *  eye + jaw slide shut and the constellation dims. Used by the good-win ending; 0 everywhere else. */
+  sleep?: number;
+  /** 0..1 — battle ROAR: the maw gapes open (the boss visibly spits its volleys, GS-story-serpent-2).
+   *  Driven by the finale battle around each volley; 0 everywhere else. */
+  rage?: number;
+}
+
 export function paintSerpent(
   ctx: CanvasRenderingContext2D,
   CX: number,
@@ -121,32 +137,80 @@ export function paintSerpent(
   t: number,
   wake: number,
   focusHead: number,
+  opts: SerpentOpts = {},
 ): SerpentAnchors {
   const DWl = 1000;
   const DHl = 640;
+  const sleep = clamp01(opts.sleep ?? 0);
+  const rage = clamp01(opts.rage ?? 0);
+  const still = 1 - sleep * 0.85; // stillness takes the body
+  const spd = 1 - sleep * 0.7; // and the movement slows
   // eldritch haze
-  const haze = ctx.createRadialGradient(CX, CY + 40, 40, CX, CY + 40, 560);
-  haze.addColorStop(0, `rgba(60,${160 + wake * 60},120,${0.1 + wake * 0.16})`);
+  const haze = ctx.createRadialGradient(CX, CY + 40 + sleep * 50, 40, CX, CY + 40 + sleep * 50, 560);
+  haze.addColorStop(0, `rgba(60,${160 + wake * 60},120,${(0.1 + wake * 0.16) * (1 - sleep * 0.4)})`);
   haze.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = haze;
   ctx.fillRect(0, 0, DWl, DHl);
 
-  const stir = wake * (0.6 + 0.4 * Math.sin(t * (1.2 + wake)));
-  const baseY = CY + 90 - focusHead * 120;
-  const spread = lerp(620, 300, focusHead);
-  const amp = 62 + stir * 44;
-  const phase = t * (0.6 + wake * 0.9);
+  const stir = wake * (0.6 + 0.4 * Math.sin(t * (1.2 + wake) * spd)) * still;
+  const phase = t * (0.55 + wake * 0.85) * spd;
   const girth = 1 + focusHead * 1.9; // the whole serpent swells to a MASSIVE thick body on the final reveal
-  const N = 64;
-  // The spine + a half-width (radius) that tapers from a thin tail to a thick neck.
-  const sx = (u: number): number => CX + spread / 2 - u * spread; // head on the LEFT (GS-story-serpent: keeps the head upright + attached — the body normal points dorsal-up at the head)
-  const sy = (u: number): number => baseY + Math.sin(u * 5.6 + phase) * amp * (0.35 + u * 0.75);
-  const rad = (u: number): number => lerp(7, 46, Math.pow(u, 0.85)) * girth;
+  const spread = lerp(opts.spread ?? 620, 300, focusHead);
+  const sc = spread / 620; // uniform geometry scale (radii stay absolute so the focus zoom behaves)
+
+  // ── SPINE (GS-story-serpent-2): marched TAIL-WARD from a FIXED head anchor — a heading integral
+  //    (turtle graphics), so the head stays put + attached by construction while the body sways.
+  //    The route: a near-straight neck, then one full 2π COIL right behind the skull (the head rears
+  //    out of its own coils — and the coil stays on-canvas in the battle's off-centre framing), then
+  //    long travelling waves, then a tightening tail SPIRAL. ──
+  const LTOT = 1500; // arc length, unscaled — ~2.4× the old sine's span (the "longer" ask)
+  const N = 150;
+  const ds = LTOT / N;
+  const COIL0 = 260; // the coil begins just past the neck…
+  const COIL_LEN = 440; // …and winds one full turn over this stretch
+  const TAIL0 = LTOT - 190; // the curling tail tip
+  const K = (Math.PI * 2) / 410; // body wavelength
+  const headX = CX - spread * 0.5 + focusHead * 60; // the focus zoom keeps the huge snout on-canvas
+  const headY = CY + 42 - focusHead * 92 + sleep * 60 + Math.sin(t * 0.7 * spd) * 6 * still;
+  const smooth01 = (x: number): number => {
+    const c = clamp01(x);
+    return c * c * (3 - 2 * c);
+  };
+  let mx = headX;
+  let my = headY;
+  const fwd: { x: number; y: number }[] = [{ x: mx, y: my }];
+  // The focus zoom swells the girth past the loop radius, so the coil UNWINDS as the camera pushes in
+  // (the head fills the frame; a knot smaller than the body is thick would degenerate into a smear) —
+  // and the WAVE flattens with it, so the body behind the huge head is one smooth sweeping arc, never
+  // a bunched squash of overlapping segments.
+  const focusW = smooth01(focusHead);
+  const coilAmt = 1 - 0.92 * focusW;
+  const waveAmt = 1 - 0.78 * focusW;
+  for (let k = 1; k <= N; k++) {
+    const sm = (k - 0.5) * ds;
+    const neckDamp = smooth01(sm / 150); // the neck leaves the skull straight (the head-gap fix)
+    const coilW = smooth01((sm - COIL0) / COIL_LEN);
+    const coilBell = Math.sin(Math.PI * clamp01((sm - COIL0) / COIL_LEN));
+    const tailW = clamp01((sm - TAIL0) / (LTOT - TAIL0));
+    const amp = (0.62 + 0.5 * stir) * neckDamp * (1 - 0.88 * coilBell * coilAmt) * (1 - tailW) * (1 - sleep * 0.5) * waveAmt;
+    const phi =
+      0.2 * (1 - smooth01(sm / 240)) + // the neck dives off the raised skull — the head REARS above the body
+      amp * Math.sin(sm * K + 0.9 + phase) +
+      0.15 * Math.sin(sm * K * 0.31 + phase * 0.6) + // slow secondary drift
+      Math.PI * 2 * coilW * coilAmt - // the great coil turns one way…
+      2.3 * Math.PI * tailW * tailW * coilAmt; // …and the tail curls the other
+    mx += Math.cos(phi) * ds * sc;
+    my += Math.sin(phi) * ds * sc;
+    fwd.push({ x: mx, y: my });
+  }
+  // pts[] tail(0) → head(N), the classic convention (radius fattens toward the neck).
+  const rad = (u: number): number => lerp(5, 52, Math.pow(u, 0.85)) * girth;
   type Pt = { u: number; x: number; y: number; r: number; nx: number; ny: number };
   const pts: Pt[] = [];
   for (let i = 0; i <= N; i++) {
     const u = i / N;
-    pts.push({ u, x: sx(u), y: sy(u), r: rad(u), nx: 0, ny: 0 });
+    const f = fwd[N - i]!;
+    pts.push({ u, x: f.x, y: f.y, r: rad(u), nx: 0, ny: 0 });
   }
   for (let i = 0; i <= N; i++) {
     const a = pts[Math.max(0, i - 1)]!;
@@ -157,70 +221,231 @@ export function paintSerpent(
     pts[i]!.nx = -dy / len; // unit normal
     pts[i]!.ny = dx / len;
   }
-  // ── BODY: one filled ribbon (top edge forward, bottom edge back) ──
-  ctx.beginPath();
-  ctx.moveTo(pts[0]!.x + pts[0]!.nx * pts[0]!.r, pts[0]!.y + pts[0]!.ny * pts[0]!.r);
-  for (let i = 1; i <= N; i++) ctx.lineTo(pts[i]!.x + pts[i]!.nx * pts[i]!.r, pts[i]!.y + pts[i]!.ny * pts[i]!.r);
-  for (let i = N; i >= 0; i--) ctx.lineTo(pts[i]!.x - pts[i]!.nx * pts[i]!.r, pts[i]!.y - pts[i]!.ny * pts[i]!.r);
-  ctx.closePath();
-  const bg = ctx.createLinearGradient(0, baseY - 130, 0, baseY + 150);
-  bg.addColorStop(0, `rgba(${46 + wake * 30},${150 + wake * 50},110,1)`); // lit dorsal
-  bg.addColorStop(0.5, `rgba(24,${86 + wake * 30},64,1)`);
-  bg.addColorStop(1, 'rgba(6,26,20,1)'); // dark belly
-  ctx.fillStyle = bg;
-  ctx.fill();
+  // NECK SHEATH (GS-story-serpent-2 round 3): the flesh continues INTO the skull — tapering collar
+  // segments extend past the head anchor along the head's forward line, carrying the same cel bands /
+  // scales / starfield, so the skull always sits ON the body. (The earlier flat cap disc read as a
+  // decapitation cross-section — the "pre-decapitated" bug.)
+  const fdxq = pts[N]!.x - pts[N - 3]!.x;
+  const fdyq = pts[N]!.y - pts[N - 3]!.y;
+  const flq = Math.hypot(fdxq, fdyq) || 1;
+  const fux = fdxq / flq;
+  const fuy = fdyq / flq;
+  const chain: Pt[] = [...pts];
+  for (let j = 1; j <= 5; j++) {
+    const base = pts[N]!;
+    chain.push({
+      u: 1,
+      x: base.x + fux * base.r * 0.34 * j,
+      y: base.y + fuy * base.r * 0.34 * j,
+      r: base.r * (1 - j * 0.09),
+      nx: base.nx,
+      ny: base.ny,
+    });
+  }
+  const M = chain.length - 1;
 
-  // ── SCALES: overlapping crescent rows across the body, brighter along the back ──
+  // ── BODY: per-segment painter, tail → head, so the coil correctly crosses OVER its own far side
+  //    (a single ribbon fill can't self-overlap). Each segment lays a slightly WIDER dark halo under
+  //    its fill — invisible against space, but where the near coil rides the far coil it reads as the
+  //    occlusion shadow that sells the over-cross. ──
+  // `band` fills the lateral slice [f0,f1] of a segment (f in −1..1 of the local radius) — the cel
+  // planes; `quad(a,b,e)` = the full slice inflated by `e` px (the halo / union path).
+  const band = (a: Pt, b: Pt, f0: number, f1: number, e: number): void => {
+    // extend a hair longitudinally so adjacent segments overlap (no AA seams)
+    const txq = (b.x - a.x) || 0.01;
+    const tyq = b.y - a.y;
+    const tl = Math.hypot(txq, tyq) || 1;
+    const ox = (txq / tl) * 0.8;
+    const oy = (tyq / tl) * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(a.x - ox + a.nx * (a.r * f0 + e * Math.sign(f0)), a.y - oy + a.ny * (a.r * f0 + e * Math.sign(f0)));
+    ctx.lineTo(b.x + ox + b.nx * (b.r * f0 + e * Math.sign(f0)), b.y + oy + b.ny * (b.r * f0 + e * Math.sign(f0)));
+    ctx.lineTo(b.x + ox + b.nx * (b.r * f1 + e * Math.sign(f1)), b.y + oy + b.ny * (b.r * f1 + e * Math.sign(f1)));
+    ctx.lineTo(a.x - ox + a.nx * (a.r * f1 + e * Math.sign(f1)), a.y - oy + a.ny * (a.r * f1 + e * Math.sign(f1)));
+    ctx.closePath();
+  };
+  const quad = (a: Pt, b: Pt, e: number): void => band(a, b, 1, -1, e);
+  for (let i = 0; i < M; i++) {
+    const a = chain[i]!;
+    const b = chain[i + 1]!;
+    quad(a, b, 3.5);
+    ctx.fillStyle = 'rgba(3,12,9,0.85)'; // lateral occlusion halo
+    ctx.fill();
+    const glint = 0.5 + 0.5 * Math.sin(t * 2.1 * spd + Math.min(i, N) * 0.5);
+    const rr = Math.round(11 + wake * 11 + glint * 6 + a.u * 8);
+    const gg = Math.round(46 + wake * 26 + glint * 16 + a.u * 30);
+    const bb = Math.round(38 + wake * 7 + glint * 9 + a.u * 9);
+    // CEL SHADING (GS-story-serpent-2): three hard-edged flat planes per segment — a lit dorsal band,
+    // the mid tone, a dark belly band — crisp toon planes instead of one soft airbrushed tube.
+    quad(a, b, 0);
+    ctx.fillStyle = `rgb(${rr},${gg},${bb})`;
+    ctx.fill();
+    band(a, b, 1, 0.42, 0);
+    ctx.fillStyle = `rgb(${Math.round(34 + wake * 16 + a.u * 10)},${Math.round(120 + wake * 34 + a.u * 26)},${Math.round(80 + wake * 10 + a.u * 8)})`;
+    ctx.fill();
+    band(a, b, -0.38, -1, 0);
+    ctx.fillStyle = `rgb(${Math.round(6 + wake * 5)},${Math.round(26 + wake * 12)},${Math.round(21 + wake * 4)})`;
+    ctx.fill();
+  }
+  // The full-body union path (nonzero winding fills overlapping quads as one region) — the clip for
+  // everything painted INSIDE the beast. Includes the neck sheath, so the interior dressing runs
+  // unbroken under the skull.
+  const bodyPath = new Path2D();
+  for (let i = 0; i < M; i++) {
+    const a = chain[i]!;
+    const b = chain[i + 1]!;
+    bodyPath.moveTo(a.x + a.nx * a.r, a.y + a.ny * a.r);
+    bodyPath.lineTo(b.x + b.nx * b.r, b.y + b.ny * b.r);
+    bodyPath.lineTo(b.x - b.nx * b.r, b.y - b.ny * b.r);
+    bodyPath.lineTo(a.x - a.nx * a.r, a.y - a.ny * a.r);
+    bodyPath.closePath();
+  }
+
   ctx.save();
-  ctx.clip(); // to the body path just filled
-  for (let i = 2; i < N - 1; i += 2) {
-    const p = pts[i]!;
-    const shimmer = 0.5 + 0.5 * Math.sin(t * 2.2 + i * 0.7);
+  ctx.clip(bodyPath);
+  // form shading — a dorsal sheen from above, the belly sinking into the void
+  const sh = ctx.createLinearGradient(0, CY - 250, 0, CY + 270);
+  sh.addColorStop(0, `rgba(190,255,215,${0.07 + wake * 0.04})`);
+  sh.addColorStop(0.45, 'rgba(0,0,0,0)');
+  sh.addColorStop(1, 'rgba(1,6,8,0.7)');
+  ctx.fillStyle = sh;
+  ctx.fillRect(0, 0, DWl, DHl);
+  // NEBULA HEARTS — the body is a torn ribbon of night sky, not solid flesh (the eldritch move).
+  // Kept OFF the coil (u ~0.52–0.79) so the wound loop stays flesh-dark, not a glowing disc.
+  const nebulaAt: [number, string][] = [
+    [0.12, '40,170,120'],
+    [0.33, '110,70,180'],
+    [0.46, '30,140,150'],
+    [0.9, '60,180,110'],
+  ];
+  for (const [uu, hue] of nebulaAt) {
+    const p = pts[Math.round(uu * N)]!;
+    const ng = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, Math.max(12, p.r * 3.1));
+    ng.addColorStop(0, `rgba(${hue},${(0.2 + wake * 0.1) * (1 - sleep * 0.4)})`);
+    ng.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = ng;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, Math.max(12, p.r * 3.1), 0, 6.283);
+    ctx.fill();
+  }
+  // INTERIOR STARFIELD — fixed seed, so the sky inside the serpent is byte-stable every frame;
+  // only the twinkle rides t.
+  const srng = mulberry32(0x7a3e11);
+  for (let i = 2; i < M; i += 2) {
+    const p = chain[i]!;
+    const nStars = 1 + (i % 3 === 0 ? 1 : 0);
+    for (let j = 0; j < nStars; j++) {
+      const off = (srng() * 2 - 1) * 0.78;
+      const jx = (srng() - 0.5) * ds * sc;
+      const rr2 = 0.45 + srng() * 1.25;
+      const tw = 0.5 + 0.5 * Math.sin(t * 2.6 * spd + i * 1.7 + j * 2.4);
+      const lit = 0.55 + 0.45 * (1 - (off + 1) / 2); // brighter toward the dorsal edge
+      ctx.fillStyle = `rgba(214,255,232,${(0.2 + 0.55 * tw) * lit * (1 - sleep * 0.45)})`;
+      ctx.beginPath();
+      ctx.arc(p.x + p.nx * off * p.r + jx, p.y + p.ny * off * p.r, rr2, 0, 6.283);
+      ctx.fill();
+    }
+  }
+  // SCALES: dense crescent rows over the starfield — the beast is still flesh over the sky. Lit hard
+  // toward the DORSAL edge (+normal, where the ridge runs): the top rows are bright pale-green plates,
+  // the belly rows sink to faint dark seams (the cel read).
+  for (let i = 2; i < M - 1; i += 2) {
+    const p = chain[i]!;
+    const shimmer = 0.5 + 0.5 * Math.sin(t * 2.2 * spd + i * 0.7);
     for (let j = -2; j <= 2; j++) {
-      const off = (j / 2.4) * p.r; // lateral position across the body (−back .. +belly)
+      const off = (j / 2.4) * p.r;
       const cx = p.x + p.nx * off;
       const cy = p.y + p.ny * off;
-      const sr = p.r * 0.42;
-      const lit = 1 - Math.abs(j) / 3; // scales catch light toward the back
-      const gG = 120 + lit * 90 + shimmer * 20 + wake * 20;
-      ctx.strokeStyle = `rgba(${30 + lit * 30},${gG},${70 + lit * 20},${0.5 + lit * 0.35})`;
-      ctx.lineWidth = 2;
+      const sr = p.r * 0.4;
+      const lit = (j + 2) / 4; // 0 belly → 1 dorsal
+      ctx.strokeStyle = `rgba(${40 + lit * 90},${110 + lit * 110 + shimmer * 16 + wake * 14},${70 + lit * 70},${0.12 + lit * 0.34})`;
+      ctx.lineWidth = 1.1 + lit * 0.8;
       ctx.beginPath();
-      // a scale = a small crescent opening toward the tail
-      ctx.arc(cx + p.nx * 0, cy + p.ny * 0, sr, Math.atan2(p.ny, p.nx) - 1.9, Math.atan2(p.ny, p.nx) + 1.9);
+      ctx.arc(cx, cy, sr, Math.atan2(p.ny, p.nx) - 1.9, Math.atan2(p.ny, p.nx) + 1.9);
       ctx.stroke();
     }
   }
   ctx.restore();
 
-  // ── DORSAL RIDGE: a lit crest line + short spines along the back edge ──
-  ctx.beginPath();
-  for (let i = 0; i <= N; i++) {
-    const p = pts[i]!;
-    const x = p.x + p.nx * p.r * 0.9;
-    const y = p.y + p.ny * p.r * 0.9;
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-  ctx.strokeStyle = `rgba(${120 + wake * 60},255,${170 + wake * 40},${0.35 + wake * 0.3})`;
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-  for (let i = 6; i < N - 2; i += 3) {
+  // ── DORSAL RIDGE: a soft acid-glow band + a crisp crest line + short fin spines ──
+  const ridge = (w: number, col: string): void => {
+    ctx.beginPath();
+    for (let i = 0; i <= N; i++) {
+      const p = pts[i]!;
+      const x = p.x + p.nx * p.r * 0.92;
+      const y = p.y + p.ny * p.r * 0.92;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = col;
+    ctx.lineWidth = w;
+    ctx.stroke();
+  };
+  ridge(6, `rgba(${90 + wake * 50},235,${150 + wake * 40},${(0.1 + wake * 0.1) * (1 - sleep * 0.5)})`);
+  ridge(2.2, `rgba(${120 + wake * 60},255,${170 + wake * 40},${(0.3 + wake * 0.3) * (1 - sleep * 0.5)})`);
+  for (let i = 8; i < N - 4; i += 5) {
     const p = pts[i]!;
     const bx = p.x + p.nx * p.r;
     const by = p.y + p.ny * p.r;
     ctx.beginPath();
     ctx.moveTo(bx, by);
-    ctx.lineTo(bx + p.nx * (6 + p.r * 0.16), by + p.ny * (6 + p.r * 0.16));
-    ctx.strokeStyle = `rgba(60,${150 + wake * 40},110,0.6)`;
+    ctx.lineTo(bx + p.nx * (5 + p.r * 0.17), by + p.ny * (5 + p.r * 0.17));
+    ctx.strokeStyle = `rgba(60,${150 + wake * 40},110,0.55)`;
     ctx.lineWidth = 2;
     ctx.stroke();
+  }
+
+  // ── THE CONSTELLATION (GS-story-serpent-2): the World-Eater is a figure DRAWN IN STARS — glowing
+  //    nodes strung along the spine, joined by faint chord lines, like a living star-map constellation.
+  //    They dim as the Reseal sings it to sleep. ──
+  const dimC = 1 - sleep * 0.55;
+  ctx.strokeStyle = `rgba(150,255,200,${(0.26 + wake * 0.2) * dimC})`;
+  ctx.lineWidth = 1.1;
+  ctx.beginPath();
+  const nodeIdx: number[] = [];
+  for (let i = 4; i <= N - 4; i += 10) nodeIdx.push(i);
+  for (let k = 0; k < nodeIdx.length; k++) {
+    const p = pts[nodeIdx[k]!]!;
+    if (k === 0) ctx.moveTo(p.x, p.y);
+    else ctx.lineTo(p.x, p.y);
+  }
+  ctx.stroke();
+  for (let k = 0; k < nodeIdx.length; k++) {
+    const p = pts[nodeIdx[k]!]!;
+    const major = k % 3 === 0;
+    const tw = 0.5 + 0.5 * Math.sin(t * 2.3 * spd + k * 2.1);
+    const a = (0.45 + 0.5 * tw) * dimC;
+    const gr = major ? 11 : 6.5;
+    const ng = ctx.createRadialGradient(p.x, p.y, 0.5, p.x, p.y, gr);
+    ng.addColorStop(0, `rgba(200,255,225,${0.75 * a})`);
+    ng.addColorStop(0.45, `rgba(120,255,190,${0.3 * a})`);
+    ng.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = ng;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, gr, 0, 6.283);
+    ctx.fill();
+    ctx.fillStyle = `rgba(234,255,242,${0.9 * a})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, major ? 2.5 : 1.6, 0, 6.283);
+    ctx.fill();
+    if (major) {
+      // 4-ray diffraction flare on the named stars
+      const fl = 6.5 + tw * 3.5;
+      ctx.strokeStyle = `rgba(210,255,230,${0.55 * a})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(p.x - fl, p.y);
+      ctx.lineTo(p.x + fl, p.y);
+      ctx.moveTo(p.x, p.y - fl);
+      ctx.lineTo(p.x, p.y + fl);
+      ctx.stroke();
+    }
   }
 
   // ── HEAD: a mythic world-serpent head — a horned crest, a deep-set reptilian eye under a shadowed brow,
   //    and a fanged maw that gapes wider as it wakes. Built in the local frame L(a,u): `a` forward from the
   //    neck, `u` along +normal (dorsal/up). ──
-  return drawSerpentHead(ctx, pts[N]!, pts[N - 3]!, t, wake, focusHead);
+  return drawSerpentHead(ctx, pts[N]!, pts[N - 3]!, t, wake, focusHead, sleep, rage);
 }
 
 /** Draw the world-serpent HEAD at the neck point. Split out so it stays legible; pure. */
@@ -231,6 +456,8 @@ function drawSerpentHead(
   t: number,
   wake: number,
   focusHead: number,
+  sleep = 0,
+  rage = 0,
 ): SerpentAnchors {
   const fdx = neck.x - back.x;
   const fdy = neck.y - back.y;
@@ -253,14 +480,16 @@ function drawSerpentHead(
   // second, visibly cracked at the third ("the World-Eater's eye cracks open"), half-lidded and looking back
   // at the fourth — so the teaser captions and the drawn head finally agree. The full wide-open glare is
   // still the fifth-Sigil focus payoff (and the battle's wide-awake serpent).
-  const gape = clamp01(focusHead * 0.95 + Math.max(0, wake - 0.62) * 0.4);
-  const eyeOpen = serpentEyeOpen(wake, focusHead);
+  const gape = clamp01(focusHead * 0.95 + Math.max(0, wake - 0.62) * 0.4 + rage * 0.8) * (1 - sleep);
+  const eyeOpen = serpentEyeOpen(wake, focusHead) * (1 - sleep);
   const litR = 60 + wake * 40;
   const litG = 168 + wake * 60;
 
   // (1) HORNS — a pair of smooth back-swept horns from the cranium (the mythic world-serpent), drawn behind
-  //    the skull so the head overlaps their base. A near + far horn gives a touch of depth.
-  const drawHorn = (baseA: number, baseU: number, len: number, sweep: number, thick: number, lit: number): void => {
+  //    the skull so the head overlaps their base. A near + far horn gives a touch of depth. Emerald-dark
+  //    (grey horns read as a void between head and body — GS-story-serpent-2); tips returned so the
+  //    constellation can hang stars on them.
+  const drawHorn = (baseA: number, baseU: number, len: number, sweep: number, thick: number, lit: number): { x: number; y: number } => {
     const base = L(HL * baseA, H * baseU);
     const c1 = L(HL * (baseA - len * 0.35), H * (baseU + sweep * 0.55));
     const tipHorn = L(HL * (baseA - len), H * (baseU + sweep));
@@ -271,16 +500,20 @@ function drawSerpentHead(
     ctx.quadraticCurveTo(c2.x, c2.y, base.x - nx * H * thick, base.y - ny * H * thick);
     ctx.closePath();
     const hng = ctx.createLinearGradient(base.x, base.y, tipHorn.x, tipHorn.y);
-    hng.addColorStop(0, `rgba(${52 + lit},${66 + lit},${54 + lit},1)`);
-    hng.addColorStop(1, 'rgba(10,18,14,1)');
+    hng.addColorStop(0, `rgba(${14 + lit},${40 + lit + wake * 14},${30 + lit},1)`);
+    hng.addColorStop(0.55, `rgba(${8 + lit * 0.5},${24 + lit * 0.7},${18 + lit * 0.5},1)`); // hard cel step
+    hng.addColorStop(1, 'rgba(2,8,6,1)');
     ctx.fillStyle = hng;
     ctx.fill();
-    ctx.strokeStyle = `rgba(${140 + wake * 60},230,180,0.3)`;
-    ctx.lineWidth = 1.3;
+    ctx.strokeStyle = `rgba(${140 + wake * 60},230,180,0.6)`;
+    ctx.lineWidth = 1.6;
     ctx.stroke();
+    return tipHorn;
   };
-  drawHorn(-0.05, 1.0, 0.95, 0.34, 0.17, 0); // far horn — swept BACK over the neck (dimmer, behind)
-  drawHorn(0.1, 1.16, 1.1, 0.42, 0.23, 20); // near horn — bigger, lit, laid back over the cranium
+  const hornTips: { x: number; y: number }[] = [];
+  const hornLen = 1 - focusHead * 0.22; // the zoomed reveal keeps the blades from crossing the whole frame
+  hornTips.push(drawHorn(-0.05, 1.0, 0.62 * hornLen, 0.42, 0.2, 0)); // far horn — swept BACK over the neck (dimmer, behind)
+  hornTips.push(drawHorn(0.1, 1.16, 0.78 * hornLen, 0.52, 0.28, 18)); // near horn — bigger, lit, hooked back over the cranium
 
   // (2) LOWER JAW (drawn first, under the skull) — drops open by `gape`.
   const jawDrop = gape * H * 0.85;
@@ -316,7 +549,7 @@ function drawSerpentHead(
   }
 
   // (4) UPPER SKULL + SNOUT silhouette — one filled shape with a form gradient (lit dorsal → dark cheek).
-  const nTop = L(-HL * 0.16, H * 1.04); // rear of the skull, extended BACK over the body end (closes the neck seam)
+  const nTop = L(-HL * 0.3, H * 0.98); // rear of the skull, extended WELL back over the neck cap (closes the seam)
   const b2 = L(HL * 0.33, H * 1.34); // the bony brow ridge over the eye
   const s1 = L(HL * 0.92, H * 0.5); // snout top
   const tip = L(HL * 1.08, H * 0.08); // snout tip
@@ -328,18 +561,34 @@ function drawSerpentHead(
   ctx.quadraticCurveTo(s1.x, s1.y, tip.x, tip.y); // down the snout to the tip
   ctx.quadraticCurveTo(L(HL * 1.06, -H * 0.02).x, L(HL * 1.06, -H * 0.02).y, lip.x, lip.y); // round the nose to the gum
   ctx.quadraticCurveTo(L(HL * 0.62, -H * 0.02).x, L(HL * 0.62, -H * 0.02).y, gapeC.x, gapeC.y); // upper gum back to the corner
-  ctx.quadraticCurveTo(L(HL * 0.12, H * 0.24).x, L(HL * 0.12, H * 0.24).y, nTop.x, nTop.y); // cheek back up to the neck-top
+  ctx.quadraticCurveTo(L(-HL * 0.02, H * 0.14).x, L(-HL * 0.02, H * 0.14).y, nTop.x, nTop.y); // cheek back OVER the neck cap to the skull rear
   ctx.closePath();
   const hg = ctx.createLinearGradient(b2.x, b2.y, gapeC.x, gapeC.y);
   hg.addColorStop(0, `rgba(${litR},${litG},124,1)`); // lit brow / dorsal
   hg.addColorStop(0.5, `rgba(30,${104 + wake * 30},76,1)`);
-  hg.addColorStop(1, 'rgba(8,32,24,1)'); // shadowed cheek
+  hg.addColorStop(1, `rgba(16,${56 + wake * 14},42,1)`); // shadowed cheek — kept near the body's tones so the head-body boundary never reads as a cut
   ctx.fillStyle = hg;
   ctx.fill();
 
   // (5) SCALES over the skull (clipped), directionally lit — a bright top edge + a soft shadow beneath.
   ctx.save();
   ctx.clip();
+  // CEL PLANES (GS-story-serpent-2): two hard-edged flat tones inside the skull — a lit crown band
+  // traced along the brow→snout silhouette and a dark jowl band along the gum line — so the head reads
+  // as toon-shaded planes, matching the body's banding.
+  ctx.strokeStyle = `rgba(${86 + wake * 30},${196 + wake * 34},130,0.5)`;
+  ctx.lineWidth = H * 0.42;
+  ctx.beginPath();
+  ctx.moveTo(nTop.x, nTop.y);
+  ctx.bezierCurveTo(L(HL * 0.1, H * 1.28).x, L(HL * 0.1, H * 1.28).y, b2.x, b2.y, L(HL * 0.62, H * 1.02).x, L(HL * 0.62, H * 1.02).y);
+  ctx.quadraticCurveTo(s1.x, s1.y, tip.x, tip.y);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(6,26,20,0.55)';
+  ctx.lineWidth = H * 0.34;
+  ctx.beginPath();
+  ctx.moveTo(gapeC.x, gapeC.y);
+  ctx.quadraticCurveTo(L(HL * 0.62, -H * 0.02).x, L(HL * 0.62, -H * 0.02).y, lip.x, lip.y);
+  ctx.stroke();
   for (let r = 0; r < 5; r++) {
     for (let c = 0; c < 6; c++) {
       const sc = L(HL * (0.08 + c * 0.17), H * (1.12 - r * 0.34));
@@ -355,38 +604,50 @@ function drawSerpentHead(
       ctx.stroke();
     }
   }
-  // brow occlusion — a soft shadow the brow casts down into the eye socket
+  // brow occlusion — a violet-black shadow the brow casts down into the eye socket (the eldritch cast)
   const socket = L(HL * 0.4, H * 0.5);
   const og = ctx.createRadialGradient(socket.x, socket.y + ny * H * 0.2, 1, socket.x, socket.y, H * 0.9);
-  og.addColorStop(0, 'rgba(0,0,0,0.55)');
+  og.addColorStop(0, 'rgba(30,8,44,0.6)');
   og.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = og;
   ctx.fillRect(neck.x - HL, neck.y - HL, HL * 2.5, HL * 2.5);
   ctx.restore();
 
-  // (6) FANGS — curved white fangs from the upper gum (and, when open, the lower jaw).
-  const fang = (base: { x: number; y: number }, len: number, curl: number): void => {
-    const dtx = fx * curl - nx; // downward-and-slightly-forward
-    const dty = fy * curl - ny;
-    const dl = Math.hypot(dtx, dty) || 1;
-    const tipF = { x: base.x + (dtx / dl) * len, y: base.y + (dty / dl) * len };
+  // (6) FANGS — curved two-tone sabre fangs rooted in the gums (GS-story-serpent-2: the old straight
+  //     triangles read as floating shards). Each fang is a bowed blade: the leading edge arcs forward,
+  //     the tip hooks back toward the throat like a real snake fang; a lit front + shaded back half.
+  const fang = (base: { x: number; y: number }, len: number, up: boolean): void => {
+    const dirx = up ? nx : -nx; // lower fangs point dorsal-up, upper fangs hang down
+    const diry = up ? ny : -ny;
+    const w = Math.max(2.2, len * 0.3); // root half-width along the gum
+    const tipF = { x: base.x + dirx * len - fx * len * 0.42, y: base.y + diry * len - fy * len * 0.42 };
+    const front = { x: base.x + fx * w, y: base.y + fy * w };
+    const backP = { x: base.x - fx * w, y: base.y - fy * w };
+    const cFront = { x: base.x + fx * w * 0.9 + dirx * len * 0.62, y: base.y + fy * w * 0.9 + diry * len * 0.62 };
+    const cBack = { x: base.x - fx * w * 0.7 + dirx * len * 0.5, y: base.y - fy * w * 0.7 + diry * len * 0.5 };
     ctx.beginPath();
-    ctx.moveTo(base.x + fx * len * 0.16, base.y + fy * len * 0.16);
-    ctx.quadraticCurveTo(base.x + (dtx / dl) * len * 0.6 + fx * len * 0.1, base.y + (dty / dl) * len * 0.6 + fy * len * 0.1, tipF.x, tipF.y);
-    ctx.quadraticCurveTo(base.x + (dtx / dl) * len * 0.55 - fx * len * 0.1, base.y + (dty / dl) * len * 0.55 - fy * len * 0.1, base.x - fx * len * 0.16, base.y - fy * len * 0.16);
+    ctx.moveTo(front.x, front.y);
+    ctx.quadraticCurveTo(cFront.x, cFront.y, tipF.x, tipF.y);
+    ctx.quadraticCurveTo(cBack.x, cBack.y, backP.x, backP.y);
     ctx.closePath();
-    ctx.fillStyle = 'rgba(236,255,242,0.95)';
+    const fg = ctx.createLinearGradient(front.x, front.y, backP.x, backP.y);
+    fg.addColorStop(0, '#f8fff2');
+    fg.addColorStop(0.55, '#dcead2');
+    fg.addColorStop(0.56, '#aebfa2'); // the hard cel step — lit front plane, shaded back plane
+    fg.addColorStop(1, '#8fa084');
+    ctx.fillStyle = fg;
     ctx.fill();
-    ctx.strokeStyle = 'rgba(120,150,130,0.5)';
-    ctx.lineWidth = 0.8;
+    ctx.strokeStyle = 'rgba(46,66,52,0.7)';
+    ctx.lineWidth = 0.9;
     ctx.stroke();
   };
   if (gape > 0.06 || eyeOpen > 0.3) {
-    fang(L(HL * 0.94, -H * 0.12), H * (0.28 + gape * 0.18), 0.5);
-    fang(L(HL * 0.74, -H * 0.12), H * (0.2 + gape * 0.14), 0.5);
+    fang(L(HL * 0.92, -H * 0.1), H * (0.3 + gape * 0.2), false);
+    fang(L(HL * 0.72, -H * 0.1), H * (0.21 + gape * 0.15), false);
+    fang(L(HL * 0.52, -H * 0.1), H * (0.14 + gape * 0.1), false);
     if (gape > 0.2) {
-      fang(jd(HL * 0.86, -H * 0.06), -H * (0.2 + gape * 0.12), -0.4); // lower fang points up
-      fang(jd(HL * 0.66, -H * 0.06), -H * (0.15 + gape * 0.1), -0.4);
+      fang(jd(HL * 0.84, -H * 0.05), H * (0.24 + gape * 0.13), true);
+      fang(jd(HL * 0.62, -H * 0.05), H * (0.17 + gape * 0.1), true);
     }
   }
 
@@ -401,26 +662,40 @@ function drawSerpentHead(
   ctx.stroke();
   ctx.lineCap = 'butt';
 
-  // (8) forked TONGUE flicking from the maw once it opens (the reveal).
+  // (8) forked TONGUE flicking from the maw once it opens — a slender TAPERED ribbon arcing out of
+  //     the throat with a gentle droop, not the old thick stroked Y (GS-story-serpent-2).
   if (gape > 0.12) {
     const flick = 0.5 + 0.5 * Math.sin(t * 9);
     const a = clamp01((gape - 0.12) * 2.2);
-    const mouth = L(HL * 1.0, -H * (0.12 + gape * 0.2));
-    const ext = H * (0.5 + flick * 0.9);
-    const forkX = mouth.x + fx * ext;
-    const forkY = mouth.y + fy * ext;
-    const tineF = H * 0.32;
-    const tineS = H * 0.18;
-    ctx.strokeStyle = `rgba(224,46,78,${a})`;
-    ctx.lineWidth = Math.max(1.6, H * 0.06);
+    const mouth = L(HL * 0.78, -H * (0.1 + gape * 0.34)); // from INSIDE the open maw
+    const ext = H * (0.55 + flick * 0.55);
+    // direction: forward with a slight droop, the tip lifting on the flick
+    const ddx = fx - nx * (0.3 - flick * 0.25);
+    const ddy = fy - ny * (0.3 - flick * 0.25);
+    const dl = Math.hypot(ddx, ddy) || 1;
+    const tx2 = mouth.x + (ddx / dl) * ext;
+    const ty2 = mouth.y + (ddy / dl) * ext;
+    const midx = mouth.x + (ddx / dl) * ext * 0.5 - nx * ext * 0.16; // sag at the middle
+    const midy = mouth.y + (ddy / dl) * ext * 0.5 - ny * ext * 0.16;
+    const w0 = Math.max(1.4, H * 0.055); // root half-width, tapering to a point
+    ctx.fillStyle = `rgba(198,42,86,${a})`;
+    ctx.beginPath();
+    ctx.moveTo(mouth.x + nx * w0, mouth.y + ny * w0);
+    ctx.quadraticCurveTo(midx + nx * w0 * 0.5, midy + ny * w0 * 0.5, tx2, ty2);
+    ctx.quadraticCurveTo(midx - nx * w0 * 0.5, midy - ny * w0 * 0.5, mouth.x - nx * w0, mouth.y - ny * w0);
+    ctx.closePath();
+    ctx.fill();
+    // fork tines — two hair-thin flicks off the tip
+    const tineF = H * 0.22;
+    const tineS = H * 0.12;
+    ctx.strokeStyle = `rgba(226,60,100,${a})`;
+    ctx.lineWidth = Math.max(1, H * 0.022);
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(mouth.x, mouth.y);
-    ctx.lineTo(forkX, forkY);
-    ctx.moveTo(forkX, forkY);
-    ctx.lineTo(forkX + fx * tineF + nx * tineS, forkY + fy * tineF + ny * tineS);
-    ctx.moveTo(forkX, forkY);
-    ctx.lineTo(forkX + fx * tineF - nx * tineS, forkY + fy * tineF - ny * tineS);
+    ctx.moveTo(tx2, ty2);
+    ctx.lineTo(tx2 + (ddx / dl) * tineF + nx * tineS, ty2 + (ddy / dl) * tineF + ny * tineS);
+    ctx.moveTo(tx2, ty2);
+    ctx.lineTo(tx2 + (ddx / dl) * tineF - nx * tineS * 0.6, ty2 + (ddy / dl) * tineF - ny * tineS * 0.6);
     ctx.stroke();
     ctx.lineCap = 'butt';
   }
@@ -434,58 +709,92 @@ function drawSerpentHead(
   // a watching eye half-lidded, the reveal wide — so the slow opening reads across the teasers.
   const aper = 0.16 + eyeOpen * 0.84;
   if (eyeOpen > 0.04) {
-    // outer glow
-    const eg = ctx.createRadialGradient(hx, hy, 2, hx, hy, eyeR * 1.7);
-    eg.addColorStop(0, `rgba(150,255,190,${0.5 * eyeOpen})`);
-    eg.addColorStop(0.5, `rgba(60,${190 + wake * 40},130,${0.3 * eyeOpen})`);
+    // THE EYE IS THE FOCAL POINT (GS-story-serpent-2): a layered menace glow — a wide VIOLET corona
+    // bleeding into the dark, a hot GOLD bloom hugging the eye — pulsing, so it reads as the one
+    // burning point even on the zoomed-out teasers.
+    const pulse = 0.82 + 0.18 * Math.sin(t * 3.1);
+    const vg = ctx.createRadialGradient(hx, hy, 2, hx, hy, eyeR * 2.6);
+    vg.addColorStop(0, `rgba(168,92,235,${0.4 * eyeOpen * pulse})`);
+    vg.addColorStop(0.45, `rgba(112,52,180,${0.2 * eyeOpen * pulse})`);
+    vg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = vg;
+    ctx.beginPath();
+    ctx.arc(hx, hy, eyeR * 2.6, 0, 6.283);
+    ctx.fill();
+    const eg = ctx.createRadialGradient(hx, hy, 1, hx, hy, eyeR * 1.4);
+    eg.addColorStop(0, `rgba(255,232,120,${0.6 * eyeOpen * pulse})`);
+    eg.addColorStop(0.6, `rgba(230,180,70,${0.28 * eyeOpen * pulse})`);
     eg.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = eg;
     ctx.beginPath();
-    ctx.arc(hx, hy, eyeR * 1.7, 0, 6.283);
+    ctx.arc(hx, hy, eyeR * 1.4, 0, 6.283);
     ctx.fill();
     // eyeball clipped to the lid aperture (opens with eyeOpen)
     ctx.save();
     ctx.beginPath();
     ctx.ellipse(hx, hy, eyeR, eyeR * aper, headAng, 0, 6.283);
     ctx.clip();
+    // toxic pale sclera
     const sg = ctx.createRadialGradient(hx - nx * eyeR * 0.3, hy - ny * eyeR * 0.3, 1, hx, hy, eyeR);
-    sg.addColorStop(0, '#eafff0');
-    sg.addColorStop(0.55, '#a6d888');
-    sg.addColorStop(1, '#3a5a2a');
+    sg.addColorStop(0, '#fbffe2');
+    sg.addColorStop(0.55, '#cfe08c');
+    sg.addColorStop(1, '#465220');
     ctx.fillStyle = sg;
     ctx.beginPath();
     ctx.arc(hx, hy, eyeR, 0, 6.283);
     ctx.fill();
-    // bloodshot veins
-    ctx.strokeStyle = 'rgba(150,40,54,0.5)';
-    ctx.lineWidth = 0.7;
-    for (let i = 0; i < 5; i++) {
-      const aa = headAng + Math.PI + (i - 2) * 0.5;
+    // corrupted veins — violet, crawling in from the rim
+    ctx.strokeStyle = 'rgba(128,54,166,0.6)';
+    ctx.lineWidth = Math.max(0.7, eyeR * 0.03);
+    for (let i = 0; i < 6; i++) {
+      const aa = headAng + Math.PI + (i - 2.5) * 0.45;
       ctx.beginPath();
       ctx.moveTo(hx + Math.cos(aa) * eyeR, hy + Math.sin(aa) * eyeR);
       ctx.quadraticCurveTo(hx + Math.cos(aa) * eyeR * 0.4, hy + Math.sin(aa) * eyeR * 0.4, hx + Math.cos(aa + 0.2) * eyeR * 0.5, hy + Math.sin(aa + 0.2) * eyeR * 0.5);
       ctx.stroke();
     }
-    // iris + vertical slit pupil (across the head, i.e. along the normal)
-    const ig = ctx.createRadialGradient(hx, hy, 1, hx, hy, eyeR * 0.62);
-    ig.addColorStop(0, '#8fffbe');
-    ig.addColorStop(0.6, `rgba(60,${180 + wake * 40},110,1)`);
-    ig.addColorStop(1, '#0c3a22');
+    // molten GOLD iris under a VIOLET limbal ring
+    const ig = ctx.createRadialGradient(hx, hy, 1, hx, hy, eyeR * 0.64);
+    ig.addColorStop(0, '#ffef9e');
+    ig.addColorStop(0.45, '#f2c44e');
+    ig.addColorStop(0.8, `rgba(170,120,40,1)`);
+    ig.addColorStop(1, '#3c2c10');
     ctx.fillStyle = ig;
     ctx.beginPath();
-    ctx.ellipse(hx, hy, eyeR * 0.62, eyeR * 0.62, 0, 0, 6.283);
+    ctx.ellipse(hx, hy, eyeR * 0.64, eyeR * 0.64, 0, 0, 6.283);
     ctx.fill();
-    // slit pupil oriented along the head normal (perpendicular to the snout)
-    ctx.fillStyle = 'rgba(4,8,4,0.96)';
+    ctx.strokeStyle = `rgba(150,70,215,${0.5 + 0.35 * pulse})`;
+    ctx.lineWidth = Math.max(1, eyeR * 0.07);
     ctx.beginPath();
-    ctx.ellipse(hx, hy, eyeR * 0.14, eyeR * 0.56, headAng, 0, 6.283);
+    ctx.ellipse(hx, hy, eyeR * 0.64, eyeR * 0.64, 0, 0, 6.283);
+    ctx.stroke();
+    // iris flecks — radial gold striations toward the slit
+    ctx.strokeStyle = 'rgba(120,80,20,0.5)';
+    ctx.lineWidth = Math.max(0.6, eyeR * 0.02);
+    for (let i = 0; i < 9; i++) {
+      const aa = (i / 9) * 6.283 + 0.3;
+      ctx.beginPath();
+      ctx.moveTo(hx + Math.cos(aa) * eyeR * 0.24, hy + Math.sin(aa) * eyeR * 0.24);
+      ctx.lineTo(hx + Math.cos(aa) * eyeR * 0.58, hy + Math.sin(aa) * eyeR * 0.58);
+      ctx.stroke();
+    }
+    // slit pupil oriented along the head normal (perpendicular to the snout), rimmed in burning gold
+    ctx.fillStyle = 'rgba(6,4,10,0.97)';
+    ctx.beginPath();
+    ctx.ellipse(hx, hy, eyeR * 0.15, eyeR * 0.58, headAng, 0, 6.283);
     ctx.fill();
-    ctx.fillStyle = `rgba(180,255,210,${0.4 + 0.3 * Math.sin(t * 5)})`;
+    ctx.strokeStyle = `rgba(255,214,90,${0.55 + 0.3 * Math.sin(t * 5)})`;
+    ctx.lineWidth = Math.max(0.8, eyeR * 0.035);
+    ctx.beginPath();
+    ctx.ellipse(hx, hy, eyeR * 0.15, eyeR * 0.58, headAng, 0, 6.283);
+    ctx.stroke();
+    // a violet ember burning INSIDE the slit
+    ctx.fillStyle = `rgba(190,120,255,${0.35 + 0.3 * Math.sin(t * 5 + 1.2)})`;
     ctx.beginPath();
     ctx.ellipse(hx, hy, eyeR * 0.05, eyeR * 0.4, headAng, 0, 6.283);
     ctx.fill();
     // cold glint
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
     ctx.beginPath();
     ctx.arc(hx - nx * eyeR * 0.35 + fx * eyeR * 0.25, hy - ny * eyeR * 0.35 + fy * eyeR * 0.25, eyeR * 0.09, 0, 6.283);
     ctx.fill();
@@ -513,13 +822,47 @@ function drawSerpentHead(
   }
 
   // (10) RIM LIGHT along the top silhouette (brow → snout) — the eldritch backlight.
-  ctx.strokeStyle = `rgba(${150 + wake * 80},255,${190 + wake * 40},${0.35 + wake * 0.35})`;
+  ctx.strokeStyle = `rgba(${150 + wake * 80},255,${190 + wake * 40},${(0.35 + wake * 0.35) * (1 - sleep * 0.45)})`;
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(nTop.x, nTop.y);
   ctx.bezierCurveTo(L(HL * 0.1, H * 1.28).x, L(HL * 0.1, H * 1.28).y, b2.x, b2.y, L(HL * 0.62, H * 1.02).x, L(HL * 0.62, H * 1.02).y);
   ctx.quadraticCurveTo(s1.x, s1.y, tip.x, tip.y);
   ctx.stroke();
+
+  // (11) STARLIT CREST (GS-story-serpent-2) — the constellation continues onto the head: star nodes
+  //     burn at the horn tips and the snout, twinkling with the body's rhythm.
+  const crestStar = (p: { x: number; y: number }, idx: number, big: boolean): void => {
+    const tw = 0.5 + 0.5 * Math.sin(t * 2.5 + idx * 1.9);
+    const a = (0.45 + 0.45 * tw) * (1 - sleep * 0.55);
+    const gr = big ? 9 : 6;
+    const sgl = ctx.createRadialGradient(p.x, p.y, 0.5, p.x, p.y, gr);
+    sgl.addColorStop(0, `rgba(200,255,225,${0.8 * a})`);
+    sgl.addColorStop(0.45, `rgba(120,255,190,${0.32 * a})`);
+    sgl.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = sgl;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, gr, 0, 6.283);
+    ctx.fill();
+    ctx.fillStyle = `rgba(234,255,242,${0.9 * a})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, big ? 2.2 : 1.5, 0, 6.283);
+    ctx.fill();
+    if (big) {
+      const fl = 5.5 + tw * 3;
+      ctx.strokeStyle = `rgba(210,255,230,${0.55 * a})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(p.x - fl, p.y);
+      ctx.lineTo(p.x + fl, p.y);
+      ctx.moveTo(p.x, p.y - fl);
+      ctx.lineTo(p.x, p.y + fl);
+      ctx.stroke();
+    }
+  };
+  crestStar(hornTips[1]!, 0, true);
+  crestStar(hornTips[0]!, 1, false);
+  crestStar(tip, 2, false);
 
   // GS-story-battle-2: hand the battle the drawn head's anchors (the graphic IS the target).
   return { eyeX: hx, eyeY: hy, eyeR, browX: b2.x, browY: b2.y, headH: H, headAng };
@@ -781,10 +1124,11 @@ export function mountSigilCeremony(opts: {
     ctx.stroke();
   }
 
-  /** The waking serpent, in this cinematic's design space. Thin wrapper over the exported `paintSerpent`. */
+  /** The waking serpent, in this cinematic's design space. Thin wrapper over the exported `paintSerpent`
+   *  — the ceremony is a centred full-frame cut, so it sprawls wider than the battle's default framing. */
   function drawSerpent(t: number, wake: number, focusHead: number): void {
     if (!ctx) return;
-    paintSerpent(ctx, CX, CY, t, wake, focusHead);
+    paintSerpent(ctx, CX, CY, t, wake, focusHead, { spread: 700 });
   }
 
   function caption(text: string, sub: string, a: number): void {
