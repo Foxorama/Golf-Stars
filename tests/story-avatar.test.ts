@@ -73,7 +73,17 @@ describe('GS-story-avatar: equipped Story gear → worn cosmetic looks', () => {
     expect(av.clubSkin!.glow).toBeTruthy(); // the legendary nova shaft glows
   });
 
-  it('every worn slot (hat/bag/glove/shoes/shaft/ball) carries a slot-appropriate avatar look (coverage)', () => {
+  it('an equipped jacket + pants clothe the golfer (torso + legs)', () => {
+    let story = grantStoryGear(defaultStoryState(), 'gear:jacket:champion');
+    story = grantStoryGear(story, 'gear:pants:cosmic');
+    const av = storyGearAvatar(story);
+    expect(av.shirtStyle).toBeDefined();
+    expect(av.shirtStyle!.shape).toBe('blazer');
+    expect(av.pantsStyle).toBeDefined();
+    expect(av.pantsStyle!.shape).toBe('nebula');
+  });
+
+  it('every worn slot (hat/bag/glove/shoes/shaft/ball/jacket/pants) carries a slot-appropriate avatar look (coverage)', () => {
     const SHAPES: Record<string, Set<string>> = {
       hat: new Set([
         'cap', 'bucket', 'visor', 'tophat', 'crown', 'helmet',
@@ -84,6 +94,8 @@ describe('GS-story-avatar: equipped Story gear → worn cosmetic looks', () => {
       shoes: new Set(['shoe', 'boot', 'spikes']),
       shaft: new Set(['clubskin']),
       ball: new Set(['line', 'comet', 'ember', 'spark']),
+      jacket: new Set(['polo', 'striped', 'jersey', 'spacesuit', 'cosmic', 'blazer', 'valkyrie', 'riftplate', 'solarflare', 'parrot']),
+      pants: new Set(['trousers', 'shorts', 'knickers', 'leggings', 'spacepants', 'nebula', 'greaves', 'riftgreaves', 'emberlegs', 'parrotpants']),
     };
     for (const g of STORY_GEAR) {
       const allowed = SHAPES[g.slot];

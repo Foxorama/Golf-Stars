@@ -1231,6 +1231,33 @@ shops / stock.
   is now cosmetic. Pure render + data — ZERO sim rng, no save bump, no `_gs*`/URL hook. Eyeball via
   `scripts/story-avatar-preview.mjs` (now with a sample-arc tracer row). Guarded by `tests/story-avatar.test.ts`.
 
+- **GS-story-clothing** — ✅ *shipped* (`sim/rpg/story.ts` + `sim/rpg/storyGear.ts` + `app/helpers.ts` +
+  `app/storyLockerScreens.ts` + `sim/rpg/storyShop.ts` + `render/itemArt.ts`). Player ask: expand the Pro
+  Shop with CLOTHING — jackets + pants — as equippable items that ALSO carry in-game effects, for a deeper
+  item pool + more reward variety (Coil-themed outfits etc.). Two new `GearSlot`s (`jacket` upper-body +
+  `pants` legwear) join the six effect slots. Because a new slot is a no-op default in `equippedGear`
+  (absent = unequipped), there's NO `STORY_VERSION` bump — `gearMap` deserialise + `migrateStory` pick it up
+  free. The catalogue adds 15 rows: **jackets** (windbreaker / storm shell / compression / sponsor / thermal
+  → `windResist` · `dispersionMult` · `creditMult`) and **pants** (tour / flex-stance / plus-fours / power /
+  starfield → `minCarryBoost` · `lieRelief` · `shapeMod` · `dispersionMult`), all reusing the proven no-op-
+  default `PlayerLoadout` levers (so an un-clothed campaign is byte-for-byte the plain loadout), tiered
+  common→legendary across the worlds' `STORY_GEAR_STOCK`. **THEMED OUTFIT sets** route-gate exactly like the
+  cursed sheddings (`alignment` + `storyGearStock` filter): a clean **Warden** mantle + greaves (dearer, no
+  strings) vs a cursed **Coil/herald** vestment + leggings (stronger AND cheaper, each with a real `curse` —
+  a credit tithe / a putt-window cost), shown only on your chosen path. Each garment is authored through the
+  three lenses: a real EFFECT, bespoke LORE, and its OWN art — a jacket wears its `ShirtShape` silhouette +
+  a pants its `PantsShape` on the on-course avatar (via `storyGearAvatar`'s new `jacket → shirtStyle`,
+  `pants → pantsStyle` mapping, which `drawGolfer` already renders — the GS-story-avatar seam), and a bespoke
+  `itemArt.ts` rack glyph (`drawJacket` tailored coat / `drawTrousers`). The Pro Shop + Locker surface them
+  automatically (stock is data-driven; the locker's `LOCKER_SLOTS`/`SLOT_LABEL` + the shop's `GEAR_SLOT_WORD`
+  gained the two slot labels). So the on-course avatar now has a FULL outfit — default base + hat / jacket /
+  pants / glove / shoes / bag + club skin + ball tracer + caddy — and the campaign has a deeper, themed pool
+  to find + experiment with. Pure model + render + data — ZERO sim rng, no save bump, no `_gs*`/URL hook.
+  Eyeball via `scripts/story-avatar-preview.mjs` (jacket/pants mannequins + rack-card glyphs). Guarded by
+  `tests/story-avatar.test.ts` (avatar mapping + coverage), `tests/story-shop.test.ts` (eight-slot span +
+  clothing effects + the Coil curse), and the existing story-flow/locker suites. **Follow-ups:** more themed
+  sets (a per-world "kit" look), and bespoke `ShirtShape`/`PantsShape` silhouettes for the flagship outfits.
+
 ## Open questions / deferred (revisit as chunks land)
 - **A genuinely-new gas-giant BIOME** (play on gas cloud-tops) — the player's optional "if we need to add
   more" ask. Deferred as its OWN focused session: a new `BiomeArchetype` fans out to ~16 compile-forced
