@@ -1341,3 +1341,38 @@ far more than the desert; the desert's greens are byte-identical; heavy-tuck pin
 **Next.** The remaining difficulty axes — FIRMNESS (bouncy/soft greens) and FORCED-CARRY frequency/length
 — touch the MAIN physics stream, so they're a heavier reflow deferred to a later pass; and the structural
 archetypes (split-fairway, generalised island/walled) are Task 4.
+
+## Green-END FLARE + variety (GS-green-flare — supersedes GS-green-end)
+
+Player report (three screenshots, all modes): "almost all the fairways still share a similar shape
+especially at the end where the green is, needs more flared fairways… the end of the fairway going to a
+point, similar shape green, doesn't look smoothly joined together." Void/Cetus read fine (island greens,
+no apron); the grounded worlds all read as a tapering corridor ending in a rounded lollipop head with the
+green a dot inside it.
+
+**Root cause.** The GS-green-end apron archetypes (SHELF/PUNCHBOWL/RUNOFF/TONGUE/OPEN) all built a
+SYMMETRIC ribbon (`ribbon(line, HW, HW)`, same L/R array) that started at the corridor half-width and
+swelled to a round `wrap ≈ greenR+9` centred on the green. Same fan, same round head, every hole — and on
+a small green the wrap dwarfed it (the "dot in a patch").
+
+**Fix.** The apron now FLARES like a real approach and leans, via a small station builder:
+`build([{f, lat, l, r}…])` where `f` = forward distance from the green centre (− = corridor side), `lat` =
+lateral offset of the apron centreline (× the approach perpendicular), `l`/`r` = the LEFT/RIGHT half-widths
+(asymmetric → a leaning, non-mirrored fan). Six silhouettes off `gcRng.float()`: **FAN** (the headline —
+fans to `wrap·1.35–1.7` just in front of the green, leaning to a seeded side, short tail), **PUNCHBOWL**
+(wide oval gather, slightly offset), **RUNOFF** (broad flare flowing to a long tapering ramp past the
+green), **TONGUE** (thin finger curling to a side), **DIAGONAL** (an angled cape — flares hard to ONE side,
+the green tucked to the flank), **SHELF** (flares up to and STOPS at the green, rough behind). A seeded
+`sk = ±1` picks the lean side; every skew is capped ≤ ~0.34·greenR (well under a half-width) so the green
+always stays inside the fan and never floats on rough.
+
+**Contracts.** Still drawn from the `${seed}:greencomplex:${holeIndex}` SIDE stream, so ZERO main-`rng`
+draws are perturbed — terrain, penalty crossings, ponds, greens, pin, slope, greenside guards all
+byte-identical; only the apron polygon (a fairway feature) changes. That IS a lie change near the green
+(more fairway around the green → auto-sim outcomes reflow), so `GENERATOR_VERSION` 41→42; the full suite
+stayed green with no re-pins (the balance bars are far from their fences — the change only eases the
+greenside slightly, and Stableford can only rise). Fairness is untouched (`validateFairness` keys off the
+FIRST fairway feature = the corridor). Skipped on lost-rough / ship worlds (island greens + ship decks have
+no apron — the derelict gets a render-only deck blend instead, GS-ship-deck-blend). The apron→green→fairway
+RENDER junction blend is a separate render-only pass (GS-green-blend). Re-shoot
+`scripts/greenblend-preview.mjs` (mid/approach zoom, the player's decision distance) after touching it.

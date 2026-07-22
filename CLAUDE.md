@@ -242,17 +242,22 @@ these systems** — each bullet is the tip of a documented iceberg.
     sparse bag still misses more greens) is a short-game/scoring pass, never softer rough.
   - Greens are varied STAR shapes about `green` (single-valued r(θ)) — `pinInGreen`/`rayPolyDist`/
     `validateCourse` depend on it. Pin ≠ centroid (attack aims at flag; auto/safe at fat-of-green).
-  - The green-END varies per hole (GS-green-end): the fairway APRON used to be ONE fixed tapering wrap on
-    EVERY hole (the "tapered snake head" — every hole-end read identical). Now a per-hole green-COMPLEX
-    archetype varies the apron shape BEHIND + AROUND the green (the part the corridor, which ends AT the
-    green, doesn't reach — so it genuinely reads): a perched SHELF (no tail, rough behind — going long is
-    punished), a gathering PUNCHBOWL (wide wrap + stub tail), a long RUNOFF collection ramp, a narrow
-    TONGUE promontory, or the classic OPEN wedge. Drawn from a DEDICATED side stream
-    (`${seed}:greencomplex:`, the pin/slope pattern), so it perturbs ZERO main-`rng` draws — terrain,
-    hazards, pin, slope, greenside guards all byte-identical; only the apron polygon shifts (the SHELF's
-    rough-behind is a mild scoring change, not a stream one). Skipped on lost-rough worlds (floating
-    island greens have no apron). `GENERATOR_VERSION` 39. Sibling of GS-approach-hazards in the
-    hazard/hole-END distribution follow-up to GS-biome-variety.
+  - The green-END FLARES + varies per hole (GS-green-flare, superseding GS-green-end): the fairway APRON
+    used to fan to a SYMMETRIC rounded blob that started at the corridor width and swelled evenly around
+    the green — so every hole-end read as the same "tapered snake head + lollipop", and a small green sat
+    as a dot inside a round patch (the player report). Now the fairway genuinely FLARES into the green
+    like a real approach: it widens to a broad, usually ASYMMETRIC fan whose widest point sits AT/just
+    short of the green (a flared approach, never a point), leaning to a seeded side so no two complexes
+    mirror, with a distinct per-hole silhouette — broad FAN, gathering PUNCHBOWL, long RUNOFF ramp,
+    narrow TONGUE finger, angled DIAGONAL cape, or perched SHELF (no tail, rough behind). Built via
+    `build([{f,lat,l,r}…])` — asymmetric L/R half-width arrays + a small lateral skew of the apron
+    centreline (skews capped well under a half-width so the green never floats on rough). Drawn from the
+    DEDICATED side stream (`${seed}:greencomplex:`, the pin/slope pattern), so it perturbs ZERO main-`rng`
+    draws — terrain, hazards, pin, slope, greenside guards all byte-identical; only the apron polygon
+    shifts (a fairway-lie change near the green — auto sim outcomes reflow, so `GENERATOR_VERSION` is
+    bumped, not a stream reorder). Skipped on lost-rough / ship worlds (floating island greens + ship
+    decks have no apron — the derelict gets a render-only deck blend instead). `GENERATOR_VERSION` 42.
+    Sibling of GS-approach-hazards in the hazard/hole-END distribution follow-up to GS-biome-variety.
   - `lieAt` is by surface PRECEDENCE, not draw order. Dispersion is ANGULAR (rotation preserves
     carry), sampled from an asymmetric 5-zone `SprayShape`.
   - Forced-carry crossings are generic penalty bands; the carry-aware AI flies them off `penalty`,
