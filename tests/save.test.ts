@@ -13,7 +13,7 @@ import { CHARACTERS } from '../src/sim/rpg/characters';
 
 describe('save schema', () => {
   it('default save carries the current version (12) with the starter fleet + empty wardrobe + per-character maps', () => {
-    expect(SAVE_VERSION).toBe(29);
+    expect(SAVE_VERSION).toBe(30);
     const d = defaultSave();
     expect(d.version).toBe(SAVE_VERSION);
     expect(d.golfBagByCharacter).toEqual({});
@@ -39,6 +39,7 @@ describe('save schema', () => {
     expect(d.endlessRuns).toEqual([]);
     expect(d.reputationByCharacter).toEqual({});
     expect(d.seenLore).toEqual({}); // GS-lore: no story beats seen on a fresh save
+    expect(d.starTourUnlocked).toBe(false); // GS-story-startour-unlock: earned by winning the Story finale
   });
 
   it('migrates a v27 blob forward to v28 (seeds an empty lore-progress set, preserves everything else)', () => {
@@ -68,6 +69,19 @@ describe('save schema', () => {
     expect(s.version).toBe(SAVE_VERSION);
     expect(s.shards).toBe(17);
     expect(s.clubhouseVisit).toBe(3);
+  });
+
+  it('migrates a v29 blob forward to v30 (seeds the permanent Star Tour unlock as not-yet-earned)', () => {
+    const v29 = {
+      ...defaultSave(),
+      version: 29 as const,
+      shards: 22,
+    } as unknown as Parameters<typeof migrate>[0];
+    delete (v29 as Record<string, unknown>).starTourUnlocked; // genuine pre-v30 shape
+    const s = migrate(v29);
+    expect(s.version).toBe(SAVE_VERSION);
+    expect(s.starTourUnlocked).toBe(false); // GS-story-startour-unlock: earned by winning the finale
+    expect(s.shards).toBe(22);
   });
 
   it('carries a stroke-play round\'s mid-round progress through the activeRun snapshot round-trip', () => {

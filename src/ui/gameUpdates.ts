@@ -363,9 +363,10 @@ export function resolveStrokePlay(state: UiState, played: PlayedHole[]): UiState
  * GS-story-prologue: resolve a completed Story Mode WORLD ROUND back into the campaign. Unlike Star Tour
  * (which banks a course record and lands on the record recap), a Story round records the world clear on the
  * `StoryState` — pay credits, keep the best score for the revisit chase, and advance the chapter if this was
- * the prologue (Earth) — then lands on the Story recap (`storyResult`). Deliberately touches NO main-save
- * meta (shards/aces/ownedShips) — the campaign is a separate progression (`gs_story`). The pure transition
- * lives in `story.ts completeStoryRound`; this wraps it with the round scoring + screen/state plumbing.
+ * the prologue (Earth) — then lands on the Story recap (`storyResult`). The campaign's ECONOMY (shards/ships)
+ * is a separate progression (`gs_story`), but a hole-in-one still ticks the cross-mode lifetime ace tally
+ * shown on the title (GS-story-ace-tally). The pure transition lives in `story.ts completeStoryRound`; this
+ * wraps it with the round scoring + screen/state plumbing.
  */
 export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState {
   const run = state.run;
@@ -396,7 +397,8 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
     !run.storyQuest,
   );
   // GS-story-ships: a hole-in-one on any Story round earns the secret Comet Rider (the ace ship).
-  const aced = played.some((p) => p.record.strokes === 1);
+  const aces = played.filter((p) => p.record.strokes === 1).length;
+  const aced = aces > 0;
   let story = aced ? grantStoryAceShip(cleared) : cleared;
 
   // GS-story-qualifiers: a non-prologue, non-quest chapter world that ISN'T the Sigil venue is a QUALIFYING
@@ -440,6 +442,10 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
     ...state,
     run: { ...run, status: 'ended', endedReason: 'banked' },
     story,
+    // GS-story-ace-tally: a hole-in-one on a Story round still counts toward the cross-mode lifetime ace
+    // tally shown on the title (the ace celebration already reads `state.lifetimeAces + 1`). The campaign's
+    // OTHER progression (credits/best/ships) stays inside `gs_story`; only this global stat crosses over.
+    lifetimeAces: state.lifetimeAces + aces,
     played,
     stopPlayed: undefined,
     play: undefined,
@@ -628,11 +634,15 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
   // GS-story-caddy-rep: a major is a round carried by the active caddy too — count it toward their quest.
   story = recordCaddyRound(story);
   const finalSigil = won && !alreadyWon && story.trophyIds.length >= STORY_CHAPTER_COUNT;
+  // GS-story-ace-tally: a hole-in-one during a major still ticks the cross-mode lifetime ace tally. Count
+  // over the BANKED holes (a closed-out match may have truncated `played`) so it matches what was played.
+  const aces = played.filter((p) => p.record.strokes === 1).length;
 
   return {
     ...state,
     run: { ...run, status: 'ended', endedReason: 'banked' },
     story,
+    lifetimeAces: state.lifetimeAces + aces,
     played,
     stopPlayed: undefined,
     play: undefined,

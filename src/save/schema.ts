@@ -18,7 +18,7 @@ import type { CosmeticRarity } from '../sim/rpg/cosmetics';
 import { CHARACTERS } from '../sim/rpg/characters';
 import type { ReputationByCharacter } from '../sim/rpg/factions';
 
-export const SAVE_VERSION = 29;
+export const SAVE_VERSION = 30;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -455,8 +455,19 @@ export type SaveV29 = Omit<SaveV28, 'version'> & {
   version: 29;
 };
 
+/** v30 adds the PERMANENT Star Tour unlock (GS-story-startour-unlock): once the Story Tour finale has
+ *  been won even once, the free-roam records chase stays available forever — starting a NEW campaign
+ *  (which resets the campaign's own `completed` flag) no longer relocks it. Distinct from `strokePlayBest`
+ *  (the records) and the campaign save (`gs_story`); this lives on the main save so it outlives any single
+ *  campaign. Seeded false for existing saves and backfilled from a live completed campaign at boot. */
+export type SaveV30 = Omit<SaveV29, 'version'> & {
+  version: 30;
+  /** The Story Tour campaign has been completed at least once → Star Tour is permanently available. */
+  starTourUnlocked: boolean;
+};
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV29;
+export type Save = SaveV30;
 
 export function defaultSave(): Save {
   return {
@@ -487,6 +498,7 @@ export function defaultSave(): Save {
     reputationByCharacter: {},
     strokePlayBest: {},
     seenLore: {},
+    starTourUnlocked: false,
   };
 }
 
@@ -893,6 +905,15 @@ function v28ToV29(s: SaveV28): SaveV29 {
   return { ...s, version: 29 };
 }
 
+/** v29 → v30: seed the permanent Star Tour unlock (GS-story-startour-unlock) as NOT-yet-earned. The
+ *  flag is set true the moment the Story Tour finale is first won, and — unlike the campaign's own
+ *  `completed` flag (wiped when a NEW campaign begins) — it survives forever, so starting a fresh
+ *  campaign never relocks the free-roam reward. A returning player mid-completed-campaign has the flag
+ *  seeded at boot from their live `gs_story` (`storyComplete`), so nobody who already earned it loses it. */
+function v29ToV30(s: SaveV29): SaveV30 {
+  return { ...s, version: 30, starTourUnlocked: false };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -929,6 +950,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 26) s = v26ToV27(s as unknown as SaveV26) as unknown as typeof s;
   if (s.version === 27) s = v27ToV28(s as unknown as SaveV27) as unknown as typeof s;
   if (s.version === 28) s = v28ToV29(s as unknown as SaveV28) as unknown as typeof s;
+  if (s.version === 29) s = v29ToV30(s as unknown as SaveV29) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
@@ -936,7 +958,7 @@ export function migrate(raw: unknown): Save {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v14 = s as unknown as Partial<SaveV29>;
+  const v14 = s as unknown as Partial<SaveV30>;
   const ownedShips = v14.ownedShips && v14.ownedShips.length ? v14.ownedShips : [DEFAULT_SHIP_ID];
   const ownedApparel = v14.ownedApparel ?? [];
   const bagTier: BagTier = v14.bagTier ?? 'common';
@@ -978,6 +1000,7 @@ export function migrate(raw: unknown): Save {
     strokePlayBest:
       v14.strokePlayBest && typeof v14.strokePlayBest === 'object' ? v14.strokePlayBest : {},
     seenLore: v14.seenLore && typeof v14.seenLore === 'object' ? v14.seenLore : {},
+    starTourUnlocked: v14.starTourUnlocked === true,
     priceRefund: typeof v14.priceRefund === 'number' && v14.priceRefund > 0 ? v14.priceRefund : undefined,
     activeRun: v14.activeRun,
     savedAt: v14.savedAt,

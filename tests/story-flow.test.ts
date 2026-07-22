@@ -903,6 +903,27 @@ describe('Story finale flow (GS-story-yggdrasil)', () => {
     const back = reduce(won, { type: 'storyFinaleContinue' });
     expect(back.screen).toBe('title'); // a win → roll credits to the title (Star Tour now unlocked)
     expect(back.story!.completed).toBe(true);
+    expect(back.starTourUnlocked).toBe(true); // GS-story-startour-unlock: the permanent main-save flag is set
+  });
+
+  it('the Star Tour unlock is PERMANENT — a new campaign never relocks it (GS-story-startour-unlock)', () => {
+    // Win the finale: the permanent main-save flag is set alongside the campaign's `completed`.
+    const won = reduce(reduce(armedKey(true), { type: 'openStoryFinale' }), { type: 'engageStoryFinale' });
+    expect(won.starTourUnlocked).toBe(true);
+
+    // Begin a FRESH campaign — the new StoryState resets `completed` to false, but the flag survives.
+    const picking = { ...won, screen: 'character' as const, pendingStoryNew: true };
+    const fresh = reduce(picking, { type: 'selectCharacter', characterId: 'longshot-larry' });
+    expect(fresh.story!.completed).toBe(false); // the new campaign is not complete…
+    expect(fresh.starTourUnlocked).toBe(true); // …but Star Tour stays unlocked (permanent).
+  });
+
+  it('a returning player mid-completed-campaign backfills the unlock at boot (GS-story-startour-unlock)', () => {
+    // An old save (flag absent) whose live campaign is already complete: initState seeds the flag true so
+    // the reward isn't lost, and it persists from there.
+    const done = { ...defaultStoryState('feather-fade'), completed: true };
+    const boot = initState('seed', {}, undefined, done);
+    expect(boot.starTourUnlocked).toBe(true);
   });
 
   it('the interactive finisher STRIKE colours a win but never decides it (GS-story-finisher)', () => {

@@ -69,6 +69,7 @@ import {
   unequipStoryClub,
   chooseAlignment,
   storyWorldEffect,
+  storyComplete,
   type StoryState,
 } from '../sim/rpg/story';
 import { storyItemKind, buyStoryCard, worldHasShop } from '../sim/rpg/storyShop';
@@ -180,6 +181,10 @@ export function initState(
     reputation: meta.reputationByCharacter ?? {},
     strokePlayBest: meta.strokePlayBest ?? {},
     seenLore: meta.seenLore ?? {},
+    // GS-story-startour-unlock: the permanent Star Tour unlock. Backfill it from a live already-completed
+    // campaign at boot so a returning player who finished the story BEFORE this flag existed keeps the
+    // reward the moment they start a new campaign (the flag then persists on the next save write).
+    starTourUnlocked: (meta.starTourUnlocked ?? false) || (story ? storyComplete(story) : false),
     priceRefund: meta.priceRefund,
   };
 }
@@ -977,6 +982,9 @@ export function reduce(state: UiState, action: Action): UiState {
       return {
         ...state,
         story,
+        // GS-story-startour-unlock: a finale win PERMANENTLY unlocks Star Tour on the main save — so
+        // starting a fresh campaign (which resets the campaign's own `completed` flag) never relocks it.
+        ...(won ? { starTourUnlocked: true } : {}),
         screen: 'storyFinaleResult',
         lastStoryFinale: {
           won,
@@ -2050,6 +2058,8 @@ export function reduce(state: UiState, action: Action): UiState {
           reputationByCharacter: state.reputation,
           strokePlayBest: state.strokePlayBest,
           seenLore: state.seenLore,
+          // GS-story-startour-unlock: the permanent Star Tour unlock is meta-progression — carry it over.
+          starTourUnlocked: state.starTourUnlocked,
         },
         state.resumable,
       );
