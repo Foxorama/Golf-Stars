@@ -186,8 +186,11 @@ function storyTileHTML(): string {
  *  (so the title stays clean before you start); a LOCKED teaser while the campaign is underway; the live
  *  `openStarTour` tile once the story is won. The `?screen=startour` deep-link (tests) bypasses this. */
 function starTourRewardTileHTML(): string {
-  if (!state.story) return ''; // no campaign yet → don't tease it
-  if (storyComplete(state.story)) {
+  // GS-story-startour-unlock: the unlock is PERMANENT — earned on the first finale win (`starTourUnlocked`,
+  // main save) and never relocked by starting a new campaign, which resets the campaign's own `completed`.
+  // A live completed campaign also counts (covers a win before this session persisted the flag).
+  const unlocked = state.starTourUnlocked || (state.story ? storyComplete(state.story) : false);
+  if (unlocked) {
     return `
     <button class="gs-navtile gs-navtile--game" style="--mc:#54c8ff;" data-action='${JSON.stringify({ type: 'openStarTour' })}'>
       <span class="gs-navtile__art" aria-hidden="true">${starTourTileArt()}</span>
@@ -197,6 +200,7 @@ function starTourRewardTileHTML(): string {
       </span>
     </button>`;
   }
+  if (!state.story) return ''; // no campaign started and never completed → don't tease it
   return `
     <div class="gs-navtile gs-navtile--game" style="--mc:#3a4656;cursor:default;opacity:0.72;" aria-disabled="true" title="Complete Story Tour to unlock">
       <span class="gs-navtile__art" aria-hidden="true" style="filter:grayscale(0.85) brightness(0.55);">${starTourTileArt()}</span>

@@ -53,6 +53,7 @@ export function metaFromSave(save: Save) {
     reputationByCharacter: save.reputationByCharacter,
     strokePlayBest: save.strokePlayBest,
     seenLore: save.seenLore,
+    starTourUnlocked: save.starTourUnlocked,
     priceRefund: save.priceRefund,
   };
 }
@@ -93,6 +94,9 @@ export function persist(): void {
     reputationByCharacter: state.reputation,
     strokePlayBest: state.strokePlayBest,
     seenLore: state.seenLore,
+    // GS-story-startour-unlock: the permanent Star Tour unlock — set on the first finale win, never
+    // cleared (a new campaign resets the campaign's own `completed`, but this outlives it).
+    starTourUnlocked: state.starTourUnlocked,
     // The one-off Trade Market price-cut notice (GS-trade-rebalance): persisted while pending so a
     // reload before dismissal still shows it; cleared to undefined once the player closes it.
     priceRefund: state.priceRefund,

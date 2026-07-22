@@ -4,8 +4,16 @@
 > `gs_story` save; title tile / hub / cinematic all read **Story Tour**). **Star Tour is now the
 > *reward* mode, unlocked once Story Tour is complete** (`GS-story-startour-unlock`): the title's Star
 > Tour tile is hidden until a campaign exists, then shows **locked** ("Complete Story Tour to free-roam
-> the galaxy") until `storyComplete(story)` (the `completed` flag OR all five Sigils / `keyToOtherRealm`)
-> — *play the story, then travel the galaxy.* Voyage/Unending are untouched by the gate.
+> the galaxy") until the story is complete — *play the story, then travel the galaxy.* Voyage/Unending
+> are untouched by the gate. **The unlock is PERMANENT** (`GS-story-startour-unlock`, save **v30**
+> `starTourUnlocked`): winning the finale sets a MAIN-save flag (not the campaign's own `completed`,
+> which a NEW campaign resets to `false`), so beginning a fresh campaign never relocks Star Tour. The
+> gate reads `state.starTourUnlocked || storyComplete(state.story)` (the live-completed OR the ever-won
+> flag); a returning player mid-completed-campaign has the flag backfilled from `storyComplete` at boot
+> (`initState`) so nobody who already earned it loses it. **Aces cross over** (`GS-story-ace-tally`): a
+> hole-in-one on any Story round (`resolveStoryRound`/`resolveStoryTournament`) ticks the cross-mode
+> `lifetimeAces` shown on the title — the campaign's ECONOMY (credits/ships) stays inside `gs_story`,
+> but the lifetime ace stat is global (the ace celebration already reads `lifetimeAces + 1`).
 >
 > **Lore cards everywhere** (`GS-story-lore-cards`): every tappable item / world / relic / ship / gear
 > raises a **lore + description card** (there is never enough room for image + name + detail + lore

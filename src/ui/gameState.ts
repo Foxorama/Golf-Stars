@@ -205,6 +205,11 @@ export interface UiState {
    *  once ever, across every run + mode. `pickLoreEvent` reads this to decide eligibility; `dismissLore`
    *  adds the just-shown beat's id. */
   seenLore: SeenLore;
+  /** The PERMANENT Star Tour unlock (GS-story-startour-unlock): true once the Story Tour finale has been
+   *  won at least once. Persisted on the MAIN save (not the campaign's `gs_story`), so beginning a fresh
+   *  campaign — which resets that campaign's own `completed` flag — never relocks the free-roam reward.
+   *  The title gate shows the live Star Tour tile when this is set OR the current campaign is complete. */
+  starTourUnlocked: boolean;
   /** The lore beat currently being shown on the `'lore'` screen (GS-lore) — its id, resolved to its
    *  presentation via `loreEventById`. Transient (never persisted); set by the arrival lore gate,
    *  cleared on dismiss. */
@@ -533,6 +538,8 @@ export interface MetaProgress {
   reputationByCharacter?: ReputationByCharacter;
   strokePlayBest?: StrokePlayBest;
   seenLore?: SeenLore;
+  /** The permanent Star Tour unlock (GS-story-startour-unlock) — earned on the first Story finale win. */
+  starTourUnlocked?: boolean;
   /** Star Shards refunded by the GS-trade-rebalance 40% Trade Market price cut — set by the save
    *  migration, drives the one-off "prices dropped, here's your refund" notice. */
   priceRefund?: number;

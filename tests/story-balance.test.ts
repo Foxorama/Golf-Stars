@@ -9,7 +9,7 @@ import {
 import { buildStaticCourse } from '../src/sim/course/staticCourses';
 import { storyRoundCredits, defaultStoryState, type StoryAlignment } from '../src/sim/rpg/story';
 import { initState } from '../src/ui/game';
-import { resolveStoryTournament } from '../src/ui/gameUpdates';
+import { resolveStoryRound, resolveStoryTournament } from '../src/ui/gameUpdates';
 import type { PlayedHole } from '../src/sim/round';
 
 /**
@@ -127,5 +127,46 @@ describe('GS-story-balance — the economy funds the campaign', () => {
     expect(loss.story!.credits).toBe(500 + storyRoundCredits(3 * pars.length));
     expect(loss.story!.trophyIds).not.toContain('sigil-emerald');
     expect(loss.story!.ownedClubIds).not.toContain('major:emerald');
+  });
+});
+
+describe('GS-story-ace-tally — a hole-in-one on a Story round ticks the lifetime ace count', () => {
+  const course = buildStaticCourse('verdant-18');
+  const pars = course.holes.map((h) => h.par);
+  /** A par round with `aces` of the holes holed in one stroke (only `.record` is read). */
+  const roundWithAces = (aces: number) =>
+    pars.map((par, i) => ({
+      record: { par, strokes: i < aces ? 1 : par },
+      stat: {},
+      shots: [],
+      putts: [],
+      holed: true,
+      pickedUp: false,
+    })) as unknown as PlayedHole[];
+
+  function storyState(over: Partial<ReturnType<typeof initState>['run']> = {}) {
+    const base = { ...defaultStoryState('longshot-larry'), chapter: 1, credits: 500 };
+    const s0 = initState('ace-seed', { lifetimeAces: 4 }, undefined, base);
+    return { ...s0, story: base, course, run: { ...s0.run, staticCourseId: 'verdant-18', ...over } };
+  }
+
+  it('a Story WORLD round adds its aces to the cross-mode lifetime tally', () => {
+    const s = storyState({ storyRound: true });
+    expect(s.lifetimeAces).toBe(4);
+    const done = resolveStoryRound(s, roundWithAces(2));
+    expect(done.screen).toBe('storyResult');
+    expect(done.lifetimeAces).toBe(6); // 4 + 2 aces
+  });
+
+  it('an ace-less Story round leaves the tally untouched', () => {
+    const s = storyState({ storyRound: true });
+    const done = resolveStoryRound(s, roundWithAces(0));
+    expect(done.lifetimeAces).toBe(4);
+  });
+
+  it('a Story TOURNAMENT round also ticks the lifetime tally', () => {
+    const s = storyState({ storyTournament: 1 });
+    const done = resolveStoryTournament(s, roundWithAces(1));
+    expect(done.lifetimeAces).toBe(5); // 4 + 1 ace
   });
 });
