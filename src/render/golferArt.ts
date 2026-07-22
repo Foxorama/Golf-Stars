@@ -56,6 +56,10 @@ export interface GolferLook {
   /** Equipped cosmetic SHOES (GS-story-avatar) — the Story-gear footwear (shoe / boot / spikes) at the
    *  golfer's feet. Absent → the plain default feet (unchanged). Story Tour only. */
   shoes?: ApparelLook;
+  /** Equipped cosmetic CLUB SKIN (GS-story-avatar) — the Story SHAFT recolours the club the golfer swings
+   *  (the shaft always; the head too when no themed `gear` set claims it). Absent → the themed/plain club
+   *  (unchanged). Ignored when a `driver` (warhammer) skin is worn. Story Tour only. */
+  clubSkin?: ApparelLook;
 }
 /** A cap colour → a full look (shirt matches the cap; default skin) — the loader-crew fallback. */
 export function lookFromColor(color: string): GolferLook {
@@ -471,10 +475,25 @@ export function drawGolfer(
   // for a mythic WARHAMMER wreathed in lightning; else a bought themed club set (GS-proshop-2) tints the
   // head + glows; else a plain club head. The driver skin takes precedence over the in-run gear theme.
   const gear = look.gear;
+  // A cosmetic CLUB SKIN (GS-story-avatar) from the equipped Story shaft recolours the shaft the golfer
+  // swings; a glowing skin (legendary) also lays a soft aura under the shaft. It never overrides the
+  // warhammer driver skin, and a themed `gear` set still claims the HEAD glow below.
+  const clubSkin = look.clubSkin;
   if (look.driver) {
     drawWarhammer(ctx, hands, head, ang, swing, follow, alpha, look.driver);
   } else {
-  ctx.strokeStyle = gear ? gear.tint : '#d9dee8';
+  if (clubSkin?.glow) {
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.4;
+    ctx.strokeStyle = clubSkin.glow;
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(hands[0], hands[1]);
+    ctx.lineTo(head[0], head[1]);
+    ctx.stroke();
+    ctx.restore();
+  }
+  ctx.strokeStyle = clubSkin ? clubSkin.color : gear ? gear.tint : '#d9dee8';
   ctx.lineWidth = 2.4;
   ctx.beginPath();
   ctx.moveTo(hands[0], hands[1]);
@@ -509,6 +528,21 @@ export function drawGolfer(
       }
       ctx.restore();
     }
+  } else if (clubSkin) {
+    // No themed set claims the head, so the club skin tints it (with a soft aura for a glowing shaft).
+    if (clubSkin.glow) {
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.5;
+      ctx.fillStyle = clubSkin.glow;
+      ctx.beginPath();
+      ctx.arc(head[0], head[1], 5.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.fillStyle = clubSkin.accent ?? clubSkin.color;
+    ctx.beginPath();
+    ctx.arc(head[0], head[1], 3, 0, Math.PI * 2);
+    ctx.fill();
   } else {
     ctx.fillStyle = '#aeb6c6';
     ctx.beginPath();

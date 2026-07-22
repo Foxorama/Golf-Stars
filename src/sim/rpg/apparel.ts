@@ -87,10 +87,14 @@ export type GloveShape = 'glove' | 'gauntlet' | 'powerglove';
 /** Shoe silhouettes the on-course golfer's feet wear (GS-story-avatar): a `shoe`, a chunky `boot`, or
  *  spiked `spikes`. Story-gear worn looks only (`GolferLook.shoes`), no shoe apparel slot. */
 export type ShoeShape = 'shoe' | 'boot' | 'spikes';
+/** Club-skin marker for the wielded club's tint (GS-story-avatar): the equipped Story SHAFT recolours the
+ *  shaft (and, absent a themed club-set head, the head) the golfer swings. Only the palette is read — the
+ *  shape is a marker. Story-gear worn look only (`GolferLook.clubSkin`), no club apparel slot. */
+export type ClubShape = 'clubskin';
 
 /** The vector look a garment renders as — a shape family + palette + optional aura for the top tiers. */
 export interface ApparelLook {
-  shape: HatShape | ShirtShape | PantsShape | BagShape | DriverShape | GloveShape | ShoeShape;
+  shape: HatShape | ShirtShape | PantsShape | BagShape | DriverShape | GloveShape | ShoeShape | ClubShape;
   /** Primary fabric colour. */
   color: string;
   /** Secondary trim / brim / stripe colour. */

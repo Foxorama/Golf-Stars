@@ -30,7 +30,7 @@ import { drawGolfer } from './src/render/golferArt';
 import { STORY_GEAR } from './src/sim/rpg/storyGear';
 
 const BASE = { cap: '#19b2a6', shirt: '#138f86', skin: '#6b4a32', build: 1 };
-const SLOT_KEY = { hat: 'hat', bag: 'bag', glove: 'glove', shoes: 'shoes' };
+const SLOT_KEY = { hat: 'hat', bag: 'bag', glove: 'glove', shoes: 'shoes', shaft: 'clubSkin' };
 
 function tile(look, label, poses) {
   const wrap = document.createElement('div');
@@ -68,7 +68,7 @@ section('Default (no Story gear) vs a full kit');
 const row0 = document.createElement('div'); row0.style.display = 'flex'; row0.style.flexWrap = 'wrap';
 row0.appendChild(tile({ ...BASE }, 'DEFAULT — no gear', POSES));
 const kitA = { ...BASE };
-for (const id of ['gear:hat:oracle', 'gear:glove:power', 'gear:shoes:anchor', 'gear:bag:cosmic']) {
+for (const id of ['gear:hat:oracle', 'gear:glove:power', 'gear:shoes:anchor', 'gear:bag:cosmic', 'gear:shaft:nova']) {
   const it = STORY_GEAR.find((g) => g.id === id); if (it?.avatar) kitA[SLOT_KEY[it.slot]] = it.avatar;
 }
 row0.appendChild(tile(kitA, 'Full legendary kit', POSES));
@@ -79,7 +79,7 @@ for (const id of ['gear:hat:cowl', 'gear:glove:shed', 'gear:shoes:coil', 'gear:b
 row0.appendChild(tile(kitB, 'Herald cursed kit', POSES));
 document.body.appendChild(row0);
 
-for (const slot of ['hat', 'glove', 'shoes', 'bag']) {
+for (const slot of ['hat', 'glove', 'shoes', 'bag', 'shaft']) {
   section(slot.toUpperCase());
   const row = document.createElement('div'); row.style.display = 'flex'; row.style.flexWrap = 'wrap';
   for (const g of STORY_GEAR) {
