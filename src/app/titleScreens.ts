@@ -86,7 +86,7 @@ export function titleScreen(): string {
     </header>
     ${resumeHTML}
     <h2 class="gs-seclabel">${resumeHTML ? 'Or start a new run — choose your game' : 'Choose your game'}</h2>
-    <div class="gs-navtiles gs-navtiles--games">${modes}${storyTileHTML()}${starTourRewardTileHTML()}</div>
+    <div class="gs-navtiles gs-navtiles--games">${modes}${storyTileHTML()}${destinationTileHTML()}${universeUnendingTileHTML()}${starTourRewardTileHTML()}</div>
     <h2 class="gs-seclabel">Between runs</h2>
     ${navTilesHTML()}`;
 }
@@ -203,6 +203,35 @@ function starTourRewardTileHTML(): string {
       <span class="gs-navtile__cap">
         <span class="gs-navtile__title">🔒 Star Tour</span>
         <span class="gs-navtile__sub">Complete Story Tour to free-roam the galaxy</span>
+      </span>
+    </div>`;
+}
+
+/** Greyed-out placeholder tile beneath THE VOYAGE (GS-title-placeholders): a future campaign,
+ *  "The Destination". Non-interactive teaser (a `<div>`, not a button) in the game row, greyed like
+ *  the locked Star Tour tile — reuses the Voyage's gold backdrop, muted. Column-aligns under Voyage. */
+function destinationTileHTML(): string {
+  return `
+    <div class="gs-navtile gs-navtile--game" style="--mc:#3a4656;cursor:default;opacity:0.72;" aria-disabled="true" title="Coming soon">
+      <span class="gs-navtile__art" aria-hidden="true" style="filter:grayscale(0.85) brightness(0.55);">${voyageTileArt()}</span>
+      <span class="gs-navtile__cap">
+        <span class="gs-navtile__title">🔒 The Destination</span>
+        <span class="gs-navtile__sub">Coming soon</span>
+      </span>
+    </div>`;
+}
+
+/** Greyed-out placeholder tile beneath the UNENDING UNIVERSE (GS-title-placeholders): a future mode,
+ *  "Universe Unending" (NOT the Unending Universe above — a distinct, teased mode). Non-interactive,
+ *  greyed like the locked Star Tour tile — reuses the Unending violet backdrop, muted. Column-aligns
+ *  under the Unending Universe. */
+function universeUnendingTileHTML(): string {
+  return `
+    <div class="gs-navtile gs-navtile--game" style="--mc:#3a4656;cursor:default;opacity:0.72;" aria-disabled="true" title="Coming soon">
+      <span class="gs-navtile__art" aria-hidden="true" style="filter:grayscale(0.85) brightness(0.55);">${unendingTileArt()}</span>
+      <span class="gs-navtile__cap">
+        <span class="gs-navtile__title">🔒 Universe Unending</span>
+        <span class="gs-navtile__sub">Coming soon</span>
       </span>
     </div>`;
 }
