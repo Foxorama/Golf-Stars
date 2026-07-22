@@ -316,6 +316,14 @@ these systems** — each bullet is the tip of a documented iceberg.
     the corridor walls with real presence (inward deck shadow so the corridor reads sunk, dark-steel body,
     lit cap, buttress ribs, rivets). A new derelict painter = a new `style/` module or the platforms
     domain; never import style.ts.
+  - SHIP GREEN SEAT (GS-ship-deck-blend, `style/ship.ts styleShipGreenBlend`): the derelict gets NO grass
+    apron (a ship deck is not a lawn — the player asked for no flaring here), so the mown turf green sat as
+    a grass pad plonked straight onto the steel deck ("blend the fairway into the deck better"). Now the
+    green is SEATED into a recessed deck BAY: a dark seam groove, two collar rings grading the turf edge
+    down into the deck steel, and a cold machined steel LIP hugging the green — so it belongs to the ship,
+    not floating on it. Drawn ON TOP of the deck plating, UNDER the green surface; the grounded worlds'
+    grass green→apron blend (GS-green-blend) EXCLUDES the derelict for exactly this reason. Pure geometry,
+    zero rng, derelict-only → every other world byte-identical.
   - SHIP INTERIOR (GS-ship-interior, `style/ship.ts`): the derelict is the inside of a large wreck you play
     golf IN (a really-big ship, not shrunken players), so three more painters — pure geometry, zero rng,
     camera-proof (course-space counts + posHash), gated to `derelict` → every other world byte-identical.
@@ -1046,7 +1054,14 @@ these systems** — each bullet is the tip of a documented iceberg.
     onto turf (reads as floating); the depression is a THIN lip capped by body radius; the green is
     FLUSH with the fairway. Its OUTWARD fringe/collar apron rings (`styleGreenSurround`) draw UNDER
     the fairway pass, so they ease the green into the ROUGH and never paint over the corridor (the
-    apron-over-fairway bug). `deeprough`/`fescue` blobs are per-ARCHETYPE (`DEEP_ROUGH` has a row for
+    apron-over-fairway bug). Where the flared APRON fairway now wraps the green (GS-green-flare), that
+    rough-side surround is covered — so a second mown COLLAR ring (GS-green-blend, in the feature loop,
+    grounded worlds only) draws ON TOP of the fairway, two outward rings blended green↔fairway turf and
+    always LIGHTER-toward-fairway (never the dark ring GS-green-apron banished), melting the green→apron
+    junction (fairway → collar → fringe → green). The green's own perimeter ink softened to 0.5/1.1 so it
+    reads as a mown edge, not a hard outline. Void/cetus (glow rim / shelf) + rainbow (ribbon) keep their
+    own edge and stay byte-for-byte (the derelict is excluded too — its deck gets its own blend,
+    GS-ship-deck-blend); pure geometry, zero rng. `deeprough`/`fescue` blobs are per-ARCHETYPE (`DEEP_ROUGH` has a row for
     every world incl. void/cetus; fescue derives its body/tufts from `turfShade('rough', arch)`) — the
     GS-rough-gradient pass pours them onto every world, so neither may hardcode one world's palette.
     Hazards get a soft grassy margin blended toward the hazard (never
