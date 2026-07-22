@@ -109,20 +109,28 @@ export function hoverBank(headingDeg: number): number {
   return HOVER_BANK_MAX * Math.cos((headingDeg * Math.PI) / 180);
 }
 
-/** The CONTENT box — the region the RA→x / Dec→y world projection maps into. This is the original chart
- *  size; every constellation keeps its exact J2000 layout INSIDE this box. The visible chart is bigger
- *  than this (see the PAD below), so the worlds cluster in the middle and open starry space surrounds
- *  them on every side. */
-const CONTENT_W = 2240;
-const CONTENT_H = 1456;
+/** The CONTENT box — the region the RA→x / Dec→y world projection maps into. Every constellation keeps
+ *  its exact J2000 layout (same relative proportions) INSIDE this box; the box's SIZE sets how far apart
+ *  the worlds sit. The visible chart is bigger than this (see the PAD below), so open starry space
+ *  surrounds the world cluster on every side.
+ *
+ *  GS-star-map-spacing: the content box was GROWN (1.25× over the original 2240×1456) and the PAD shrunk
+ *  by exactly as much, so the worlds SPREAD OUT into what used to be empty margin — while CHART_W/CHART_H
+ *  stay byte-for-byte the same. The zoom-out cover floor (`starTourFitZoom` = max(w/CHART_W, h/CHART_H))
+ *  is defined purely off CHART_*, so holding those constant means the pinch-out limit — and thus the
+ *  "no black edges when fully zoomed out" guarantee — is completely unchanged. The worlds just occupy
+ *  more of the same-sized canvas. */
+const CONTENT_W = 2800;
+const CONTENT_H = 1820;
 
 /** Starry-space PADDING around the content box (GS-star-map-bigger-canvas). The world cluster is a
- *  DESTINATION field; space is mostly empty, so we wrap the constellations in a generous margin of pure
- *  starfield you can fly out into. The pad is asymmetric-friendly but here symmetric: the content sits
- *  dead-centre. A portrait-leaning aspect (taller than the old 1.54:1 landscape) means a phone screen
- *  zoomed all the way out shows far more starry sky and far less black letterbox. */
-const PAD_X = 620;
-const PAD_Y = 1120;
+ *  DESTINATION field; space is mostly empty, so we wrap the constellations in a margin of pure starfield
+ *  you can fly out into. Symmetric (content sits dead-centre). Trimmed from the original 620×1120 as the
+ *  content grew (GS-star-map-spacing), so CHART_W/CHART_H — and the whole zoom system keyed off them —
+ *  are unchanged while the worlds fill more of the frame. A portrait-leaning aspect (taller than a 1.54:1
+ *  landscape) still means a phone zoomed all the way out shows plenty of starry sky, not black letterbox. */
+const PAD_X = 340;
+const PAD_Y = 938;
 
 /** The chart's intrinsic size (bigger than any viewport → it pans). = content + padding on every side.
  *  The RA→x / Dec→y projection keeps the same proportions inside the content box, so the constellations
