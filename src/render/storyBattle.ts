@@ -206,8 +206,10 @@ export function mountStoryBattle(opts: {
   const bursts: Burst[] = [];
 
   let anchors: SerpentAnchors = { eyeX: 730, eyeY: 300, eyeR: 18, browX: 720, browY: 250, headH: 46, headAng: 3 };
-  const SERPENT_CX = 1040;
-  const SERPENT_CY = 230;
+  // GS-story-serpent-2: pulled left from 1040 so the great coil behind the skull stays on-canvas —
+  // the boss now rears out of its own coils instead of a lone head poking in from the wing.
+  const SERPENT_CX = 950;
+  const SERPENT_CY = 200;
   const POSE_T = 1.5; // held pose for the aim reveal (keeps the head framed + targetable)
 
   let raf = 0;
