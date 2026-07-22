@@ -242,6 +242,21 @@ these systems** — each bullet is the tip of a documented iceberg.
     sparse bag still misses more greens) is a short-game/scoring pass, never softer rough.
   - Greens are varied STAR shapes about `green` (single-valued r(θ)) — `pinInGreen`/`rayPolyDist`/
     `validateCourse` depend on it. Pin ≠ centroid (attack aims at flag; auto/safe at fat-of-green).
+  - NO PENALTY HAZARD ON THE PUTTING SURFACE (GS-green-clear, `clearGreenOfPenalty`): the greenside
+    placements ray-march a SINGLE line from the green CENTRE (`rayPolyDist`) and drop the blob just past
+    where THAT ray exits — but a concave/STAR green fans lobes to either side of a near notch, so a 2-D
+    blob lands in the bay and pokes onto an adjacent lobe. On a penalty greensideKind (lava = ember,
+    water = ice-ring/toxic-mire/ocean, void, breach = derelict) that left molten/acid/void/water ON the
+    green, blocking the putt to the hole (the player report: "ice/lava biomes get hazards on the green").
+    The fix is the `clearVoidHazards` SIBLING — a PURE zero-rng post-filter (byte-identical streams; only
+    which placed hazards SURVIVE changes) that DROPS any non-crossing penalty hazard sitting on the green
+    surface or walling off the short-approach landing (exactly `validateGreenApproach`'s conditions, so a
+    survivor can never violate them). Dropping never moves a blob into the corridor (no new fairness
+    violation) and only RAISES Stableford (contract 4). CROSSINGS are exempt (they end before the green —
+    `validateCrossings`); so is `validateGreenApproach`, which now EXCLUDES crossings from its flag/centre/
+    short-approach checks (the `validateInFairwayWater` idiom) — a long ice SHELF green's big max-radius
+    threw `shortPt` ~70 yd back onto a legitimate frozen-pond/creek CARRY, a spurious high-wildness crash.
+    `GENERATOR_VERSION` 43.
   - The green-END FLARES + varies per hole (GS-green-flare, superseding GS-green-end): the fairway APRON
     used to fan to a SYMMETRIC rounded blob that started at the corridor width and swelled evenly around
     the green — so every hole-end read as the same "tapered snake head + lollipop", and a small green sat

@@ -40,7 +40,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 42; // GS-green-flare: fairways FLARE into varied, asymmetric green complexes (fan/punchbowl/runoff/tongue/diagonal/shelf)
+export const GENERATOR_VERSION = 43; // GS-green-clear: drop penalty greenside blobs that poke onto the putting surface / approach (no lava/acid/water/void ON the green)
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -810,6 +810,46 @@ function clearVoidHazards(hazards: Feature[], pads: Feature[]): Feature[] {
     if (CROSSING_KINDS.has(h.kind)) return true;
     if (lieInfo(h.kind).penalty) return false; // the abyss is the only penalty on an island hole
     return pads.some((p) => polysOverlap(h.poly, p.poly));
+  });
+}
+
+/**
+ * Keep penalty hazards OFF the putting surface (GS-green-clear). The greenside placements ray-march a
+ * single line from the green CENTRE (`rayPolyDist`) and drop the blob just past where THAT ray exits
+ * the green — but a green is a varied STAR shape, so on a concave/kidney green a ray can exit through a
+ * near notch while the green's LOBES fan out to either side, and the blob (a 2-D body, not a point) then
+ * lands in the bay with its edge poking onto an adjacent lobe. For a penalty greenside kind (lava/water/
+ * void/breach — ember, ice-ring, toxic-mire, void, the derelict) that leaves molten/acid/void ON the
+ * green, blocking the putt to the hole (the player-reported bug: "ice and lava biomes can have hazards
+ * on the green that block getting the ball in the hole"). The same near-green geometry also let a ring
+ * blob rarely wall off the approach (a hard generateCourse throw at high wildness).
+ *
+ * This is a PURE post-filter (the `clearVoidHazards` sibling): zero rng draws — every seeded stream stays
+ * byte-identical, only which of the already-placed hazards SURVIVE changes. A non-crossing penalty hazard
+ * is DROPPED when it sits on the green surface, or walls off the flag / green centre / the short-approach
+ * landing — exactly the conditions `validateGreenApproach` proves, so a surviving penalty hazard can never
+ * violate them. Dropping (never moving) can't push a blob into the play corridor, so it introduces no new
+ * fairness violation; and removing a hazard only ever RAISES Stableford (contract 4). Forced-carry
+ * CROSSINGS are exempt — they terminate before the green (`validateCrossings`) — and NON-penalty sand/pot
+ * greenside guards are untouched (they don't block a putt).
+ */
+function clearGreenOfPenalty(hazards: Feature[], green: Vec, greenPolygon: Vec[], centreline: Vec[]): Feature[] {
+  // The short-approach landing point, computed exactly as `validateGreenApproach` does.
+  let greenR = 0;
+  for (const p of greenPolygon) greenR = Math.max(greenR, dist(p, green));
+  const appFrom = centrePoint(centreline, 0.84);
+  let dx = green[0] - appFrom[0];
+  let dy = green[1] - appFrom[1];
+  const dl = Math.hypot(dx, dy) || 1;
+  dx /= dl;
+  dy /= dl;
+  const shortPt: Vec = [green[0] - dx * (greenR + 12), green[1] - dy * (greenR + 12)];
+  return hazards.filter((h) => {
+    if (CROSSING_KINDS.has(h.kind)) return true; // a forced carry ends before the green (validateCrossings)
+    if (!lieInfo(h.kind).penalty) return true; // sand/pot greenside guards don't block a putt
+    if (polysOverlap(h.poly, greenPolygon)) return false; // molten/acid/void ON the putting surface
+    if (pointInPoly(shortPt, h.poly)) return false; // walls off the approach landing
+    return true;
   });
 }
 
@@ -1849,6 +1889,11 @@ function generateHole(
   // (water over sand, sand over lava…) is dropped — trees and the sanctioned crossings excepted.
   // Pure geometry, zero rng draws — every stream stays byte-identical.
   let cleanHazards = dedupeHazardOverlaps(hazards);
+  // Keep penalty hazards off the putting surface + approach (GS-green-clear): a greenside blob placed
+  // by a single centre-ray can poke onto a concave/star green, leaving lava/acid/water/void ON the green
+  // and blocking the putt (the "ice/lava hazards on the green" bug). Pure zero-rng post-filter — drops
+  // only the offending penalty blob, so no stream shifts and no new corridor violation can appear.
+  cleanHazards = clearGreenOfPenalty(cleanHazards, green, greenPolygon, centreline);
   // On a LOST-ROUGH island hole the pads float in the abyss and the abyss IS the only penalty, so
   // strip any hazard stranded in the void (GS-cetus / void): every penalty pool and every sand/tree
   // blob that isn't sitting on a pad. Zero-rng post-filter (like the dedupe), gated on lostRough so
@@ -2613,9 +2658,18 @@ export function validateGreenApproach(course: Course): string[] {
   const errs: string[] = [];
   course.holes.forEach((h, i) => {
     if (!h.hazards.some((hz) => hz.sanctioned && lieInfo(hz.kind).penalty)) return;
+    // A forced-carry CROSSING is a SANCTIONED penalty proven separately carryable by `validateCrossings`
+    // (it has a safe layup short + a shelf past the far bank), so it must not count as the ring walling
+    // off the green — excluded here exactly as `validateInFairwayWater` excludes it. (Without this, a long
+    // shelf green's big max-radius throws `shortPt` ~70 yd back onto a legitimate creek/frozen-pond carry,
+    // a spurious high-wildness crash on ice/lava worlds.)
+    const badLie = (p: Vec): boolean => {
+      const lie = lieAt(h, p);
+      return !!lieInfo(lie).penalty && !CROSSING_KINDS.has(lie);
+    };
     const target = h.pin ?? h.green;
-    if (lieInfo(lieAt(h, target)).penalty) errs.push(`hole[${i}]: greenside ring covers the flag`);
-    if (lieInfo(lieAt(h, h.green)).penalty) errs.push(`hole[${i}]: greenside ring covers the green centre`);
+    if (badLie(target)) errs.push(`hole[${i}]: greenside ring covers the flag`);
+    if (badLie(h.green)) errs.push(`hole[${i}]: greenside ring covers the green centre`);
     // A landing just short of the green on the incoming line must be penalty-free (a fair approach).
     const appFrom = centrePoint(h.centreline, 0.84);
     let dx = h.green[0] - appFrom[0];
@@ -2627,7 +2681,7 @@ export function validateGreenApproach(course: Course): string[] {
     const gf = h.features.find((f) => f.kind === 'green');
     if (gf) for (const p of gf.poly) greenR = Math.max(greenR, dist(p, h.green));
     const shortPt: Vec = [h.green[0] - dx * (greenR + 12), h.green[1] - dy * (greenR + 12)];
-    if (lieInfo(lieAt(h, shortPt)).penalty) errs.push(`hole[${i}]: greenside ring blocks the approach`);
+    if (badLie(shortPt)) errs.push(`hole[${i}]: greenside ring blocks the approach`);
   });
   return errs;
 }
