@@ -77,7 +77,7 @@ import {
 } from './style/hazards';
 import { styleFlora, archetypeDecor } from './style/flora';
 import { styleShipWalls, styleTornHull } from './style/walls';
-import { styleShipDeck, styleShipBreaches, styleShipPlates, styleShipInterior, jagShipPlatforms } from './style/ship';
+import { styleShipDeck, styleShipBreaches, styleShipPlates, styleShipInterior, jagShipPlatforms, styleShipGreenBlend } from './style/ship';
 import { GROUND_COVER, groundCover, easterEggs } from './style/ground';
 import { BIOME_RELIEF, RAINBOW_RELIEF, biomeRelief } from './style/relief';
 import {
@@ -605,6 +605,11 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
       prims.push({ t: 'poly', pts: offsetPoly(sp, -6), fill: mixHex(grShade.base, fwShade.base, 0.62) });
       prims.push({ t: 'poly', pts: offsetPoly(sp, -3), fill: mixHex(grShade.base, fwShade.base, 0.34) });
     }
+    // GS-ship-deck-blend: the derelict gets NO grass apron (no flaring on a ship), so seat its green
+    // into the metal DECK with a machined turf-pad bay instead — the "blend the fairway into the deck"
+    // report. Drawn on top of the deck plating, under the green surface. Derelict-only → other worlds
+    // byte-for-byte.
+    if (arch === 'derelict' && f.kind === 'green') prims.push(...styleShipGreenBlend(sp, grShade.base));
     // GS-inset-2: the green reads FLUSH with the fairway — no cast shadow (a drop shadow made the
     // putting surface float proud of the turf like a raised sticker). Its own mown fringe/collar
     // rings ease it into the land; the shelf/void-glow worlds still model their raised edge.

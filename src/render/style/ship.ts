@@ -20,7 +20,8 @@
 import type { Hole, Vec } from '../../sim/course/contract';
 import { dist, polylineDist } from '../../sim/course/contract';
 import type { Projector } from '../project';
-import { type Prim, type Box, bboxOf, centroidOf, offsetPoly, posHash } from './shared';
+import { type Prim, type Box, bboxOf, centroidOf, offsetPoly, posHash, hexAlpha } from './shared';
+import { mixHex } from '../palette';
 
 const DECK = {
   seam: 'rgba(8,11,16,0.55)', // recessed panel seam (a dark groove between plates)
@@ -38,6 +39,25 @@ const DECK = {
   scorch: 'rgba(3,5,9,0.5)', // an old burn mark
   rivet: 'rgba(180,200,222,0.26)', // a cold rivet glint
 };
+
+/**
+ * GS-ship-deck-blend: seat the derelict GREEN into the metal DECK. The derelict gets NO grass apron
+ * (the deck is not a lawn — the player asked for no flaring here), so the mown turf green sat as a
+ * grass pad plonked straight onto the steel deck with only its ink edge between — "blend the fairway
+ * into the deck better". This rings the green as a turf pad SET INTO a recessed deck bay: a dark seam
+ * groove, two collar rings grading the turf edge down into the deck steel, and a cold machined steel
+ * LIP hugging the green — so the green belongs to the ship instead of floating on it. Drawn ON TOP of
+ * the deck plating, UNDER the green surface. Pure geometry, zero rng; derelict-only at the call site.
+ */
+export function styleShipGreenBlend(sp: Vec[], greenBase: string): Prim[] {
+  const steel = '#3a444e'; // the deck's cold steel (matches the STEEL plate + DECK tones below)
+  return [
+    { t: 'poly', pts: offsetPoly(sp, -7.5), fill: 'rgba(6,10,15,0.5)' }, // recessed bay groove (dark panel seam)
+    { t: 'poly', pts: offsetPoly(sp, -5.5), fill: mixHex(greenBase, steel, 0.6) }, // deck-tone collar
+    { t: 'poly', pts: offsetPoly(sp, -2.8), fill: mixHex(greenBase, steel, 0.32) }, // easing up to the green
+    { t: 'poly', pts: offsetPoly(sp, -1.2), fill: 'none', stroke: hexAlpha('#90b3ce', 0.32), sw: 1.2 }, // machined steel lip
+  ];
+}
 
 // The ACID-BREACH palette (GS-ship-interior): a hole eaten through the deck by corrosive spill, open
 // to the void. Bright acid-green corrosion rings a dark star-lit breach — a hazard that reads as its

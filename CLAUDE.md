@@ -316,6 +316,14 @@ these systems** — each bullet is the tip of a documented iceberg.
     the corridor walls with real presence (inward deck shadow so the corridor reads sunk, dark-steel body,
     lit cap, buttress ribs, rivets). A new derelict painter = a new `style/` module or the platforms
     domain; never import style.ts.
+  - SHIP GREEN SEAT (GS-ship-deck-blend, `style/ship.ts styleShipGreenBlend`): the derelict gets NO grass
+    apron (a ship deck is not a lawn — the player asked for no flaring here), so the mown turf green sat as
+    a grass pad plonked straight onto the steel deck ("blend the fairway into the deck better"). Now the
+    green is SEATED into a recessed deck BAY: a dark seam groove, two collar rings grading the turf edge
+    down into the deck steel, and a cold machined steel LIP hugging the green — so it belongs to the ship,
+    not floating on it. Drawn ON TOP of the deck plating, UNDER the green surface; the grounded worlds'
+    grass green→apron blend (GS-green-blend) EXCLUDES the derelict for exactly this reason. Pure geometry,
+    zero rng, derelict-only → every other world byte-identical.
   - SHIP INTERIOR (GS-ship-interior, `style/ship.ts`): the derelict is the inside of a large wreck you play
     golf IN (a really-big ship, not shrunken players), so three more painters — pure geometry, zero rng,
     camera-proof (course-space counts + posHash), gated to `derelict` → every other world byte-identical.
