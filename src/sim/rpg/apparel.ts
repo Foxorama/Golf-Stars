@@ -91,10 +91,15 @@ export type ShoeShape = 'shoe' | 'boot' | 'spikes';
  *  shaft (and, absent a themed club-set head, the head) the golfer swings. Only the palette is read — the
  *  shape is a marker. Story-gear worn look only (`GolferLook.clubSkin`), no club apparel slot. */
 export type ClubShape = 'clubskin';
+/** Ball-tracer styles the flight renderer draws (GS-story-avatar): a thin `line` (the plain colour trail),
+ *  a fat glowing `comet` tail, a sparking `ember` fire-trail, or a `spark` hiss. The equipped Story BALL
+ *  drives it; palette + style are read at the play-view flight trail. Story-worn only (`GolferLook.ballTracer`),
+ *  no ball apparel slot. */
+export type TracerShape = 'line' | 'comet' | 'ember' | 'spark';
 
 /** The vector look a garment renders as — a shape family + palette + optional aura for the top tiers. */
 export interface ApparelLook {
-  shape: HatShape | ShirtShape | PantsShape | BagShape | DriverShape | GloveShape | ShoeShape | ClubShape;
+  shape: HatShape | ShirtShape | PantsShape | BagShape | DriverShape | GloveShape | ShoeShape | ClubShape | TracerShape;
   /** Primary fabric colour. */
   color: string;
   /** Secondary trim / brim / stripe colour. */

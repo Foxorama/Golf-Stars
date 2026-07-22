@@ -1217,11 +1217,19 @@ shops / stock.
   `GolferLook.clubSkin` + `ClubShape` marker in `apparel.ts`, read in `drawGolfer`'s club block — the shaft
   always, and the HEAD too when no themed `gear` set already claims its glow; a legendary shaft lays a soft
   aura down the shaft). Every shaft gear row gets a `clubskin` avatar (steel/graphite/wood/chrome/speed-red/
-  nova-glow); `storyGearAvatar` maps `shaft → clubSkin`. So the on-course avatar now reflects the WHOLE worn/
-  wielded kit — default outfit + themed clubs (glow) + hat/glove/shoes/bag + club skin + the story caddy
-  (`caddyId` was already story-aware). **Deferred:** the BALL → flight-TRAIL cosmetic — the ball is the one
-  remaining effect-only slot, and its cosmetic home is an in-flight trail in the shot-animation path
-  (`playView`/trajectory), a hot render path best done as its own focused pass, not an avatar-outfit rider.
+  nova-glow); `storyGearAvatar` maps `shaft → clubSkin`. **PR4** adds the last slot — the BALL → in-flight
+  TRACER: the equipped Story ball drives the play-view flight trail's colour + STYLE (a new `GolferLook.ballTracer`
+  + `TracerShape` — `line`/`comet`/`ember`/`spark` — in `apparel.ts`). The existing GS-tracer flight trail
+  (`playView.ts`, which read the golfer's cap colour) now, when a ball is equipped in a Story round, strokes in
+  the ball's colour, fattens + auras a glowing `comet` tail, scatters glinting motes for an `ember`/`spark`
+  fire-trail, and haloes the ball for a glowing tracer; the aim-line trajectory (`app.ts` `shotColor`) reads the
+  same tracer colour so the preview matches the flight. Every ball gear row gets a tracer `avatar` (white tour /
+  cyan / silver comet / hot-orange / pale-wind / aqua / magma-ember / violet-void-comet / acid-venom-spark /
+  gold-blessed-comet / phoenix-ember). Absent (every non-Story mode) → the cap-colour line, byte-for-byte. So the
+  on-course avatar now reflects the WHOLE worn/wielded/flown kit — default outfit + themed clubs (glow) + hat /
+  glove / shoes / bag + club skin + ball tracer + the story caddy (`caddyId` was already story-aware). Every slot
+  is now cosmetic. Pure render + data — ZERO sim rng, no save bump, no `_gs*`/URL hook. Eyeball via
+  `scripts/story-avatar-preview.mjs` (now with a sample-arc tracer row). Guarded by `tests/story-avatar.test.ts`.
 
 ## Open questions / deferred (revisit as chunks land)
 - **A genuinely-new gas-giant BIOME** (play on gas cloud-tops) — the player's optional "if we need to add
