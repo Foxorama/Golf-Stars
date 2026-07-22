@@ -11,6 +11,7 @@ import { effectPatchKind } from '../sim/rpg/effects';
 import { getCharacter } from '../sim/rpg/characters';
 import { equippedGearTheme, isPuttingCaddy, namedCaddyOwned } from '../sim/rpg/economy';
 import { apparelById } from '../sim/rpg/apparel';
+import { storyGearAvatar } from '../sim/rpg/storyGear';
 import { driverForCharacter, golfBagForCharacter, hatForCharacter, pantsForCharacter, shirtForCharacter } from '../ui/game';
 import type { GolferLook } from '../render/playView';
 import { CADDY_LABEL, hasCaddyArt } from '../render/caddyArt';
@@ -66,6 +67,19 @@ export function golferLook(): GolferLook | undefined {
   const base = getCharacter(state.run.loadout.characterId)?.style;
   if (!base) return undefined;
   const gear = equippedGearTheme(state.run.loadout);
+  // GS-story-avatar: a STORY TOUR round wears the DEFAULT outfit (the character's colour-coded base look)
+  // plus ONLY the cosmetics earned + equipped IN the campaign (its own Story gear) — the global clubhouse
+  // wardrobe is deliberately ignored here, so a golfer's Story look reflects their Story progress, not
+  // their main-save cosmetics. Every other mode (Voyage/Unending/Star Tour) keeps the clubhouse look below.
+  if (state.run.storyRound && state.story) {
+    const av = storyGearAvatar(state.story);
+    return {
+      ...base,
+      ...(gear ? { gear: { theme: gear.theme, tint: gear.tint } } : {}),
+      ...(av.hat ? { hat: av.hat } : {}),
+      ...(av.bag ? { bag: av.bag } : {}),
+    };
+  }
   // Layer the PLAYED character's equipped cosmetic hat/shirt (GS-clubhouse) over their base colours.
   const cid = state.run.loadout.characterId;
   const hat = apparelById(hatForCharacter(state, cid))?.look;

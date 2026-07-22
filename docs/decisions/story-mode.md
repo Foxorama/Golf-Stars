@@ -1189,6 +1189,26 @@ shops / stock.
   plumbing. No save bump, no sim rng. Guarded by the extended vendor-coverage + fleet tests in
   `tests/story-ships.test.ts`.
 
+- **GS-story-avatar** — ✅ *shipped (PR1: the seam + hats & bags)* (`sim/rpg/storyGear.ts` + `app/helpers.ts`).
+  Player ask: in Story Tour the on-course avatar was showing the GLOBAL clubhouse cosmetics (the main-save
+  wardrobe picks); it should instead wear the **DEFAULT colour-coded outfit** and only change with the
+  **equipment gathered + equipped IN the campaign** (the Story gear). Every other mode keeps the clubhouse
+  look. The seam: `golferLook()` (helpers.ts) already had `state.run.storyRound` + `state.story` in scope but
+  never branched (the `caddyId()` story-branch pattern applied to apparel). It now, on a Story round, composes
+  the golfer look from the character's `GolferStyle` BASE (the default outfit) + the in-run club-set glow
+  (`equippedGearTheme` — already the Story-bought themed clubs) + the equipped Story gear's WORN looks
+  (`storyGearAvatar(story)`), and NEVER reads the `*ForCharacter` clubhouse resolvers. Story gear carries a
+  new optional `StoryGearItem.avatar` (an `ApparelLook`, reusing the existing `drawGolfer` hat/bag/… painters —
+  what you equip in the campaign is what you wear), so a hat gear item wears its silhouette (visor/crown/
+  circlet/…) and a bag gear item props its colourway beside the golfer; effect-only slots (ball/shaft/…) and
+  un-avatared gear show nothing (the default outfit stands). `storyGearAvatar` is a pure resolver keyed by
+  `GEAR_AVATAR_SLOT` (gear slot → golfer-render slot). Pure render + data — ZERO sim rng (determinism /
+  auto≡interactive untouched — the avatar isn't part of the sim), no save bump (`equippedGear` already
+  persists), no `_gs*`/URL hook (no test-hub wiring). Guarded by `tests/story-avatar.test.ts`. **Follow-ups
+  (later PRs):** glove + shoes worn looks (new `GolferLook` glove/shoe fields + `drawGolfer` rendering), the
+  shaft → club-skin and ball → flight-trail cosmetics, and more per-item silhouette variety — the "quite a few
+  cosmetics" the ask anticipated, each a `storyGear` row + (where a new look is needed) a `drawGolfer` painter.
+
 ## Open questions / deferred (revisit as chunks land)
 - **A genuinely-new gas-giant BIOME** (play on gas cloud-tops) — the player's optional "if we need to add
   more" ask. Deferred as its OWN focused session: a new `BiomeArchetype` fans out to ~16 compile-forced
