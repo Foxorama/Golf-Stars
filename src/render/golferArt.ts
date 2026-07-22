@@ -50,6 +50,12 @@ export interface GolferLook {
    *  the caddy bag you outfit in the Clubhouse actually shows on the course. Absent → no bag prop (the
    *  clubs still carry their bag-tier gear skin). */
   bag?: ApparelLook;
+  /** Equipped cosmetic GLOVE (GS-story-avatar) — the Story-gear grip skin worn on the golfer's hands
+   *  (a glove / gauntlet / power-glove). Absent → bare hands (unchanged). Story Tour only. */
+  glove?: ApparelLook;
+  /** Equipped cosmetic SHOES (GS-story-avatar) — the Story-gear footwear (shoe / boot / spikes) at the
+   *  golfer's feet. Absent → the plain default feet (unchanged). Story Tour only. */
+  shoes?: ApparelLook;
 }
 /** A cap colour → a full look (shirt matches the cap; default skin) — the loader-crew fallback. */
 export function lookFromColor(color: string): GolferLook {
@@ -137,6 +143,14 @@ export function drawGolfer(
     ctx.moveTo(2, -30);
     ctx.lineTo(12, 0);
     ctx.stroke();
+  }
+
+  // Cosmetic SHOES (GS-story-avatar) — the equipped Story footwear at each planted foot (the default
+  // legs plant at −7 and +12; a cosmetic pants shape plants near the same feet). Drawn over the legs so
+  // the shoe caps the ankle. Absent → the bare default feet are unchanged.
+  if (look.shoes) {
+    drawShoe(ctx, -7, 0, look.shoes, alpha);
+    drawShoe(ctx, 12, 0, look.shoes, alpha);
   }
 
   // Torso (hip → shoulders, tilted toward the ball). A cosmetic shirt (GS-cosmetics) overrides the
@@ -511,6 +525,12 @@ export function drawGolfer(
   ctx.lineTo(hands[0], hands[1]);
   ctx.stroke();
 
+  // Cosmetic GLOVE (GS-story-avatar) — the equipped Story grip skin over the hands (a glove / gauntlet /
+  // power-glove), the cuff running a little up the lead forearm toward the shoulder. Absent → bare hands.
+  if (look.glove) {
+    drawGlove(ctx, hands, S, look.glove, alpha);
+  }
+
   // Head + headwear (brim/front points down the line, +x toward the target).
   ctx.fillStyle = look.skin;
   ctx.beginPath();
@@ -527,6 +547,124 @@ export function drawGolfer(
     ctx.fillRect(15, -60, 9, 3); // brim
   }
 
+  ctx.restore();
+}
+
+/**
+ * Draw a cosmetic SHOE (GS-story-avatar) at a planted foot, in the figure's local frame — a rounded
+ * upper with the toe pushed toward the target (+x) over a sole line. `boot` adds an ankle collar,
+ * `spikes` adds cleats under the sole; a `glow` look (legendary) gets a soft halo. Pure, assetless.
+ */
+function drawShoe(ctx: CanvasRenderingContext2D, x: number, y: number, look: ApparelLook, alpha: number): void {
+  const col = look.color;
+  const acc = look.accent ?? mixHex(col, '#000000', 0.35);
+  ctx.save();
+  if (look.glow) {
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.45;
+    ctx.fillStyle = look.glow;
+    ctx.beginPath();
+    ctx.ellipse(x + 2, y - 1.5, 6, 3.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  // Boot: an ankle collar rising above the shoe.
+  if (look.shape === 'boot') {
+    ctx.fillStyle = acc;
+    ctx.beginPath();
+    ctx.moveTo(x - 2, y - 2);
+    ctx.lineTo(x - 1, y - 8);
+    ctx.lineTo(x + 3, y - 8);
+    ctx.lineTo(x + 3.5, y - 2);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // Upper + sole: a rounded shoe with the toe pushed toward the target (+x).
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.moveTo(x - 3, y - 1);
+  ctx.quadraticCurveTo(x - 3.5, y - 4, x + 1, y - 4);
+  ctx.quadraticCurveTo(x + 6, y - 4, x + 6.5, y - 1);
+  ctx.lineTo(x + 6.5, y);
+  ctx.quadraticCurveTo(x + 3, y + 0.6, x - 3, y);
+  ctx.closePath();
+  ctx.fill();
+  // Sole line.
+  ctx.strokeStyle = acc;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(x - 3, y);
+  ctx.lineTo(x + 6.5, y);
+  ctx.stroke();
+  // Spikes: little cleats under the sole.
+  if (look.shape === 'spikes') {
+    ctx.fillStyle = acc;
+    for (const dx of [-1.5, 1.5, 4.5]) {
+      ctx.beginPath();
+      ctx.moveTo(x + dx - 0.7, y);
+      ctx.lineTo(x + dx + 0.7, y);
+      ctx.lineTo(x + dx, y + 1.6);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+/**
+ * Draw a cosmetic GLOVE (GS-story-avatar) over the grip hand, in the figure's local frame — a coloured
+ * hand blob with a cuff running a little up the forearm toward the shoulder `S`. `gauntlet` runs a longer
+ * armoured cuff + a knuckle ridge; `powerglove` adds the toy relic's control panel; a `glow` look gets a
+ * halo. Pure, assetless.
+ */
+function drawGlove(ctx: CanvasRenderingContext2D, hands: Vec, S: Vec, look: ApparelLook, alpha: number): void {
+  const col = look.color;
+  const acc = look.accent ?? mixHex(col, '#ffffff', 0.4);
+  const hx = hands[0];
+  const hy = hands[1];
+  const dx = S[0] - hx;
+  const dy = S[1] - hy;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len; // up the forearm toward the shoulder
+  ctx.save();
+  if (look.glow) {
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.5;
+    ctx.fillStyle = look.glow;
+    ctx.beginPath();
+    ctx.arc(hx, hy, 4.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  // Cuff up the forearm (longer + heavier for a gauntlet).
+  const cuffLen = look.shape === 'gauntlet' ? 9 : 4.5;
+  ctx.strokeStyle = look.shape === 'powerglove' ? acc : col;
+  ctx.lineWidth = look.shape === 'gauntlet' ? 5.2 : 4.2;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(hx, hy);
+  ctx.lineTo(hx + ux * cuffLen, hy + uy * cuffLen);
+  ctx.stroke();
+  // The gripping hand.
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.arc(hx, hy, 3, 0, Math.PI * 2);
+  ctx.fill();
+  if (look.shape === 'powerglove') {
+    // The toy relic: an accent control panel with a red readout.
+    ctx.fillStyle = acc;
+    ctx.fillRect(hx - 1.6, hy - 1.6, 3.2, 3.2);
+    ctx.fillStyle = look.glow ?? '#ff4d4d';
+    ctx.fillRect(hx - 1.2, hy - 1.0, 2.4, 0.8);
+  } else if (look.shape === 'gauntlet') {
+    // A bright knuckle ridge across the back of the hand.
+    ctx.strokeStyle = acc;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(hx, hy, 3, -0.4, 1.2);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
