@@ -163,6 +163,7 @@ export function mountStoryBattle(opts: {
   let shake = 0;
   let assaultStart = 0;
   let nextAttackAt = 0;
+  let lastVolleyAt = -9e9; // the maw gapes around each volley (GS-story-serpent-2)
   let overwhelmStart = 0;
   let overwhelmHitsDealt = 0;
   let aimStart = 0;
@@ -566,6 +567,7 @@ export function mountStoryBattle(opts: {
       // volleys
       if (now0 >= nextAttackAt) {
         spawnVolley();
+        lastVolleyAt = now0;
         nextAttackAt = now0 + PHASE_ATTACK_MS[phaseIdx]! * (0.9 + rng() * 0.2);
       }
       const elapsed = now0 - assaultStart;
@@ -750,7 +752,12 @@ export function mountStoryBattle(opts: {
     if (!ctx) return;
     if (dim > 0) ctx.globalAlpha = 1 - dim;
     const tPose = focus > 0 ? lerp(t, POSE_T + 0.06 * Math.sin(t * 0.9), Math.min(1, focus / 0.6)) : t;
-    anchors = paintSerpent(ctx, SERPENT_CX, SERPENT_CY, tPose, wakeLevel(), focus + roar * 0.12);
+    // the maw gapes around each volley (GS-story-serpent-2): opens as the attack winds up, spits, closes
+    const fighting = phase === 'assault' || phase === 'overwhelm';
+    const windUp = clamp01(1 - (nextAttackAt - now0) / 380);
+    const spit = clamp01(1 - (now0 - lastVolleyAt) / 520);
+    const rage = fighting ? Math.max(windUp * 0.85, spit) : 0;
+    anchors = paintSerpent(ctx, SERPENT_CX, SERPENT_CY, tPose, wakeLevel(), focus + roar * 0.12, { rage });
     ctx.globalAlpha = 1;
   }
 

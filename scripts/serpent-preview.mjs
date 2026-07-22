@@ -33,6 +33,7 @@ figure{margin:0;position:relative;}</style>
     { wake: 1.0, focus: 0.55, opts: CEREMONY, label: 'Sigil 5 · zooming to head' },
     { wake: 1.0, focus: 1.0, opts: CEREMONY, label: 'Sigil 5 · FINAL reveal (eye wide)' },
     { wake: 1.0, focus: 0, cx: 950, cy: 200, t: 1.5, label: 'FINAL BATTLE framing (CX 950 · pose t)' },
+    { wake: 1.0, focus: 0, cx: 950, cy: 200, t: 1.5, opts: { rage: 1 }, label: 'FINAL BATTLE · spitting (rage 1)' },
     { wake: 0.3, focus: 0, opts: { spread: 500, sleep: 0.85 }, cy: 300, label: 'Reseal ending · sung to sleep' },
   ];
   const app = document.getElementById('app');
