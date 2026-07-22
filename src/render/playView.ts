@@ -1010,21 +1010,64 @@ export function mountPlayView(
         // Trail.
         trail.push([gx, ballY]);
         if (trail.length > F.trailLen) trail.shift();
-        ctx.beginPath();
-        trail.forEach((p, i) => (i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1])));
-        // GS-tracer: the flight trail reads the chosen golfer's colour (was a fixed yellow).
+        const tracePath = (): void => {
+          ctx.beginPath();
+          trail.forEach((p, i) => (i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1])));
+        };
+        // GS-tracer: the flight trail reads the chosen golfer's colour (was a fixed yellow). GS-story-avatar:
+        // an equipped Story BALL overrides it with its own tracer colour + STYLE — a fat glowing `comet` tail,
+        // a sparking `ember` fire-trail, a `spark` hiss, or a plain coloured `line`. Absent (every non-Story
+        // mode) → the cap-colour line, byte-for-byte unchanged.
+        const tracer = look.ballTracer;
+        const trailCol = tracer ? tracer.color : look.cap;
+        const comet = tracer?.shape === 'comet';
+        const fiery = tracer?.shape === 'ember' || tracer?.shape === 'spark';
         ctx.save();
-        ctx.globalAlpha = 0.5;
-        ctx.strokeStyle = look.cap;
-        ctx.lineWidth = 2;
+        if (tracer && (tracer.glow || comet)) {
+          // A soft wide aura under the trail for a glowing/comet ball.
+          ctx.globalAlpha = 0.24;
+          ctx.strokeStyle = tracer.glow ?? trailCol;
+          ctx.lineWidth = comet ? 6.5 : 5;
+          ctx.lineCap = 'round';
+          tracePath();
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 0.55;
+        ctx.strokeStyle = trailCol;
+        ctx.lineWidth = comet ? 2.8 : 2;
+        ctx.lineCap = 'round';
+        tracePath();
         ctx.stroke();
+        // Ember/spark balls scatter a few glinting motes along the freshest trail points.
+        if (fiery && trail.length > 1) {
+          ctx.fillStyle = tracer!.accent ?? trailCol;
+          const from = Math.max(1, trail.length - 5);
+          for (let i = from; i < trail.length; i++) {
+            const p = trail[i];
+            if (!p) continue;
+            ctx.globalAlpha = 0.7 * ((i - from + 1) / (trail.length - from + 1));
+            ctx.beginPath();
+            ctx.arc(p[0], p[1], tracer!.shape === 'ember' ? 1.5 : 1.1, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
         ctx.restore();
 
-        // Ball (a touch bigger when lofted).
+        // Ball (a touch bigger when lofted). A glowing tracer ball wears a faint halo in its glow colour.
+        const ballR = 3 + (height / (peak + 1)) * 1.5;
+        if (tracer?.glow) {
+          ctx.save();
+          ctx.globalAlpha = 0.5;
+          ctx.fillStyle = tracer.glow;
+          ctx.beginPath();
+          ctx.arc(gx, ballY, ballR + 2.4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
         ctx.fillStyle = '#fff';
         ctx.strokeStyle = 'rgba(0,0,0,0.5)';
         ctx.beginPath();
-        ctx.arc(gx, ballY, 3 + (height / (peak + 1)) * 1.5, 0, Math.PI * 2);
+        ctx.arc(gx, ballY, ballR, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
 

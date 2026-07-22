@@ -60,6 +60,10 @@ export interface GolferLook {
    *  (the shaft always; the head too when no themed `gear` set claims it). Absent → the themed/plain club
    *  (unchanged). Ignored when a `driver` (warhammer) skin is worn. Story Tour only. */
   clubSkin?: ApparelLook;
+  /** Equipped cosmetic BALL TRACER (GS-story-avatar) — the Story BALL's in-flight trail colour + style
+   *  (line / comet / ember / spark), read by the play-view flight trail. Absent → the flight trail keeps
+   *  the golfer's cap colour (unchanged). Story Tour only. */
+  ballTracer?: ApparelLook;
 }
 /** A cap colour → a full look (shirt matches the cap; default skin) — the loader-crew fallback. */
 export function lookFromColor(color: string): GolferLook {

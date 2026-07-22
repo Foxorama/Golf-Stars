@@ -1425,7 +1425,9 @@ function playingBody(animating: boolean): string {
   overlayDecor = mapOpts.focus ? { mapProj: mapOpts, drift: true, meteorScorch: scorchActive() } : null;
   const svg = renderHoleSVG(play.hole, {
     shots: play.shots,
-    shotColor: golferLook()?.cap, // GS-tracer: the player's shot tracer reads the chosen golfer's colour.
+    // GS-tracer: the player's shot tracer reads the chosen golfer's colour. GS-story-avatar: an equipped
+    // Story BALL's tracer colour overrides it on the aim line too, so the aim preview matches the flight.
+    shotColor: (() => { const l = golferLook(); return l?.ballTracer?.color ?? l?.cap; })(),
     // On a matchplay boss stop, overlay the boss's pre-played line for THIS hole so you see them on the
     // course (where they drove it, where they ended up) — feedback on their ball, not just a number.
     // Best-ball (GS-team-duel) hides it: the hole result is revealed at the end-of-hole cards, and the

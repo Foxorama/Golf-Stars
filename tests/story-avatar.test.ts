@@ -40,13 +40,14 @@ describe('GS-story-avatar: equipped Story gear → worn cosmetic looks', () => {
     expect(av.bag!.shape).toBe('staffbag');
   });
 
-  it('effect-only gear with no avatar shows nothing (a ball is not worn)', () => {
-    const story = grantStoryGear(defaultStoryState(), 'gear:ball:soft');
+  it('an equipped ball gives an in-flight tracer', () => {
+    const story = grantStoryGear(defaultStoryState(), 'gear:ball:comet');
     const av = storyGearAvatar(story);
-    expect(av.hat).toBeUndefined();
-    expect(av.bag).toBeUndefined();
-    // the ball slot has no avatar mapping at all
-    expect(Object.keys(av)).toHaveLength(0);
+    expect(av.ballTracer).toBeDefined();
+    expect(av.ballTracer!.shape).toBe('comet');
+    expect(av.ballTracer!.glow).toBeTruthy(); // the legendary comet ball glows
+    // a plain ball still gives a coloured line tracer
+    expect(storyGearAvatar(grantStoryGear(defaultStoryState(), 'gear:ball:soft')).ballTracer!.shape).toBe('line');
   });
 
   it('an equipped glove is worn on the grip hand', () => {
@@ -72,7 +73,7 @@ describe('GS-story-avatar: equipped Story gear → worn cosmetic looks', () => {
     expect(av.clubSkin!.glow).toBeTruthy(); // the legendary nova shaft glows
   });
 
-  it('every worn slot (hat/bag/glove/shoes/shaft) carries a slot-appropriate avatar look (coverage)', () => {
+  it('every worn slot (hat/bag/glove/shoes/shaft/ball) carries a slot-appropriate avatar look (coverage)', () => {
     const SHAPES: Record<string, Set<string>> = {
       hat: new Set([
         'cap', 'bucket', 'visor', 'tophat', 'crown', 'helmet',
@@ -82,24 +83,17 @@ describe('GS-story-avatar: equipped Story gear → worn cosmetic looks', () => {
       glove: new Set(['glove', 'gauntlet', 'powerglove']),
       shoes: new Set(['shoe', 'boot', 'spikes']),
       shaft: new Set(['clubskin']),
+      ball: new Set(['line', 'comet', 'ember', 'spark']),
     };
     for (const g of STORY_GEAR) {
       const allowed = SHAPES[g.slot];
-      if (!allowed) continue; // the ball slot is effect-only (its cosmetic home is a flight trail)
+      if (!allowed) continue;
       expect(g.avatar, `${g.id} should define an avatar look`).toBeDefined();
       expect(allowed.has(g.avatar!.shape), `${g.id} shape ${g.avatar!.shape}`).toBe(true);
     }
   });
 
-  it('the effect-only ball slot carries no worn look', () => {
-    for (const g of STORY_GEAR) {
-      if (g.slot === 'ball') {
-        expect(g.avatar, `${g.id} is effect-only and should not be worn`).toBeUndefined();
-      }
-    }
-    // a Story ball resolves to no worn cosmetic
-    const story = grantStoryGear(defaultStoryState(), 'gear:ball:comet');
-    expect(storyGearAvatar(story)).toEqual({});
+  it('storyGearById still resolves a ball item (catalogue intact)', () => {
     expect(storyGearById('gear:ball:comet')).toBeDefined();
   });
 });

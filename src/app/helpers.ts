@@ -81,6 +81,7 @@ export function golferLook(): GolferLook | undefined {
       ...(av.glove ? { glove: av.glove } : {}),
       ...(av.shoes ? { shoes: av.shoes } : {}),
       ...(av.clubSkin ? { clubSkin: av.clubSkin } : {}),
+      ...(av.ballTracer ? { ballTracer: av.ballTracer } : {}),
     };
   }
   // Layer the PLAYED character's equipped cosmetic hat/shirt (GS-clubhouse) over their base colours.

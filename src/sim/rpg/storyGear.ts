@@ -175,6 +175,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:ball:soft',
     slot: 'ball',
     name: 'Soft-Cover Tour Ball',
+    avatar: { shape: 'line', color: '#eaf2ff' },
     rarity: 'rare',
     price: 180,
     blurb: 'More check — approaches bite and hold.',
@@ -191,6 +192,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:ball:zip',
     slot: 'ball',
     name: 'Zip-Spin Ball',
+    avatar: { shape: 'line', color: '#5fd0ff' },
     rarity: 'epic',
     price: 360,
     blurb: 'Vicious check — approaches rip back.',
@@ -207,6 +209,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:ball:comet',
     slot: 'ball',
     name: 'Comet Ball',
+    avatar: { shape: 'comet', color: '#dfe8ff', accent: '#ffffff', glow: '#bcd0ff' },
     rarity: 'legendary',
     price: 620,
     blurb: 'Long AND biting — the apex ball.',
@@ -518,6 +521,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:ball:range',
     slot: 'ball',
     name: 'Hot Distance Balls',
+    avatar: { shape: 'line', color: '#ff9a3a' },
     rarity: 'common',
     price: 90,
     blurb: 'Longer off the tee — +10y, straighter.',
@@ -539,6 +543,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:ball:wind',
     slot: 'ball',
     name: 'Wind-Cheater Balls',
+    avatar: { shape: 'line', color: '#a8c8e0' },
     rarity: 'rare',
     price: 140,
     blurb: 'Bores through the breeze — 45% less wind.',
@@ -555,6 +560,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:ball:floater',
     slot: 'ball',
     name: 'Floater Balls',
+    avatar: { shape: 'line', color: '#5fe0d0' },
     rarity: 'epic',
     price: 230,
     blurb: 'Skips clean across water — no penalty.',
@@ -571,6 +577,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:ball:magma',
     slot: 'ball',
     name: 'Magma-Skimmer Balls',
+    avatar: { shape: 'ember', color: '#ff6a2a', accent: '#ffd070', glow: '#ff5a2a' },
     rarity: 'epic',
     price: 230,
     blurb: 'Skips across lava — no penalty.',
@@ -587,6 +594,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:ball:void',
     slot: 'ball',
     name: 'Void-Walker Balls',
+    avatar: { shape: 'comet', color: '#b088ff', accent: '#e0d0ff', glow: '#8a5aff' },
     rarity: 'legendary',
     price: 340,
     blurb: 'Drifts across the abyss — the void spares it.',
@@ -819,6 +827,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:ball:venom',
     slot: 'ball',
     name: 'Venom-Core Ball',
+    avatar: { shape: 'spark', color: '#7fe0a0', accent: '#c0ff90', glow: '#7fe0a0' },
     rarity: 'epic',
     price: 340,
     alignment: 'herald',
@@ -871,6 +880,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:ball:blessed',
     slot: 'ball',
     name: 'Star-Blessed Ball',
+    avatar: { shape: 'comet', color: '#ffe9a8', accent: '#ffffff', glow: '#ffd873' },
     rarity: 'epic',
     price: 500,
     alignment: 'warden',
@@ -908,6 +918,7 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     id: 'gear:ball:phoenix',
     slot: 'ball',
     name: 'The Phoenix Core Ball',
+    avatar: { shape: 'ember', color: '#ff8a3a', accent: '#ffd070', glow: '#ff5a2a' },
     rarity: 'legendary',
     price: 640,
     acquire: 'reward',
@@ -1139,16 +1150,19 @@ export interface StoryAvatarLooks {
   shoes?: ApparelLook;
   /** The cosmetic club skin — the equipped SHAFT recolours the club the golfer swings. */
   clubSkin?: ApparelLook;
+  /** The cosmetic ball tracer — the equipped BALL's in-flight trail colour + style. */
+  ballTracer?: ApparelLook;
 }
 
 /** Map each equipped-gear SLOT to the golfer-render slot its `avatar` look drives. Only slots that have a
- *  visible avatar representation appear; effect-only slots (e.g. `ball`) are omitted. */
+ *  visible avatar representation appear. */
 const GEAR_AVATAR_SLOT: Partial<Record<GearSlot, keyof StoryAvatarLooks>> = {
   hat: 'hat',
   bag: 'bag',
   glove: 'glove',
   shoes: 'shoes',
   shaft: 'clubSkin',
+  ball: 'ballTracer',
 };
 
 /**
