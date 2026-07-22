@@ -233,7 +233,7 @@ export function styleGreen(
         arrows.push({ t: 'line', a: tip, b: [tip[0] - ar.dir[0] * head - perp[0] * (head * 0.7), tip[1] - ar.dir[1] * head - perp[1] * (head * 0.7)], stroke: col, sw: 1.05, round: true });
       }
       out.push({ t: 'clip', clip: poly, children: arrows });
-      if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: hexAlpha(s.ink, 0.7), sw: 1.2 });
+      if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: hexAlpha(s.ink, 0.5), sw: 1.1 }); // GS-green-blend: softer edge — the collar ring carries the transition now
       return out;
     }
     // Fall-line chevrons pointing downhill. GS-putt-depth: a STEEPER green (a harder, breakier stop)
@@ -285,7 +285,7 @@ export function styleGreen(
       ],
     });
   }
-  if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: hexAlpha(s.ink, 0.7), sw: 1.2 });
+  if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: hexAlpha(s.ink, 0.5), sw: 1.1 }); // GS-green-blend: softer edge — the collar ring carries the transition now
   return out;
 }
 /** Screen-space green slope ART inputs: the dominant plane's downhill dir + mag (GS-greens-3), and —

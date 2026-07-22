@@ -1046,7 +1046,14 @@ these systems** — each bullet is the tip of a documented iceberg.
     onto turf (reads as floating); the depression is a THIN lip capped by body radius; the green is
     FLUSH with the fairway. Its OUTWARD fringe/collar apron rings (`styleGreenSurround`) draw UNDER
     the fairway pass, so they ease the green into the ROUGH and never paint over the corridor (the
-    apron-over-fairway bug). `deeprough`/`fescue` blobs are per-ARCHETYPE (`DEEP_ROUGH` has a row for
+    apron-over-fairway bug). Where the flared APRON fairway now wraps the green (GS-green-flare), that
+    rough-side surround is covered — so a second mown COLLAR ring (GS-green-blend, in the feature loop,
+    grounded worlds only) draws ON TOP of the fairway, two outward rings blended green↔fairway turf and
+    always LIGHTER-toward-fairway (never the dark ring GS-green-apron banished), melting the green→apron
+    junction (fairway → collar → fringe → green). The green's own perimeter ink softened to 0.5/1.1 so it
+    reads as a mown edge, not a hard outline. Void/cetus (glow rim / shelf) + rainbow (ribbon) keep their
+    own edge and stay byte-for-byte (the derelict is excluded too — its deck gets its own blend,
+    GS-ship-deck-blend); pure geometry, zero rng. `deeprough`/`fescue` blobs are per-ARCHETYPE (`DEEP_ROUGH` has a row for
     every world incl. void/cetus; fescue derives its body/tufts from `turfShade('rough', arch)`) — the
     GS-rough-gradient pass pours them onto every world, so neither may hardcode one world's palette.
     Hazards get a soft grassy margin blended toward the hazard (never

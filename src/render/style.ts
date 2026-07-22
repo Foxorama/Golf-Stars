@@ -592,6 +592,19 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // Raise the green onto the same shelf as the fairway so the play surface reads as one continuous
     // raised mesa (GS-cetus-6) rather than the green sitting back down at rough level.
     if (calmShelf && f.kind === 'green') prims.push(...raisedShelf(sp, proj.scale, shelfLook));
+    // GS-green-blend: a mown COLLAR ring drawn ON TOP of the fairway, easing the green into the
+    // flared apron/fairway that now wraps it (GS-green-flare). styleGreenSurround eases the green into
+    // the ROUGH (drawn UNDER the fairway) — but where the apron fairway wraps the green the fairway
+    // covers that, so the green butted the bright fairway with only its hard ink edge between (the "green
+    // and fairway don't join smoothly" report). Two outward rings blended green↔fairway turf (a mown
+    // fringe/collar, always LIGHTER-toward-fairway so it never reads as the dark ring GS-green-apron
+    // banished) melt that junction: fairway → collar → fringe → green. Grounded worlds only — void/cetus
+    // edge their green with a glow rim / raised shelf, rainbow rides its own ribbon, so all stay
+    // byte-for-byte. Pure geometry, zero rng.
+    if (groundedFw && arch !== 'derelict' && f.kind === 'green') {
+      prims.push({ t: 'poly', pts: offsetPoly(sp, -6), fill: mixHex(grShade.base, fwShade.base, 0.62) });
+      prims.push({ t: 'poly', pts: offsetPoly(sp, -3), fill: mixHex(grShade.base, fwShade.base, 0.34) });
+    }
     // GS-inset-2: the green reads FLUSH with the fairway — no cast shadow (a drop shadow made the
     // putting surface float proud of the turf like a raised sticker). Its own mown fringe/collar
     // rings ease it into the land; the shelf/void-glow worlds still model their raised edge.
