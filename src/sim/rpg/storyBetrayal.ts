@@ -219,6 +219,12 @@ interface BetrayalVoice {
    *  personal and stops being a switch-flip. Shown at the turn of the Chapter-3 major, before The Choice. */
   sidelined: readonly DoubtLine[];
   tempted: readonly DoubtLine[];
+  /** GS-story-heard-the-word — the HERALD payoff of the `tempted` mid-round omen. When YOU turned to the
+   *  Coil, the friend who heard the word beside you (the trusted-twice betrayer) did NOT: they resisted the
+   *  same whisper and now confront you, heartbroken and uncomprehending — "I heard the word the same as you…
+   *  how could you side with them?" Fires only on the Herald path when this friend was the tempted odd one
+   *  out (so it pays off exactly the seed the omen planted). In their own voice + Coil thread. */
+  heardTheWord: readonly DoubtLine[];
 }
 
 const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
@@ -267,6 +273,12 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       { kind: 'say', text: '"Don’t look at me like that. I’m not saying he’s right. I’m saying I’ve aimed off the trouble my whole life, and he offered me a line with no trouble on it at all. Just the still, and the end. Maybe there’s something to it. Maybe."' },
       { kind: 'action', text: 'She pockets the ball and heads for the back nine — and for the first time in fifteen years, you cannot read which way she’ll break.' },
     ],
+    // GS-story-heard-the-word: the Herald payoff — she heard the windless line too, and chose the wind.
+    heardTheWord: [
+      { kind: 'action', text: 'Feather steps out of the Warden line and plants herself between you and the tee. There is no calm in her at all now.' },
+      { kind: 'say', text: '"I heard it too, you know. Standing right beside you when Voss holed the impossible one — the whisper in the deep rough. I heard every word of it. Every single one."' },
+      { kind: 'say', text: '"And I chose the wind. The doubt, the read, the trouble two yards right — all of it. A line with no trouble on it is a line with no LIFE on it. I heard the word the same as you. So how — HOW could you side with them?"' },
+    ],
   },
   'huang-woo-hook': {
     defection: [
@@ -313,6 +325,12 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       { kind: 'say', text: '"Both majors, right there on the tee next to you. When the whole gallery went dead for that Voss guy’s shot — you felt it too, yeah? That HUM underneath the quiet. Like the biggest crowd in the universe, roaring, a long way down."' },
       { kind: 'say', text: '"And Venoma keeps saying it’s for me. That the noise never stops down there. I keep telling her to get lost… and I keep finding reasons to go back and hear her say it one more time. Maybe there’s something to it. Don’t you dare tell Larry."' },
       { kind: 'action', text: 'They wrestle the grin back on, bump your shoulder, and jog to the tenth — but the laugh lands half a beat late, like an echo of itself.' },
+    ],
+    // GS-story-heard-the-word: the Herald payoff — Venoma reached them too, and they chose the quiet nights.
+    heardTheWord: [
+      { kind: 'action', text: 'Woo is waiting on the tee. No high-fives. No gallery worked up. Just them — and it is the quietest you have ever seen them stand.' },
+      { kind: 'say', text: '"I heard the roar same as you did. Venoma made sure of it — that hum under every silence, the biggest gallery in creation. It REACHED me, friend. Don’t you think it didn’t."' },
+      { kind: 'say', text: '"And I said no. I chose the 2 a.m. noodles and the quiet nights and the person you used to be over a crowd that only roars because everything’s ENDING. I heard the word the same as you. So how could you say yes? HOW?!"' },
     ],
   },
   'longshot-larry': {
@@ -361,6 +379,12 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       { kind: 'say', text: '"He reckons every ball I ever lost is still out there, at rest. Peaceful, like. And I keep thinkin’ — that doesn’t sound so bad? THAT’S the bit’s got me rattled. That it doesn’t sound bad at all. Reckon there might be somethin’ to it."' },
       { kind: 'action', text: 'He rips one off the deck edge into the black and — for the first time you’ve ever seen him do it — doesn’t watch to see where it goes.' },
     ],
+    // GS-story-heard-the-word: the Herald payoff — the Apostate whispered the still to him too; he picked the fight.
+    heardTheWord: [
+      { kind: 'action', text: 'Larry blocks the fairway, driver laid across his shoulders like a yoke, and for the first time in his life he is not grinning.' },
+      { kind: 'say', text: '"I heard it, mate. Every ball I ever lost, safe and still out there forever — the Apostate whispered it right in me ear, same as he did yours. Don’t you DARE tell me I didn’t hear it."' },
+      { kind: 'say', text: '"And I picked the fight anyway. The losing, the bunkers, the whole daft business of trying — ’cause that’s LIVING, and the still is just… stopping. I heard the word the same as you. So how could ya side with the thing that stops it ALL?"' },
+    ],
   },
   'backspin-bo': {
     defection: [
@@ -407,6 +431,12 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       { kind: 'say', text: '"I was beside you on both tees. When Voss holed the impossible one and the whole world went still — I felt the read CHANGE. Under my feet. Every green since has been pulling toward the same quiet centre."' },
       { kind: 'say', text: '"He calls it mercy. I read greens for a living; you can see why that reaches me. Everything, everywhere, coming to rest. I keep trying to prove the read wrong, and I keep agreeing with it a little more. Maybe there’s something to it."' },
       { kind: 'action', text: 'They roll an invisible ball dead straight along the bench, watch it die exactly where they knew it would, and go very quiet.' },
+    ],
+    // GS-story-heard-the-word: the Herald payoff — Bo read the still green as clear as you, and chose the broken ones.
+    heardTheWord: [
+      { kind: 'action', text: 'Bo is standing on the green you came to desecrate, marker in hand, reading a line that leads nowhere good.' },
+      { kind: 'say', text: '"I felt the read change under my feet the same second you did. The one perfectly still green — no break, no wind, everything at rest. I read that line as clear as you ever could. Clearer, maybe."' },
+      { kind: 'say', text: '"And I chose the broken greens. The living ones. A green that never breaks is a green nobody is left to play. I heard the word the same as you — so how, HOW could you side with them?"' },
     ],
   },
 };
@@ -456,6 +486,19 @@ export function betrayalSidelined(charId: string): readonly DoubtLine[] {
  *  SAME partner was picked twice, so the betrayer is the one you trusted most (the twist). */
 export function betrayalTempted(charId: string): readonly DoubtLine[] {
   return BETRAYAL_VOICE[charId]?.tempted ?? FALLBACK_TEMPTED;
+}
+
+const FALLBACK_HEARD: readonly DoubtLine[] = [
+  { kind: 'action', text: 'The friend you trusted most steps into your path, and there is no forgiveness in their face.' },
+  { kind: 'say', text: '"I heard the word the same as you did — I was right there beside you. And I said NO. How could you side with them?"' },
+];
+
+/** GS-story-heard-the-word: the HERALD payoff of the tempted omen — the trusted-twice friend who heard the
+ *  Coil's word beside you, RESISTED it, and now confronts you for turning: "I heard the word the same as
+ *  you… how could you side with them?" In their own voice + Coil thread. Fires only on the Herald path when
+ *  this friend was the tempted odd one out (so it pays off exactly the seed the mid-round omen planted). */
+export function betrayalHeardTheWord(charId: string): readonly DoubtLine[] {
+  return BETRAYAL_VOICE[charId]?.heardTheWord ?? FALLBACK_HEARD;
 }
 
 /** The betrayer's display short-name for story copy (the `{betrayer}` token) — falls back generic so a
@@ -509,7 +552,8 @@ export function everyGolferHasBetrayalVoice(): boolean {
       v.doubt.length >= 3 &&
       v.distance.length >= 3 &&
       v.sidelined.length >= 3 &&
-      v.tempted.length >= 2
+      v.tempted.length >= 2 &&
+      v.heardTheWord.length >= 2
     );
   });
 }

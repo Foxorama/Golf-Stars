@@ -96,11 +96,15 @@ default). One focused, tested, auto-merged PR each:
   `storyMidround.ts`, once-tracked in `seenStoryBeats`. Pure + render-only — zero sim rng, no save bump.
   Guards: `tests/story-midround.test.ts` (picker + per-character coverage + the hole-9 reducer flow) + a
   `?screen=storymidbeat` browser smoke.
-- **GS-story-heard-the-word** — NEXT: the mid-round omen's PAYOFF. Herald path — the trusted-twice friend
-  who heard the word (the `tempted` omen) resists it and confronts you: "I heard the word the same as you —
-  how could you side with them?" (a new same-twice Herald voice, wired into the Severing/Ch.4 beats). Warden
-  path — the defection/interlude references the mid-round Coil interaction so the turn "makes sense". Extends
-  `BETRAYAL_VOICE`; no new screen.
+- **GS-story-heard-the-word** — ✅ *shipped*: the mid-round omen's Herald PAYOFF. When you turn Coil, the
+  trusted-twice friend who heard the word beside you (the `tempted` omen) did NOT — they resisted the same
+  whisper, and now confront you: "I heard the word the same as you… how could you side with them?" Per-
+  character Herald arrival beats `story-heard-<golfer>` (`BETRAYAL_VOICE.heardTheWord`), gated on the Herald
+  path + `betrayerOddness==='tempted'` + that exact friend (new `LoreContext.storyBetrayerOddness`, populated
+  in `withLoreGate`), placed after the Venoma-welcome so the Viper lands first. Pays off the seed the omen
+  planted — the tempted friend falls to it on Warden, resists it on Herald. (The Warden linkage was already
+  delivered by the omen itself — the player SAW the friend recruited/tempted, then they defect.) Extends
+  `BETRAYAL_VOICE`; no new screen, no save bump; guarded in `tests/story-midround.test.ts`.
 - **GS-story-betrayal-polish** — balance, dialogue depth, costume polish, docs.
 - **GS-the-destination** — the FUTURE game mode the Warden ending now names: the Coil's remnant (and the
   betrayed friend) fled "past the edge of every chart" to **The Destination** — an unknown-deep voyage mode

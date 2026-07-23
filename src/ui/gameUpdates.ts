@@ -54,7 +54,7 @@ import { storyGearCreditMult } from '../sim/rpg/storyGear';
 import { tournamentForChapter, tournamentRival, sigilMatchThrough, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS, isStoryQualifier, chapterQualifierEvents, isTeamTournament, isSinglesMatchTournament, isTeamMatchTournament, teamFieldPairs, teamPartnerOrDefault, TEAM_PARTNER_EDGE } from '../sim/rpg/storyTournaments';
 import { resolveStoryTeamStroke, opposingField } from '../sim/rpg/storyTeams';
 import { qualifierField, qualifierPlacement, recordQualifier, qualifiedCount, qualifyTop, QUALIFY_EVENTS_NEEDED } from '../sim/rpg/storyQualifiers';
-import { betrayerId } from '../sim/rpg/storyBetrayal';
+import { betrayerId, betrayerOddness } from '../sim/rpg/storyBetrayal';
 import { getCharacter } from '../sim/rpg/characters';
 import type { HolePlay } from '../sim/rpg/play';
 import type { MatchUi, UiState } from './gameState';
@@ -292,6 +292,9 @@ export function withLoreGate(next: UiState): UiState {
     // GS-story-doubt: who the betrayal arc says will turn — lets the Ch.4 Warden foreshadow beats speak
     // in the RIGHT friend's voice (the doubt rows gate on chapter/path, so the early fallback never fires).
     ...(run.storyRound === true && next.story ? { storyBetrayerId: betrayerId(next.story) } : {}),
+    // GS-story-heard-the-word: why the betrayer is the odd one out, so the Herald "I heard it too" beat
+    // pays off exactly the tempted (trusted-twice) friend the mid-round omen showed hearing the word.
+    ...(run.storyRound === true && next.story ? (() => { const o = betrayerOddness(next.story); return o ? { storyBetrayerOddness: o } : {}; })() : {}),
   };
   const event = pickLoreEvent(ctx, next.seenLore);
   return event ? { ...next, screen: 'lore', pendingLoreId: event.id } : next;
