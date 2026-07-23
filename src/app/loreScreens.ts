@@ -10,6 +10,7 @@
 import { state, btn } from './ctx';
 import { loreEventById, resolveLoreTokens, type LoreLine } from '../sim/rpg/lore';
 import { lorePortraitSVG } from '../render/loreArt';
+import { caddyPortraitSVG } from '../render/caddyPortraits';
 import { getCharacter } from '../sim/rpg/characters';
 import { betrayerName } from '../sim/rpg/storyBetrayal';
 import { golferPreviewSVG } from '../render/apparelArt';
@@ -65,8 +66,14 @@ function loreLineHTML(l: LoreLine, resolve: (t: string) => string): string {
 }
 
 /** GS-story-doubt: a beat spoken by one of the PLAYABLE golfers carries a `golfer:<id>` portrait — drawn
- *  as their real figure (the cast is the portrait). Everything else resolves through `lorePortraitSVG`. */
+ *  as their real figure (the cast is the portrait). GS-story-caddy-quest-dialogue: a `caddy:<id>` portrait
+ *  draws the ally's roster bust (the caddy-quest mid-round beat). Everything else resolves through
+ *  `lorePortraitSVG`. */
 function lorePortrait(portrait: string): string {
+  if (portrait.startsWith('caddy:')) {
+    const svg = caddyPortraitSVG(portrait.slice('caddy:'.length));
+    if (svg) return svg;
+  }
   if (portrait.startsWith('golfer:')) {
     const ch = getCharacter(portrait.slice('golfer:'.length));
     if (ch) {
