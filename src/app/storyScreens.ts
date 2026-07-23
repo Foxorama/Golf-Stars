@@ -242,12 +242,13 @@ function questBannerHTML(story: StoryState): string {
   if (!q) return '';
   const world = q ? questWorld(q) : undefined;
   const worldName = world ? staticCourseSpec(world)?.name ?? 'their world' : 'their world';
-  // GS-story-quest-beat: the accepted quest gives the ally a spoken send-off (their authored `offer`
-  // dialogue, otherwise unused) before you fly — a story beat, not an instant drop into another round —
-  // and it's a shorter NINE-hole round (GS-story-quest-9), not a repeat 18 on the world you just cleared.
-  const offer = q.offer.map((l) => `<p style="margin:0 0 6px;color:#e6ddf0;font-size:13px;line-height:1.5;">${l}</p>`).join('');
-  // GS-story-reward-variety: tease the PRIZE on the offer, so the pull to fly out and play is concrete — a
-  // ship part / equipment / club, named, with its "why you want it" line.
+  // GS-story-quest-offer-beat: the ally's spoken send-off (their authored `offer` dialogue) is NO LONGER shown
+  // as prose here — it now plays as a cinematic beat card the instant before the quest round tees off, on BOTH
+  // round-start paths (this "fly out" button AND the star map's "accept & play"). So the first story beat always
+  // lands, exactly once, regardless of route. This banner keeps a short hook + the prize teaser + the fly button.
+  // It's a shorter NINE-hole round (GS-story-quest-9), not a repeat 18 on the world you just cleared.
+  // GS-story-reward-variety: tease the PRIZE, so the pull to fly out and play is concrete — a ship part /
+  // equipment / club, named, with its "why you want it" line.
   const effect = questRewardEffectLabel(q);
   const rewardTeaser = `
     <div style="margin:0 0 10px;background:#181322;border:1px solid #3a2f4a;border-left:3px solid #a97b25;border-radius:10px;padding:8px 12px;">
@@ -259,7 +260,7 @@ function questBannerHTML(story: StoryState): string {
     <section style="max-width:520px;margin:12px auto 0;">
       <div style="background:linear-gradient(180deg,#1e1630,#140e1e);border:1px solid #5a3f8a;border-radius:12px;padding:14px 16px;">
         <div style="font-size:15px;font-weight:800;color:#d6c2ff;">🗺 ${q.title} — with ${questGiverName(q).split(' ')[0]}</div>
-        <div style="margin:8px 0 10px;">${offer}</div>
+        <p style="margin:8px 0 10px;color:#e6ddf0;font-size:13px;line-height:1.5;">${q.hook}</p>
         ${rewardTeaser}
         <button class="gs-btn" style="background:linear-gradient(180deg,#2a1e44,#1a1230);border-color:#7a5ab0;color:#e2d4ff;width:100%;text-align:left;padding:11px 14px;"
           data-action='${JSON.stringify({ type: 'playStoryQuest' })}'>

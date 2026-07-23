@@ -54,3 +54,27 @@ export function storyQuestBeatScreen(): string {
     { type: 'storyQuestBeatContinue' },
   );
 }
+
+/**
+ * GS-story-quest-offer-beat: the ally's PITCH beat, shown the instant before a quest round tees off — the
+ * "first story beat" that the star map's "accept & play" path used to skip. Reuses the same shared `.gs-lore*`
+ * beat card, so it reads identically to every other story beat and forks no CSS. Reads `state.pendingQuestOffer`
+ * (the assembled beat with the ally's portrait + `offer` lines); its single CTA dispatches
+ * `storyQuestOfferContinue` (fly out, tee up the round).
+ */
+export function storyQuestOfferScreen(): string {
+  const beat = state.pendingQuestOffer;
+  if (!beat) {
+    return `<div style="min-height:60vh;display:flex;align-items:center;justify-content:center;padding:24px;">${btn(
+      'Fly out together →',
+      { type: 'storyQuestOfferContinue' },
+      { variant: 'primary' },
+    )}</div>`;
+  }
+  const lines: readonly LoreLine[] = beat.lines;
+  return loreBeatHTML(
+    { accent: beat.accent, kicker: beat.kicker, title: beat.title, speaker: beat.speaker, portrait: beat.portrait, lines, cta: beat.cta },
+    (t) => t,
+    { type: 'storyQuestOfferContinue' },
+  );
+}

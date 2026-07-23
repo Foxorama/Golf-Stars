@@ -6,7 +6,7 @@
  * the completion recap — and a NON-quest round never diverts (no interruption of the main story).
  */
 import { describe, it, expect } from 'vitest';
-import { questBeatFor, questBeatTurnIndex } from '../src/sim/rpg/storyQuestBeat';
+import { questBeatFor, questBeatTurnIndex, questOfferBeatFor } from '../src/sim/rpg/storyQuestBeat';
 import { STORY_QUESTS, questForCaddy } from '../src/sim/rpg/storyQuests';
 import { defaultStoryState, type StoryState } from '../src/sim/rpg/story';
 import { initState, reduce } from '../src/ui/game';
@@ -94,11 +94,14 @@ function sandyQuestReady(): UiState {
   return { ...initState('sandy-quest-seed', {}, undefined, story), screen: 'story' as const };
 }
 
-/** Dismiss any arrival lore beat(s) so we reach the intro. */
+/** Dismiss the ally's OFFER beat (GS-story-quest-offer-beat) and any arrival lore beat(s) so we reach the
+ *  intro — the pitch now plays before every quest round, regardless of entry path. */
 function pastLore(s0: UiState): UiState {
   let s1 = s0;
   let guard = 0;
-  while (s1.screen === 'lore' && guard++ < 10) s1 = reduce(s1, { type: 'dismissLore' });
+  while ((s1.screen === 'storyQuestOffer' || s1.screen === 'lore') && guard++ < 12) {
+    s1 = reduce(s1, s1.screen === 'storyQuestOffer' ? { type: 'storyQuestOfferContinue' } : { type: 'dismissLore' });
+  }
   return s1;
 }
 
@@ -162,5 +165,83 @@ describe('GS-story-caddy-quest-dialogue — the reducer flow on a quest round', 
       s1 = next;
     }
     expect(s1.screen).toBe('storyResult');
+  });
+});
+
+// ── GS-story-quest-offer-beat: the ally's PITCH always plays before the quest round, on EITHER entry path ──
+
+describe('GS-story-quest-offer-beat — the pure offer-beat assembler', () => {
+  it('assembles the offer beat from the active quest — the ally pitches in their own portrait', () => {
+    const beat = questOfferBeatFor({ storyQuest: 'quest-sandy' } as unknown as Run)!;
+    expect(beat).toBeTruthy();
+    expect(beat.questId).toBe('quest-sandy');
+    expect(beat.caddyId).toBe('sandy-sandsaver');
+    expect(beat.portrait).toBe('caddy:sandy-sandsaver');
+    // the pitch lines are exactly the quest's authored `offer` dialogue, one `say` line each.
+    const offer = questForCaddy('sandy-sandsaver')!.offer;
+    expect(beat.lines.map((l) => l.text)).toEqual([...offer]);
+    expect(beat.lines.every((l) => l.kind === 'say')).toBe(true);
+  });
+
+  it('is QUEST-ONLY — no run / no storyQuest / unknown quest → no offer beat', () => {
+    expect(questOfferBeatFor(undefined)).toBeUndefined();
+    expect(questOfferBeatFor({} as Run)).toBeUndefined();
+    expect(questOfferBeatFor({ storyQuest: 'nope' } as unknown as Run)).toBeUndefined();
+  });
+
+  it('every quest resolves an offer beat (all have authored `offer` lines)', () => {
+    for (const q of STORY_QUESTS) {
+      const beat = questOfferBeatFor({ storyQuest: q.id } as unknown as Run);
+      expect(beat, `${q.id} has an offer beat`).toBeTruthy();
+      expect(beat!.lines.length, `${q.id} pitch has lines`).toBeGreaterThanOrEqual(1);
+    }
+  });
+});
+
+describe('GS-story-quest-offer-beat — the first beat always fires, regardless of path', () => {
+  it('the CLUBHOUSE "fly out" path shows the pitch, then tees off the round', () => {
+    const hub = sandyQuestReady(); // quest already accepted, on the clubhouse
+    const offer = reduce(hub, { type: 'playStoryQuest' });
+    expect(offer.screen).toBe('storyQuestOffer');
+    expect(offer.pendingQuestOffer!.questId).toBe('quest-sandy');
+    expect(offer.run.storyQuest).toBe('quest-sandy'); // the round is already built behind the beat
+
+    const intro = pastLore(offer); // continue past the pitch (+ any arrival lore) to the round intro
+    expect(intro.screen).toBe('intro');
+    expect(intro.pendingQuestOffer).toBeUndefined();
+    expect(intro.run.storyQuest).toBe('quest-sandy');
+    expect(intro.course.holes.length).toBe(9);
+  });
+
+  it('the STAR-MAP "accept & play" path shows the SAME pitch first (the reported bug)', () => {
+    // Sandy offerable, flown on elsewhere, standing on the star map — accept & play straight from the chart.
+    const story: StoryState = {
+      ...defaultStoryState('feather-fade'),
+      chapter: 2,
+      hiredCaddyIds: ['sandy-sandsaver'],
+      activeCaddyId: 'sandy-sandsaver',
+      caddiedRoundIds: ['sandy-sandsaver'],
+      clearedWorldIds: ['standrews-18', 'verdant-18'],
+    };
+    const map = { ...initState('map-offer-seed', {}, undefined, story), screen: 'starTour' as const };
+    const offer = reduce(map, { type: 'storyStartQuest', courseId: 'desert-18' });
+    // Used to drop straight into the round — now it pauses on the ally's pitch first, exactly like the clubhouse.
+    expect(offer.screen).toBe('storyQuestOffer');
+    expect(offer.pendingQuestOffer!.questId).toBe('quest-sandy');
+    expect(offer.story!.activeQuestId).toBe('quest-sandy'); // accepted as part of the same action
+
+    const intro = pastLore(offer);
+    expect(intro.screen).toBe('intro');
+    expect(intro.pendingQuestOffer).toBeUndefined();
+    expect(intro.run.storyQuest).toBe('quest-sandy');
+  });
+
+  it('continuing past the pitch fires it exactly ONCE — the beat never re-triggers into the round', () => {
+    const intro = pastLore(reduce(sandyQuestReady(), { type: 'playStoryQuest' }));
+    expect(intro.screen).toBe('intro');
+    // Play the whole round; the offer beat must never reappear (it belongs before the round, not during it).
+    const played = playUntilNotPlaying(reduce(intro, { type: 'playInteractive' }));
+    // The first non-playing screen is the MID-ROUND beat (the turn), not another offer beat.
+    expect(played.screen).not.toBe('storyQuestOffer');
   });
 });

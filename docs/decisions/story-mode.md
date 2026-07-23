@@ -770,6 +770,20 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   the Coil lore portrait into the beat card, since a Herald caddy has no `caddyArt` figure; Venoma #570,
   Ouros #571, Ecdysis). Each shipped as its own focused PR and also deepened that ally's `offer` + `complete`
   dialogue, so the whole quest chain now reads as a beginning, a middle, and an end.
+- **GS-story-quest-offer-beat** — ✅ *shipped*. The FIRST beat (the ally's pitch) was skippable: it lived only
+  as **prose in the clubhouse quest banner** (`questBannerHTML`), so the star-map **"accept & play"** path
+  (`storyStartQuest`, which accepts + tees off in one action) dropped the player straight into the round and
+  they *never saw the pitch* — the quest lost its whole setup. Fix: the `offer` dialogue now plays as a proper
+  cinematic beat on the shared `.gs-lore*` card (`storyQuestOffer` screen, `questOfferBeatFor` assembler — the
+  `questBeatFor` sibling, same `beatFrame` identity + `caddy:<id>`/Coil portrait). BOTH round-start diverts
+  (`playStoryQuest` from the clubhouse AND `storyStartQuest` from the map) build the run, then — if the quest
+  has `offer` lines — divert to the offer beat; `storyQuestOfferContinue` funnels on to the SAME `withLoreGate`
+  intro both paths already shared. So the first beat **always fires regardless of path, exactly once**: the
+  banner no longer carries the pitch prose (only a short `hook` + the reward teaser + the fly button), so the
+  clubhouse path can't double it (banner + beat). Quest-only + zero sim rng (assembled from `Run.storyQuest`,
+  like the mid-round beat); no `STORY_VERSION` bump (the run field is transient). Guarded by
+  `story-quest-beat.test.ts` (offer assembler + both entry paths show the pitch once + never re-fires into the
+  round) + patched `story-flow.test.ts` quest flows + `?screen=storyquestoffer` browser smoke.
 - **GS-story-fullbody** → **superseded by GS-story-figures.** The first fix wrapped each portrait BUST as the
   head+torso of a figure with drawn legs beneath (`storyStandee.ts`) — but a bust authored as head+chest with
   stick-legs bolted under it read as programmer-art (big head / short legs), rejected on sight. Removed.
