@@ -161,11 +161,20 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
     offer: [
       '🎒 "You rang? No — I rang. There’s a golfer collapsed at the Forge, third round of heat-stroke, and the ' +
         'Coil won’t stop play to help. Para-Spatial Medics don’t abandon a patient. Neither do I."',
+      '"I lost one, you know. Years ago, on a course just like Orion — waited for permission that never came, and ' +
+        'by the time I moved it was too late. I don’t wait for permission any more. I answer the call."',
       '"Fly me to Orion Forge. Play the round so the tour can’t cancel it, and I’ll work the sidelines. Save the ' +
         'game, I save the golfer. And I’ll fit you with a wedge that’ll never let a chip flatline."',
     ],
+    duringQuest: [
+      { kind: 'action', text: 'At the turn Dr Chipinski jogs up from the sideline tent, sleeves rolled and scorched, stethoscope swinging, and flashes you a quick thumbs-up before the worry settles back over his face.' },
+      { kind: 'say', text: '🎒 "Pulse is steadying — colour’s coming back into them. But that Coil marshal keeps eyeing the clock. Long as there’s a round in play, they can’t clear the Forge and cart everyone off. So keep swinging, champion. You are the reason these doors stay open."' },
+      { kind: 'say', text: '"Funny thing about a call-out: nobody rings on the easy days. You just answer, and you keep answering. Give me nine more clean holes and I’ll give this golfer their life back. Deal?"' },
+    ],
     complete: [
       '🎒 "Patient’s stable. Colour’s back. Ha — you rang, I answered, everybody lives. That’s the practice."',
+      '"You kept the round alive when it would’ve been so easy to walk in out of that heat. You didn’t. That’s the ' +
+        'whole oath, right there — not the cleverness, the not-leaving. You’d have made a fine medic, champion."',
       '"Here — a sleeve of Phoenix Core balls, milled on the sidelines while I worked. Each one wound around ' +
         'the same fire I use to restart a heart. Chip with one and it always finds a pulse near the pin — it ' +
         'won’t let a ball flatline any more than I will. Doctor’s orders."',
