@@ -299,8 +299,15 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
     offer: [
       '🖤 "Come to the edge of the Core with me, champion. To the black mouth where I first heard it — the ' +
         'whisper under the world. I have shown that place to no living soul."',
+      '"I was the brightest the Wardens ever raised, you know. Their golden child, before you. And out there at ' +
+        'the edge I heard the truth they had trained me to shout over — and I could not un-hear it."',
       '"Play the abyss at my side. Not to conquer it — to LISTEN. When you understand what I understood out ' +
         'there, I will put my own driver in your hands. The one I carried down when I fell."',
+    ],
+    duringQuest: [
+      { kind: 'action', text: 'At the edge of the Core the Apostate halts you where the abyss falls away into nothing. For a moment neither of you plays; he only listens, eyes closed, the way a man listens for a tide.' },
+      { kind: 'say', text: '🖤 "There. Do you hear it now, under the silence? That is the whisper. It does not command. It does not threaten. It simply tells the truth the Wardens spend their whole lives shouting over — that every ball, in the end, wants to stop."' },
+      { kind: 'say', text: '"Play on, champion. Do not conquer this place — let it in. When you understand what I understood out here, the driver in my hands becomes yours, and you will never fear a lie again."' },
     ],
     complete: [
       '🖤 "There. You heard it too — I watched your hands go still on the club. That quiet is the truth the ' +
