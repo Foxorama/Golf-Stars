@@ -251,16 +251,16 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       '"Stop WINNING! You’re making the noise go quiet and I can’t— I won’t go back to the quiet. SWING SOFTER!"',
     ],
     doubt: [
-      { kind: 'action', text: 'Woo hasn’t shouted in three worlds. At dinner he pushes noodles around the bowl, then finally looks up.' },
+      { kind: 'action', text: 'Woo hasn’t shouted in three worlds. At dinner they push noodles around the bowl, then finally look up.' },
       { kind: 'say', text: '"Hey. Real question. When the gallery goes quiet — REALLY quiet — do you hear it? Underneath? There’s a hum. Like a crowd, but a long, long way down."' },
       { kind: 'say', text: '"The hooded weirdos say everyone hears it eventually. HA! Creepy, right? …Right. Anyway. Forget it. GREAT noodles tonight!"' },
-      { kind: 'action', text: 'His laugh lands half a beat late, like an echo of itself.' },
+      { kind: 'action', text: 'Their laugh lands half a beat late, like an echo of itself.' },
     ],
     distance: [
       { kind: 'action', text: 'You find Woo in the hold with the lights off, forehead against the hull, listening.' },
       { kind: 'say', text: '"Sh— shh. There. You feel that, through the metal? It ROARS down there, friend. It never stops roaring. It never gets tired of me."' },
       { kind: 'say', text: '"I’m fine! Warm-up ritual! New thing I’m trying!"' },
-      { kind: 'action', text: 'He snaps the lights back on too fast and grins too wide, and neither of you mentions it at breakfast.' },
+      { kind: 'action', text: 'They snap the lights back on too fast and grin too wide, and neither of you mentions it at breakfast.' },
     ],
   },
   'longshot-larry': {
