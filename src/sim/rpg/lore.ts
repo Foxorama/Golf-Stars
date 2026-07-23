@@ -366,8 +366,11 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
   // wordlessly, which is worse. Fires on a Chapter-4 Warden arrival (the Viper's old slot); the Viper herself
   // returns at the Ch.5 shrine (below), so each Coil champion now owns a distinct chapter.
   {
+    // Gated to the vigil tee-off (`storyTournament === true`) so this is your FIRST sighting of him, on
+    // the tee where he actually waits — never a stray practice-world encounter that would make the major
+    // read as a second meeting. The tournament intro screen sets the STAKES; this beat is the man himself.
     id: 'story-scorpius-warden',
-    trigger: (c) => c.storyRound === true && c.storyChapter === 4 && c.storyAlignment === 'warden',
+    trigger: (c) => c.storyRound === true && c.storyChapter === 4 && c.storyAlignment === 'warden' && c.storyTournament === true,
     speaker: 'Scorpius, "the Silent Sting"',
     portrait: 'scorpius',
     kicker: 'The hunter, up close',
@@ -375,11 +378,10 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
     accent: '#7fe0a0',
     cta: 'Give him nothing →',
     lines: [
-      { kind: 'action', text: 'There is no entrance. No gallery parting, no hissing ball. He is simply already on the tee when you arrive — a figure of chitin and shadow, a scorpion’s tail arced over one shoulder, a bead of venom trembling at its point. He does not move. He has, you realise, been waiting for you to notice him.' },
-      { kind: 'action', text: 'The Viper failed twice, so the Coil sent something that does not gloat. Scorpius says nothing — he has never once been heard to. He only watches you, the way a scorpion watches the ground go still before it strikes.' },
-      { kind: 'action', text: 'He turns a small black card between two fingers and holds it up, just long enough to read. On it, scratched in a single acid-green line, is one word: a name.' },
+      { kind: 'action', text: 'Up close he is smaller than the dread of him, and worse for it — no bulk, no swagger, just economy. A hunter pared down to only what kills. He does not look at the flag. He looks at your hands, at the set of your shoulders, at the place a nerve lives.' },
+      { kind: 'action', text: 'Then, without hurry, he turns a small black card between two fingers and holds it up — just long enough to read. Scratched across it in a single acid-green line is one word. A name.' },
       { kind: 'say', text: '{betrayer}.' },
-      { kind: 'action', text: 'He pockets the card, lifts two fingers to the stinger at his shoulder, and points them — once, unhurried — past you, at your own ship. Then he steps to the tee, and waits for you to be afraid enough to begin.' },
+      { kind: 'action', text: 'He lets you feel it land. He has not come only for the Sigil, the card says; he has come for the crack already running through your crew — and he knows exactly whose. He pockets it, taps the stinger at his shoulder once, and tips it a hair past you, toward your own ship. Then he steps to his mark and waits.' },
     ],
   },
   // GS-story-scorpius: the Viper RETURNS at the Chapter-5 shrine, at the traitor's shoulder — her bookend on

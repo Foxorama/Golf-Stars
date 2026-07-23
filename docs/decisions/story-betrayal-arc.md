@@ -232,6 +232,21 @@ the corrupted one; the former friends stay clean Warden.
   `story-scorpius-warden` takes the old Ch.4 Warden rival-up-close slot (after the doubt thread, carrying the
   same `{betrayer}` knife wordlessly). Pure content-as-data + render; zero sim rng, no save/STORY_VERSION bump.
   Guarded by `tests/lore.test.ts` + `tests/story-tournament.test.ts`.
+- **GS-story-scorpius-fixes** — ✅ the eyes-on-play polish pass (player report: the tail "looks like a stick,
+  comes out of his chest", no constellation identity, and the dialogue reads like a SECOND meeting / duplicates
+  itself across screens). Four fixes: (1) **portrait** — the tail is redrawn as a Coil-plum SEGMENTED metasoma
+  (a chain of chitin bulbs with acid-green rim-light + dark seams, never a smooth stick), rising from BEHIND the
+  near shoulder (root segments drawn under the shoulder mantle so it reads as coming from behind, not the chest),
+  plus the **Scorpio constellation** hangs behind him — a stylised fishhook of pale stars with red Antares as its
+  heart (the starry identity the other Coil champions have); (2) the up-close beat `story-scorpius-warden` is now
+  **gated to the vigil tee-off** (`storyTournament === true`) so it's your FIRST sighting on the tee where he
+  waits — never a stray practice-world pre-meeting; (3) the **two screens de-duplicated** — the tournament intro
+  frames the STAKES (strokeplay, the vigil, the doubt aboard your ship), the beat is the MAN (he reads your
+  hands, shows the named card, tips the stinger at your ship), the lobby taunt is his STILLNESS (won't swing till
+  you do) — no shared "chitin and shadow / already on the tee / never spoken / two fingers point" prose across
+  them; (4) **betrayal payoff** — the Defection interlude now calls back the Sting's card ("he wasn't reading the
+  future… he was reading you"), so the wordless naming at the Vigil actually pays off when the friend turns.
+  Pure content-as-data + render; zero sim rng, no save/STORY_VERSION bump. Guards updated in `tests/lore.test.ts`.
 - **GS-story-betrayal-polish** — balance re-tune (the finale + team-major edges), any dialogue-depth follow-up,
   constitution/roadmap docs.
 
