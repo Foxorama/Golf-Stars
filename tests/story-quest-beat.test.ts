@@ -37,6 +37,18 @@ describe('GS-story-caddy-quest-dialogue — the pure mid-round beat assembler', 
     expect(questBeatFor({ storyQuest: 'nope' } as unknown as Run)).toBeUndefined();
   });
 
+  // The caddies whose mid-round beat has SHIPPED (GS-story-caddy-quest-dialogue, one PR each). Each must
+  // resolve a beat with the caddy's own portrait — extend this as each caddy lands so coverage never regresses.
+  const SHIPPED = ['quest-sandy', 'quest-chipinski'];
+  it('every shipped caddy quest resolves a mid-round beat with its own portrait', () => {
+    for (const id of SHIPPED) {
+      const beat = questBeatFor({ storyQuest: id } as unknown as Run)!;
+      expect(beat, `${id} has a beat`).toBeTruthy();
+      expect(beat.portrait).toBe(`caddy:${beat.caddyId}`);
+      expect(beat.lines.length, `${id} beat has lines`).toBeGreaterThanOrEqual(2);
+    }
+  });
+
   it('a quest with no authored `duringQuest` lines produces no beat (byte-identical, no pause)', () => {
     // Every quest that HAS lines resolves; one without stays silent — the optional-field contract.
     for (const q of STORY_QUESTS) {
