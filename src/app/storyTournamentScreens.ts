@@ -14,17 +14,18 @@ import { finaleMatchup, corruptedLookOpts, friendRivalTaunt, friendRivalHalftime
 import { golferPreviewSVG } from '../render/apparelArt';
 import { storyClubEffectLabel } from '../sim/rpg/storyClubEffects';
 import { shipUpgradeById, upgradeDetail } from '../sim/rpg/storyShipUpgrades';
-import { venomaPortraitSVG, vossPortraitSVG, driverDanPortraitSVG } from '../render/loreArt';
+import { venomaPortraitSVG, vossPortraitSVG, scorpiusPortraitSVG, driverDanPortraitSVG } from '../render/loreArt';
 import { penelopePortraitSVG } from '../render/caddyPortraits';
 
 /** The rival's glyph for the field/lobby (a portrait shows when one exists; else this reads them). */
 function rivalGlyph(rivalId: string): string {
-  return rivalId === 'venoma' ? '🐍' : rivalId === 'voss' ? '🖤' : rivalId === 'driver-dan' ? '🎒' : rivalId === 'penelope' ? '⛳' : '🏌';
+  return rivalId === 'venoma' ? '🐍' : rivalId === 'scorpius' ? '🦂' : rivalId === 'voss' ? '🖤' : rivalId === 'driver-dan' ? '🎒' : rivalId === 'penelope' ? '⛳' : '🏌';
 }
 
 /** The rival's glyph from their DISPLAY NAME (the recap payload carries the name, not the id). */
 function rivalGlyphByName(rivalName: string): string {
   if (/Venoma|Viper/.test(rivalName)) return '🐍';
+  if (/Scorpius|Sting/.test(rivalName)) return '🦂';
   if (/Voss|Sable/.test(rivalName)) return '🖤';
   if (/Driver Dan/.test(rivalName)) return '🎒';
   if (/Penelope/.test(rivalName)) return '⛳';
@@ -37,6 +38,8 @@ function rivalPortraitSVG(rivalId: string): string {
   switch (rivalId) {
     case 'venoma':
       return venomaPortraitSVG();
+    case 'scorpius':
+      return scorpiusPortraitSVG();
     case 'voss':
       return vossPortraitSVG();
     case 'driver-dan':
@@ -68,6 +71,11 @@ function rivalHalftimeLine(rivalId: string, brag: boolean): string {
       '"Nine holes, and I already smell the fear on you. Save yourself the back nine, little Warden."',
       '"You’re… ahead? No. NO. A lucky front nine. The Viper does not lose to a tourist. Watch me."',
     ],
+    // Scorpius never speaks — his "lines" are stage directions of the Silent Sting reading you.
+    scorpius: [
+      '(Scorpius says nothing. He simply turns his card so you can see it — nine holes, not a stroke wasted — and waits, still as a struck match, for you to break.)',
+      '(For the first time, the Silent Sting goes utterly motionless. Behind the veil, the cold green eyes narrow — you are ahead, and he had not accounted for that. The tail over his shoulder curls a fraction higher.)',
+    ],
     voss: [
       '"You see? The true line comes so easily when you stop pretending it’s a game. Nine more, and you’ll understand."',
       '"You play beautifully when you’re angry. Good. Hold onto that. It’s the first honest thing I’ve seen you do."',
@@ -94,6 +102,8 @@ function rivalTaunt(rivalId: string): string {
   switch (rivalId) {
     case 'venoma':
       return '"Another Sigil for the Warden? How quaint. I do so enjoy taking things from the hopeful."';
+    case 'scorpius':
+      return '(The Silent Sting does not greet you. He sets a matte-black ball on the tee without a sound, lifts two fingers to the stinger arced over his shoulder, and points — once — at you. The gallery has gone very quiet.)';
     case 'voss':
       return '"I am not here to beat you. I am here so you finally SEE. Play. Watch what the true line costs."';
     case 'driver-dan':

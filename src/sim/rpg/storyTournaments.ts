@@ -180,8 +180,12 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     venueId: 'void2-18',
     name: 'The Abyssal Vigil',
     host: 'The Fairway Wardens',
-    rivalId: 'venoma',
-    rivalName: 'Venoma "the Viper" Krait',
+    // GS-story-scorpius: the fourth Sigil used to pit you against Venoma a SECOND time (she also plays the
+    // Ch.2 Forge) — a replay that read like a bug. The Coil, twice-failed with the Viper, now sends its
+    // silent assassin: Scorpius, "the Silent Sting", the executioner for the second-to-last Sigil. The Viper
+    // returns at the Ch.5 shrine, at the traitor's shoulder — so each Coil champion owns a distinct chapter.
+    rivalId: 'scorpius',
+    rivalName: 'Scorpius "the Silent Sting"',
     rivalEdge: 0.23,
     unlockAfterClears: 2,
     sigilId: 'sigil-abyssal',
@@ -192,13 +196,16 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     // story is the betrayal brewing aboard YOUR ship, so the copy now carries the doubt thread instead.
     intro: [
       'Not a show — a vigil. At the edge of a black hole the Coil is trying to wake a lesser dreamer, and ' +
-        'the Wardens play the Sagittarius Core to hold it down. Venoma hunts you openly now, and her ' +
-        'gallery of hooded faithful grows by the world.',
-      'But the cold at your back is not the void — it is the quiet on your own ship. {betrayer} has hardly ' +
-        'spoken since the storm-world, and the Choice you made there is still being made, hole by hole, by ' +
-        'everyone who followed you out here. The Coil’s favourite door is a doubting heart.',
-      'Hold the vigil, beat the Viper, and take the Abyssal Sigil — and watch your friends, champion. The eye ' +
-        'at the root is half-open now, and it is not only looking at you.',
+        'the Wardens play the Sagittarius Core to hold it down. The Viper has failed to take a Sigil off you ' +
+        'twice, so the Coil has sent something quieter: Scorpius, "the Silent Sting" — an assassin in chitin ' +
+        'and shadow who has never once spoken, and never once missed. He does not stride onto the tee. He is ' +
+        'simply already there, waiting, when you arrive.',
+      'But the cold at your back is not the void, nor the hunter — it is the quiet on your own ship. ' +
+        '{betrayer} has hardly spoken since the storm-world, and the Choice you made there is still being ' +
+        'made, hole by hole, by everyone who followed you out here. The Coil’s favourite door is a doubting ' +
+        'heart, and its Sting knows exactly which one aboard your ship has been left ajar.',
+      'Hold the vigil, outplay the Silent Sting, and take the Abyssal Sigil — and watch your friends, ' +
+        'champion. The eye at the root is half-open now, and it is not only looking at you.',
     ],
   },
   {

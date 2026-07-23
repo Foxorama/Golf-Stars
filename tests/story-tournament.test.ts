@@ -120,7 +120,9 @@ describe('Galaxy Tournaments (GS-story-tournament)', () => {
     const h4 = tournamentForChapter(4, 'herald')!;
     expect(w4.venueId).not.toBe(h4.venueId);
     expect(w4.sigilId).not.toBe(h4.sigilId);
-    expect(w4.rivalName).toContain('Venoma');
+    // GS-story-scorpius: the Ch.4 Warden rival is the Coil's silent assassin (was Venoma a 2nd time — a replay).
+    expect(w4.rivalName).toContain('Scorpius');
+    expect(w4.rivalId).toBe('scorpius');
     // GS-story-sigil-rivals: the back-half rivals are DYNAMIC — people from the betrayal arc, not fixed NPCs.
     expect(h4.dynamicRival).toBe('severed'); // the friend the Wardens send (and you then sever)
     const w5 = tournamentForChapter(5, 'warden')!;

@@ -812,7 +812,7 @@ describe('The Choice + alignment fork (GS-story-chapters)', () => {
       clearedWorldIds: ['standrews-18', 'ocean-18', 'crystal2-18'],
       // GS-story-qualifiers: for Warden the venue is void2-18, so the qualifiers are ocean-18 + crystal2-18.
       qualifierResults: { 'ocean-18': { place: 1, field: 12 }, 'crystal2-18': { place: 2, field: 12 } },
-      // arm up so the Warden Ch4 rival (Venoma, edge 0.42) is beatable by the auto round
+      // arm up so the Warden Ch4 rival (Scorpius the Silent Sting, edge 0.23) is beatable by the auto round
       ownedClubIds: [...defaultStoryState().ownedClubIds, 'club:solar:D', 'club:solar:3W', 'club:masters:2H'],
       equippedBagIds: defaultStoryState().equippedBagIds.map((id) => (id === 'D' ? 'club:solar:D' : id)),
     };
