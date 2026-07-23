@@ -20,6 +20,7 @@ import type { ClubUnlockReward } from '../sim/rpg/club-unlock';
 import type { ReputationByCharacter } from '../sim/rpg/factions';
 import type { SeenLore } from '../sim/rpg/lore';
 import type { StoryState } from '../sim/rpg/story';
+import type { MidroundOmen } from '../sim/rpg/storyMidround';
 import type { AimMode, HolePlay, ScrambleShot } from '../sim/rpg/play';
 import type { HoleDuel } from '../sim/rpg/match';
 import type { Rng } from '../sim/rng';
@@ -68,6 +69,8 @@ export type Screen =
   | 'storyTournamentResult'
   // GS-story-tournament-midpop: the halftime (after hole 9) rival brag/curse pop in an 18-hole major.
   | 'storyTournamentPop'
+  // GS-story-midround-omen: the pre-Choice betrayal foreshadow at the Ch.3 major's turn (before the pop).
+  | 'storyMidBeat'
   // GS-story-yggdrasil: the finale — the Jörmungandr battle briefing and its victory/defeat recap.
   | 'storyFinale'
   | 'storyFinaleResult'
@@ -343,6 +346,10 @@ export interface UiState {
      *  per side, not stroke counts. `team` = the 2v2 finale (label the sides as teams). */
     match?: { holesUp: number; thru: number; team: boolean };
   };
+  /** GS-story-midround-omen: the pre-Choice betrayal foreshadow shown at the Ch.3 major's turn (the
+   *  `storyMidBeat` screen), BEFORE the halftime rival pop. Carries the assembled beat (the future
+   *  betrayer + why + their voice lines); on continue it's marked seen and flows into the pop. Transient. */
+  pendingMidBeat?: MidroundOmen;
   /** GS-story-yggdrasil: the finale recap payload (win/lose + which gate fell short). Transient. */
   lastStoryFinale?: { won: boolean; failReason?: 'firepower' | 'defence' | 'repelled'; strike?: 'clean' | 'graze' };
   /** GS-story-econ: the world whose Pro Shop is open (the `storyShop` screen). Transient. */
@@ -465,6 +472,7 @@ export type Action =
   | { type: 'storyPlayTournament' } // GS-story-tournament: tee off the tournament round (vs the rival)
   | { type: 'selectStoryPartner'; characterId: string } // GS-story-partners: pick your team-Sigil partner in the lobby
   | { type: 'tournamentPopContinue' } // GS-story-tournament-midpop: dismiss the halftime rival pop, play on
+  | { type: 'storyMidBeatContinue' } // GS-story-midround-omen: dismiss the pre-Choice foreshadow → the pop
   | { type: 'storyTournamentContinue' } // GS-story-tournament: dismiss the win/lose recap
   | { type: 'openStoryFinale' } // GS-story-yggdrasil: open the finale battle briefing (five Sigils in hand)
   | { type: 'exitStoryFinale' } // GS-story-yggdrasil: back to the clubhouse from the briefing

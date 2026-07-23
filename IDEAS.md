@@ -82,6 +82,25 @@ default). One focused, tested, auto-merged PR each:
   keyed to your FIRST completed caddy quest + whether you still wield its reward club (Sandy's Second feels
   heavy) — realistically Sandy/Chipinski/Sam/Penelope, the caddies reachable before The Choice, never the
   Ch.5-only Dan/Mole. The friend's per-character farewell. Four distinct betrayal voices (`BETRAYAL_VOICE`).
+- **GS-story-midround-omen** — ✅ *shipped* (player ask: "mid-round at the nine-hole pause there needs to be
+  a story beat before the Choice; the odd-man-out beat needs a piece per character per outcome"): the
+  PRE-CHOICE betrayal foreshadow. At the turn of the Chapter-3 major (Storm Championship) — both team-Sigil
+  partner picks locked, path unchosen — the round diverts ONCE to a cinematic beat (the shared `.gs-lore*`
+  card, `storyMidBeat` screen) that shows the future betrayer's first crack, keyed to WHY they're the odd
+  one out (`betrayerOddness`): SIDELINED (two distinct picks → the friend you never chose mutters "never
+  good enough" at the ropes while a Coil NPC drifts to their shoulder) or TEMPTED (same pick twice → the
+  trusted friend admits they heard the Coil's word beside you and "maybe there's something to it"). Then it
+  flows into the classic halftime rival pop. Per-character, Coil-NPC flavoured (Huang-Woo ↔ Venoma; Feather/
+  Larry/Bo ↔ the Apostate), authored to seed each friend's later defection/farewell so the betrayal stops
+  being a switch-flip. Content in `BETRAYAL_VOICE.sidelined/tempted` (`storyBetrayal`), assembly in
+  `storyMidround.ts`, once-tracked in `seenStoryBeats`. Pure + render-only — zero sim rng, no save bump.
+  Guards: `tests/story-midround.test.ts` (picker + per-character coverage + the hole-9 reducer flow) + a
+  `?screen=storymidbeat` browser smoke.
+- **GS-story-heard-the-word** — NEXT: the mid-round omen's PAYOFF. Herald path — the trusted-twice friend
+  who heard the word (the `tempted` omen) resists it and confronts you: "I heard the word the same as you —
+  how could you side with them?" (a new same-twice Herald voice, wired into the Severing/Ch.4 beats). Warden
+  path — the defection/interlude references the mid-round Coil interaction so the turn "makes sense". Extends
+  `BETRAYAL_VOICE`; no new screen.
 - **GS-story-betrayal-polish** — balance, dialogue depth, costume polish, docs.
 - **GS-the-destination** — the FUTURE game mode the Warden ending now names: the Coil's remnant (and the
   betrayed friend) fled "past the edge of every chart" to **The Destination** — an unknown-deep voyage mode

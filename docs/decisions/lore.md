@@ -55,7 +55,11 @@ engine edit.**
 
 ### The screen (cinematic, one-screen, impactful)
 - `app/loreScreens.ts` `loreScreen()` — a pure HTML-string builder reading `state.pendingLoreId` →
-  `loreEventById`. Full-bleed (`'lore'` added to the `fullBleed` set in `app.ts`, so it owns the whole
+  `loreEventById`. The cinematic CARD itself is the exported `loreBeatHTML(view, resolve, dismiss)` (GS-story-
+  midround-omen extracted it), so any DYNAMIC beat that isn't a static `LORE_EVENTS` row — e.g. the mid-round
+  betrayal omen (`app/storyMidroundScreens.ts`, dismiss → `storyMidBeatContinue`) — reuses the identical
+  `.gs-lore*` chrome instead of forking a second prefix. Full-bleed (`'lore'` added to the `fullBleed` set in
+  `app.ts`, so it owns the whole
   viewport with its own starfield backdrop tinted by the beat's `accent`; the modal drops the settings
   cog like the play view). A banner (kicker + title + speaker), the portrait, dialogue (bubbles + dim
   italic stage directions), and one CTA → `dismissLore`. Defensive fallback (a bare Continue) if the id
