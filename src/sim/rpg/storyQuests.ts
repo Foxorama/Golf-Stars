@@ -263,11 +263,20 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
     offer: [
       '🎒 "Beneath the Hydra Mire is a green I have felt but never surfaced to play. The break there is older ' +
         'than the serpent. I have waited my whole life for a golfer who could hole out on it. blind, by feel."',
+      '"The surface folk pitied me my whole life — the blind mole, they said, as if the dark were a cage. It was ' +
+        'never a cage. It was a gift they were too sighted to understand. Down there, I am the one who sees."',
       '"Come down into the deep with me. I cannot see your line — I never could — but I will feel it for you. ' +
         'Trust the soil. Trust me. And what I dig up for you afterward, no surface-dweller has ever held."',
     ],
+    duringQuest: [
+      { kind: 'action', text: 'Deep in the mire the light gives out entirely. The Mole presses one paw flat to the wet ground, tilts his head, and goes utterly still — reading something no eye could ever find.' },
+      { kind: 'say', text: '🎒 "Down here your eyes are worth nothing, champion. Good — mine never were. Feel the ground answer up through your feet. The break is older than the serpent, and it is speaking, if you will only stop looking and listen."' },
+      { kind: 'say', text: '"I have waited my whole life in the dark for a golfer who would trust the soil over their sight. Play on by feel. Let me be your eyes down here, the way the deep has always been mine."' },
+    ],
     complete: [
       '🎒 "You holed it. In the dark, by feel alone, you holed it. Even the serpent paused to listen."',
+      '"Do you feel it now — the ground under everything, telling you where the world truly leans? That is what I ' +
+        'have felt every day of my life. For once I was not alone down here in the knowing. Thank you for that."',
       '"From the deepest seam I dug this band of mire-iron — the Dowser’s Circlet. Wear it, and the break ' +
         'comes up through the ground into your bones, the way it always did for me. No eyes required. Now you ' +
         'carry a little of the deep with you, champion."',
