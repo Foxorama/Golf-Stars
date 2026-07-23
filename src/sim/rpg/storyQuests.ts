@@ -363,12 +363,21 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
     offer: [
       '🖤 "Walk the Cetus Shelf with me, champion, out where the star-tides fall and the deep listens back. ' +
         'I whispered the Offer to you once at the crossroads. Now let me teach you to HEAR."',
+      '"I was a loud man, once. I argued, I proved, I won. And I heard nothing at all. It was only when I ' +
+        'went quiet — truly quiet — that the deep began to speak to me. I would give you that quiet."',
       '"Read nothing with your eyes on that green — let me whisper the line, and hole out on faith. Do it, ' +
         'and I give you the reader I have carried since before your grandfather ever teed off."',
+    ],
+    duringQuest: [
+      { kind: 'action', text: 'On the Cetus Shelf the star-tides fall away below. Brother Ouros draws the hood back from his ears and turns his head slowly, as if catching a voice on the wind that only he can hear.' },
+      { kind: 'say', text: '🖤 "I whispered the Offer to you once, at the crossroads, and you took my hand. Now the deep whispers back. Do not read this green with your eyes, champion — let me tell you the line, and hole out on faith alone."' },
+      { kind: 'say', text: '"This is the whole of the Long Rest: to stop striving, and let the world choose your line for you. Play on by trust. When you hole out on a whisper, the reader I have carried a lifetime becomes yours."' },
     ],
     complete: [
       '🖤 "You holed it on a whisper. No read, no doubt — only trust. That is the whole of the Long Rest: to ' +
         'stop striving, and let the world choose your line for you."',
+      '"Most who take the Offer are running from something — a loss, a grief, a fear. You are not. You came to ' +
+        'the quiet clear-eyed, and stayed. In a long life of whispering, you are the first who ever truly listened back."',
       '"Take my cowl — the Whisperer\'s Cowl, worn since before your grandfather teed off. Draw the hood up on ' +
         'a green and the deep hums the true break straight into your ear. Every line it gives is honest. It ' +
         'has never once lied. Nor have I, to you."',
