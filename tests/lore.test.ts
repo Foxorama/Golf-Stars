@@ -176,22 +176,30 @@ describe('GS-story-beats — story-round dialogue beats gate on the campaign', (
     expect(pickLoreEvent({ ...W, storyTournament: true }, seenDoubt)?.id).toBe(`story-distance-${betrayer}`);
     // The doubt thread is Warden-only, Chapter-4-only, and never fires without the betrayer id.
     expect(pickLoreEvent({ ...W, storyAlignment: 'herald' }, {})?.id).toBe('story-venoma-herald');
+    // GS-story-scorpius: the Viper is now the Ch.5 shrine return (not Ch.4); Ch.4's rival-up-close is the Sting.
     expect(pickLoreEvent({ ...W, storyChapter: 5 }, seenDoubt)?.id).toBe(`story-venoma-warden`);
-    expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden' }, seenVow)?.id).toBe('story-venoma-warden');
+    expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden' }, seenVow)?.id).toBe('story-scorpius-warden');
   });
 
-  it('Venoma confronts you from Chapter 4, her beat branching on the chosen path', () => {
+  it('GS-story-scorpius: the Silent Sting is the Ch.4 Warden rival-up-close; the Viper returns at Ch.5', () => {
     const doubtSeen = {
       'story-warden-vow': true,
       ...Object.fromEntries(CHARACTERS.flatMap((c) => [[`story-doubt-${c.id}`, true], [`story-distance-${c.id}`, true]])),
     };
-    expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden' }, doubtSeen)?.id).toBe('story-venoma-warden');
+    // Chapter 4 Warden: after the doubt thread, the silent assassin Scorpius stands across the tee.
+    expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden' }, doubtSeen)?.id).toBe('story-scorpius-warden');
+    // Venoma no longer fires at Ch.4 (the "second Venoma" replay is gone) — she returns at the Ch.5 shrine.
     expect(pickLoreEvent({ ...STORY, storyChapter: 5, storyAlignment: 'warden' }, {})?.id).toBe('story-venoma-warden');
+    // Herald keeps the Viper's welcome from Ch.4 (the Warden Sting is a Warden-path beat only).
     expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'herald' }, {})?.id).toBe('story-venoma-herald');
-    // Chapter 4+ but no alignment chosen yet → neither variant fires.
+    expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden' }, {})?.id).not.toBe('story-venoma-warden');
+    // Chapter 4+ but no alignment chosen yet → neither Coil beat fires.
     expect(pickLoreEvent({ ...STORY, storyChapter: 4 }, {})).toBeUndefined();
-    // Before The Choice (Ch <4) → no Venoma.
+    // Before The Choice (Ch <4) → no Coil champion beat.
     expect(pickLoreEvent({ ...STORY, storyChapter: 3, storyAlignment: 'warden' }, {})?.id).toBe('story-coilkeepers');
+    // The Sting's portrait paints, and he never speaks — every line is a stage direction save the written name.
+    expect(loreEventById('story-scorpius-warden')!.portrait).toBe('scorpius');
+    expect(lorePortraitSVG('scorpius')).toContain('Scorpius');
   });
 
   it('none of the story beats fire on an ordinary Voyage/Unending arrival (no storyRound)', () => {
@@ -214,7 +222,7 @@ describe('GS-story-beats — story-round dialogue beats gate on the campaign', (
 
   it('every story beat names a portrait that lorePortraitSVG can paint', () => {
     for (const id of [
-      'story-coil-named', 'story-coilkeepers', 'story-apostate', 'story-venoma-warden', 'story-venoma-herald',
+      'story-coil-named', 'story-coilkeepers', 'story-apostate', 'story-scorpius-warden', 'story-venoma-warden', 'story-venoma-herald',
       'story-omen-emerald', 'story-omen-abyss-warden', 'story-omen-abyss-herald', 'story-ragnarok-warden', 'story-ragnarok-herald',
     ]) {
       const beat = loreEventById(id)!;
@@ -237,11 +245,11 @@ describe('GS-story-ragnarok — the impending-Ragnarök escalation beats (one pe
     expect(pickLoreEvent({ ...STORY, storyChapter: 1, storyTournament: true }, { 'story-omen-emerald': true })).toBeUndefined();
   });
 
-  it('Chapter 4 escalation lands AFTER the doubt thread + the Venoma confrontation, branching by path', () => {
-    // The Warden Ch.4 sequence is vow → doubt → distance → Venoma → the eye-half-opens omen.
+  it('Chapter 4 escalation lands AFTER the doubt thread + the Scorpius confrontation, branching by path', () => {
+    // The Warden Ch.4 sequence is vow → doubt → distance → Scorpius → the eye-half-opens omen.
     const seenWarden = {
       'story-warden-vow': true,
-      'story-venoma-warden': true,
+      'story-scorpius-warden': true,
       ...Object.fromEntries(CHARACTERS.flatMap((c) => [[`story-doubt-${c.id}`, true], [`story-distance-${c.id}`, true]])),
     };
     expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden' }, seenWarden)?.id).toBe('story-omen-abyss-warden');
@@ -288,9 +296,13 @@ describe('GS-story-doubt — the beats always name the RIGHT characters', () => 
     expect(resolveLoreTokens('No tokens here.', 'Feather')).toBe('No tokens here.');
   });
 
-  it('the vow + Venoma beats speak about the betrayer via the {betrayer} token (resolved at render)', () => {
+  it('the vow + Scorpius + Venoma beats speak about the betrayer via the {betrayer} token (resolved at render)', () => {
     const vow = loreEventById('story-warden-vow')!;
     expect(vow.lines.some((l) => l.text.includes('{betrayer}'))).toBe(true);
+    // GS-story-scorpius: the Silent Sting names the betrayer wordlessly (a written card); the Viper's Ch.5
+    // return names them aloud — both carry the {betrayer} token, resolved to the campaign's actual traitor.
+    const scorpius = loreEventById('story-scorpius-warden')!;
+    expect(scorpius.lines.some((l) => l.text.includes('{betrayer}'))).toBe(true);
     const venoma = loreEventById('story-venoma-warden')!;
     expect(venoma.lines.some((l) => l.text.includes('{betrayer}'))).toBe(true);
   });

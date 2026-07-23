@@ -359,23 +359,47 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
       lines: [...betrayalDistance(ch.id)],
     }),
   ),
-  // GS-story-doubt reworked this beat (it used to be about Venoma's own crack of fear — "saving Venoma" —
-  // which crowded the chapter the BETRAYAL is supposed to be brewing in): the Viper now twists the knife
-  // about your own crew, feeding the doubt thread instead of her redemption arc.
+  // GS-story-scorpius: the Chapter-4 Warden rival up close. The fourth Sigil used to pit you against Venoma a
+  // SECOND time (she already plays the Ch.2 Forge) — a replay that read like a bug. The Coil, twice-failed
+  // with the Viper, now sends its silent assassin: Scorpius, "the Silent Sting". He never speaks — his beat
+  // is stage directions + one written card — and he twists the SAME {betrayer} knife the doubt thread carries,
+  // wordlessly, which is worse. Fires on a Chapter-4 Warden arrival (the Viper's old slot); the Viper herself
+  // returns at the Ch.5 shrine (below), so each Coil champion now owns a distinct chapter.
+  {
+    id: 'story-scorpius-warden',
+    trigger: (c) => c.storyRound === true && c.storyChapter === 4 && c.storyAlignment === 'warden',
+    speaker: 'Scorpius, "the Silent Sting"',
+    portrait: 'scorpius',
+    kicker: 'The hunter, up close',
+    title: 'The Silent Sting',
+    accent: '#7fe0a0',
+    cta: 'Give him nothing →',
+    lines: [
+      { kind: 'action', text: 'There is no entrance. No gallery parting, no hissing ball. He is simply already on the tee when you arrive — a figure of chitin and shadow, a scorpion’s tail arced over one shoulder, a bead of venom trembling at its point. He does not move. He has, you realise, been waiting for you to notice him.' },
+      { kind: 'action', text: 'The Viper failed twice, so the Coil sent something that does not gloat. Scorpius says nothing — he has never once been heard to. He only watches you, the way a scorpion watches the ground go still before it strikes.' },
+      { kind: 'action', text: 'He turns a small black card between two fingers and holds it up, just long enough to read. On it, scratched in a single acid-green line, is one word: a name.' },
+      { kind: 'say', text: '{betrayer}.' },
+      { kind: 'action', text: 'He pockets the card, lifts two fingers to the stinger at his shoulder, and points them — once, unhurried — past you, at your own ship. Then he steps to the tee, and waits for you to be afraid enough to begin.' },
+    ],
+  },
+  // GS-story-scorpius: the Viper RETURNS at the Chapter-5 shrine, at the traitor's shoulder — her bookend on
+  // the Warden path (she debuts at the Ch.2 Forge, vanishes while Scorpius hunts Ch.4, and comes back for the
+  // finale). Retargeted from the old `>=4` gate to Ch.5 so it never overlaps Scorpius's chapter, and rewritten
+  // for the shrine: the whisper has already found its door, and {betrayer} is standing in it.
   {
     id: 'story-venoma-warden',
-    trigger: (c) => c.storyRound === true && (c.storyChapter ?? 0) >= 4 && c.storyAlignment === 'warden',
+    trigger: (c) => c.storyRound === true && (c.storyChapter ?? 0) >= 5 && c.storyAlignment === 'warden',
     speaker: 'Venoma "the Viper" Krait',
     portrait: 'venoma',
-    kicker: 'The rival, up close',
-    title: "The Viper's Whisper",
+    kicker: 'The Viper returns',
+    title: 'She Kept a Trophy',
     accent: '#c98adf',
     cta: 'We\'ll see →',
     lines: [
-      { kind: 'action', text: 'Venoma leans on her driver, smile all teeth, eyes not quite matching it.' },
-      { kind: 'say', text: 'A Warden. To the end. How noble. Tell me, champion — is that little crew of yours as true as you are?' },
-      { kind: 'say', text: "The Coil doesn't break doors down. It whispers through the one that's already open. Someone on that green ship of yours has been listening — ask {betrayer} what they hear in the quiet." },
-      { kind: 'action', text: 'She tees a hissing ball, and smiles wider at whatever just crossed your face.' },
+      { kind: 'action', text: 'She is waiting at the shrine, easy and unhurried, like she has all the time in the world now — and she does not stand alone.' },
+      { kind: 'say', text: 'Scorpius couldn’t close it either? A pity. He’s such a tidy worker. But some doors you can’t force, champion — you have to be INVITED through. And I was.' },
+      { kind: 'say', text: 'You should have watched your crew closer. I told you the Coil whispers through the open door. Well — {betrayer} answers to me now, and they’ll be standing at my shoulder when you tee it up. Wave hello.' },
+      { kind: 'action', text: 'She tees a hissing ball and smiles at you like an old friend, wearing your grief like it was cut to fit her.' },
     ],
   },
   {

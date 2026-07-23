@@ -347,7 +347,8 @@ Ordered so each ships something playable and nothing lands before its foundation
   Storm-Sigil win (`storyTournamentContinue` diverts to `storyChoice` once, path unchosen): stay a **Warden**
   or join the **Coil** as a **Herald** (`chooseAlignment` → `StoryState.alignment`). Real divergence, not a
   reskin: Ch.1–3 shared trunk; **Ch.4–5 are per-path variants** — Warden Abyssal/Serpent's Vigil (void/swamp,
-  face + redeem Venoma) vs Herald Drowning Rite/Ghost Harvest (ocean/derelict, **crush Penelope then Driver
+  face the Coil's silent assassin **Scorpius** at Ch.4, then the corrupted betrayer + the returning Viper at
+  Ch.5 — GS-story-scorpius) vs Herald Drowning Rite/Ghost Harvest (ocean/derelict, **crush Penelope then Driver
   Dan**), each collecting five distinct Sigils. `tournamentForChapter(chapter, alignment)` picks the row
   (`currentTournament`/`resolveStoryTournament` pass `story.alignment`); the **finale ending branches** —
   Warden "The Reseal" vs Herald "The Long Rest". `STORY_VERSION` → 2 (additive `alignment`; migrate keeps a
@@ -491,7 +492,9 @@ Ordered so each ships something playable and nothing lands before its foundation
   they can NEVER fire in Voyage/Unending. Four beats ESCALATE the campaign: `story-coil-named` (Ch.2 — the
   Parrot names the Coil cult), `story-coilkeepers` (Ch.3 — hooded cultists ring the tee), and Venoma's
   confrontation from Ch.4, branching on the chosen path (`story-venoma-warden` "You Chose Wrong" vs
-  `story-venoma-herald` "Welcome, Sister"). Two bespoke portraits added to `render/loreArt.ts`
+  `story-venoma-herald` "Welcome, Sister"). *(GS-story-scorpius later moved the WARDEN Ch.4 rival to the new
+  silent-assassin `story-scorpius-warden` and retargeted `story-venoma-warden` to the Ch.5 shrine return, so
+  the Viper bookends the Warden path instead of playing it twice; the Herald `story-venoma-herald` is unchanged.)* Two bespoke portraits added to `render/loreArt.ts`
   (`venoma` — a viper-woman with amber slit-pupil eyes + fangs + a Coil-sigil hood; `coilkeeper` — a
   faceless hooded cultist, an acid-green void where a face should be), in the house SVG language + the
   Coil palette (venom-violet #b060c0 / acid-green #7fe0a0). The one-off is recorded in the main-save

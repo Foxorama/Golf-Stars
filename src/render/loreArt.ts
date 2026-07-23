@@ -16,6 +16,8 @@ export function lorePortraitSVG(id: string): string {
       return prognosticParrotPortraitSVG();
     case 'venoma':
       return venomaPortraitSVG();
+    case 'scorpius':
+      return scorpiusPortraitSVG();
     case 'coilkeeper':
       return coilkeeperPortraitSVG();
     case 'voss':
@@ -439,6 +441,132 @@ export function venomaPortraitSVG(): string {
     <circle r="9" fill="none" stroke="#7fe0a0" stroke-width="2.2"/>
     <path d="M-4 5 Q6 3 4 -4 Q3 -8 -2 -7" fill="none" stroke="#7fe0a0" stroke-width="2.2" stroke-linecap="round"/>
     <circle cx="5" cy="-5" r="1.8" fill="#7fe0a0"/>
+  </g>
+</svg>`;
+}
+
+/**
+ * Scorpius, "the Silent Sting", up close (GS-story-scorpius) — the Coil's second-to-last champion, the
+ * assassin the cult sends to the Abyssal Vigil (Chapter 4, Warden path) when the Viper has failed twice.
+ * Where Venoma is saturated plum menace and Voss is grief, Scorpius is COLD armour: a chitin-black
+ * carapace hood, a segmented face-VEIL that hides mouth and jaw (he never speaks aloud), and only two
+ * narrow, pale acid-green eyes reading you from the dark. His identity motif is a segmented SCORPION TAIL
+ * arcing over his shoulder to a raised stinger, a bead of venom trembling at its point (the mirror of
+ * Venoma's little coiled snake and Voss's dripping driver). Obsidian carapace (#161020 / #2a1e3a) with the
+ * Coil acid-green (#7fe0a0) as the only warmth — a hunter, not a zealot. Deliberately still and blade-like.
+ */
+export function scorpiusPortraitSVG(): string {
+  return `<svg viewBox="0 0 320 340" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Scorpius the Silent Sting" style="display:block;aspect-ratio:320/340;overflow:visible;">
+  <defs>
+    <radialGradient id="gs-lore-sco-spot" cx="50%" cy="40%" r="66%">
+      <stop offset="0%" stop-color="#243a34" stop-opacity="0.9"/>
+      <stop offset="55%" stop-color="#12181e" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#06090c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gs-lore-sco-carapace" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2a1e3a"/>
+      <stop offset="100%" stop-color="#100a1a"/>
+    </linearGradient>
+    <linearGradient id="gs-lore-sco-hood" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3a2a52"/>
+      <stop offset="100%" stop-color="#150e22"/>
+    </linearGradient>
+    <linearGradient id="gs-lore-sco-tail" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#3a2c1e"/>
+      <stop offset="100%" stop-color="#7a5a2a"/>
+    </linearGradient>
+    <radialGradient id="gs-lore-sco-veil" cx="50%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#241830" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#0a0610" stop-opacity="1"/>
+    </radialGradient>
+  </defs>
+
+  <!-- soft spotlight halo -->
+  <ellipse cx="160" cy="150" rx="150" ry="162" fill="url(#gs-lore-sco-spot)"/>
+
+  <!-- shoulders / segmented carapace mantle -->
+  <path d="M30 340 Q36 248 96 232 Q160 218 224 232 Q284 248 290 340 Z" fill="url(#gs-lore-sco-carapace)"/>
+  <!-- overlapping plate seams on the shoulders -->
+  <g fill="none" stroke="#4a3660" stroke-width="2.4" opacity="0.7" stroke-linecap="round">
+    <path d="M48 320 Q96 292 132 300"/>
+    <path d="M272 320 Q224 292 188 300"/>
+    <path d="M64 338 Q110 312 140 320"/>
+    <path d="M256 338 Q210 312 180 320"/>
+  </g>
+  <!-- chitin sheen highlights -->
+  <path d="M96 232 Q108 250 100 300 Q92 262 78 300 Q84 250 96 232 Z" fill="#4a3660" opacity="0.35"/>
+  <path d="M224 232 Q212 250 220 300 Q228 262 242 300 Q236 250 224 232 Z" fill="#4a3660" opacity="0.35"/>
+
+  <!-- collar clasp: a pair of small pincers meeting at the throat, acid-green edged -->
+  <g transform="translate(160 250)">
+    <path d="M-30 -6 Q-14 -2 -4 6 Q-16 4 -30 8 Z" fill="#1a1226" stroke="#7fe0a0" stroke-width="1.6"/>
+    <path d="M30 -6 Q14 -2 4 6 Q16 4 30 8 Z" fill="#1a1226" stroke="#7fe0a0" stroke-width="1.6"/>
+    <circle cx="0" cy="4" r="4.5" fill="#7fe0a0" opacity="0.9"/>
+  </g>
+
+  <!-- the scorpion tail arcing over the near shoulder, raised to strike (his identity motif) -->
+  <g>
+    <!-- segmented tail sweeping up from behind the right shoulder -->
+    <path d="M232 300 Q276 288 288 236 Q294 196 268 172 Q248 154 250 128"
+          fill="none" stroke="url(#gs-lore-sco-tail)" stroke-width="15" stroke-linecap="round"/>
+    <!-- segment ridges -->
+    <g fill="none" stroke="#1c140a" stroke-width="2" opacity="0.75">
+      <path d="M244 296 q10 -3 18 -8"/>
+      <path d="M270 268 q9 -6 13 -15"/>
+      <path d="M284 232 q4 -10 2 -22"/>
+      <path d="M266 190 q-6 -10 -14 -16"/>
+    </g>
+    <!-- the bulbed stinger + curved barb -->
+    <path d="M250 128 Q240 112 250 100 Q262 90 258 108" fill="none" stroke="url(#gs-lore-sco-tail)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M258 108 Q266 98 262 88" fill="none" stroke="#c9a24a" stroke-width="6" stroke-linecap="round"/>
+    <!-- a bead of venom trembling at the point -->
+    <circle cx="262" cy="86" r="4.5" fill="#7fe0a0"/>
+    <circle cx="262" cy="86" r="9" fill="#7fe0a0" opacity="0.25"/>
+    <path d="M262 90 q-1 8 0 14" stroke="#7fe0a0" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+  </g>
+
+  <!-- neck, in shadow beneath the veil -->
+  <path d="M138 232 Q138 252 160 258 Q182 252 182 232 L182 212 L138 212 Z" fill="#1a1226"/>
+
+  <!-- the carapace hood: a sharp, ridged cowl framing the face -->
+  <path d="M86 152 Q80 72 160 64 Q240 72 234 152 Q234 154 214 150 Q220 110 160 96 Q100 110 106 150 Q86 154 86 152 Z" fill="url(#gs-lore-sco-hood)"/>
+  <!-- crown ridge crest (segmented spine down the hood) -->
+  <g fill="#4a3660" opacity="0.85"><path d="M160 70 l9 -8 9 8 -9 6 Z"/><path d="M160 70 l-9 -8 -9 8 9 6 Z"/><path d="M152 88 q8 -6 16 0 q-8 6 -16 0 Z"/></g>
+  <path d="M86 152 Q80 72 160 64 Q240 72 234 152" fill="none" stroke="#5a4478" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+
+  <!-- the face-VEIL: a plated mask covering everything below the eyes (he is silent) -->
+  <path d="M106 150 Q106 132 160 128 Q214 132 214 150 Q214 210 160 226 Q106 210 106 150 Z" fill="url(#gs-lore-sco-veil)"/>
+  <!-- veil plate seams (chitin segments across the lower face) -->
+  <g fill="none" stroke="#3a2c50" stroke-width="2" opacity="0.8" stroke-linecap="round">
+    <path d="M116 168 Q160 178 204 168"/>
+    <path d="M120 188 Q160 202 200 188"/>
+    <path d="M130 206 Q160 220 190 206"/>
+    <path d="M160 156 L160 224"/>
+  </g>
+  <!-- a thin acid-green Coil filament tracing the veil's upper edge -->
+  <path d="M108 150 Q160 132 212 150" fill="none" stroke="#7fe0a0" stroke-width="2.2" stroke-linecap="round" opacity="0.75"/>
+
+  <!-- brow shadow above the visor slit -->
+  <path d="M108 146 Q160 118 212 146 Q160 134 108 146 Z" fill="#0c0812"/>
+
+  <!-- the eyes: two narrow, cold pale-green slivers reading you from the dark -->
+  <path d="M124 150 Q140 142 154 149 Q140 154 124 150 Z" fill="#0a0610"/>
+  <path d="M166 149 Q180 142 196 150 Q180 154 166 149 Z" fill="#0a0610"/>
+  <path d="M126 150 Q140 145 152 149 Q140 152 126 150 Z" fill="#aef0c4"/>
+  <path d="M168 149 Q180 145 194 150 Q180 152 168 149 Z" fill="#aef0c4"/>
+  <ellipse cx="139" cy="149" rx="3" ry="2.6" fill="#7fe0a0"/>
+  <ellipse cx="181" cy="149" rx="3" ry="2.6" fill="#7fe0a0"/>
+  <ellipse cx="139" cy="149" rx="1.4" ry="2.4" fill="#0f0a14"/>
+  <ellipse cx="181" cy="149" rx="1.4" ry="2.4" fill="#0f0a14"/>
+  <!-- cold liner above each eye -->
+  <path d="M122 146 Q140 138 156 146" fill="none" stroke="#5aa878" stroke-width="1.8" stroke-linecap="round" opacity="0.8"/>
+  <path d="M164 146 Q180 138 198 146" fill="none" stroke="#5aa878" stroke-width="1.8" stroke-linecap="round" opacity="0.8"/>
+
+  <!-- the Coil sigil branded on the brow of the hood, dim -->
+  <g transform="translate(160 112)">
+    <circle r="8" fill="none" stroke="#7fe0a0" stroke-width="2" opacity="0.8"/>
+    <path d="M-3 4 Q5 2 4 -4 Q3 -7 -2 -6" fill="none" stroke="#7fe0a0" stroke-width="2" stroke-linecap="round" opacity="0.85"/>
+    <circle cx="4.5" cy="-4.5" r="1.6" fill="#7fe0a0"/>
   </g>
 </svg>`;
 }

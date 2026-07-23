@@ -32,7 +32,7 @@ chosen partner characters, alignment, and each character's own dialogue. Specifi
 | 1 | Ch.1 | **Scramble** (2-ball team; share one ball, best of the two shots each stroke) | pick one of the 3 others | rival PAIR (Ch.1 rival + a rando) + two low-tier RANDO pairs + the two NON-chosen golfers as a pair |
 | 2 | Ch.2 | **Best-ball** (2-ball team; each plays own ball, team keeps the lower per hole) | pick again (may switch) | same shape; rival pair includes **Venoma** |
 | 3 | Ch.3 | **Singles MATCHPLAY** (1v1 vs the rival, hole-by-hole, lower score takes the hole) | — | just you vs the Apostate. **The Choice fires after this win.** |
-| 4 | Ch.4 | **Strokeplay** (single person, per path) | — | Warden: Venoma. Herald: a former friend. Betrayal beats land here. |
+| 4 | Ch.4 | **Strokeplay** (single person, per path) | — | Warden: **Scorpius, "the Silent Sting"** (GS-story-scorpius — a new Coil assassin; was Venoma a 2nd time). Herald: a former friend. Betrayal beats land here. |
 | 5 | Ch.5 | **2v2 SCRAMBLE MATCHPLAY** (both sides share a ball) | your loyal ally / Coil champion | the betrayer + a champion (see below) |
 
 > **GS-story-sigil-formats (2026-07-20)** — the Sigil formats were corrected to the intended spine:
@@ -219,6 +219,19 @@ the corrupted one; the former friends stay clean Warden.
 - **GS-story-midround-omen** — ✅ the PRE-CHOICE betrayal foreshadow at the nine-hole pause (player ask:
   "mid-round at the nine-hole pause there needs to be a story beat before the Choice; the odd-man-out beat
   needs a piece per character per outcome"). See *"The mid-round omen"* below.
+- **GS-story-scorpius** — ✅ a new Coil NPC for the fourth Sigil (player report: the Ch.4 Warden major "The
+  Abyssal Vigil" pitted you against **Venoma a SECOND time** — she already plays the Ch.2 Forge — which read
+  like a bug/replay). The Coil, twice-failed with the Viper, now sends its silent assassin **Scorpius, "the
+  Silent Sting"** (`rivalId: 'scorpius'`, default ghost profile → balance-neutral, `rivalEdge` unchanged at
+  0.23). He NEVER speaks — his beat + taunt + halftime lines are stage directions of a still, blade-like hunter
+  who names the traitor on a written card. Bespoke Coil-palette bust `scorpiusPortraitSVG` (obsidian carapace +
+  a scorpion-tail stinger motif, distinct from the Viper's plum) wired through `lorePortraitSVG` +
+  `rivalPortraitSVG`; 🦂 glyph. The Viper now BOOKENDS the Warden path instead of repeating: `story-venoma-warden`
+  retargeted from `>=4` to Ch.5 (she RETURNS at the shrine, at the traitor's shoulder), so each Coil champion
+  owns a distinct chapter (Ch.2 Venoma → Ch.3 Voss → Ch.4 Scorpius → Ch.5 betrayer+Venoma). New beat
+  `story-scorpius-warden` takes the old Ch.4 Warden rival-up-close slot (after the doubt thread, carrying the
+  same `{betrayer}` knife wordlessly). Pure content-as-data + render; zero sim rng, no save/STORY_VERSION bump.
+  Guarded by `tests/lore.test.ts` + `tests/story-tournament.test.ts`.
 - **GS-story-betrayal-polish** — balance re-tune (the finale + team-major edges), any dialogue-depth follow-up,
   constitution/roadmap docs.
 
