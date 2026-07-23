@@ -15,7 +15,7 @@
 import type { BiomeArchetype } from '../course/themes';
 import type { ReputationByCharacter } from './factions';
 import { CHARACTERS } from './characters';
-import { betrayalDoubt, betrayalDistance } from './storyBetrayal';
+import { betrayalDoubt, betrayalDistance, betrayalHeardTheWord } from './storyBetrayal';
 
 /** The persisted set of one-off lore events already seen — id → true. A JSON-friendly "set" (JSON has
  *  no native Set), the house style for the `*ByCharacter` maps. Absent ids simply haven't fired yet. */
@@ -66,6 +66,11 @@ export interface LoreContext {
    *  of an early campaign never fires them. Lets a beat speak in the RIGHT friend's voice — the betrayer
    *  and the competition rival can be different characters at any given point. */
   storyBetrayerId?: string;
+  /** GS-story-heard-the-word: WHY the betrayer is the odd one out (`betrayerOddness` — `sidelined` = never
+   *  picked, `tempted` = trusted twice). Only meaningful once both team-Sigil picks are locked. The Herald
+   *  "I heard the word too" confrontation gates on `tempted`, so it pays off exactly the friend the mid-round
+   *  omen showed hearing the word. Absent until both picks lock. */
+  storyBetrayerOddness?: 'sidelined' | 'tempted';
 }
 
 /**
@@ -389,6 +394,30 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
       { kind: 'action', text: 'She flicks a hissing ball into the air and catches it without looking.' },
     ],
   },
+  // GS-story-heard-the-word: the HERALD payoff of the TEMPTED mid-round omen. When you turned, the friend
+  // you trusted most — who stood at the tee and heard the Coil's word BESIDE you (the tempted omen) — did
+  // NOT turn. They resisted the same whisper, and now they come to stop you, heartbroken: "I heard the word
+  // the same as you… how could you side with them?" Per-character rows, gated on the Herald path + the
+  // tempted oddness + this exact friend, so it fires only when the omen planted the seed for them. Placed
+  // after `story-venoma-herald` so the Viper's welcome lands first, then the friend's confrontation.
+  ...CHARACTERS.map(
+    (ch): LoreEvent => ({
+      id: `story-heard-${ch.id}`,
+      trigger: (c) =>
+        c.storyRound === true &&
+        (c.storyChapter ?? 0) >= 4 &&
+        c.storyAlignment === 'herald' &&
+        c.storyBetrayerOddness === 'tempted' &&
+        c.storyBetrayerId === ch.id,
+      speaker: ch.shortName,
+      portrait: `golfer:${ch.id}`,
+      kicker: 'The friend who heard it too',
+      title: `${ch.shortName}: "I Heard It Too"`,
+      accent: '#54c8ff',
+      cta: 'Say nothing →',
+      lines: [...betrayalHeardTheWord(ch.id)],
+    }),
+  ),
 
   // ── GS-story-ragnarok: the impending-RAGNARÖK escalation thread — one beat per Sigil chapter so EVERY
   // Sigil carries the stakes, not just Ch.3. It tracks the sigil-ceremony's waking serpent (chapter N = N−1

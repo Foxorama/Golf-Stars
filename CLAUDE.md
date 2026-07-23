@@ -264,7 +264,7 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     `betrayerId(story)` = the odd one out of your two team-Sigil partner picks; `betrayerOddness` says WHY
     (`sidelined` = never picked / `tempted` = trusted twice). ALL of a friend's betrayal dialogue is ONE
     indexed block, `BETRAYAL_VOICE` in `storyBetrayal.ts` (defection/farewell/confront/corrupt/doubt/distance
-    + the pre-Choice `sidelined`/`tempted`), each authored around that golfer's own Coil relationship (Voss
+    + the pre-Choice `sidelined`/`tempted` + the Herald `heardTheWord` payoff), each around that golfer's Coil relationship (Voss
     or Venoma); `everyGolferHasBetrayalVoice` machine-checks full coverage. The **mid-round omen**
     (GS-story-midround-omen, `storyMidround.ts`) fires ONCE at the Ch.3 major's nine-hole pause — before The
     Choice, both picks locked — diverting `holeComplete` to the shared `.gs-lore*` beat card (`storyMidBeat`,

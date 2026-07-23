@@ -16,8 +16,10 @@ import {
   betrayerOddness,
   betrayalSidelined,
   betrayalTempted,
+  betrayalHeardTheWord,
   everyGolferHasBetrayalVoice,
 } from '../src/sim/rpg/storyBetrayal';
+import { pickLoreEvent, type LoreContext } from '../src/sim/rpg/lore';
 import { defaultStoryState, type StoryState } from '../src/sim/rpg/story';
 import { CHARACTERS } from '../src/sim/rpg/characters';
 import { otherGolferIds } from '../src/sim/rpg/storyCast';
@@ -118,6 +120,54 @@ describe('GS-story-midround-omen — per-character voice coverage', () => {
     for (const ch of CHARACTERS) {
       expect(betrayalSidelined(ch.id)).not.toEqual(betrayalTempted(ch.id));
     }
+  });
+});
+
+// ── GS-story-heard-the-word: the Herald payoff of the tempted omen ───────────────────────────────────────
+
+describe('GS-story-heard-the-word — the Herald "I heard it too" confrontation', () => {
+  const heraldCtx = (overrides: Partial<LoreContext> = {}): LoreContext => ({
+    biome: 'ocean',
+    archetype: 'ocean',
+    format: 'strokeplay',
+    stopIndex: 0,
+    storyRound: true,
+    storyChapter: 4,
+    storyAlignment: 'herald',
+    ...overrides,
+  });
+
+  it('every golfer has a heard-the-word confrontation ("I heard the word", "how could you side")', () => {
+    for (const ch of CHARACTERS) {
+      const text = betrayalHeardTheWord(ch.id).map((l) => l.text).join(' ');
+      // they heard the word too (the seed), and confront your choice ("how could you…") — in their own
+      // voice, so Larry's "how could ya" and Woo's "how could you say yes" both count.
+      expect(text.toLowerCase()).toContain('i heard');
+      expect(text.toLowerCase()).toMatch(/how could (you|ya)/);
+    }
+  });
+
+  it('fires the tempted betrayer\'s confrontation on the Herald path, in their voice', () => {
+    // Ignore the higher-priority Venoma-welcome beat (fires first) to probe the heard beat directly.
+    const betrayer = betrayerId(s(A, A)); // same pick twice → the trusted friend = A
+    const seenExceptHeard = { 'story-venoma-herald': true };
+    const ev = pickLoreEvent(heraldCtx({ storyBetrayerId: betrayer, storyBetrayerOddness: 'tempted' }), seenExceptHeard);
+    expect(ev?.id).toBe(`story-heard-${betrayer}`);
+    expect(ev?.portrait).toBe(`golfer:${betrayer}`);
+    expect(ev?.lines).toEqual(betrayalHeardTheWord(betrayer));
+  });
+
+  it('does NOT fire for the sidelined case, on the Warden path, or off a story round', () => {
+    const betrayer = betrayerId(s(A, B)); // distinct picks → sidelined
+    const seen = { 'story-venoma-herald': true, 'story-venoma-warden': true };
+    // sidelined oddness → no heard beat
+    expect(pickLoreEvent(heraldCtx({ storyBetrayerId: betrayer, storyBetrayerOddness: 'sidelined' }), seen)?.id ?? '').not.toMatch(/^story-heard-/);
+    // Warden path → no heard beat (that's the defection arc's job)
+    expect(
+      pickLoreEvent(heraldCtx({ storyAlignment: 'warden', storyBetrayerId: betrayerId(s(A, A)), storyBetrayerOddness: 'tempted' }), seen)?.id ?? '',
+    ).not.toMatch(/^story-heard-/);
+    // not a story round at all
+    expect(pickLoreEvent(heraldCtx({ storyRound: false, storyBetrayerId: betrayerId(s(A, A)), storyBetrayerOddness: 'tempted' }), seen)?.id ?? '').not.toMatch(/^story-heard-/);
   });
 });
 

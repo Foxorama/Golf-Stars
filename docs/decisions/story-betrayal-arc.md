@@ -261,6 +261,25 @@ Venoma), `applyMidroundOmen` once-only, and the full hole-9 reducer flow (divert
 never re-firing; a Ch.1 major's turn shows the classic pop with no false fire). Plus a `?screen=storymidbeat`
 browser smoke in `tests/build.test.ts`. `everyGolferHasBetrayalVoice` now also requires the two new scenes.
 
+## The payoff — "I heard it too" (GS-story-heard-the-word)
+
+The `tempted` omen plants a seed that must pay off BOTH ways. **Warden:** the tempted friend falls to the
+word (the existing defection/doubt/distance arc + the interlude) — and because the omen SHOWED you them
+hearing it, the defection now "makes sense" rather than reading as a switch-flip (the player's Warden ask).
+**Herald:** YOU turn, and the friend who heard the word beside you did NOT — they resisted the same whisper
+and come to stop you, heartbroken and uncomprehending: *"I heard the word the same as you… how could you side
+with them?"* (the player's Herald ask, verbatim in intent).
+
+That confrontation is per-character Herald arrival beats `story-heard-<golfer>` (`LORE_EVENTS`), from
+`BETRAYAL_VOICE.heardTheWord` — each in that golfer's voice + Coil thread (Feather's windless line, Woo's
+Venoma-roar, Larry's void-tide, Bo's still-green). They gate on the Herald path + the new
+`LoreContext.storyBetrayerOddness === 'tempted'` (populated in `withLoreGate` from `betrayerOddness`) + this
+exact `storyBetrayerId`, so the beat fires ONLY for the friend the omen showed hearing the word, and only in
+the same-pick-twice case that raised the tempted omen. Placed after `story-venoma-herald` so the Viper's
+welcome lands first, then the friend's grief. Pure DATA + a context field — zero sim rng, no save bump.
+Guarded in `tests/story-midround.test.ts` (fires for the tempted betrayer in their voice; never for the
+sidelined case, the Warden path, or off a story round; `everyGolferHasBetrayalVoice` now requires it too).
+
 ### Notes / follow-ups for the polish pass
 - **Finale balance** (`FINALE_ALLY_EDGE`, opp `rivalEdge×0.5`) is a first fair cut (a −2 round wins >60%,
   a blow-up isn't carried to a halve). Re-measure once eyes-on play confirms the human-round baseline.
