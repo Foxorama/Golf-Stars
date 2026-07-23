@@ -260,6 +260,16 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     triggering beat to the `'lore'` screen. Mode-agnostic (derelict via biome, caddy via perks). The screen
     (`app/loreScreens.ts` + `render/loreArt.ts`) uses its OWN `.gs-lore*` prefix, never the play `.gs-hud`.
     Zero sim rng. Guards: `tests/lore.test.ts` + build smoke + save v27→v28.
+  - **The Story-Tour betrayal is per-character + foreshadowed** (`docs/decisions/story-betrayal-arc.md`).
+    `betrayerId(story)` = the odd one out of your two team-Sigil partner picks; `betrayerOddness` says WHY
+    (`sidelined` = never picked / `tempted` = trusted twice). ALL of a friend's betrayal dialogue is ONE
+    indexed block, `BETRAYAL_VOICE` in `storyBetrayal.ts` (defection/farewell/confront/corrupt/doubt/distance
+    + the pre-Choice `sidelined`/`tempted`), each authored around that golfer's own Coil relationship (Voss
+    or Venoma); `everyGolferHasBetrayalVoice` machine-checks full coverage. The **mid-round omen**
+    (GS-story-midround-omen, `storyMidround.ts`) fires ONCE at the Ch.3 major's nine-hole pause — before The
+    Choice, both picks locked — diverting `holeComplete` to the shared `.gs-lore*` beat card (`storyMidBeat`,
+    `loreBeatHTML`) then on to the halftime pop. A new golfer = new `BETRAYAL_VOICE` rows; never an engine
+    edit. Zero sim rng, no `STORY_VERSION` bump (rides `seenStoryBeats`).
 
 - **Putting** — `docs/decisions/putting.md`
   - Manual pace-meter by default; AUTO only via the Penelope Putter caddy (`takePutt(…, control?)`;

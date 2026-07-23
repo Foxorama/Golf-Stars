@@ -54,6 +54,19 @@ export function betrayerCharacter(story: StoryState): Character | undefined {
 }
 
 /**
+ * GS-story-midround-omen: WHY the betrayer is the odd one out (pure) — the single classifier the pre-Choice
+ * foreshadow (and later payoff) reads. `'sidelined'` when you picked two DIFFERENT partners (the betrayer is
+ * the friend you NEVER chose — benched, resentful); `'tempted'` when you picked the SAME partner both times
+ * (the betrayer is the friend you TRUSTED most — the twist, who heard the Coil's word right beside you).
+ * Undefined until BOTH team-Sigil picks are locked, so a pre-Sigil-2 campaign has no omen yet.
+ */
+export function betrayerOddness(story: StoryState): 'sidelined' | 'tempted' | undefined {
+  const picks = validPicks(story);
+  if (picks.length < 2) return undefined; // both team Sigils not yet played → betrayer not yet settled
+  return new Set(picks).size >= 2 ? 'sidelined' : 'tempted';
+}
+
+/**
  * Your LOYAL friend ally for the WARDEN Ch.5 finale (pure): a friend who is NOT the betrayer. Prefer one
  * you actually PARTNERED (your Sigil-2 pick, then Sigil-1), so the friend at your side is one you chose;
  * else the first loyal tour-mate.
@@ -196,6 +209,16 @@ interface BetrayalVoice {
    *  `defection` lines later pay off, so the betrayal reads as an arc, not a switch-flip. */
   doubt: readonly DoubtLine[];
   distance: readonly DoubtLine[];
+  /** GS-story-midround-omen — the PRE-CHOICE, nine-hole-pause foreshadow, keyed to WHY this friend became
+   *  the odd one out of your two team-Sigil partner picks. `sidelined` = they were NEVER picked (two
+   *  DISTINCT partners): benched twice, "never good enough", and a Coil NPC drifts to their shoulder while
+   *  they mutter at the ropes. `tempted` = they were your partner BOTH times (the SAME pick twice): they
+   *  stood at the tee when the Coil spoke and heard the word right beside you — "maybe there's something to
+   *  it". Each is authored to seed this friend's later defection (Warden) / farewell (Herald), and each
+   *  names this golfer's own Coil relationship (Voss the Apostate or Venoma the Viper), so the betrayal is
+   *  personal and stops being a switch-flip. Shown at the turn of the Chapter-3 major, before The Choice. */
+  sidelined: readonly DoubtLine[];
+  tempted: readonly DoubtLine[];
 }
 
 const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
@@ -230,6 +253,20 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       { kind: 'say', text: '"I’m fine. I’ll play tomorrow. I always play."' },
       { kind: 'action', text: 'In her open locker, half-wrapped in a towel, is a ball you have seen before. It is very quietly hissing.' },
     ],
+    // Feather’s Coil thread is the APOSTATE — two quiet technicians; Voss respects a precise hand and
+    // offers her the one thing a lifelong fader can never have: a line with no wind on it at all.
+    sidelined: [
+      { kind: 'action', text: 'Feather isn’t in the field today — not picked, again. You find her past the ropes, hitting the same buttery fade into an empty net, over and over, for no one.' },
+      { kind: 'say', text: '"Two yards right of the trouble. Every single time. A perfect line… and I watch from the ropes while you tee off with somebody else. Starting to think a perfect line’s worth nothing if there’s never anyone at the end of it to see it land."' },
+      { kind: 'action', text: 'A gaunt man in a coat of shed scale has stopped at her shoulder. You never saw him cross the range. The Apostate says something low; she doesn’t walk away.' },
+      { kind: 'say', text: 'Voss, just loud enough to carry: "They overlook the steady hand. They always do. Come find me when the wind gets too loud to think, Feather — I know a green where it never blows at all."' },
+    ],
+    tempted: [
+      { kind: 'action', text: 'Feather catches you at the turn, a ball turning slow in her hand, her wind-reader’s eyes fixed on something a long way past the flag.' },
+      { kind: 'say', text: '"I was on the tee both times you picked me. Right beside you when that Voss man holed the one no one should hole. You heard the whisper down in the deep rough. So did I — I was close enough to."' },
+      { kind: 'say', text: '"Don’t look at me like that. I’m not saying he’s right. I’m saying I’ve aimed off the trouble my whole life, and he offered me a line with no trouble on it at all. Just the still, and the end. Maybe there’s something to it. Maybe."' },
+      { kind: 'action', text: 'She pockets the ball and heads for the back nine — and for the first time in fifteen years, you cannot read which way she’ll break.' },
+    ],
   },
   'huang-woo-hook': {
     defection: [
@@ -261,6 +298,21 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       { kind: 'say', text: '"Sh— shh. There. You feel that, through the metal? It ROARS down there, friend. It never stops roaring. It never gets tired of me."' },
       { kind: 'say', text: '"I’m fine! Warm-up ritual! New thing I’m trying!"' },
       { kind: 'action', text: 'They snap the lights back on too fast and grin too wide, and neither of you mentions it at breakfast.' },
+    ],
+    // Woo’s Coil thread is VENOMA — the hype-man who needs a crowd, and the Viper who tells them the crowd
+    // never goes quiet on her side. A charged, half-romantic pull: Venoma is the roar in the silence, and
+    // Woo, who dies a little every time the gallery hushes, keeps going back to hear her say it again.
+    sidelined: [
+      { kind: 'action', text: 'Woo isn’t in the field again. So they’re working the gallery instead — high-fiving strangers, filling a silence that used to fill itself. Nobody picked the hype man. Twice.' },
+      { kind: 'say', text: '"It’s FINE! Great spot, the ropes — best view in the house! …You didn’t pick me. Either time. Your loudest friend, out here clapping for the golfer who took my seat. Ha. Ha. Hilarious, honestly."' },
+      { kind: 'action', text: 'Venoma has appeared at their shoulder — close, a hand on their arm, saying something meant only for Woo. And Woo, who never stops talking, has gone quiet, and is listening.' },
+      { kind: 'say', text: 'Venoma, warm as poison: "They stuck a voice like YOURS behind the ropes? Darling. The Coil never lets a gallery go quiet — not for a second. Come stand where they’ll ROAR for you. I’ll keep you a place right at the front."' },
+    ],
+    tempted: [
+      { kind: 'action', text: 'Woo drops onto the bench beside you at the turn and — for once — says nothing at all for a whole three seconds.' },
+      { kind: 'say', text: '"Both majors, right there on the tee next to you. When the whole gallery went dead for that Voss guy’s shot — you felt it too, yeah? That HUM underneath the quiet. Like the biggest crowd in the universe, roaring, a long way down."' },
+      { kind: 'say', text: '"And Venoma keeps saying it’s for me. That the noise never stops down there. I keep telling her to get lost… and I keep finding reasons to go back and hear her say it one more time. Maybe there’s something to it. Don’t you dare tell Larry."' },
+      { kind: 'action', text: 'They wrestle the grin back on, bump your shoulder, and jog to the tenth — but the laugh lands half a beat late, like an echo of itself.' },
     ],
   },
   'longshot-larry': {
@@ -294,6 +346,21 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       { kind: 'say', text: '"Course I’m right for tomorrow. Grip it and rip it, eh?"' },
       { kind: 'action', text: 'His grin is the same as ever. His eyes have gone very still — like the tide finally came in.' },
     ],
+    // Larry’s Coil thread is the APOSTATE — the man who lost a hundred balls to the void and the priest who
+    // tells him every one of them is safe out there, at rest. Voss’s fatalism (“the tide always wins the
+    // long game”) is the exact line Larry half-quotes in his own doubt beat; here it finds its source.
+    sidelined: [
+      { kind: 'action', text: 'Larry’s not in the field. He’s out on the far range instead, bombing drivers off the deck edge into the void — watching each one vanish, and not reaching for the next.' },
+      { kind: 'say', text: '"Passed over again, eh. Fair enough, fair enough. Who picks the bloke who loses half his balls into the black? …Bit rich, though, mate. Bit rich. I’d have sent one straight down the guts for ya. If you’d only asked."' },
+      { kind: 'action', text: 'The Apostate is leaning on the rail beside him, watching a ball shrink to nothing. Larry doesn’t tell him to shove off.' },
+      { kind: 'say', text: 'Voss, easy as a mate at the bar: "Every ball you ever sent out there is still going, Larry — safe, still, at rest. The void keeps them all. The tide always wins the long game. Stop fighting it, and you can finally stop losing."' },
+    ],
+    tempted: [
+      { kind: 'action', text: 'Larry catches you at the turn with a range ball weighing in his palm — not gripping it, just holding it, like it might tell him something.' },
+      { kind: 'say', text: '"Both times I was on the peg right next to ya, mate. When that scale-coat fella holed the one that shouldn’t go — dead quiet, and under the quiet, somethin’. You heard it. Don’t tell me ya didn’t. I KNOW ya did."' },
+      { kind: 'say', text: '"He reckons every ball I ever lost is still out there, at rest. Peaceful, like. And I keep thinkin’ — that doesn’t sound so bad? THAT’S the bit’s got me rattled. That it doesn’t sound bad at all. Reckon there might be somethin’ to it."' },
+      { kind: 'action', text: 'He rips one off the deck edge into the black and — for the first time you’ve ever seen him do it — doesn’t watch to see where it goes.' },
+    ],
   },
   'backspin-bo': {
     defection: [
@@ -326,6 +393,21 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       { kind: 'say', text: '"I’ll be at the vigil. Whatever I’m becoming, I’ll be there. Promise."' },
       { kind: 'action', text: 'When they do open their eyes, it takes a moment too long for their gaze to find you.' },
     ],
+    // Bo’s Coil thread is the APOSTATE — the green-reader and the priest who has stood on the one green Bo
+    // has chased their whole life: perfectly still, no break, a pin that never moves. Voss calls it mercy;
+    // for a golfer who reads greens for a living, that word lands harder than any taunt.
+    sidelined: [
+      { kind: 'action', text: 'Bo wasn’t picked. They’re on the practice green anyway, reading the line for a putt they won’t get to hit, in a match that was never theirs.' },
+      { kind: 'say', text: '"I read greens better than anyone on this tour. You know I do. And twice now you’ve walked past me to the tee with someone else. I’m not angry. I’m just… quietly recalculating what all that reading was ever for."' },
+      { kind: 'action', text: 'A gaunt figure in shed-scale has crouched at the low side, reading the same line. The Apostate nods, slow, like he agrees with a break only Bo can see.' },
+      { kind: 'say', text: 'Voss, almost gentle: "You’ve spent your life chasing the one green that’s perfectly still. No break. No wind. A pin that never moves. I have stood on it, Bo. When you tire of reading lines nobody will let you play — I’ll show you the way there."' },
+    ],
+    tempted: [
+      { kind: 'action', text: 'Bo sits with you at the turn, marker still in hand, and charts a slope on the empty bench between you that isn’t there.' },
+      { kind: 'say', text: '"I was beside you on both tees. When Voss holed the impossible one and the whole world went still — I felt the read CHANGE. Under my feet. Every green since has been pulling toward the same quiet centre."' },
+      { kind: 'say', text: '"He calls it mercy. I read greens for a living; you can see why that reaches me. Everything, everywhere, coming to rest. I keep trying to prove the read wrong, and I keep agreeing with it a little more. Maybe there’s something to it."' },
+      { kind: 'action', text: 'They roll an invisible ball dead straight along the bench, watch it die exactly where they knew it would, and go very quiet.' },
+    ],
   },
 };
 
@@ -351,6 +433,29 @@ export function betrayalDoubt(charId: string): readonly DoubtLine[] {
 /** GS-story-doubt: the betrayer DRIFTING — the eve-of-the-vigil beat, deeper than the first crack. */
 export function betrayalDistance(charId: string): readonly DoubtLine[] {
   return BETRAYAL_VOICE[charId]?.distance ?? FALLBACK_DISTANCE;
+}
+
+const FALLBACK_SIDELINED: readonly DoubtLine[] = [
+  { kind: 'action', text: 'Your friend isn’t in the field again — passed over twice now, watching from the ropes.' },
+  { kind: 'say', text: '"Never quite good enough to pick, am I? …It’s fine. Forget it."' },
+  { kind: 'action', text: 'A hooded figure has drifted to their shoulder, and they are, for once, listening instead of walking away.' },
+];
+const FALLBACK_TEMPTED: readonly DoubtLine[] = [
+  { kind: 'action', text: 'Your partner in both majors finds you at the turn, unusually quiet.' },
+  { kind: 'say', text: '"I stood on the tee beside you when the Coil spoke. I heard the word the same as you did. And… maybe there’s something to it. Maybe."' },
+];
+
+/** GS-story-midround-omen: the SIDELINED omen — the unpicked friend at the ropes ("never good enough") +
+ *  a Coil NPC at their shoulder. The pre-Choice nine-hole-pause foreshadow when TWO DISTINCT partners were
+ *  picked, so the betrayer is the one you never chose. */
+export function betrayalSidelined(charId: string): readonly DoubtLine[] {
+  return BETRAYAL_VOICE[charId]?.sidelined ?? FALLBACK_SIDELINED;
+}
+/** GS-story-midround-omen: the TEMPTED omen — the trusted friend you partnered BOTH times, admitting they
+ *  heard the Coil's word beside you and "maybe there's something to it". The pre-Choice foreshadow when the
+ *  SAME partner was picked twice, so the betrayer is the one you trusted most (the twist). */
+export function betrayalTempted(charId: string): readonly DoubtLine[] {
+  return BETRAYAL_VOICE[charId]?.tempted ?? FALLBACK_TEMPTED;
 }
 
 /** The betrayer's display short-name for story copy (the `{betrayer}` token) — falls back generic so a
@@ -402,7 +507,9 @@ export function everyGolferHasBetrayalVoice(): boolean {
       v.confront.length === 3 &&
       v.corrupt.length === 3 &&
       v.doubt.length >= 3 &&
-      v.distance.length >= 3
+      v.distance.length >= 3 &&
+      v.sidelined.length >= 3 &&
+      v.tempted.length >= 2
     );
   });
 }

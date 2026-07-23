@@ -87,6 +87,7 @@ import { currentTournament, tournamentForChapter, tournamentRival, sigilMatchThr
 import { finaleMatchup } from '../sim/rpg/storyBetrayal';
 import { finaleUnlocked, finaleResult, winFinale } from '../sim/rpg/storyFinale';
 import { interludeSeen, applyInterlude } from '../sim/rpg/storyInterlude';
+import { midroundOmen, applyMidroundOmen } from '../sim/rpg/storyMidround';
 import type { GearSlot } from '../sim/rpg/story';
 import {
   autoDecision,
@@ -932,6 +933,18 @@ export function reduce(state: UiState, action: Action): UiState {
       };
     }
 
+    case 'storyMidBeatContinue': {
+      // GS-story-midround-omen: dismiss the pre-Choice foreshadow → mark it seen (fires once per run) and
+      // flow into the halftime rival pop (its payload was stashed on the divert). Guarded to the beat screen.
+      if (state.screen !== 'storyMidBeat') return state;
+      return {
+        ...state,
+        screen: 'storyTournamentPop',
+        pendingMidBeat: undefined,
+        ...(state.story ? { story: applyMidroundOmen(state.story) } : {}),
+      };
+    }
+
     case 'storyTournamentContinue': {
       // GS-story-tournament: dismiss the tournament recap back to the clubhouse (already banked).
       // GS-story-chapters: winning Chapter 3 (the Storm Sigil) reaches THE CHOICE — divert to it once,
@@ -1452,39 +1465,37 @@ export function reduce(state: UiState, action: Action): UiState {
           const m = sigilMatchThrough(t, state.story, stopPlayed.map((p) => p.record.strokes), String(state.run.seed), pars, {
             teamPlayed: state.run.storyTeamFormat === 'scramble',
           });
-          if (m) {
-            const wonHoles = m.res.duels.filter((d) => d.winner === 'player').length;
-            const lostHoles = m.res.duels.filter((d) => d.winner === 'boss').length;
-            return {
-              ...state,
-              stopPlayed,
-              screen: 'storyTournamentPop',
-              storyTournamentMidPop: {
+          // GS-story-midround-omen: BEFORE the rival pop, at the Chapter-3 major's turn (both partner picks
+          // locked, path unchosen), divert ONCE to the pre-Choice betrayal foreshadow — the future betrayer's
+          // first crack, keyed to why they're the odd one out. It flows into the pop on continue. A no-op on
+          // every other tournament/chapter, so the classic halftime pop is unchanged.
+          const pop = m
+            ? {
                 rivalId: rival.id,
                 rivalName: rival.name,
                 brag: m.res.holesUp < 0, // the rival's side leads the match → they brag
-                playerThru: wonHoles,
-                rivalThru: lostHoles,
+                playerThru: m.res.duels.filter((d) => d.winner === 'player').length,
+                rivalThru: m.res.duels.filter((d) => d.winner === 'boss').length,
                 match: { holesUp: m.res.holesUp, thru: m.res.thru, team: m.kind === 'team' },
                 ...(rival.golferId ? { rivalGolferId: rival.golferId, rivalVoice: rival.voice, rivalCorrupted: rival.corrupted } : {}),
-              },
-            };
-          }
-          const rivalThru = rivalTotalThrough(t, String(state.run.seed), pars, 9, rival);
-          const playerThru = stopPlayed.reduce((s, p) => s + p.record.strokes, 0);
-          return {
-            ...state,
-            stopPlayed,
-            screen: 'storyTournamentPop',
-            storyTournamentMidPop: {
-              rivalId: rival.id,
-              rivalName: rival.name,
-              brag: rivalThru < playerThru, // rival ahead (fewer strokes) → they brag; else they curse you
-              playerThru,
-              rivalThru,
-              ...(rival.golferId ? { rivalGolferId: rival.golferId, rivalVoice: rival.voice, rivalCorrupted: rival.corrupted } : {}),
-            },
-          };
+              }
+            : (() => {
+                const rivalThru = rivalTotalThrough(t, String(state.run.seed), pars, 9, rival);
+                const playerThru = stopPlayed.reduce((s, p) => s + p.record.strokes, 0);
+                return {
+                  rivalId: rival.id,
+                  rivalName: rival.name,
+                  brag: rivalThru < playerThru, // rival ahead (fewer strokes) → they brag; else they curse you
+                  playerThru,
+                  rivalThru,
+                  ...(rival.golferId ? { rivalGolferId: rival.golferId, rivalVoice: rival.voice, rivalCorrupted: rival.corrupted } : {}),
+                };
+              })();
+          const omen = midroundOmen(state.story, state.run.storyTournament);
+          const midBase = { ...state, stopPlayed, storyTournamentMidPop: pop };
+          return omen
+            ? { ...midBase, screen: 'storyMidBeat' as const, pendingMidBeat: omen }
+            : { ...midBase, screen: 'storyTournamentPop' as const };
         }
       }
       // cumulative total (exactly as the headless `playStop` does), so auto ≡ interactive holds.

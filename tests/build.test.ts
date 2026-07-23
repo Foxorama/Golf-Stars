@@ -278,6 +278,7 @@ describe('build output (real browser)', () => {
     { screen: 'shipinterior', sel: '.si-nav', text: 'aboard your ship', label: 'the ship interior (rooms + crew + outfitting)' },
     { screen: 'storytournament', sel: '.gs-tourn-card', text: 'Emerald Invitational', label: 'the Story Galaxy Tournament lobby' },
     { screen: 'storytournamentpop', sel: '.gs-tourn-card', text: 'The turn', label: 'the Story tournament halftime rival pop' },
+    { screen: 'storymidbeat', sel: '.gs-lore', text: 'Overlooked', label: 'the Story mid-round betrayal foreshadow (nine-hole pause)' },
     { screen: 'storytournamentresult', sel: '.gs-storyres', text: 'Emerald', label: 'the Story tournament result recap' },
     { screen: 'storyfinale', sel: '.gs-fin-gate', text: 'Jörmungandr', label: 'the Story finale battle briefing' },
     { screen: 'storyfinaleresult', sel: '.gs-storyres', text: 'Universe', label: 'the Story finale victory recap' },

@@ -141,8 +141,14 @@ describe('close-out banking (resolveStoryTournament on a decided match)', () => 
     let s = ch3Round();
     s = reduce(s, { type: 'playInteractive' });
     let guard = 0;
-    while (s.screen === 'playing' || s.screen === 'storyTournamentPop') {
+    while (s.screen === 'playing' || s.screen === 'storyTournamentPop' || s.screen === 'storyMidBeat') {
       if (guard++ > 800) throw new Error('round never resolved');
+      if (s.screen === 'storyMidBeat') {
+        // GS-story-midround-omen: the pre-Choice betrayal foreshadow lands at the Ch.3 turn (both partner
+        // picks locked, path unchosen) — dismiss it into the halftime pop.
+        s = reduce(s, { type: 'storyMidBeatContinue' });
+        continue;
+      }
       if (s.screen === 'storyTournamentPop') {
         // GS-story-sigil-live: the matchplay halftime pop reads the MATCH, not stroke counts.
         expect(s.storyTournamentMidPop?.match).toBeTruthy();

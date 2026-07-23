@@ -216,8 +216,50 @@ the corrupted one; the former friends stay clean Warden.
   together"), `storyGuide.ts` (the completed-campaign line). The ending names the actual betrayer:
   `mountStoryEnding` gained `betrayerName` (the `{betrayer}` token), passed from `app.ts` via the shared
   `betrayerName(story)` seam. Render/copy only — no reducer/save/rng impact; Herald surfaces untouched.
+- **GS-story-midround-omen** — ✅ the PRE-CHOICE betrayal foreshadow at the nine-hole pause (player ask:
+  "mid-round at the nine-hole pause there needs to be a story beat before the Choice; the odd-man-out beat
+  needs a piece per character per outcome"). See *"The mid-round omen"* below.
 - **GS-story-betrayal-polish** — balance re-tune (the finale + team-major edges), any dialogue-depth follow-up,
   constitution/roadmap docs.
+
+## The mid-round omen — pre-Choice foreshadow (GS-story-midround-omen)
+
+The betrayal used to have NO on-screen build-up before The Choice — `betrayerId` is settled the moment both
+team-Sigil picks lock (end of Ch.2), but the first the player saw of it was the Ch.4 doubt thread, *after*
+the fork. So the betrayal read as a switch-flip. This beat plants the seed while the trunk is still shared.
+
+**When.** At the nine-hole pause (the turn) of the **Chapter-3 major** (the Storm Championship) — the last
+tournament before The Choice, by which point both partner picks are locked and `betrayerId` is final. The
+`holeComplete` reducer, at the hole-9 boundary, checks `midroundOmen(story, chapter)` BEFORE building the
+halftime rival pop; if it qualifies it diverts to the `storyMidBeat` screen, and `storyMidBeatContinue` marks
+it seen (`seenStoryBeats['midround-omen']`, once per run) and flows into the pop. Every gate is a
+pre-condition (Ch.3 only, `!alignment`, both picks locked, unseen), so every other tournament turn is the
+classic pop, byte-unchanged.
+
+**What — keyed to WHY the friend is the odd one out** (`betrayerOddness(story)`, the single classifier):
+- **SIDELINED** (two DISTINCT partner picks → the betrayer is the one you NEVER chose): they mutter from the
+  ropes that they're never good enough — passed over twice — and a Coil NPC drifts to their shoulder. You
+  SEE them get recruited, so the defection lands softer.
+- **TEMPTED** (the SAME partner picked twice → the betrayer is the friend you TRUSTED most, the twist): they
+  stood at the tee beside you when the Coil spoke, heard the word the same as you, and admit "maybe there's
+  something to it." Pays off BOTH ways — Warden, the word takes them; Herald, they resist it and can't
+  forgive that you didn't (the GS-story-heard-the-word follow-up).
+
+**Where it lives.** Content is `BETRAYAL_VOICE.sidelined/tempted` in `storyBetrayal.ts` (so a friend's
+foreshadow, defection, farewell and rival lines are all ONE indexed voice block), each authored around that
+golfer's own Coil relationship — **Huang-Woo ↔ Venoma** (the Viper is the roar when his gallery goes quiet),
+**Feather / Larry / Bo ↔ the Apostate** (Voss's windless line / void-tide fatalism / still-green mercy match
+each one's established doubt). Assembly + once-tracking is `storyMidround.ts` (`midroundOmen`,
+`applyMidroundOmen`, the `MidroundOmen` payload). The screen reuses the shared `.gs-lore*` beat card via
+`loreBeatHTML` (extracted from `loreScreens.ts` — no forked CSS prefix). Pure + render-only: zero sim rng,
+no `STORY_VERSION`/save bump (it rides the existing `seenStoryBeats`).
+
+**Guards.** `tests/story-midround.test.ts` — the picker (fires only Ch.3/pre-Choice/both-picks/unseen; the
+sidelined-vs-tempted flavour; `betrayerOddness`), per-character voice coverage (every golfer has both scenes,
+the tempted friend says "something to it", the sidelined scene names a Coil NPC, Huang-Woo's thread is
+Venoma), `applyMidroundOmen` once-only, and the full hole-9 reducer flow (divert → beat → pop → back nine,
+never re-firing; a Ch.1 major's turn shows the classic pop with no false fire). Plus a `?screen=storymidbeat`
+browser smoke in `tests/build.test.ts`. `everyGolferHasBetrayalVoice` now also requires the two new scenes.
 
 ### Notes / follow-ups for the polish pass
 - **Finale balance** (`FINALE_ALLY_EDGE`, opp `rivalEdge×0.5`) is a first fair cut (a −2 round wins >60%,
