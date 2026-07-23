@@ -74,6 +74,8 @@ export type Screen =
   | 'storyMidBeat'
   // GS-story-caddy-quest-dialogue: the caddy's mid-round beat at the turn of THEIR quest round (quest-only).
   | 'storyQuestBeat'
+  // GS-story-quest-offer-beat: the ally's PITCH beat, shown before a quest round tees off (either entry path).
+  | 'storyQuestOffer'
   // GS-story-yggdrasil: the finale — the Jörmungandr battle briefing and its victory/defeat recap.
   | 'storyFinale'
   | 'storyFinaleResult'
@@ -357,6 +359,11 @@ export interface UiState {
    *  `storyQuestBeat` screen). Set on the divert, cleared on continue → the next hole tees up. Transient;
    *  quest-only, so it never appears in a tournament / main-story round. */
   pendingQuestBeat?: QuestBeat;
+  /** GS-story-quest-offer-beat: the ally's PITCH beat shown the instant before a quest round tees off (the
+   *  `storyQuestOffer` screen). Set on both round-start diverts (`playStoryQuest` from the clubhouse AND
+   *  `storyStartQuest` from the star map), cleared on continue → the round intro (via `withLoreGate`), so the
+   *  first story beat always plays regardless of path and never doubles. Transient; quest-only. */
+  pendingQuestOffer?: QuestBeat;
   /** GS-story-yggdrasil: the finale recap payload (win/lose + which gate fell short). Transient. */
   lastStoryFinale?: { won: boolean; failReason?: 'firepower' | 'defence' | 'repelled'; strike?: 'clean' | 'graze' };
   /** GS-story-econ: the world whose Pro Shop is open (the `storyShop` screen). Transient. */
@@ -481,6 +488,7 @@ export type Action =
   | { type: 'tournamentPopContinue' } // GS-story-tournament-midpop: dismiss the halftime rival pop, play on
   | { type: 'storyMidBeatContinue' } // GS-story-midround-omen: dismiss the pre-Choice foreshadow → the pop
   | { type: 'storyQuestBeatContinue' } // GS-story-caddy-quest-dialogue: dismiss the caddy mid-round beat → play on
+  | { type: 'storyQuestOfferContinue' } // GS-story-quest-offer-beat: dismiss the ally's pitch → fly out, tee up the quest round
   | { type: 'storyTournamentContinue' } // GS-story-tournament: dismiss the win/lose recap
   | { type: 'openStoryFinale' } // GS-story-yggdrasil: open the finale battle briefing (five Sigils in hand)
   | { type: 'exitStoryFinale' } // GS-story-yggdrasil: back to the clubhouse from the briefing

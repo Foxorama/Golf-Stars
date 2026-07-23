@@ -88,7 +88,7 @@ import { finaleMatchup } from '../sim/rpg/storyBetrayal';
 import { finaleUnlocked, finaleResult, winFinale } from '../sim/rpg/storyFinale';
 import { interludeSeen, applyInterlude } from '../sim/rpg/storyInterlude';
 import { midroundOmen, applyMidroundOmen } from '../sim/rpg/storyMidround';
-import { questBeatFor, questBeatTurnIndex } from '../sim/rpg/storyQuestBeat';
+import { questBeatFor, questBeatTurnIndex, questOfferBeatFor } from '../sim/rpg/storyQuestBeat';
 import type { GearSlot } from '../sim/rpg/story';
 import {
   autoDecision,
@@ -624,7 +624,13 @@ export function reduce(state: UiState, action: Action): UiState {
         storyRound: true,
         storyQuest: q.id,
       };
-      return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', viewHole: 0, played: undefined, storyItemInspectId: undefined });
+      // GS-story-quest-offer-beat: play the ally's PITCH as a cinematic beat before the round tees off, so the
+      // first story beat lands here (not just as clubhouse-banner prose). `storyQuestOfferContinue` funnels on
+      // to the round intro (the same `withLoreGate` both paths reach). Absent `offer` lines ⇒ straight to intro.
+      const base = { ...state, run, course: currentCourse(run), viewHole: 0, played: undefined, storyItemInspectId: undefined };
+      const offer = questOfferBeatFor(run);
+      if (offer) return { ...base, screen: 'storyQuestOffer', pendingQuestOffer: offer };
+      return withLoreGate({ ...base, screen: 'intro' });
     }
 
     case 'storyStartQuest': {
@@ -650,7 +656,13 @@ export function reduce(state: UiState, action: Action): UiState {
         storyRound: true,
         storyQuest: q.id,
       };
-      return withLoreGate({ ...state, story, run, course: currentCourse(run), screen: 'intro', viewHole: 0, played: undefined, storyItemInspectId: undefined });
+      // GS-story-quest-offer-beat: the star-map "accept & play" path used to skip the ally's pitch entirely —
+      // fly the offer beat here too, so the first story beat lands regardless of how the player reached the
+      // round. Then `storyQuestOfferContinue` flows on to the same round intro (`withLoreGate`).
+      const base = { ...state, story, run, course: currentCourse(run), viewHole: 0, played: undefined, storyItemInspectId: undefined };
+      const offer = questOfferBeatFor(run);
+      if (offer) return { ...base, screen: 'storyQuestOffer', pendingQuestOffer: offer };
+      return withLoreGate({ ...base, screen: 'intro' });
     }
 
     case 'completeStoryQuest': {
@@ -956,6 +968,15 @@ export function reduce(state: UiState, action: Action): UiState {
       const hole = state.course.holes[nextIdx];
       if (!hole) return { ...state, screen: 'story', pendingQuestBeat: undefined };
       return { ...state, screen: 'playing', pendingQuestBeat: undefined, play: beginHole(hole, nextIdx) };
+    }
+
+    case 'storyQuestOfferContinue': {
+      // GS-story-quest-offer-beat: dismiss the ally's pitch → fly out and tee up the quest round. The run +
+      // course were built on the divert (from `playStoryQuest`/`storyStartQuest`), so this just flips to the
+      // round intro through the SAME `withLoreGate` both round-start paths funnel into (an arrival lore beat
+      // may still fire after). Guarded to the offer screen.
+      if (state.screen !== 'storyQuestOffer') return state;
+      return withLoreGate({ ...state, screen: 'intro', pendingQuestOffer: undefined });
     }
 
     case 'storyTournamentContinue': {

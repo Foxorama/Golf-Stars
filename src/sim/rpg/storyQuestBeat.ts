@@ -16,7 +16,7 @@
  * mid-round beat simply by carrying `duringQuest` lines on its quest row; absent ⇒ no pause (byte-identical).
  */
 
-import { questById } from './storyQuests';
+import { questById, type StoryQuest } from './storyQuests';
 import { allyName } from './storyAllies';
 import { heraldAgent } from './storyHeraldCrew';
 import type { LoreLine } from './lore';
@@ -50,6 +50,45 @@ function heraldPortraitFor(caddyId: string): string | undefined {
   return heraldAgent(caddyId)?.portrait;
 }
 
+/** The identity fields every quest beat shares — the ally's accent, portrait, speaker + the quest id/title.
+ *  A WARDEN ally draws its `caddy:<id>` roster bust; a COIL inner-circle caddy (GS-story-herald-quests) has
+ *  no `caddyArt` figure, so it draws its Coil lore portrait (`voss`/`venoma`/`coilkeeper`) — the same bust
+ *  the Herald crew card uses. Both resolve on the shared beat card (`lorePortrait`). */
+function beatFrame(q: StoryQuest): Omit<QuestBeat, 'kicker' | 'lines' | 'cta'> {
+  const herald = q.alignment === 'herald';
+  return {
+    questId: q.id,
+    caddyId: q.caddyId,
+    accent: herald ? '#c98adf' : '#e6b45a',
+    title: q.title,
+    portrait: heraldPortraitFor(q.caddyId) ?? `caddy:${q.caddyId}`,
+    speaker: allyName(q.caddyId),
+  };
+}
+
+/**
+ * The OFFER beat for the active quest round (GS-story-quest-offer-beat) — the ally's PITCH, spoken on the
+ * shared `.gs-lore*` beat card the instant before the quest round tees off, so the "first story beat" always
+ * plays no matter HOW the player reached the round: the clubhouse "fly out" button OR the star map's
+ * "accept & play" both funnel through it. It is the cinematic realisation of the ally's authored `offer`
+ * lines (previously only shown as passive clubhouse-banner prose, which the map path skipped entirely).
+ *
+ * Reads ONLY the run's `storyQuest`, exactly like `questBeatFor`, so a non-quest round (a tournament, a plain
+ * world clear, Voyage/Unending) never produces one. Undefined too if the quest has no authored `offer` lines.
+ */
+export function questOfferBeatFor(run: Run | undefined): QuestBeat | undefined {
+  if (!run?.storyQuest) return undefined;
+  const q = questById(run.storyQuest);
+  if (!q || !q.offer || q.offer.length === 0) return undefined;
+  return {
+    ...beatFrame(q),
+    kicker: 'A quest',
+    // The `offer` strings are the ally speaking (dialogue) — render each as a `say` line on the beat card.
+    lines: q.offer.map((text) => ({ kind: 'say', text })),
+    cta: 'Fly out together →',
+  };
+}
+
 /**
  * The mid-round beat for the active quest round, or undefined when none applies (pure). Reads ONLY the run's
  * `storyQuest`, so a non-quest round (a tournament, a plain world clear, Voyage/Unending) never produces one.
@@ -59,18 +98,9 @@ export function questBeatFor(run: Run | undefined): QuestBeat | undefined {
   if (!run?.storyQuest) return undefined;
   const q = questById(run.storyQuest);
   if (!q || !q.duringQuest || q.duringQuest.length === 0) return undefined;
-  const herald = q.alignment === 'herald';
   return {
-    questId: q.id,
-    caddyId: q.caddyId,
-    accent: herald ? '#c98adf' : '#e6b45a',
+    ...beatFrame(q),
     kicker: 'At the turn',
-    title: q.title,
-    // A WARDEN ally draws its `caddy:<id>` roster bust; a COIL inner-circle caddy (GS-story-herald-quests)
-    // has no `caddyArt` figure, so it draws its Coil lore portrait (`voss`/`venoma`/`coilkeeper`) — the same
-    // bust the Herald crew card uses. Both resolve on the shared beat card (`lorePortrait`).
-    portrait: heraldPortraitFor(q.caddyId) ?? `caddy:${q.caddyId}`,
-    speaker: allyName(q.caddyId),
     lines: q.duringQuest,
     cta: 'Play on →',
   };

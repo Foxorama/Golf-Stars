@@ -999,9 +999,11 @@ describe('Ally side quests (GS-story-quests)', () => {
     const accepted = reduce(hub, { type: 'acceptStoryQuest', questId: 'quest-dan' });
     expect(accepted.story?.activeQuestId).toBe('quest-dan');
 
-    // play it → tees off Dan's home world (the derelict), marked as the quest. A Ch.3 derelict arrival may
-    // fire a lore beat first (withLoreGate) — dismiss it to reach the intro.
+    // play it → the ally's OFFER beat plays first (GS-story-quest-offer-beat), then tees off Dan's home world
+    // (the derelict), marked as the quest. A Ch.3 derelict arrival may fire a lore beat too (withLoreGate).
     let intro = reduce(accepted, { type: 'playStoryQuest' });
+    expect(intro.screen).toBe('storyQuestOffer');
+    intro = reduce(intro, { type: 'storyQuestOfferContinue' });
     if (intro.screen === 'lore') intro = reduce(intro, { type: 'dismissLore' });
     expect(intro.screen).toBe('intro');
     expect(intro.run.staticCourseId).toBe('derelict-18');
@@ -1042,8 +1044,11 @@ describe('Ally side quests (GS-story-quests)', () => {
     const accepted = reduce(hub, { type: 'acceptStoryQuest', questId: 'quest-coil-venoma' });
     expect(accepted.story?.activeQuestId).toBe('quest-coil-venoma');
 
-    // play it → tees off Venoma's quest world (the Mire), marked as the quest (a lore beat may fire first)
+    // play it → the ally's OFFER beat plays first, then tees off Venoma's quest world (the Mire), marked as
+    // the quest (a lore beat may fire after the pitch too).
     let intro = reduce(accepted, { type: 'playStoryQuest' });
+    expect(intro.screen).toBe('storyQuestOffer');
+    intro = reduce(intro, { type: 'storyQuestOfferContinue' });
     if (intro.screen === 'lore') intro = reduce(intro, { type: 'dismissLore' });
     expect(intro.screen).toBe('intro');
     expect(intro.run.staticCourseId).toBe('swamp-18');
@@ -1099,7 +1104,13 @@ describe('Story star-map navigation (GS-story-map-nav)', () => {
     expect(res.run.storyRound).toBe(true);
     expect(res.run.storyQuest).toBe('quest-sandy');
     expect(res.run.staticCourseId).toBe('desert-18');
-    expect(res.screen === 'intro' || res.screen === 'lore').toBe(true);
+    // GS-story-quest-offer-beat: the star-map path shows the ally's PITCH first (it used to skip it entirely),
+    // then continues to the round intro (a lore beat may fire after).
+    expect(res.screen).toBe('storyQuestOffer');
+    expect(res.pendingQuestOffer!.questId).toBe('quest-sandy');
+    let intro = reduce(res, { type: 'storyQuestOfferContinue' });
+    if (intro.screen === 'lore') intro = reduce(intro, { type: 'dismissLore' });
+    expect(intro.screen).toBe('intro');
   });
 
   it('storyStartQuest is a no-op for a world with no offerable/active quest', () => {
