@@ -225,7 +225,7 @@ export const CHARACTERS: readonly Character[] = [
     loadout: (m) => ({ ...m, bag: buildStartBag(BALANCED_BAG) }),
     // The big sticks fight a snap-hook: their LEFT zones balloon (a real chance of a duck-hook),
     // while the surgical irons not only spray tighter but also clean up their miss zones (more
-    // green, fewer side misses) — so his shape is genuinely two-faced, club to club.
+    // green, fewer side misses) — so their shape is genuinely two-faced, club to club.
     clubMods: (carry) => {
       if (carry >= LONG_CARRY) return mods({ angleBias: -0.06, dispMult: 1.18, shape: { hookL: 0.05, duckHookL: 0.03 } });
       if (carry >= WEDGE_CARRY) return mods({ angleBias: -0.01, dispMult: 0.78, shape: { hookL: -0.03, sliceR: -0.03 } }); // striped irons
