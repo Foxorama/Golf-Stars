@@ -1376,3 +1376,491 @@ FIRST fairway feature = the corridor). Skipped on lost-rough / ship worlds (isla
 no apron — the derelict gets a render-only deck blend instead, GS-ship-deck-blend). The apron→green→fairway
 RENDER junction blend is a separate render-only pass (GS-green-blend). Re-shoot
 `scripts/greenblend-preview.mjs` (mid/approach zoom, the player's decision distance) after touching it.
+
+---
+
+## Migrated from CLAUDE.md — System-index bullets (2026-07-23 refactor)
+
+> These are the verbatim terse System-index bullets moved out of `CLAUDE.md` when it was
+> compressed back to a lean constitution. They are the tip-of-iceberg pointers that had grown
+> into full implementation histories in the root file. The durable *rule* now lives as a short
+> bullet in `CLAUDE.md`; the detail below (and the deeper narrative already in this doc) is the
+> archive. Nothing here is lost — it is just no longer cluttering the constitution.
+
+- **Generator & sim** — `docs/decisions/sim-generator.md`
+  - Biomes are physics-only data rows; the render palette is keyed by biome id in the render layer.
+  - A world can own a COURSE IDENTITY via optional `Biome` profile fields (GS-biome-profile), not just
+    scalar skins: `parMix` (the composed par rhythm — desert leans par-5, jungle par-4, ice par-3),
+    `shapeWeights` (per-world par-4/5 shape vocabulary, replacing the single `doglegBias` mix — desert =
+    straight+cape, jungle = doglegs+doubles), `widthWeights` (per-world width-archetype pool — desert
+    broad/wander, jungle chute/neck/thin). ALL OPTIONAL: the defaults reproduce the old global
+    thresholds/proportions BYTE-FOR-BYTE (`cumWeights` default = the old `[.28/.41/.54/.66/.78/.89]`
+    width chain; `DEFAULT_PAR_MIX` = round(n·.25)/round(n·.22)), so a world without them is unchanged
+    and only an opted-in world reflows (re-run its death-spiral/fairness bars — other worlds untouched).
+    A new world's FEEL is now these rows, not an engine edit. Currently set on dust-belt (long/open),
+    spore-jungle (tight/twisty), ice-ring (exposed links); guarded by `tests/biome-profile.test.ts`.
+    `widthWeights`/`shapeWeights` apply to par-4/5 land holes only (island/ship/par-3 pools keep their
+    own recipes). `GENERATOR_VERSION` 24.
+  - GS-biome-variety (in progress) — the player ask: "almost every hole/biome looks the same, difficulty
+    is just length; give each world unique shapes + FILL the rough so you can't direct-line the green."
+    The fix is per-world profiles on the WHOLE rotation (not just the three GS-biome-profile worlds) +
+    denser off-corridor hazards, world by world (one PR each, GENERATOR_VERSION bumped): distinct
+    `shapeWeights` (kill the wandering-snake read — real doglegs/capes/pinches), `widthWeights` leaning on
+    the SQUEEZE archetypes (`hourglass`/`neck`/`chute`) so a pinch forces a LAYUP + iron approach
+    (difficulty from strategy, not length or trick greens), and bumped `treeDensity`/`ponds`/`potBunkers`/
+    scatter so the rough bites. For the SCRUBBY / TREELESS worlds a gated `Biome.roughFill` (a NON-penalty
+    lie kind) scatters world-appropriate obstacles (dune-scrub `waste`, rock/shard/scrap) through the
+    off-corridor rough at a density INDEPENDENT of `treeDensity`, on the `${seed}:rough:` SIDE stream so it
+    perturbs ZERO main-`rng` draws (penalty crossings/greens byte-identical; only non-penalty rough ADDED)
+    — the "fill the empty desert/metal/crystal rough" answer. Difficulty is deliberately raised — the
+    death-spiral/tents balance fences are RELAXED with `TODO(GS-biome-variety)` (the GS-rough-gradient
+    pattern), NEVER the structural fairness contracts (`validateFairness`/`Crossings`/`Course` stay green
+    by construction). The `tests/fairway-width.test.ts` GRAMMAR sample moved off verdant → `asgard-realm`
+    (the neutral default-weights reference we never re-profile — the `biome-profile.test.ts` byte-identity
+    case moved off ember → asgard for the same reason). Done: verdant-station (strategic parkland),
+    dust-belt (open dune-field desert — `roughFill` waste mounds + hourglass dune pinches), ember-world
+    (tight inferno — lava-carry capes/hairpins + squeezed thin/neck corridors + charred-snag rough),
+    crystal-spires (angular precision — cape/hairpin lines threaded through NECK/CHUTE corridors between
+    spire forests, `treeDensity` 0.3→1.3 so the namesake spires wall the rough), tempest-reach (exposed
+    wind-links — WIDE broad/wander fairways guarded by flanking storm `ponds` + pot-bunker fields, wind is
+    the defence, `roughFill` fescue moor), tidal-archipelago (heroic water-carry — CAPE carries over the
+    sea + lagoon-threaded hourglass/neck, `deepRough` water cut carries, palm + `roughFill` beach shore),
+    toxic-mire (the Water-Serpent's swamp — the TWISTIEST world, S-curve `double`/`hairpin` coils down
+    claustrophobic chute/neck/thin corridors between dead mangroves, acid pools everywhere; distinct from
+    the jungle's doglegs), scrap-belt (low-grav bomber's junkyard — WIDE broad/wander bombs pocked by dense
+    CRATER fields + `roughFill` scrap-plate flats + hourglass crater-pinches + barranca CAPE carries),
+    ice-ring (exposed frosted links — enhanced with `roughFill` fescue on the wind-scoured shelves + more
+    frozen `ponds`/pot bunkers; its green vector later RESTORED to steep in GS-green-diversity). The lost
+    island/wall worlds (void/cetus/derelict) got a CAREFUL, GREENS-ONLY pass (bigger island/deck greens
+    via GS-green-diversity) — no shape/width changes, because they're already the most visually distinct
+    worlds (island chains / star-waterfalls / ship corridors, never a "snake") and their waterfall/wall
+    machinery must not be touched (guarded green by the full walls.test/cetus.test/island-gaps suites).
+    (The scrap-belt PR also UNFROZE the flagship `metal-18` static course — see the static-courses bullet —
+    so no 18-hole course is a frozen exception.) ALL 15 worlds done.
+  - A world can get harder via its GREENS, not just length (GS-biome-difficulty) — the optional
+    `Biome.difficulty` vector (`greenTilt`/`greenComplexity`/`pinTuck` multipliers on how those ramp
+    with wildness) so two worlds at the SAME depth are hard in different ways: a desert stays
+    long-but-smooth (no `difficulty`), an ice/ember/crystal world's greens turn treacherous deep in.
+    All ride the existing GREEN SIDE STREAMS (`:slope:`/`:contour:`/`:pin:`) and every lever CLAMPS so
+    the defaults reproduce the old draws byte-for-byte (terrain + non-opted worlds unchanged); bounded
+    so it's harder-never-unfair (slope/lobe stay under `greenSlopeMax`, the pin stays inside the green).
+    This is the GREEN axis only; firmness / forced-carry axes (main physics stream) are a later pass.
+    Guarded by `tests/biome-difficulty.test.ts`. `GENERATOR_VERSION` 25.
+  - GREEN DIVERSITY (GS-green-diversity) — the player ask: "small greens are too EASY to putt (if you hit
+    one you're near the pin); bigger, more varied greens are HARDER (you can be on the green but 60 ft away
+    across a ridge) — do a lot more green diversity for difficulty + uniqueness." So every rotation world
+    got a DISTINCT, mostly BIGGER green identity via the existing scalar levers: `greenSize` (the poster
+    lever — desert/earth HUGE smooth 1.5, most worlds 1.1–1.25, up from 0.85–1.0), `greenAspect` (long
+    shelves — ice 2.6, tempest 2.3), `greenIrregular` (kept per-world for silhouette variety — jagged ember
+    1.45, smooth desert 0.85), `greenSlopeMax` (steeper), and a `difficulty` vector on nearly every world
+    (ice restored to the steepest 1.35/1.35/0.55; the DESERT deliberately keeps NO vector — its putting
+    test is pure SIZE on a big SMOOTH green, and it's also the biome-difficulty test's smooth reference).
+    CRITICAL — cheap by construction: `greenSize`/`greenAspect` are a post-multiply / fixed-draw PARAM (not
+    an rng-count change) and slope/contour/pin ride the per-hole SIDE streams, so this pass reflows ZERO
+    main-terrain draws (crossings/shapes/widths byte-identical) — only `greenIrregular` would perturb the
+    stream, so it was LEFT per-world. Bigger greens are EASIER to hit (so the auto death-spiral bars don't
+    trip — the auto sim's putting is simplified) but HARDER to putt for a human (longer lag, more break) —
+    the intended asymmetry. Only the ace-ship fixture seed re-pinned (79 → 25). `GENERATOR_VERSION` 36.
+    The careful trio followed (`GENERATOR_VERSION` 37): void (bigger, steeper asteroid greens), cetus
+    (bigger rolling tide-pool greens — waterfall/island machinery UNTOUCHED), derelict (bigger canted
+    deck pads — walls/ship-corridor/containment UNTOUCHED); green levers ONLY, so the full walls.test /
+    cetus.test / island-gaps suites stay green. Every rotation world now has a distinct green identity.
+  - A multi-hole stop is COMPOSED, not IID-sampled (GS-compose, `course/compose.ts planCourse`): the
+    run path (`runCourse`, `opts.compose`) plans a par SEQUENCE (proportions track the generator's own
+    ~25/55/20 mix, a par-3+par-5 guaranteed, never 3 identical pars in a row), 1–2 SIGNATURE holes (a
+    heroic drivable par-4, a stout long hole — skipped on lost/ship worlds), adjacent-SHAPE contrast
+    (a hole rotates off its predecessor's family, zero extra draws), and a MEAN-PRESERVING difficulty
+    ARC (per-hole wildness opens gentle → builds to the finish with a seeded breather/spike jitter; the
+    offsets sum to ~0 so the stop's average wildness = the course wildness the death-spiral bar is tuned
+    to). OPT-IN: `compose` absent ⇒ byte-for-byte the old IID generator (the planner is never called), so
+    every DIRECT `generateCourse` test/slice is unchanged — only the run path + `tests/compose.test.ts`
+    opt in. Balance guarded by a composed death-spiral bar (`tests/compose.test.ts`, same fences as the
+    IID bar); it's an internal generator opt, NOT a `_gs*`/URL hook, so no test-hub wiring.
+    `GENERATOR_VERSION` 23.
+  - A composed course can PIN its exact par routing (GS-hole-plan, `GenerateOptions.parSequence` →
+    `planCourse`): an authored hole-by-hole par list REPLACES the random par multiset + contrast
+    ordering entirely (hole `i` = `parSequence[i % len]`; shorter tiles, longer truncates), so a
+    real-course replica carries its actual rhythm instead of a distribution sample. Wins over
+    `parCap`/`parMix`; when set the par-planning rng draws are skipped (authored, not rolled). OPT-IN +
+    only ever passed by a pinned static course ⇒ absent is byte-for-byte the old random par plan, no
+    stream perturbed (contract 1), no test-hub wiring. Built for the Old St Andrews course (below).
+  - A world's APPEARANCE RATE is its themes' summed rarity weight per arc; a world with themes in
+    only one arc (or only epic-weight ones) is near-unreachable in the deep game where a run spends
+    most of its stops. Every archetype must carry ≥1 arc-3 theme at ~toxic-mire (swamp) weight or a
+    long voyage can skip it entirely (GS-biome-frequency: cetus/derelict/metal each got one COMMON,
+    arc-3-pinned deep-sky destination — the frequency lever is rarity WEIGHT, not a loot statement).
+    Lifting a world = a new theme ROW (+ a `gen-sky-coords.mjs` J2000 anchor for the journey map),
+    never an engine edit.
+  - Corridor: wide-and-wild early → tight late, a `ribbon` off a smoothed template-grammar
+    centreline; hazard placement + `validateFairness` key off the corridor's WIDEST point.
+    WIDTH is a per-hole ARCHETYPE (`chooseWidthProfile`: classic/chute/neck/hourglass/wander/
+    thin/broad → `Hole.widthId`), variety-not-difficulty like the shape grammar. Lost-rough
+    holes draw a WIDEN-ONLY island pool (island/-bays/-flare/-broadtee/-broad): width is
+    survival there, so every island `at(u) ≥ 1` (machine-checked) — islands only get wider,
+    never squeezed. Squeezed profiles floor at their own `floorFrac` (abs 5-yd half-width
+    min). Re-shoot `scripts/width-preview.mjs` after touching it. The auto AI READS this width
+    (GS-fairway-width-2, `widthLayupTarget`/`corridorHalfWidthAt` in `round.ts`): a positioning
+    drive that would come down in a GENUINELY TIGHT driving-zone pinch lays up to the wider bay
+    just short (position over power, auto ≡ interactive — it lives in the shared `safeTarget`).
+    Gated LOW (`pinchHalfWidth` 10) so it fires only on the brutal deep-stop corridors — RAISES
+    mean per-stop Stableford (contract 4), never fires on wide calm corridors. Pure, zero rng.
+  - The reach-AI plays POSITIONAL golf out of trouble (GS-rough-gradient-rebalance, `round.ts`): the
+    twin sparse-bag death-spiral drivers were (a) a TREES lie — the AI aimed at the green through the
+    forest (`clearLine` only sees penalty hazards, not trees), re-hit trees, and blew up (~60% of
+    pick-ups carried a trees lie), and (b) a SHORT-game stall — the sim only ever swung FULL, so a chip
+    onto a green / a punch-out flew the target into trouble. Two pure, zero-rng fixes in the SHARED
+    `layupTarget`/exec path (so auto ≡ interactive, contract 2, byte-checked): `recoveryTarget` punches
+    OUT of trees/deep-rough to the nearest REACHABLE fairway (penalty-free line, never over a hazard)
+    when the green's out of reach; `autoShotPower` dials the power DOWN for a genuine short shot (shortest
+    club + target inside `AUTO_THROTTLE_MAX` of its carry, never a forced carry) so a chip/punch lands
+    near the target instead of past it. Both fire only in the chip/punch regime, so ordinary reach shots
+    are BYTE-IDENTICAL (the whole suite is the guard). Pulled the worst sparse-bag max-wildness bar
+    ~1.27→~1.07 toPar and ~20%→~12% floor-hits WITHOUT softening the rough (density unchanged); the
+    `tests/characters.test.ts` fences tightened 1.45/0.25 → 1.15/0.15 to match. The residual gap (a
+    sparse bag still misses more greens) is a short-game/scoring pass, never softer rough.
+  - Greens are varied STAR shapes about `green` (single-valued r(θ)) — `pinInGreen`/`rayPolyDist`/
+    `validateCourse` depend on it. Pin ≠ centroid (attack aims at flag; auto/safe at fat-of-green).
+  - NO PENALTY HAZARD ON THE PUTTING SURFACE (GS-green-clear, `clearGreenOfPenalty`): the greenside
+    placements ray-march a SINGLE line from the green CENTRE (`rayPolyDist`) and drop the blob just past
+    where THAT ray exits — but a concave/STAR green fans lobes to either side of a near notch, so a 2-D
+    blob lands in the bay and pokes onto an adjacent lobe. On a penalty greensideKind (lava = ember,
+    water = ice-ring/toxic-mire/ocean, void, breach = derelict) that left molten/acid/void/water ON the
+    green, blocking the putt to the hole (the player report: "ice/lava biomes get hazards on the green").
+    The fix is the `clearVoidHazards` SIBLING — a PURE zero-rng post-filter (byte-identical streams; only
+    which placed hazards SURVIVE changes) that DROPS any non-crossing penalty hazard sitting on the green
+    surface or walling off the short-approach landing (exactly `validateGreenApproach`'s conditions, so a
+    survivor can never violate them). Dropping never moves a blob into the corridor (no new fairness
+    violation) and only RAISES Stableford (contract 4). CROSSINGS are exempt (they end before the green —
+    `validateCrossings`); so is `validateGreenApproach`, which now EXCLUDES crossings from its flag/centre/
+    short-approach checks (the `validateInFairwayWater` idiom) — a long ice SHELF green's big max-radius
+    threw `shortPt` ~70 yd back onto a legitimate frozen-pond/creek CARRY, a spurious high-wildness crash.
+    `GENERATOR_VERSION` 43.
+  - The green-END FLARES + varies per hole (GS-green-flare, superseding GS-green-end): the fairway APRON
+    used to fan to a SYMMETRIC rounded blob that started at the corridor width and swelled evenly around
+    the green — so every hole-end read as the same "tapered snake head + lollipop", and a small green sat
+    as a dot inside a round patch (the player report). Now the fairway genuinely FLARES into the green
+    like a real approach: it widens to a broad, usually ASYMMETRIC fan whose widest point sits AT/just
+    short of the green (a flared approach, never a point), leaning to a seeded side so no two complexes
+    mirror, with a distinct per-hole silhouette — broad FAN, gathering PUNCHBOWL, long RUNOFF ramp,
+    narrow TONGUE finger, angled DIAGONAL cape, or perched SHELF (no tail, rough behind). Built via
+    `build([{f,lat,l,r}…])` — asymmetric L/R half-width arrays + a small lateral skew of the apron
+    centreline (skews capped well under a half-width so the green never floats on rough). Drawn from the
+    DEDICATED side stream (`${seed}:greencomplex:`, the pin/slope pattern), so it perturbs ZERO main-`rng`
+    draws — terrain, hazards, pin, slope, greenside guards all byte-identical; only the apron polygon
+    shifts (a fairway-lie change near the green — auto sim outcomes reflow, so `GENERATOR_VERSION` is
+    bumped, not a stream reorder). Skipped on lost-rough / ship worlds (floating island greens + ship
+    decks have no apron — the derelict gets a render-only deck blend instead). `GENERATOR_VERSION` 42.
+    Sibling of GS-approach-hazards in the hazard/hole-END distribution follow-up to GS-biome-variety.
+  - `lieAt` is by surface PRECEDENCE, not draw order. Dispersion is ANGULAR (rotation preserves
+    carry), sampled from an asymmetric 5-zone `SprayShape`.
+  - Forced-carry crossings are generic penalty bands; the carry-aware AI flies them off `penalty`,
+    never the kind. Rivers hold the full carry width across the corridor but taper + terminate
+    believably off it (GS-rivers); crossing character/position vary and are fair BY CONSTRUCTION —
+    `riverChannel` clamps the crossing into the fair window, `generateCourse` throws, no retry.
+  - Hazards never overlap CROSS-family (`dedupeHazardOverlaps`, zero-rng post-filter; trees exempt,
+    crossings always win); SAME-family overlaps are legal and render union-merged.
+  - An ARMED lost-rough island hole strips every void-stranded hazard (`clearVoidHazards` — the
+    abyss is the only penalty there); void/cetus deep par 4/5 are ISLAND-HOP pad chains whose gaps
+    are completable by construction (`separateIslandGaps` + `validateIslandHops`). Void/cetus AND the
+    **derelict-ship** (GS-derelict — a dead starship: off the mown hull DECK is open space, par 4/5 break
+    into a chain of hull SECTIONS split by star-gaps you carry) are all in `BALANCE_EXEMPT_BIOMES`
+    (deliberately brutal, skipped by the death-spiral harnesses). The derelict reuses the proven island
+    machinery: a `shiprough` lie ("Lost to space") whose penalty IS `voidlost` (the +1 non-replay drop),
+    `SHIP_CLIFF` metal undersides, a `derelict` archetype (deep-sky themes Ghost/Skull Nebula, no
+    champion/figure). Unlike void/cetus (which arm lost-rough only at `wildness ≥ LOST_ROUGH_MIN_WILDNESS`
+    0.55, playing as FAIR rough when calm), the derelict is walled SPACE at EVERY wildness
+    (GS-ship-calm-space, `lostRoughMinWild = biome.walls ? 0 : 0.55`): off the deck is ALWAYS `shiprough`,
+    even on a calm stop, so the bulkheads always have space to bounce a ball back from — a calm derelict is
+    a tighter walled corridor, never a parkland-with-rough where a ball sails "over" a decorative wall into
+    fair rough. Gated on `biome.walls` (derelict-only), so void/cetus stay byte-for-byte. `GENERATOR_VERSION` 26.
+  - SHIP CORRIDORS (GS-ship-corridor): the derelict does NOT play the void's wide, blobby survival
+    islands — it plays STRAIGHT, CONSTANT-WIDTH metal HALLWAYS you shoot DOWN. Gated on `biome.walls`
+    (`const ship`, the derelict is the only walls world → every other world byte-identical): (a)
+    `SHIP_CORRIDOR_SCALE` (1.6, fixed — no wildness ramp, no VOID_ISLAND_SCALE) sets the hallway
+    half-width (widened from 1.25 so wall bounces cost less distance + you can cut corners, and the
+    corridor SHOULDER has room for breach hazards — GS-ship-interior); (b) `chooseWidthProfile`'s `ship` branch returns a `'ship-corridor'` UNIFORM profile
+    (`floorFrac` 1, near-symmetric — no landing bays, no widen-only bulges); (c) `buildCentreline`'s
+    `sp()` resamples at ONE point/segment for the ship (`sharp` → 2 elsewhere), so runs are DEAD STRAIGHT
+    and turns are HARD ANGULAR junctions, and the island 1.4× bend swing is skipped. The hull-SECTION
+    star-gaps (lost par 4/5) remain — a chain of straight corridor pieces across breached hull. The
+    walled corridor + impassable bulkheads mean a sideways miss ricochets back, never lost, so the tight
+    hallway stays fair. `GENERATOR_VERSION` 21.
+  - SHIP FEEL (GS-ship-feel): three pure-geometry, zero-rng touches that sell "a ship coming apart adrift".
+    (1) SHARP CORNERS — `biome.sharpCorners` drops `buildCentreline`'s Catmull-Rom sampling to 2/segment
+    (`sp()`), so the corridor bends at ANGULAR ship-hallway corners not smooth arcs; SAME control points/rng
+    (every other world byte-identical), mild enough the ribbon never folds (1200-seed fairness sweep clean).
+    (2) TORN EDGES — `styleTornHull` bristles twisted-metal shard teeth along each lost hull-SECTION outline
+    (course-length-spaced count → camera-proof), so a severed piece reads ripped, not clean-cut. (3) DRIFTING
+    JUNK — `render/shipDrift.ts` (the cetusFlow twin: play-view only, rides the SHARED WALL clock +
+    `_gsFeel.shipDriftSpeed`, SVG map byte-identical) tumbles torn hull-plates through the open space
+    around the wreck; all its pieces are course-anchored (GS-decor-view-states).
+  - SHIP DECK LOOK (GS-ship-deck): the derelict is DRESSED as a ship interior, all pure geometry + zero
+    rng (posHash/course-length counts → camera-proof), gated to the `derelict` archetype so every other
+    world is byte-identical. (1) DECK PLATING — `style/ship.ts styleShipDeck` reads the corridor
+    LENGTHWISE as a hallway floor you travel DOWN (a lit central WALKWAY spine with painted guide edges +
+    chevrons, wall-hugging edge SHADOW so it reads concave/sunk, conduit trays down each wall, an
+    OFFSET-BRICK plate grid whose staggered joints read as deck panels — NOT the old uniform transverse
+    rungs that looked like a tank track — access hatches + scuffs/scorch), built in course space off
+    `hole.centreline` and clipped to the corridor polys. (2) HULL SECTIONS — `style/platforms.ts
+    styleShipHull` REPLACES the void's geological `platformCliffs` strata under the derelict's lost pads
+    with a SHIP-HULL cross-section (dark riveted hull wall + horizontal interior-deck lines + vertical
+    structural frames + a lit steel deck-rim + a ragged torn bottom), so a floating section reads as a
+    chunk of wrecked STARSHIP, not a rock island. (3) BULKHEADS — `style/walls.ts styleShipWalls` draws
+    the corridor walls with real presence (inward deck shadow so the corridor reads sunk, dark-steel body,
+    lit cap, buttress ribs, rivets). A new derelict painter = a new `style/` module or the platforms
+    domain; never import style.ts.
+  - SHIP GREEN SEAT (GS-ship-deck-blend, `style/ship.ts styleShipGreenBlend`): the derelict gets NO grass
+    apron (a ship deck is not a lawn — the player asked for no flaring here), so the mown turf green sat as
+    a grass pad plonked straight onto the steel deck ("blend the fairway into the deck better"). Now the
+    green is SEATED into a recessed deck BAY: a dark seam groove, two collar rings grading the turf edge
+    down into the deck steel, and a cold machined steel LIP hugging the green — so it belongs to the ship,
+    not floating on it. Drawn ON TOP of the deck plating, UNDER the green surface; the grounded worlds'
+    grass green→apron blend (GS-green-blend) EXCLUDES the derelict for exactly this reason. Pure geometry,
+    zero rng, derelict-only → every other world byte-identical.
+  - SHIP INTERIOR (GS-ship-interior, `style/ship.ts`): the derelict is the inside of a large wreck you play
+    golf IN (a really-big ship, not shrunken players), so three more painters — pure geometry, zero rng,
+    camera-proof (course-space counts + posHash), gated to `derelict` → every other world byte-identical.
+    (1) `styleShipInterior` dresses the grey platform BESIDE the corridor as the ship's guts: an interior
+    deck-plate band flanking the hallway with bulkhead RIBS (doorway gaps), conduit runs, adjacent
+    ROOMS/compartments (sunk floors, consoles, lamps) + lower-level GRATING glimpses — clipped to the
+    platform, so a room past the hull tear is sliced open in cross-section. (2) `styleShipBreaches`
+    draws the derelict's `breach` HAZARDS (union-merged via `derelictBreachesFor`) as ACID-ETCHED HOLES
+    eaten through the deck to space (acid-green corrosion + a caustic etch rim + the cut deck thickness +
+    a star-lit void interior); the bright acid ring reads them apart from the plain-black OB. CRITICAL:
+    `breach` is EXCLUDED from `style.ts`'s generic `scatterHaz` bucket — left in, `styleScatter` ALSO
+    painted each breach with the unknown-surface fallback fill (`fillFor` → purple `#6a4f8a`), a PURPLE
+    blob over the acid hole (the "acid void holes render as purple zones" bug); `styleShipBreaches` is now
+    the ONLY breach painter. (3) the
+    derelict's `waste`/`sand` SCATTER FEATURE draws as an intact riveted steel DECK PLATE (`styleShipPlates`
+    in the feature loop) — a firm lie, never the default tan beach-sand patch. So the ship has NO bunkers.
+    (4) JAGGED PLATFORMS — `jagShipPlatforms` rips the smooth rounded pill of each LOST hull section into a
+    SHARP torn silhouette (densify + posHash outward-biased teeth, capped so the poly stays simple for the
+    clip), used for the fill, hull cross-section, torn teeth AND the interior clip; `styleShipHull` follows
+    the JAGGED front edge (not a convex hull), tears its bottom hard, and cuts open EXPOSED lower-deck
+    compartments (dark voids to vacuum). Gated to LOST holes (a calm stop is one continuous deck).
+  - BREACHES ARE A PENALTY (GS-ship-interior, sim): the derelict's only on-corridor hazard is the acid
+    `breach` lie — a lost-ball penalty (`voidlost`, the +1 non-replay drop, reusing shiprough's mechanic).
+    The walled corridor otherwise loses no balls, so breaches force care. Placed in a dedicated ship block
+    in the corridor SHOULDER — OUT past the central fair lane (`half*0.5`) but INSIDE the bulkheads, so a
+    sensible centred shot is clean yet a drift toward a wall falls through; every breach is proven clear of
+    the central lane before it's kept (a strict mirror of `validateFairness`), so `generateCourse` never
+    throws. `greensideKind: 'breach'` rings calm greens via the SANCTIONED greenside ring (gated `!ship ||
+    !lostRough` so a lost island-green never floats breaches in space); `fairwayBunkers: 0` (no sand).
+    Ship-only + gated → every other world byte-identical. `GENERATOR_VERSION` 22.
+  - DRIFTING WRECK PIECES (GS-ship-wreck, `render/shipWreck.ts` + `render/shipDrift.ts`): SMALL, detailed,
+    weathered chunks of the ship "STARLIT WANDERER" drift through the space beside the corridor — a BRIDGE
+    (window grids, nav lights, dying ember, the ship NAME sprayed + WEATHERED + CLIPPED to the hull, not a
+    flat decal), a solar WING, an ENGINE cluster. Canvas2D play-view only (the animated twin of the static
+    map debris). The big hull SECTIONS are WORLD-ANCHORED (GS-decor-view-states, `shipDriftModel`): a
+    course-space base + a course-yd/s drift + a course-YARD size, projected each frame exactly like the
+    small tumbling chunks and the static SVG twin — NOT the old screen-fraction anchor (`fx*W`,
+    `sizeFrac*min(W,H)`) that held a fixed on-screen size but decoupled from the world, so it rendered a
+    DIFFERENT scale + drift path in every view state and JUMPED on the aim→watch switch. They now zoom with
+    the world (bigger in the tight follow-cam, smaller in the whole-hole map). CRITICAL: `drawWreck`'s piece
+    frame is `ctx.scale(S)`, so every stroke width is a PIXEL value ÷ S (a raw lineWidth balloons into a
+    giant blurred halo). Zero rng, map byte-identical.
+  - SHIP-CORRIDOR WALLS (GS-ship-walls, `sim/walls.ts`): the derelict's corridor is lined by collidable
+    METAL BULKHEADS (stamped on `hole.walls` by the generator from the SAME ribbon edges it draws, gated on
+    `biome.walls` → zero rng, every other world byte-identical, skipped on island-green par 3s). They stand
+    `WALL_HEIGHT` = 72 yd — ABOVE the 60-yd shot-apex cap (`ARC_FEEL.peakMax`) — so NOTHING clears them: every
+    ball that leaves the deck sideways RICOCHETS back onto the corridor. Resolved in the shared `executeShot`
+    right after the tent branch (auto ≡ interactive).
+  - SHIP PINBALL FLIGHT (GS-ship-pinball-flight, `round.ts shipFlightPath`): the derelict does NOT fly the
+    parkland fade/hook BANANA — a corridor ball flies a STRAIGHT line and CRACKS off each bulkhead, caroming
+    down the metal hallway to its airborne landing (a spaceship corridor, not a gentle curve — the whole feel
+    of the world). The sim marches the straight shot line, reflecting off the DRAWN DECK edge at the first
+    SOLID-station departure (`firstSolidDeparture` + `inwardReflect`, which forces a `WALL_MIN_INWARD` turn so
+    a grazing hit can't machine-gun a bounce loop), then CONTINUES the flight along the reflected line up to
+    `maxBounces` — the full carry is spent along the reflected polyline (a bounce-cap hit LANDS at the last
+    on-deck ricochet, never extends into space). A forward torn-hull star-gap is a NON-solid station, so a
+    sanctioned carry flies clean. The exact reflected polyline is stored on `ShotLog.flightPath`; the renderer
+    draws THOSE straight segments (`samplePolylineFlight`), so the graphic IS the physics (contract 5). ALWAYS
+    taken on a walled hole so even a clean drive is straight, never a banana; a 0-bounce ship shot keeps its
+    exact old landing + roll energy (byte-identical outcome, render-only straight path), a bounced one carries
+    on down the deck with a lively metal floor. Pure geometry, ZERO rng, derelict-only (`hole.walls` gate → every
+    other world byte-identical), and it only ever keeps a would-be-lost ball IN the corridor (Stableford can only
+    rise — contract 4; plain corridors keep ~99% of drives in, gapped island-hop holes still punish a blind
+    driver into a carry-gap). This SUPERSEDED the old banana-walk `flightWallBounce` (removed); `wallFlightHit`
+    now feeds ONLY the aim cone (below). ON THE GROUND it's a PINBALL (GS-ship-pinball): a rolling ball REFLECTS off a wall
+    (`wallRollBounce` + `wallReflect`) and keeps rolling — wall to wall — until friction + a per-bounce
+    metal loss (`WALL_ROLL_RESTITUTION` 0.82) bleed the momentum away, NEVER the old dead stop. A walled
+    hole routes through `rollOut`'s position-tracking integrator (the curling one, kick/bend gated to
+    genuinely-contoured greens so a plane green stays byte-identical to the straight walk); non-walled
+    holes take the straight/curling paths byte-for-byte. Walls also BLOCK THE AIM CONE like a treeline
+    (`sprayBlocking` `walls` opt → a 🧱 glyph on the shaded slice) so a bounce is never a surprise. Walls
+    break at the island gaps (open hull) so a star-carry stays open, and only ever SAVE a ball that would
+    be lost to space (they raise Stableford — contract 4 by construction). Drawn by `style/walls.ts`
+    (`styleShipWalls`, camera-proof rivet counts) off the same `hole.walls`; a bounce clangs the world's
+    struck-metal voice + throws sparks (`onWallBounce` → `sfx.land(..,treeHit)`). `ShipWall` lives in the
+    course contract. WALL GRAPHIC = BOUNCE LINE (GS-ship-wall-bounce): on a LOST hole the ball bounces at the
+    fairway-corridor edge (`hole.walls`), but the DRAWN hull deck is `dilateUnion(fairway,+14)` — ~14 yd of
+    dead space you can never land on (`lieAt`→`shiprough`) lies past the bounce line, and its bright torn-hull
+    rim was misread as the boundary. So on a lost hole `styleShipWalls(…, bold=true)` draws an UNMISTAKABLE
+    bulkhead — a thick lit crest tracing the exact bounce line + an OUTWARD cast shadow sinking the dead-hull
+    margin behind it — and `SHIP_CLIFF.lip*` is dimmed so the outer torn rim no longer out-shines it. Render-
+    only, derelict-LOST-only (calm derelict holes, where off-corridor is fair rough and walls don't bounce,
+    keep the subtle partition look byte-identical; every other world unaffected), zero rng, camera-proof.
+  - SHIP-CORRIDOR CONTAINMENT (GS-ship-corridor-contain, `round.ts`): the promise "a sideways miss ricochets
+    back, NEVER lost to space" is guaranteed BY CONSTRUCTION, not by the per-segment collision. The pre-built
+    wall SEGMENTS are two parallel rails per corridor section — they do NOT close a fence around a deck that
+    ZIGZAGS with hard-angular corners, so a flight + the pinball roll reach off-hull spots
+    through the corner OPENINGS between adjacent rails and past the chain ends (measured before the fix: ~25%
+    of full-power derelict drives lost to space DESPITE the walls, most resting a few yards off the edge — the
+    root of five failed "fix the walls" attempts). THE FIX: the DECK the renderer draws IS the real bulkhead
+    (graphic ≡ physics). `executeShot` runs two deck-boundary layers on walled holes: (a) `shipFlightPath`
+    (GS-ship-pinball-flight) — march the STRAIGHT shot line and ricochet off the DECK edge at each SOLID-station
+    departure (a real mid-air carom, continues down the corridor, sparks), the straight-pinball flight that
+    replaced the leaky per-segment `wallFlightHit` AND the old banana-walk `flightWallBounce`; it catches every
+    sideways escape (100% of first-departure leaks gone; plain corridors keep ~99% of drives in); (b) a rest BACKSTOP (`containToDeck`) — any ball still off the
+    hull at a solid station (a rare post-gap-transition drift) is pulled to the nearest deck, appended to the
+    run-out path so it visibly rolls back. "SOLID station" = the centreline point
+    nearest the ball is itself ON the deck; a rest whose station centreline is off-deck is a sanctioned
+    torn-hull GAP (a forward carry) and stays lost, and a `breach` rest is a deliberate hazard (excluded via
+    `isLostToSpace`). The margin-seat is RE-VALIDATED so it never lands in a thin space sliver between a `waste`
+    plate and the fairway. BUT the boundary is a DRAWN bulkhead you can SEE (GS-ship-space-boundary): both the
+    flight ricochet (`firstSolidDeparture`) and the rest backstop (`containToDeck`) are gated on a real wall
+    within `CONTAIN_MAX_WALL_DIST` (22 yd) of the departure/rest point. A near-edge miss (a few yards off a
+    solid stretch, covering the +14 yd drawn dead-hull dilation and the hard-corner NOTCHES) is still caught;
+    but a ball flung FAR out into open space — beyond every bulkhead, through a torn-hull gap OPENING or clean
+    past the wall ends — has nothing to bounce off, so it flies FREE (stays lost) rather than caroming off
+    nothing / being reeled onto the fairway by an invisible "far space boundary" (the bug: derelict drives were
+    reaching 40–175 yd off the nearest wall out in the void, then boomeranging back). "Contained" means a
+    bulkhead is THERE; open space is a real loss. Pure geometry, ZERO rng, derelict-only (`hole.walls` gate →
+    every other world byte-identical), and containment still only ever moves a ball ONTO the deck. The
+    LESSON for any future "walled / contained" world: a pre-built segment fence can't contain a ball on a
+    bending, breaking corridor — make the DRAWN PLAYABLE SURFACE the physics boundary (in flight AND at rest),
+    never a segment crossing — but only where a bulkhead actually EXISTS; past the walls the ball is genuinely
+    lost. Regression: end-to-end seeded drives in `tests/walls.test.ts` assert (1) no resting ball off a SOLID
+    walled stretch is still `containToDeck`-able, (2) a ball flung far past the bulkheads flies free (no reel-
+    back), and (3) no flight bounce-vertex sits far from a drawn wall (no ricochet off empty space).
+  - Variety is DECOUPLED from difficulty: shape archetypes + dogleg corner groves appear on CALM
+    stops; difficulty rides bend severity + hazard density, not which shapes exist. And a hard hole
+    need NOT bend (GS-variety-3): `straightP` RISES with wildness (deep stops GAIN straight holes,
+    defended by length/width/rough/green tilt) so a wild stop stops reading as all-severe-bends — the
+    worst-hit worlds were the long low-gravity ones (void/cetus/Rainbow Road). DRIVABLE par-4s persist
+    at every wildness (a heroic change-of-pace, no longer halved deep in). Lost-rough par 4/5 draw an
+    island STORY (`runway`/`island-green`/`cape`/`stepping-stones`/`staggered`) so the pad chain varies
+    in count + position, not one even chain; every gap is floored to `ISLAND_GAP_MIN_YD` (past the
+    render's dilation bridge) so a void carry always READS as a real gap (graphic ≡ physics), still
+    clamped completable (`separateIslandGaps`/`validateIslandHops`). `GENERATOR_VERSION` 20.
+  - GS-variety-4 EXTENDS variety-3 to the PROFILED worlds (the player ask: a high-Ascension DESERT stop
+    read as an unbroken run of long, boring, bending "snakes"). Variety-3's `straightP`-rises-with-wildness
+    only fired on the FALLBACK (no-`shapeWeights`) picker, so every `shapeWeights` world (desert/scrap/ice/
+    jungle/…) stayed maximally bendy deep in. Now `pickWeightedShape(roll, weights, wildness)` lifts the
+    STRAIGHT share past `SHAPE_STRAIGHT_RAMP_MIN` (0.55) by `SHAPE_STRAIGHT_RAMP_K·(wildness−min)` and
+    renormalises — so a wild stop mixes in change-of-pace straight breathers (bend share ~84%→~75% on the
+    desert at w=1) instead of all-bends. Byte-identical BELOW the threshold (boost 0 ⇒ every calm/mid seeded
+    test unchanged) and consumes ZERO extra rng (remaps the already-drawn `shapeRoll`, contract 1); deep-stop
+    output re-flows so `GENERATOR_VERSION` is bumped. The DESERT also got a touch WIDER + more generous
+    (`fairwayWidthMult` 1.1→1.25, `widthWeights` leaned onto broad/classic) to make higher difficulty FUN not
+    tight — but KEEPS its hourglass pinch (0.16) and the corner-cut deep-rough reject margin was tightened
+    (+22→+18) so the wider fairways don't flatten the surviving bends into free curves (cutting a corner
+    still lands in hay). Difficulty from strategy + length + wind + big greens, never a monotonous snake.
+    Guarded by the composed + IID death-spiral bars (huge headroom: all-worlds toPar ~0.62 at w=1) and the
+    biome-profile contrasts. `GENERATOR_VERSION` 41.
+  - DEEP ROUGH chokes a dogleg's cut-the-corner chord (biome opt-in `deepRough`; ocean uses water);
+    fair by construction (far from the bent corridor), wildness-gated, zero-rng on straight holes.
+  - ROUGH GRADIENT (GS-rough-gradient): a distance-graded fill LINES every non-lost hole so a spray
+    can't ignore the hole — HEAVY rough (deeprough/fescue) HUGS the fairway edge, TREES thicken with
+    distance ("further out = more forest"). Calm stops = a WIDE recoverable buffer, trees far out;
+    wild stops (≥ `ROUGH_CHAR_MIN_WILDNESS` 0.45) roll a per-hole CHARACTER (tight tree chute /
+    heavy-rough gauntlet / mixed) so they read "a lot more random". All NON-penalty (fairness ignores
+    them); a `standoff` keeps every blob OFF the mown centreline route. Ocean keeps `fescue`-only (its
+    heavy rough is dune, its deep-rough-cut is the SEA). CRITICAL: drawn from a DEDICATED side stream
+    (`${seed}:rough:${holeIndex}`, like the pin/slope), so it perturbs ZERO main-`rng` draws — every
+    penalty crossing/green/grove + `validateCrossings`/`validateFairness` stay byte-identical; only
+    the non-penalty rough is ADDED. Balance was DELIBERATELY not re-tuned (rough first, rebalance
+    next): the death-spiral fences are relaxed to the interim reality with `TODO(GS-rough-gradient)`
+    — re-tighten them in the rebalance, never by softening the rough.
+  - A hole gets a forced-carry crossing **or** greenside drama (sanctioned penalty rings +
+    approach lake), never both. Corridors can break into mown segments (`brokenCorridor`, biome
+    `roughBreaks`; skipped on lost-rough worlds).
+  - APPROACH DEFENCE (GS-approach-hazards): every earlier hazard pass clusters on the LANDING zone
+    (`t ≈ 0.28–0.75`), so the last third + the FRONT of the green were nearly hazard-free and a long
+    approach was a free swing ("hazards are incredibly tee-heavy; very few in front of the green"). A
+    dedicated pass now guards the run-in on par 4/5 non-lost worlds: a FRONT bunker short of the green
+    (ray-marched to the real front edge, slid to a side so a tucked back pin sits behind it — "carry the
+    front bunker to the back pin") + 1–2 cross-bunkers pinching the last third (`t 0.72–0.9`). Sand/pot
+    class → NON-penalty (a stance tax, never a lost card) so they may bite the approach line and
+    `validateFairness` ignores them. Drawn from a DEDICATED side stream (`${seed}:approach:`, the
+    rough-gradient pattern) → perturbs ZERO main-`rng` draws (penalty crossings/ponds/greens + every later
+    hole byte-identical; only non-penalty approach bunkers ADDED). `GENERATOR_VERSION` 38. Part of the
+    hazard-DISTRIBUTION follow-up to GS-biome-variety (the sibling green-END-variety + in-fairway-water/
+    split-fairway passes are next).
+  - IN-FAIRWAY WATER + SPLIT FAIRWAYS (GS-fairway-water): penalty water only ever FLANKED the corridor
+    (`clearsPlayCorridor`), so "no lakes on/interrupting fairways and no split fairways". This pass bites
+    INTO the corridor at a WIDE landing zone while keeping the CENTRELINE (the safe line AND the auto-AI's
+    aim) DRY — so it's fair by construction (a middle shot is always clean) and the auto-AI is UNCHANGED:
+    a CAPE (a lake eats ONE side; carry the corner or bail to the dry lane) or a SPLIT (an off-centre
+    hazard STRIP + a parallel ALTERNATE fairway lane — main route down the dry centre, shortcut lane past
+    the hazard). WATER on water worlds is marked `sanctioned` (exempt from `validateFairness`'s flank rule,
+    the greenside-ring pattern) and proven fair by the new `validateInFairwayWater` (the centre route stays
+    penalty-free through the fairway BODY, `t 0.1–0.82`, so it never coincides with the near-green ring);
+    dry worlds get a NON-penalty rough/bunker bite (needs no sanction). Par 4/5, non-lost, wildness-gated
+    (`FW_WATER_MIN_WILDNESS` 0.32), ONE per hole, skipped when a crossing already interrupts the hole.
+    Drawn on a DEDICATED side stream (`${seed}:fwwater:`) → perturbs ZERO main draws (terrain/hazards/
+    greens byte-identical; only this feature ADDED). The STRUCTURAL fairness contract is NOT relaxed —
+    `generateCourse` throws (via `validateInFairwayWater`) on any bite that reaches the centre.
+    `GENERATOR_VERSION` 40. Last of the hazard-distribution follow-ups to GS-biome-variety.
+  - OB = stroke-and-distance off the play-bounds box (which doubles as the OB trigger — don't
+    shrink it casually).
+  - All new generator draws gate on their feature being armed (contract 1); current
+    `GENERATOR_VERSION` 19.
+  - A STATIC course is a pinned `StaticCourseSpec` (`seed`/`opts`) REBUILT on demand through the live
+    `generateCourse` pipeline (GS-static-courses, `course/staticCourses.ts` + `staticCourseSpecs.ts` —
+    `docs/decisions/static-courses.md`): `buildStaticCourse(id)` / `metalEighteen()` regenerate it (the
+    default), DETERMINISTIC within a `GENERATOR_VERSION` (same layout every play; a version bump re-rolls
+    it, the accepted cost of a lean unfrozen bundle for a casual records chase). `{regenerate:true}` /
+    `regenerateStaticCourse` / `npm run gen:courses` are the same path (a seasonal-redesign / rebalance /
+    re-freeze hook), re-validating the course so a redesign can't ship an unfair hole. NO COURSE IS FROZEN
+    (GS-biome-variety): a course COULD be frozen to a byte-identical `course/static/<id>.json` via a
+    `FROZEN_COURSES` row (the mechanism is kept, `buildStaticCourse` deep-clones a frozen singleton so the
+    run path's in-place stamping can't corrupt it), but freezing all ~15 tour courses would add ~2.5 MB, so
+    even the flagship `metal-18` "Antlia Scrapworks" — the `scrap-belt` (metal) archetype,
+    `{holes:18,compose:true,wildness:0.5}`, formerly the ONE frozen exception — now regenerates, keeping the
+    18-hole formats uniform (no exception) and letting each course reflect the latest per-world design (e.g.
+    the GS-biome-variety Scrap Belt crater fields). A course's exact par thus shifts with the design; its
+    identity is a VALID varied routing in the ~69–73 band (guarded by `tests/static-courses.test.ts`), not a
+    pinned number. The catalogue is a ROW, never hand-authored geometry. A tour course
+    row carries star-map metadata (`themeId`/`archetype`/`tier`/`blurb`) that does NOT feed generation. Every
+    Star Tour row (NOT flagship `metal-18`, which keeps a fixed `wildness: 0.5`) sets `opts.wildnessMix` = `STAR_TOUR_MIX` `{medium 0.6, hard 0.85}`
+    (GS-star-tour-difficulty): each hole rolls its wildness INDEPENDENTLY from that discrete set via the
+    composer's `planWildnessMix` (gated on `GenerateOptions.wildnessMix`), so a Star Tour round mixes
+    medium/hard holes and may come out all-one-level — fine for a solo stroke-play records chase with no
+    death-spiral cut. `meta.wildness` = the mix midpoint `STAR_TOUR_WILDNESS` (0.725) for the intro number.
+    OPT-IN + Star-Tour-only: the Voyage/Unending never pass a mix, so their mean-preserving arc AND byte
+    output are untouched (no `GENERATOR_VERSION` bump — no fixed-opts output changed). No `_gs*`/URL hook
+    (no test-hub wiring).
+  - STAR TOUR — the third game mode (GS-star-tour, format `strokeplay`, `formats.ts` `STROKEPLAY_FORMAT`):
+    a single 18-hole STROKE-PLAY round on a player-CHOSEN static course, ranked into personal course-record
+    leaderboards. `Run.staticCourseId`/`staticEffect` pin the course + weather; `currentCourse` branches on
+    `staticCourseId` (which NO other format sets → generated path byte-for-byte unchanged) to serve
+    `buildStaticCourse(id)` and apply the chosen weather sky: `applyEffectPhysics` (wind/carry, NO geometry
+    change) + the sky's GROUND MARKS (GS-weather-depth — scorch craters / stardust-ice-junk-tar-acid patches,
+    seeded off the HOLE geometry so the same course+sky is the identical repeatable test; `playerHoleOpts`
+    keys the headless arming off `staticEffect` for static rounds so auto ≡ interactive). The round is resolved like
+    Asgard (a bespoke reducer path, not the Stableford-cut/travel flow) — the single stop IS the whole run.
+    Records live in `sim/rpg/strokePlay.ts` (`StrokePlayBest` = courseId → best round, a MAP so a course's
+    all-time best is never evicted; ranked by TO-PAR asc, ties → fewer strokes): two boards, per-course best
+    + best-rounds-overall. Persisted in save v27 (`strokePlayBest`). Threaded through both the auto
+    (`playCourse`+`playTotals`) and interactive drivers (contract 2). The mode does NOT touch Voyage/Unending
+    behaviour.
+  - EARTH — the HOME course (GS-earth): the one real-world course, the Old Course at St Andrews, is the
+    Star Tour destination you reach by flying to the Earth landmark. It is a NEW `earth` BiomeArchetype +
+    `earth-links` Biome (a true Scottish LINKS: `carryMult` 1.0 — the only real-Earth gravity — seaside
+    wind, treeless firm turf, deep revetted POT bunkers, fescue/gorse rough, the Swilcan BURN carry, huge
+    undulating SHARED double greens). WEIGHT 0 + no pickable theme ⇒ out of the normal galaxy rotation,
+    reached only by the static course forcing the biome by id (the Asgard pattern; kept mid-`BIOMES` so
+    the last row stays positive-weight for the `pickBiome(0.999)` span test). NOT balance-exempt — a fair
+    world, so it clears the fairness/death-spiral bars (auto-AI plays it ≈ even par). The `standrews-18`
+    spec (`The Old Course, St Andrews`) is an UNFROZEN tour row like the others EXCEPT it PINS the real
+    par-72 routing (`opts.parSequence`, GS-hole-plan) and uses the designed difficulty ARC — NOT
+    `STAR_TOUR_MIX` — so a real course opens gentle and builds through the closing stretch. A new
+    archetype = a row in every archetype-keyed table (compile-forced: `ARCHETYPE_BIOME`/`ARCHETYPE_AFFINITY`/
+    `ARCHETYPE_TURF`/`ARCHETYPE_SPACE`/`OB_LOOK`/`BIOME_RELIEF`/`WIND_COL`/`TREE_VOICES`/`TREE_GLYPH`/`PRO_LOOK`/
+    `MUSIC_TRACKS`/`ZONES`/`PROS`; test-forced: `GROUND_COVER`/`WIND_RGBA`/`AMBIENT`; plus `BIOME_ROUGH`/
+    `ACCENTS` by biome id, `DEEP_ROUGH`, a `zoneHeroSVG` branch), never an engine fork. Star map: Earth is
+    the tappable Old-Course target — `worldPos` special-cases `themeId:'earth'` → the blue-marble
+    `EARTH_POS`, and `earthGlyph` (not a generic constellation planet) carries the selection ring + record
+    + play flow. Guarded by `tests/startour-flow.test.ts`. Pure render/data + a static row — no `_gs*`/URL
+    hook, no test-hub wiring.

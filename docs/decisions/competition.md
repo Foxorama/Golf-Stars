@@ -369,3 +369,34 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
       rainbow world's own prismatic crystal, not the Void's monochrome violet. Re-shoot
       `scripts/rainbow-preview.mjs` (now applies `applyRainbowRoad` + rasterizes to PNG) after touching it.
 
+
+---
+
+## Migrated from CLAUDE.md — System-index bullets (2026-07-23 refactor)
+
+> These are the verbatim terse System-index bullets moved out of `CLAUDE.md` when it was
+> compressed back to a lean constitution. They are the tip-of-iceberg pointers that had grown
+> into full implementation histories in the root file. The durable *rule* now lives as a short
+> bullet in `CLAUDE.md`; the detail below (and the deeper narrative already in this doc) is the
+> archive. Nothing here is lost — it is just no longer cluttering the constitution.
+
+- **Competition & leaderboards** — `docs/decisions/competition.md`
+  - The field is a deterministic STATISTICAL ghost (`ghostHoleStableford`), not N real ball-sims.
+  - Voyage survival is your POSITION in one persistent field thinning to the final two;
+    `competition.ts` is the single source for the drawn board AND real survival. The cut thins GENTLY
+    so the leaderboard keeps VARIETY the whole way and CONVERGES to 2 only at the FINAL ordinary stop
+    (GS-cut-variety): base curve `VOYAGE_SURVIVOR_TARGETS = [16,13,10,8,5,2]` with a PER-ORDINAL floor
+    `VOYAGE_SURVIVOR_FLOORS = [10,8,7,5,4,2]`, so even at `ASCENSION_MAX` the field stays a real,
+    descending set through arcs 1–2 (≥7 mid-arc-2) and only the last ordinal reaches 2. Ascension
+    tightens the EARLY cuts but can NEVER flatten the curve to its floor (the old flat floor of 4
+    collapsed a hard voyage to a four-golfer board for two arcs); high-Ascension difficulty rides the
+    field's strength (`voyageFieldEase`→0 by A8) + scaling bosses, and the binding survival gate is the
+    final top-2 (even-par A8 survival stays ~brutal, `a8<0.15`).
+  - LOW-Ascension ghost-field EASE (GS-green-ease): `voyageFieldEase(ascension)` hands the whole AI
+    field back `VOYAGE_EASE_A0` (0.66) SF/hole at A0 — held across A0–A4, faded to 0 by A8 — so a
+    green-bag player shooting ~even par is competitive at the gentle tiers (cut-survival ≈84→61% A0→A4)
+    instead of getting positionally cut mid-field, while BELOW-par golf still misses the cut. It's
+    `ghostHoleStableford`'s `ease` param (default 0 = original field, byte-identical; applied to `base`,
+    ZERO extra rng), carried on `ArcStopSlice.fieldEase` (voyage-only) so survival AND the live
+    leaderboard apply the SAME ease. Eases the CUT only — the matchplay BOSSES stay the hard climax.
+  - `league.ts` imports `run.ts`, never the reverse; the matchplay boss-id resolves in the UI reducer.

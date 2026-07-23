@@ -316,3 +316,64 @@ was the "make Ducks/Sheep bounce the ball back to the fairway regardless of how 
 because the snapped landing is now far from the miss, the redirect cinematic's arc-back reads as a real
 deflection instead of a tiny nudge. Regression: `tests/caddies.test.ts` fires a far-right aim and
 asserts every saved ball lands on the fairway WITH the snap and is stranded in the rough WITHOUT it.
+
+---
+
+## Migrated from CLAUDE.md — System-index bullets (2026-07-23 refactor)
+
+> These are the verbatim terse System-index bullets moved out of `CLAUDE.md` when it was
+> compressed back to a lean constitution. They are the tip-of-iceberg pointers that had grown
+> into full implementation histories in the root file. The durable *rule* now lives as a short
+> bullet in `CLAUDE.md`; the detail below (and the deeper narrative already in this doc) is the
+> archive. Nothing here is lost — it is just no longer cluttering the constitution.
+
+- **Caddies** — `docs/decisions/caddies.md`
+  - One named caddy on the bag at a time, but hiring a NEW one FIRES the incumbent (GS-caddy-factions,
+    `buy` rebuilds the loadout minus the fired caddy's perk) — NOT a no-op. A fired caddy lands in
+    `Run.firedCaddies` and is never offered again THIS run (returns in future runs); the shop keeps the
+    OTHER caddies offerable so a swap is always possible. All caddies are LEGENDARY (equal scarcity —
+    no "Dan's just the one that showed up"); the four ex-epics (Dan/Sam/Sandy/Mole) got a small buff.
+    Each folds ONE loadout field. THE RULE (machine-checked): every `NAMED_CADDY_IDS` entry surfaces a
+    `caddyEffects` row AND a `factions.ts` faction.
+  - FACTIONS + REPUTATION (`src/sim/rpg/factions.ts`) are HIDDEN groundwork — nothing renders them yet.
+    Every caddy belongs to a faction; hiring earns `REP_ON_HIRE` (+1), firing costs `REP_ON_FIRE` (−3),
+    tracked PER CHARACTER (`reputationByCharacter`, save v21). Reputation is a UI/save concern moved by
+    the reducer's `buy` case — the sim `buy()` only does the fire mechanic (so auto ≡ interactive; the
+    headless/Lab path never touches reputation). The UI gates the fire behind a "they won't be happy"
+    confirmation (`pendingFireCaddy` → `confirmFire`); the sim fires unconditionally.
+  - CREDIT TOKENS are faction-branded too (GS-credit-factions): each of the four credit-boost shop items
+    is ISSUED BY a distinct faction (`CREDIT_ITEM_FACTION`) — Sponsor's Badge +15% → Sponsors' Syndicate,
+    Lucky Ball Marker +20% → Fortune Cartel, Birdie Hunter → Birdie Hunters, Eagle Eye → Eagle Order —
+    machine-checked DISTINCT. The card wears its house CREST on a medallion (`factionCrest`/
+    `drawCreditToken`; `itemArtSVG` intercepts a credit id before the base gear switch). Pure render +
+    data, zero rng, no save bump — the `apply`/mechanic is untouched. A new credit item = a
+    `CREDIT_ITEM_FACTION` row + a `FACTION_CREST` emblem.
+  - Guard redirects + chip-ins add rng ONLY when armed + qualifying. A guard's `side` is a FAIRWAY
+    side classified off the hole's `centreline` (`ShotInput.fairwaySide`), NOT the shot bearing.
+  - A Space Ducks / Convict Sheep FAIRWAY save snaps the ball HOME to the fairway SPINE, not the aim line
+    (GS-caddy-snapback, `ShotInput.fairwaySnap` closed over `nearestFairwayPoint`): the old recentre-onto-
+    the-BEARING left a save in the rough whenever the miss was aimed far off the fairway (the bearing points
+    into the rough, so a de-spread version of it still lands off). Now however far offline the miss went, it
+    comes back onto the short grass. Greenside saves still land ON the green (`greenAim`). Guard-only (a
+    guard-less shot passes `undefined` → byte-for-byte), consumes the SAME single `sampleGreenAngle` draw
+    (draw count stable), resolved in the shared `resolveShot` (auto ≡ interactive). On a walled derelict the
+    fairway spine IS the deck spine, so this subsumes the old GS-ship-wall-caddy snap (kept as a backstop).
+  - On a WALLED derelict corridor a guard save is DECK-AWARE (GS-ship-wall-caddy, `executeShot`): the
+    guard recentres a miss onto the aim-BEARING line, which runs off into space on a BENDING ship
+    corridor, and the wall bounce then re-processed that fictional curve-back arc (~81% of caddy saves
+    double-handled, ~7% flung back into space — the "caddy interacts really badly" bug). So on a walled
+    hole a redirect (a) snaps its landing to the nearest ON-DECK centreline point (the deck spine) when
+    the recentre lands in space, (b) SKIPS the flight wall bounce (the guard's placement is final), and
+    (c) is STICKY — a still-lost redirected rest is seated back on the deck. Guard-only + walled-only →
+    byte-identical everywhere else; a caddy save now finishes on the deck ~98% fairway, 0% lost.
+  - The renderer draws the guard figure ONCE (the corner figure) — never also float the portrait badge.
+  - The **Prognostic Parrot** (GS-caddy-parrot, faction **Space Bandits** — the merged pirate crew that
+    also fields the Convict Sheep) reuses the SCRAMBLE machinery:
+    `loadout.previewScramble` (0.33) is a per-full-swing proc where the pirate captain FORESEES the shot →
+    you play a SECOND ball with the player's OWN golfer (`opts.shotMods`, never a partner) and keep the
+    better (`pickBetterExec`). Threaded IDENTICALLY through the auto sim (`playHole`, gated `!opts.scramble`
+    so a team duel wins) and the interactive reducer (`'shot'` shows the foresight choice card via
+    `resolveScrambleShot`+`{preview:true}`; `autoShotHole`/watch auto-keeps like headless) — the proc is ONE
+    `rng.bool(chance)` drawn BEFORE the shot in BOTH, so undefined/0 is byte-for-byte and best-of-two only
+    ever RAISES Stableford (contract 4 by construction). It's NOT a guard/projectile caddy, so no
+    `_gsFeel.forceRedirect` case — just the `caddyEffects` row + faction the RULE demands.

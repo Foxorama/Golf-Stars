@@ -184,3 +184,39 @@ Engine gotchas encoded in the module:
 `music: boolean` (default on) joined `Settings` — the localStorage prefs layer merges parsed
 saves over defaults, so existing players pick the new field up with **no migration** (this is why
 player prefs live in `settings.ts`, not the versioned save).
+
+---
+
+## Migrated from CLAUDE.md — System-index bullets (2026-07-23 refactor)
+
+> These are the verbatim terse System-index bullets moved out of `CLAUDE.md` when it was
+> compressed back to a lean constitution. They are the tip-of-iceberg pointers that had grown
+> into full implementation histories in the root file. The durable *rule* now lives as a short
+> bullet in `CLAUDE.md`; the detail below (and the deeper narrative already in this doc) is the
+> archive. Nothing here is lost — it is just no longer cluttering the constitution.
+
+- **Audio** — `docs/decisions/audio.md`
+  - ASSETLESS, always: every cue + music note is synthesized WebAudio — no downloaded audio file,
+    ever. ONE shared `AudioContext`, two buses: SFX on `sound`, generative music on `music`.
+  - Strikes are voiced per club FAMILY (`strikeClassOf` — beware `PW/GW/SW` end in 'W' but are
+    wedges); touchdowns per SURFACE + tree hits per ARCHETYPE (coverage machine-checked). A hazard
+    with its OWN surface voice does NOT also play `sfx.penalty` (that stays for SURFACELESS
+    penalties). A safe-landing-then-abyss-roll fires its lost FX at REST, not on the landing.
+  - Music is table+dispatch per archetype (`MUSIC_TRACKS` + `'menu'`; coverage + gain ≤0.35
+    machine-checked) on a PRIVATE seeded stream. The sim never calls audio; audio modules must
+    import clean in node. Worlds are made AUDIBLY DISTINCT (GS-music-distinct) — not just re-tuned —
+    by per-row TIMBRE levers the engine renders (all optional, absent = the old plain voice): `lead`
+    (the melodic voice's CHARACTER: pluck/bell/marimba/bowed/blip — the biggest cue), `padDetune`
+    (chorus width), `padCut` (a low-pass that DARKENS the pad — the strongest bright-vs-murky cue),
+    `sub` (a deep drone for weight), `pulse`/`pulseVoice` (a subtle percussion groove: kick/clank/
+    heart/shaker/tick on the driving worlds). Guarded that the table stays genuinely varied (≥4 leads,
+    ≥6 grooved, ≥4 darkened) so it can't collapse back to one voice.
+  - WEATHER AMBIENCE (GS-weather-audio, `render/weatherAudio.ts`) — a subtle environmental sound bed
+    that COMPLEMENTS the music, keyed to the route's `CourseEffect` (content-as-data, coverage
+    machine-checked): a blizzard howls, a storm crackles, an aurora shimmers, a gravity well rumbles.
+    One `WEATHER_AMBIENCE` row per effect = a continuous bed (wind/drone/shimmer, gusting on an LFO) +
+    a sparse event pump (crackle/sparkle/twinkle/whoosh/clank). Its OWN low-gain bus off the shared
+    context; gated on `sound` (environmental SFX, independent of `music`); DELIBERATELY subtle —
+    capped at `WEATHER_GAIN_CAP` (0.16), well under the music bed, so it never overpowers the melody.
+    Driven from `syncMusic()` (only while a golf hole is on screen; silent on menu/travel/shop). A new
+    sky's sound = a row. `_gsFeel.weatherVolume` scales it (a sub-field, no test-hub wiring).

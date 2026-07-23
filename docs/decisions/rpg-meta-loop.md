@@ -1933,3 +1933,239 @@ for free — both drive through the shared `routeOptions`/`routeTheme`. Guarded 
 `tests/journey-effects.test.ts` (cold skies over-represent cold worlds; affinity-less skies byte-
 identical; every physics-y sky carries an affinity set). The `avoid`-set lane-distinctness is untouched
 (the boost only re-weights within the already-filtered pool).
+
+---
+
+## Migrated from CLAUDE.md — System-index bullets (2026-07-23 refactor)
+
+> These are the verbatim terse System-index bullets moved out of `CLAUDE.md` when it was
+> compressed back to a lean constitution. They are the tip-of-iceberg pointers that had grown
+> into full implementation histories in the root file. The durable *rule* now lives as a short
+> bullet in `CLAUDE.md`; the detail below (and the deeper narrative already in this doc) is the
+> archive. Nothing here is lost — it is just no longer cluttering the constitution.
+
+- **RPG meta-loop** — `docs/decisions/rpg-meta-loop.md`
+  - The spine: `startRun → [playStop → buy* → travel]*` until the survival rule fails; pure and
+    deterministic. The **Voyage** is the winnable campaign (3 arcs, boss each, `endedReason 'won'`);
+    the **Unending Universe** is the ONLY endless format (`flat`/`ladder` retired — `getFormat`
+    folds their ids).
+  - Endless survival is a PER-SET (per set-of-four = per stop) CUMULATIVE bar (GS-set-survival,
+    `endless.ts`): the four-hole total `Σ(strokes−par)` must clear the set's allowance, RESET each
+    set — so one blow-up hole (capped at par+MAX_OVER_PAR) never ends the run, only a set boundary
+    does. Allowance ramps every two sets: +4 (sets 1–2) → +3 → +2 → +1 → E → −1 → −2 → −3, capped
+    at −4 (`ENDLESS_SET_STEPS`, keyed off `run.stopIndex` = holesSurvived/4). Threaded IDENTICALLY
+    through `playStop` (plays the FULL set, no early break) and the interactive `holeComplete`
+    (contract 2). DEPTH (sets cleared / holes reached) is the SOLE metric — there is NO run-total
+    score (gross/to-par/net removed); the leaderboard ranks purely on depth (ties → most recent).
+    The starting CLUB SET is the difficulty axis (a weaker bag makes the thresholds harder, no
+    handicap math); finished runs bank into the persisted `endlessRuns` leaderboard. `grossStrokes`/
+    `parPlayed` are retained on the Run/record for save-shape stability but never shown or ranked on.
+  - WARP fast-forwards only PROVEN holes under the hidden automatic-birdie rule: `canWarpStop`
+    requires a contiguous warp prefix fitting under `endlessBestHoles` — new ground is always
+    hand-played; a warped stop banks NO milestone shards and never grants the ace ship; leaderboard
+    rows carry their honest hole range.
+  - FUEL: every jump burns `routeFuelCost` off `Run.fuel` — distance ± the SKY's tail/headwind
+    (`effectFuelDelta`, derived + zero rng; a headwind sky never rides a calm-category lane —
+    machine-checked), floored at 1. ONE rule lives in `travel` (auto ≡ interactive by construction)
+    — a short tank buys the shortfall at the LOCAL depth-scaled price, printed on the Jump button,
+    never silently; tanker events (`RouteEvent.fuelBonus`, desc must state `refuel +n ⛽`) refuel on
+    arrival there too, capacity-clamped. Unaffordable lane ⇒ locked; all locked ⇒ run ends
+    `'stranded'` — the SECTOR SCAN is the lifeline: burn fuel to redraw the lanes (escalating
+    price, always leaves ≥1 cell; `Run.routeScans` re-keys `routeOptions`' stream and is
+    snapshotted so a resume keeps the offer you paid for; scan 0 = the classic stream,
+    byte-identical). Fuel is drawn ONLY via `render/fuel.ts fuelGaugeHTML`, never a bare number.
+    Ship outfitting (thrusters/reserve tank/eagle siphon) rides perk ids — the Reserve Tank's
+    fuel pours ONCE in `buy`, never in `apply` (resume would double-grant).
+  - Milestone cosmetics are EARN-ONLY (`unlockHoles` rows; `canBuy*` refuses); a hole-in-one is the
+    only way to earn the secret Comet Rider ship (`aceUpdates` on ANY ace, not a first-ace flag).
+  - **ASGARD interlude** (`docs/decisions/asgard.md`; GS-asgard): an eagle-or-better on RAINBOW ROAD
+    (`asgardPortalOpens`, reducer-only + gated on the ball → zero rng, feature-off byte-identical) opens
+    the Bifröst — instead of the result/shop it diverts to the Himinbjörg map, then a nine-hole STROKE-
+    play tournament on The Warrior's Tee (three bespoke `contender` golfers — Hogan/Frankie/Vince; `warriorsThreeTotals` ghost
+    gross, lowest wins, ties→player). The field SCALES with the run (GS-asgard-scaling / GS-warriors-tune):
+    `warriorsEdge(depth, ascension, voyage)` sharpens every warrior by a per-hole stroke `edge`. The
+    Warriors are effectively a boss match but LOSING costs nothing (no run ends), so they sit ABOVE an
+    ordinary boss, tuned per CONTEXT: the VOYAGE Bifröst (`voyage=true`, `asgardReturn` present ⇒ the
+    player arrives upgraded) rides a flat `WARRIORS_VOYAGE_BASE` (0.2) floor so even an EARLY Rainbow-Road
+    eagle is "slightly harder than an Arc-III boss", then DEPTH+Ascension sharpen to `WARRIORS_VOYAGE_CAP`
+    (0.34) — a strong upgraded round (≈6 under) still wins ~12–25% (beatable, never a brick wall); the
+    STAR TOUR / Yggdrasil realm (`voyage=false`, no parked run) stays the gentle default-bag baseline
+    (edge 0, ≈5-under Warriors, the easier venue). `asgardFieldEdge` picks the context off `asgardReturn`
+    and feeds BOTH the verdict and the live board; `edge=0` (Star Tour / base) is byte-identical. The
+    real run is SUSPENDED (`asgardReturn` snapshot); the Asgard run
+    (`startAsgardRun`, format `asgard`, `pendingTheme` = the `ASGARD_THEME` object so it never needs a
+    THEMES entry) plays the player's bag MINUS the Rainbow Ball. It is NEVER persisted (`persist` parks
+    `asgardReturn` instead → a mid-tournament quit resumes the journey). Win OR lose, the return strips
+    `rainbow-ball` + sets `run.rainbowConsumed` (the shop never re-offers it); a WIN also banks the
+    Thor's Hammer cosmetic + the `talent-odins-favour` perk. Then it resumes at the travel screen.
+  - The cosmetic **`driver` apparel slot** (GS-thor) is the club skin the golfer swings ON THE DRIVER SHOT
+    ONLY — `playView` strips `look.driver` when `shot.club.id !== 'D'` so irons/wedges/chips swing the plain
+    (or gear-themed) club; the clubhouse/market previews show it unconditionally. Thor's Hammer is `secret`
+    (earn-only, hidden until owned) and won on Asgard. Same EQUIP/reveal plumbing as the other slots (save
+    v22 `driverByCharacter`); rendered in the swing + leaning at the clubhouse fireplace.
+  - **Per-golfer bag rarity / difficulty** (GS-wardrobe-bagtier, save v23 `bagTierByCharacter`): each
+    golfer's STARTING BAG in EVERY mode (Voyage + Unending), chosen in the Clubhouse wardrobe's BAG slot
+    (`bagTierForCharacter` reads it, clamped ≤ the owned `bagTier` — never a free upgrade; picking the
+    owned tier CLEARS the override so a golfer defaults to the owned tier). Fed into `startRun` by
+    `selectCharacter` for ALL formats. Buying a new bag tier (`buyBagTier`) RESETS the whole map (`{}`) so
+    every golfer auto-jumps to the fresh best tier; the player re-picks a weaker bag per golfer afterwards.
+    The char-select club-set strip (Unending only) stays a per-run OVERRIDE sent only when TAPPED
+    (`selClubSetTouched`) so an untouched strip can't clobber a golfer's stored pick — an explicit strip
+    pick write-throughs to the golfer. Default path (empty map ⇒ owned tier ⇒ common) is byte-identical.
+    Meta only, no rng.
+  - The equipped cosmetic **BAG** now shows ON THE COURSE (GS-wardrobe-bagtier, `GolferLook.bag`): a staff
+    bag propped BEHIND the golfer (−x, clear of the target-side swing arc), the canvas `drawGolfBag` mirror
+    of the wardrobe SVG `bagGlyph`. With no cosmetic bag the clubs still carry their bag-TIER gear skin
+    (`equippedGearTheme`); the cosmetic DRIVER still overrules the club head on the driver shot.
+  - Pro Shop rarity is VOYAGE-paced (`voyageRarityBias` keyed off the STOP; endless keeps
+    `rarityDepthBias`) — it reweights WHICH item is drawn, never the rng COUNT. Every shop item is
+    a one-shot; the `stackable` plumbing stays dormant for save back-compat.
+  - Two currencies: per-run **credits** (shop perks), cross-run **Star Shards** (cosmetics + bag
+    tiers). Cosmetics split BUY (Trade Market, global ownership) vs EQUIP (Clubhouse, per
+    character); every unlock-gated item is HIDDEN until unlockable — ONE reveal predicate per
+    catalogue drives the filter. `CosmeticRarity` (mythic tier) stays OUT of the sim's loot `Rarity`.
+    Trade Market prices (ships/apparel/bag tiers) are tuned only in their three tables; the Pro Shop
+    (credits) is a SEPARATE economy — never touch it for a Trade Market rebalance. A price change with
+    a player refund is a SAVE MIGRATION with OLD prices snapshotted in the step (never read live —
+    migrations must be edit-proof), stamping a one-off `priceRefund` notice cleared on dismiss
+    (GS-trade-rebalance).
+  - The Clubhouse (hall lounge + per-golfer stage + spaceport) is purely cosmetic, seeded via `Rng`
+    keyed off `clubhouseVisit` — zero sim/rng-stream impact. Mount figures/ships in TIGHT frames
+    (golfer 72×210, ship 96×62); re-shoot `scripts/clubhouse-preview.mjs` after touching
+    `apparelArt.ts`/`clubhouseLounge.ts`. The spaceport is ONE cohesive floating golf-deck that reads
+    as the view out the bar's picture window (same sky/ringed-planet/moon as `loungeArt`, a warm "19th
+    Hole" clubhouse twin at its back): the four golfers are dealt across FOUR berths (`BERTHS`) — three
+    holo pads + one FUEL station — by the visit shuffle, so the fleet re-parks AND a different equipped
+    ride tops up at the pump each run. Every ride stays the `openClubhouse` button; the ONLY randomness
+    is the berth shuffle (which also picks the pump occupant). GS-clubhouse-starport-redesign.
+  - GENDER PRESENTATION lives ONLY in the head layer (GS-avatar-gender): each golfer's `GolferStyle.hair`
+    (a chosen hairstyle + optional stubble, `golferPreviewSVG` opts.hair → `hairLayers`) is drawn strictly
+    ABOVE THE NECK. The body silhouette, torso, limbs and every cosmetic garment are byte-identical for all
+    golfers, so outfits stay fully gender-neutral (no chest/curve shaping — ever) and drape the same on
+    everyone. A SEALED helmet (`hat.look.shape === 'helmet'`) hides hair, so all four read identical in a
+    spacesuit. Hairstyles are a length/shape spectrum any golfer could wear; the row just picks the look.
+  - Won Ascension gates unlock permanent bag TIERS (`applyBagTier`, baked at `startRun`/`resumeRun`;
+    a Pro-Shop floor; no-op at `'common'`). A per-character Ascension clear unlocks one random club
+    (`unlockedClubsByCharacter` stores TYPES, re-stamped by `applyBagTier`). `ASCENSION_MAX = 15`.
+  - The reducer's exported `runEndUpdates` is the SINGLE source for all run-end sites.
+  - The travel screen is ONE FULL-SCREEN STAR MAP framed by sticky glass chrome (GS-journey-map-redesign,
+    `travelScreens.ts`; superseded the GS-journey-cockpit status-strip + comparison-rail + docked-sheet).
+    The MAP fills the ENTIRE viewport (`.gs-journey--v` PANS at intrinsic size — never scales down, so the
+    zoom-out-to-unusable bug can't return; a fresh stop shows with NO scroll). STICKY chrome is absolutely
+    anchored to `.gs-travel__viewport` (not the scrolling chart, so it never scrolls with the map) as a
+    BRIDGE HUD (GS-journey-hud, `.gs-bhud`): a starship command FRAME — glowing corner brackets + a bottom
+    command BAR (`.gs-bhud__console`) that COMPLETES the page. It is deliberately SHORT (~60px) so the MAP stays
+    the hero (GS-journey-map-hud-tweaks — a tall sculpted dashboard tried earlier ate half the chart and was
+    rejected). It's a premium ship-tinted GLASS strip floating above the map on a drop shadow, seating three
+    instruments as ONE cluster with a clear hierarchy: two dark RECESSED readouts — the 🚪 EXIT switch (left,
+    bank/end run, two-step confirm) and the ⛽ FUEL lit readout (right) — flanking one glowing raised COMMAND
+    dial, the 📡 SCAN (centre focal point). The FUEL is a compact HORIZONTAL `fuelGaugeHTML({icon})` (⛽ · segment
+    cells · big count) recessed like an instrument screen; it grows along its WIDTH as capacity upgrades and the
+    count is the authoritative value (this is the settled answer to the fuel-sizing saga — a vertical tower/pod
+    made the bar too tall; a short bar + horizontal readout keeps the map the hero). Recolours to the flown ship
+    via `--hud-*`; each `.gs-bhud--<variant>` re-tints the glass + its own top-rail `::before` (wagon chrome
+    lip / racer stripe work again on a flat bar), so a livery is still a table row. The map's bottom-pad +
+    feather-mask clear the ~60px bar. (This SUPERSEDED three rejected takes — a floating fuel PILLAR + poking
+    scanner keystone; a flat row with fuel crammed in a fixed no-grow slot; a 128px `clip-path` sculpted panel
+    that covered too much map.) The old separate `.gs-travel__topbar` status
+    strip + the floating `.gs-cog` are GONE (GS-journey-map-hud-consolidate): the golfer identity + run
+    progress dock into a top-LEFT glass pod (`.gs-bhud__idpod`) and the credits + settings cog into a
+    top-RIGHT pod (`.gs-bhud__statpod`) — the top-edge twin of the bottom console, so all four edges of the
+    frame are furnished and the screen reads as ONE command deck, not a strip over a disconnected map. The
+    docked `.gs-bhud__cog` dispatches the same `data-open-settings` as the global cog, which `app.ts`
+    SUPPRESSES on the travel screen (like the full-bleed play view) so there's no double button. The pods
+    recolour to the ship via the SAME `--hud-*` props and leave the frame's top CENTRE clear for a livery
+    title plate. TOP-BAND SPACING (GS-journey-map-hud-spacing): the ship-name title plate owns the very top
+    ROW; the id/stat pods dock a ROW BELOW it (`top:44px`) so the livery name never overlaps the golfer
+    name / credits, clearing the centre-hanging ornaments too (wagon dice ~41px, racer stripe ~40px, feather
+    wings) — the `standard` no-plate console rides its pods back up to `top:12px`. The scrollable map
+    (`.gs-travel .gs-journey--v`) is INSET (top pad past the pods, bottom pad past the console row)
+    AND feather-MASKED top+bottom, so a long voyage's route worlds never slide up UNDER the pods and Earth
+    never pokes past the console outside the frame (both dissolve into the chrome instead). The frame
+    RECOLOURS + RESHAPES to the flown ship via `hudThemeForShip`
+    (`render/hudTheme.ts`) → `--hud-*` custom properties + a `variant` on `.gs-bhud`; a per-fleet livery
+    is a `SHIP_HUD` table ROW (keyed shipId → set → standard cyan) with a `variant`, its frame SHAPE a
+    `.gs-bhud--<variant>` block, its bespoke CHROME a `render/hudChrome.ts` builder (bridge ICONS + labels
+    + frame ORNAMENTS) — never a layout edit. **GS-fleet-bridges**: EVERY set now carries a `variant`, so
+    flying a different ship gives a genuinely different command deck — a wagon's woody road-trip dash
+    (compass/fuzzy-dice), a racer's redline carbon cockpit (tachometer/checkered stripe), a hauler's
+    riveted freighter, an alien saucer's orbital-ring probe deck, a neon bike's double-rim speedo, the
+    Asgardian Pegasus's runic war-bridge (rune-ring/shield/bronze wings), the Mothership's chasing
+    light-ring saucer deck, the Comet Rider's dimpled golf-ball cockpit, the Thunderbolt's flame-lick
+    chopper — each with its own scanner/exit/fuel instruments and its ship NAME on the title plate
+    (`hudChromeFor(variant, ship)`). The SHARED ornament + instrument BASE (title plate / rails / nodes /
+    wings / themed SVG icons, all reading `--hud-*`) lives once; each `.gs-bhud--<variant>` re-tints or
+    reshapes it. **GS-fleet-dashboards**: each livery also drops a bespoke `HudChrome.deck` — a physical
+    instrument CLUSTER (`.gs-bhud__deck`) — into the console's LEFT gap (the reliably-clear ~90px between
+    the exit switch and the centre command dial; the fuel readout owns the right gap, growing with tank
+    capacity), so a dashboard reads as its OWN cockpit, not the same three pills recoloured: a woody
+    STEERING WHEEL + speed dial (wagon), a redline tach + toggle bank (racer), rune stones + a bronze gauge
+    (Valkyrie), a saucer light-ring dial (Mothership), an oscilloscope (neon bike / Infinity Ace), … built
+    from a shared `DECK` instrument kit (wheel/gauge/redline/switches/leds/faders/knob/wave/runes/saucer/
+    dimple SVGs, all reading `--hud-*`) composed via `deckRow(...)`. The deck is pure decorative SVG —
+    absolutely anchored between exit and dial, painted BELOW the controls (`.gs-bhud__slot` gets
+    `z-index:1`), `pointer-events:none` so map taps + buttons are untouched, mask-faded + `overflow:hidden`
+    so it clips if the gap is tight. `''` for the standard console → byte-identical. A new fleet's deck is a
+    `deckRow` of kit pieces + `.gs-bdeck*` CSS, never a layout edit. The **Infinity Ace** (GS-infinity-hud, the hole-150 grail) is the reference full reskin:
+    `variant:'infinity'` unlocks `.gs-bhud--infinity` (a rotating living-aurora ring — @property
+    `--gs-aur-angle`, the ship's gold→emerald→aquamarine→violet palette — gold double-rim + inner wash,
+    a phoenix-wing CANOPY, breathing corner L-brackets) AND its chrome swaps the controls for a
+    sensor-sweep SCANNER, an airlock EJECT hatch, and a plasma-cell fuel glyph (via `fuelGaugeHTML`'s
+    `icon` opt); its icons read the `--aur*` props. `hudChromeFor` returns `null` only for an UNKNOWN ship
+    (the classic 📡/🚪/⛽ cyan console, byte-identical); all ornaments are `pointer-events:none` (map taps
+    still pass), and every animation is off under reduced-motion (degrades to a rich STATIC deck). Pure
+    render + data (no reducer/save/rng/`_gs*`/URL hook). Eyeball any bridge via `scripts/travel-preview.mjs
+    QS="?ship=<id>"` (wagon-classic / racer-redline / ufo-mothership / infinity-ace / …). Its base class MUST stay `.gs-bhud`, NOT
+    `.gs-hud` (the play screen's own HUD class): a shared `.gs-hud` here once stretched the play screen's
+    `.gs-glass` chrome into a full-screen map-blur (GS-hud-class-collision, guarded by the play-HUD layout
+    test in `tests/build.test.ts`). `.gs-bhud` is `pointer-events:none` so map taps
+    pass through; only the console controls catch touches. Tapping a world (`data-route-inspect`) raises
+    `laneCard` over the bottom HALF (z-index above the HUD) — world + weather LORE (`BIOME_LORE` +
+    theme/effect blurbs), Boons & Rewards vs Hazards & Conditions chips, the Jump action. Only ONE bottom
+    overlay at a time (`travelView.selectedRouteId`/`depotOpen`/`exitOpen`, priority exit > depot > card).
+    Pure app/render — the `{type:'route'}`/`scanRoutes`/`bank`/`strand`/`buyFuel` actions are UNCHANGED
+    (no reducer/save/rng impact, no `_gs*`/URL hook). Re-shoot `scripts/travel-preview.mjs`
+    (`?select=N`/`?depot=1`/`?exit=1` variants) after touching it.
+  - Route choice carries destination biome + an event that is economy/cut/meta only — **NEVER
+    generation rng**. Every non-none course effect carries a REAL play hook, machine-checked
+    (`tests/journey-effects.test.ts`): wind/carry multipliers are pure post-gen scales; geometric
+    hooks (tents, scorch craters, ground patches) are pure seeded per-kind streams drawn + played
+    from the SAME source. The route card states every hook. A new course effect = a
+    `COURSE_EFFECTS` row + a `routeEffect` mapping + a `weather.ts` showpiece on its OWN stream.
+  - Weather is biome-INDEPENDENT (it rides the route EVENT, gated by journey ARC via `minArc`, never by
+    the world), but a SOFT thematic affinity (GS-weather-affinity, `EFFECT_BIOME_AFFINITY`) biases a
+    weathered lane's DESTINATION toward a fitting world — a blizzard leans cold, a dust storm desert/scrap.
+    It's a `pickThemeFrom` WEIGHT boost inside the lane's own (separate) theme rng draw, SAME draw count,
+    so the `:routes:` stream (distances + events) is byte-identical and an affinity-LESS sky (moonlight,
+    nebula, …) draws exactly as before. Soft not hard: a fitting world is only ~most-likely, mismatches
+    stay possible. A new weather with a thematic home = one `EFFECT_BIOME_AFFINITY` row (guarded in
+    `tests/journey-effects.test.ts`). Because a biome only meets an arc's weather, keep each archetype
+    spanning ≥2 arcs (constellation `stars`) so it isn't locked to one arc's skies.
+  - Trade tents ring EVERY hole of a tradeMarket stop; effects are dealt per hole so colour never
+    predicts. Only the marmot changes the shot (deterministic lost ball in `executeShot`, auto ≡
+    interactive); the other four are interactive-only reducer meta.
+  - A `salvage` lane loots a CLUB (private stream keyed to the DESTINATION
+    `salvage:<seed>:<arrivingStop>:<eventId>`, rarity floored at rare, resume-safe as a shop perk id,
+    only ever raises Stableford). It's a BLIND gamble (GS-salvage-mystery): the route card previews only
+    the TIER, never the exact club — each salvage stop is its own roll, so skip it and the next lane's loot
+    may differ. The grant still resolves from that same stream in `travel` (auto ≡ interactive), so the
+    mystery is presentation-only. Route events carry no `shardBonus` — shards are run-END rewards;
+    `run.bonusShards` moves only via endless milestones.
+  - The three route lanes land DISTINCT archetypes, never the current one (filtered redraw, not a
+    retry loop). A fresh run opens RANDOM + non-hard (stop 0 skips `HARD_ARCHETYPES`; same single
+    draw off a filtered pool). Characters/talents/ace rewards ride `loadout.perks` ids, rebuilt on
+    resume (no save bump).
+  - Bosses play on a separate `:boss` rng and SCALE with Ascension via `bossEdgeForRun` (the ONE
+    source for headless AND reducer); A0 + a common bag + Arc-I is the classic boss, byte-for-byte. The
+    auto-AI pin-hunts via `PlayHoleOptions.attackPin` (default off = byte-identical), armed for
+    endless bogey-or-tighter bars and high-Ascension bosses; `playHole` takes `puttSkill` so putter
+    perks reach the headless putt-out.
+  - The voyage's three bosses ESCALATE, not just scale flat with Ascension (GS-boss-escalation): the
+    boss's `cutBonus` (1/2/3, arc order) maps to an `arcRank` (0/1/2) on `BossEdge`, which sharpens the
+    boss LOADOUT — handicap −`BOSS_ARC_HANDICAP`/rank, distance +`BOSS_ARC_DISTANCE`/rank, dispersion
+    −`BOSS_ARC_DISPERSION`/rank — so the Arc-II boss is harder and the Arc-III FINAL harder again, INDEPENDENT
+    of Ascension. The final (rank 2) also pin-hunts even at A0 (`BOSS_ARC_ATTACK_RANK`). This revived
+    `cutBonus`, which was INERT for matchplay bosses (they pass on the DUEL `matchWon`, never the Stableford
+    cut, so the +1/+2/+3 never bit). Rank 0 (Arc-I, and the default `BossEdge`) is byte-identical to the
+    classic boss; a grown bag can still out-club the climb (`tests/boss-scale.test.ts` guards the escalation +
+    the strong-build voyage win). The Asgard Warrior's Tee is a separate stroke-play ghost (see below).
