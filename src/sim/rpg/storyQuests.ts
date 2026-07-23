@@ -109,11 +109,20 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
     offer: [
       '🎒 "Kid. That wreck the Coil calls the Ghost Wreck? …That was my rig. The Long Haul. Best girl I ever drove. ' +
         'I left her out there the night I heard the whisper and ran. Never went back."',
+      '"Forty years I told myself she was just metal. Just a hauler. But you don’t leave forty years of your life ' +
+        'in the dark and call it nothing. I owe her a proper goodbye, and I’ve been too much of a coward to give it."',
       '"I can’t face her alone. But with you on the bag… come out there with me. Let me say goodbye to the old ' +
         'girl properly. There’s something aboard I want you to have."',
     ],
+    duringQuest: [
+      { kind: 'action', text: 'Halfway round, Dan stops at a buckled bulkhead, runs a gloved hand down a faded stencil — L-O-N-G  H-A-U-L — and just stands there a while before he can get the words out.' },
+      { kind: 'say', text: '🎒 "Slept forty years in the bunk right behind that wall. Hauled ore, hauled ice, hauled a whole colony’s worth of seed grain across the Rim the winter the crops failed. She never once quit on me. …I quit on her."' },
+      { kind: 'say', text: '"Keep playin’, kid. To the tour it’s just a golf round out on a dead ship. To me, every hole is a mile of road I never got to finish. Let me drive it to the end this time. With you riding shotgun."' },
+    ],
     complete: [
       '🎒 "There she is. Rustier than I remember. …We hauled half this galaxy in that hold, the Long Haul and me."',
+      '"Ran when I should’ve stayed. Left her when she never left me. You brought me back out here to face that, ' +
+        'and I don’t know that I’d have managed it for anybody else. So — thank you, kid. Truly."',
       '"Down in the engine bay, kid — that’s her drive core. Solar-fusion, hauled a full load clean across a ' +
         'ring system once. Bolt it into your ship. She’s got one more haul left in her, and I want it to be ' +
         'yours. Go save the universe — and come home riding low on winnings."',
