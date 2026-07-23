@@ -318,13 +318,13 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       { kind: 'action', text: 'Bo has been reading the same practice green for an hour — walking the line, marking nothing.' },
       { kind: 'say', text: '"Here’s what I can’t stop thinking. Every green breaks somewhere. Every read bends. But there’s supposed to be one green, somewhere, that’s perfectly still. No break. No wind. A pin that never moves."' },
       { kind: 'say', text: '"The Apostate called it mercy. I read greens for a living — you can see why that reaches me. …It’s fine. It’s nothing. The line’s just noisy this week."' },
-      { kind: 'action', text: 'He putts once, dead straight, and the ball dies exactly on the lip — and he stares at it for a long, long time.' },
+      { kind: 'action', text: 'They putt once, dead straight, and the ball dies exactly on the lip — and they stare at it for a long, long time.' },
     ],
     distance: [
       { kind: 'action', text: 'You find Bo asleep on the practice green, marker still in hand — every slope on it charted a dozen times over.' },
-      { kind: 'say', text: '"I keep dreaming the final read," he says, without opening his eyes. "Everything, everywhere, at rest. And in the dream I’m not sad about it. That’s the part that scares me."' },
+      { kind: 'say', text: '"I keep dreaming the final read," they say, without opening their eyes. "Everything, everywhere, at rest. And in the dream I’m not sad about it. That’s the part that scares me."' },
       { kind: 'say', text: '"I’ll be at the vigil. Whatever I’m becoming, I’ll be there. Promise."' },
-      { kind: 'action', text: 'When he does open his eyes, it takes a moment too long for them to find you.' },
+      { kind: 'action', text: 'When they do open their eyes, it takes a moment too long for their gaze to find you.' },
     ],
   },
 };

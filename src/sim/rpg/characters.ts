@@ -294,9 +294,9 @@ export const CHARACTERS: readonly Character[] = [
       distanceClubBonus: (m.distanceClubBonus ?? 0) - 8,
     }),
     // Backspin Bo is the ONLY golfer who spins the ball BACK (GS-backspin-optin): the universal wedge
-    // backspin was removed from `clubRollFraction`, so Bo now carries the whole check himself. A
+    // backspin was removed from `clubRollFraction`, so Bo now carries the whole check themselves. A
     // loft-scaled negative roll on the scoring clubs — mild through the mid irons, biting on the short
-    // wedges — makes his approaches genuinely bite and hold while staying controllable (a specialist's
+    // wedges — makes their approaches genuinely bite and hold while staying controllable (a specialist's
     // spice, not the old land-over-the-green-and-pray lottery every player was stuck with). Above the
     // 5-iron the big sticks are untouched.
     clubMods: (carry) => {
