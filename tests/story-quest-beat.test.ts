@@ -42,8 +42,15 @@ describe('GS-story-caddy-quest-dialogue — the pure mid-round beat assembler', 
   // A WARDEN ally draws its `caddy:<id>` roster bust; a COIL caddy draws its Coil lore portrait id.
   const SHIPPED = [
     'quest-sandy', 'quest-chipinski', 'quest-sam', 'quest-penelope', 'quest-dan', 'quest-mole', // Warden
-    'quest-coil-voss', 'quest-coil-venoma', 'quest-coil-ouros', // Coil (Herald)
+    'quest-coil-voss', 'quest-coil-venoma', 'quest-coil-ouros', 'quest-coil-ecdysis', // Coil (Herald)
   ];
+  it('EVERY caddy quest has now shipped its mid-round beat (full coverage)', () => {
+    // With the last Coil caddy landed, every quest in the table carries a `duringQuest` scene.
+    for (const q of STORY_QUESTS) {
+      expect(q.duringQuest && q.duringQuest.length >= 2, `${q.id} has a mid-round beat`).toBe(true);
+    }
+    expect(SHIPPED.length).toBe(STORY_QUESTS.length);
+  });
   it('every shipped caddy quest resolves a mid-round beat with a renderable portrait', () => {
     for (const id of SHIPPED) {
       const beat = questBeatFor({ storyQuest: id } as unknown as Run)!;

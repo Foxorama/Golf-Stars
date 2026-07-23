@@ -748,7 +748,7 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   on" crew-card message for the waiting state. The accepted-quest banner now shows the ally's authored
   `offer` dialogue (previously unused) as a spoken send-off before you fly. Guarded by `story-quests.test.ts`
   (the beat gate holds then opens) + `story-flow.test.ts` (a quest round is 9 holes).
-- **GS-story-caddy-quest-dialogue** — *in progress, caddy-by-caddy*. Deepen the quest CHAINS so each has a
+- **GS-story-caddy-quest-dialogue** — ✅ *COMPLETE, shipped caddy-by-caddy*. Deepen the quest CHAINS so each has a
   living middle, not just a pitch (`offer`) and a payoff (`complete`). Adds the missing **DURING** beat: an
   optional `StoryQuest.duringQuest` (`LoreLine[]`) plays ONCE at the **turn** of the ally's quest round on the
   shared `.gs-lore*` beat card (`storyQuestBeat` screen, `storyQuestBeat.ts` assembler + `caddy:<id>` portrait
@@ -761,7 +761,12 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   headless sim never runs `holeComplete`), so auto ≡ interactive and every seeded test is untouched; a quest
   with no `duringQuest` lines is byte-identical (no pause). Each caddy is its OWN focused PR (content rows +
   richer `offer`/`complete`). Guarded by `story-quest-beat.test.ts` (quest-only assembler + the reducer flow +
-  no-false-fire on a non-quest round) + `?screen=storyquestbeat` browser smoke. **Shipped so far:** Sandy.
+  no-false-fire on a non-quest round + full per-caddy coverage) + `?screen=storyquestbeat` browser smoke.
+  **All ten caddy quests carry their mid-round beat:** the six Warden allies (Sandy #563, Chipinski #564,
+  Sam #565, Penelope #566, Dan #567, Mole #568) and the four Coil inner circle (Voss #569 — which also wired
+  the Coil lore portrait into the beat card, since a Herald caddy has no `caddyArt` figure; Venoma #570,
+  Ouros #571, Ecdysis). Each shipped as its own focused PR and also deepened that ally's `offer` + `complete`
+  dialogue, so the whole quest chain now reads as a beginning, a middle, and an end.
 - **GS-story-fullbody** → **superseded by GS-story-figures.** The first fix wrapped each portrait BUST as the
   head+torso of a figure with drawn legs beneath (`storyStandee.ts`) — but a bust authored as head+chest with
   stick-legs bolted under it read as programmer-art (big head / short legs), rejected on sight. Removed.

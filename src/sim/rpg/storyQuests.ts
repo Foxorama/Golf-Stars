@@ -397,12 +397,21 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
     offer: [
       '🖤 "Bring me to the Atolls, Herald, where I drown the old wards and harvest what the sea gives up. ' +
         'Come hold the tide down with me, and I will grow you a gift from the serpent\'s own cast scale."',
+      '"You wonder that I feel nothing for the wards I drown. I felt everything, once — that is precisely why ' +
+        'I shed it. A skin you cannot take off is not armour. It is only another thing that can be cut."',
       '"Play the drowning shrine at my side. When the water is ours, I will fit your bag with a wedge shed ' +
         'from the World-Eater — power, and its price, as all true things carry."',
+    ],
+    duringQuest: [
+      { kind: 'action', text: 'At the drowning shrine Sister Ecdysis wades out to where an old Warden ward-stone is going under, and does not help it — only watches, patient as the tide, until the water takes it whole.' },
+      { kind: 'say', text: '🖤 "See how quietly the old wards drown, Herald? No screaming. No fighting it. Just the sea taking back what was always hers. Everything sheds, in the end. The wise do it willingly."' },
+      { kind: 'say', text: '"Hold the tide down with me — play the shrine under while it goes. When the water is ours, I will peel a scale from the World-Eater and lay it over your hull. Power, and its price, as all true things carry."' },
     ],
     complete: [
       '🖤 "The wards are drowned; the sea kept its bargain, and so will I. You did not flinch when the old ' +
         'shrine went under. Good. Flinching is for those who still hope."',
+      '"I do not give thanks — the old self who knew how to is long shed. But know this: I have fit no other ' +
+        'hull but my own before yours. Read that as you like. I mean it as the only kind of trust I keep."',
       '"Then hold still while I fit your hull. The Shedmaker\'s Carapace — sheet upon sheet of the ' +
         'World-Eater\'s own cast scale, annealed and laid over your ship like a second skin. It turns a strike ' +
         'the way the serpent turns a blade. Power, and its price. Wear it into the last fight."',
