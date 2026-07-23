@@ -215,11 +215,20 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
     offer: [
       '🎒 "So — you always tell ME the club, and I say yes, great, love it. But out on Cygnus Links, in that ' +
         'crosswind… I actually KNOW the read. I do! I’m just scared to say it out loud."',
+      '"It’s not that I can’t see the shot. I see it clear as you do. I just… the second someone looks at me, I ' +
+        'fold. I say what I think they want. I’ve done it my whole life. I’m so tired of it."',
       '"Take me back to the Links. This time I call the shots and I DON’T change my mind when you look at me. ' +
         'Help me trust myself once. If I manage it… I made you something. It’s good, I think. I THINK it’s good."',
     ],
+    duringQuest: [
+      { kind: 'action', text: 'On the exposed ridge at Cygnus Links the crosswind flattens the flags. Sam stands over the bag a long moment, mouth opening and closing, before he forces the words out — quietly, then not quietly.' },
+      { kind: 'say', text: '🎒 "Okay. Okay okay okay. You didn’t tell me the club that time — you just let me stand here. And the scary part? I have an answer. It’s right there. I KNOW the shot."' },
+      { kind: 'say', text: '"Don’t look at me like you’re waiting to correct me, alright? Just… trust me the way I trust everyone else. One more nine. Let me hear my own voice for once and not flinch at the sound of it."' },
+    ],
     complete: [
       '🎒 "Three-wood. Low, into the wind, hold it left. …I called it. I CALLED IT and I didn’t take it back!"',
+      '"You know what you did? You didn’t nod along and you didn’t overrule me. You just waited. Nobody ever ' +
+        'just waited for me before. Turns out that’s all the confidence was ever going to take."',
       '"This is Conviction — I forged it myself, on the Links, and I’m not asking if you like it. It’s ' +
         'solar-forged and it’s YOURS and it flies dead straight because for once I was sure. Take it. …You like it?"',
     ],
