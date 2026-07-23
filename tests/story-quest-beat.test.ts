@@ -38,13 +38,21 @@ describe('GS-story-caddy-quest-dialogue — the pure mid-round beat assembler', 
   });
 
   // The caddies whose mid-round beat has SHIPPED (GS-story-caddy-quest-dialogue, one PR each). Each must
-  // resolve a beat with the caddy's own portrait — extend this as each caddy lands so coverage never regresses.
-  const SHIPPED = ['quest-sandy', 'quest-chipinski', 'quest-sam', 'quest-penelope', 'quest-dan', 'quest-mole'];
-  it('every shipped caddy quest resolves a mid-round beat with its own portrait', () => {
+  // resolve a beat with a renderable portrait — extend this as each caddy lands so coverage never regresses.
+  // A WARDEN ally draws its `caddy:<id>` roster bust; a COIL caddy draws its Coil lore portrait id.
+  const SHIPPED = [
+    'quest-sandy', 'quest-chipinski', 'quest-sam', 'quest-penelope', 'quest-dan', 'quest-mole', // Warden
+    'quest-coil-voss', // Coil (Herald)
+  ];
+  it('every shipped caddy quest resolves a mid-round beat with a renderable portrait', () => {
     for (const id of SHIPPED) {
       const beat = questBeatFor({ storyQuest: id } as unknown as Run)!;
       expect(beat, `${id} has a beat`).toBeTruthy();
-      expect(beat.portrait).toBe(`caddy:${beat.caddyId}`);
+      const q = STORY_QUESTS.find((x) => x.id === id)!;
+      // Warden allies use their roster bust; Coil caddies use their lore portrait id (never `caddy:`).
+      if (q.alignment === 'herald') expect(beat.portrait).not.toContain('caddy:');
+      else expect(beat.portrait).toBe(`caddy:${beat.caddyId}`);
+      expect(beat.portrait.length, `${id} portrait`).toBeGreaterThan(0);
       expect(beat.lines.length, `${id} beat has lines`).toBeGreaterThanOrEqual(2);
     }
   });

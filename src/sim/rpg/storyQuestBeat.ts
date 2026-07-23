@@ -18,6 +18,7 @@
 
 import { questById } from './storyQuests';
 import { allyName } from './storyAllies';
+import { heraldAgent } from './storyHeraldCrew';
 import type { LoreLine } from './lore';
 import type { Run } from './run';
 
@@ -43,6 +44,12 @@ export function questBeatTurnIndex(totalHoles: number): number {
   return Math.max(1, Math.ceil(totalHoles / 2));
 }
 
+/** The Coil lore-portrait id for a Herald caddy (`voss`/`venoma`/`coilkeeper`), or undefined for a Warden
+ *  caddy (who uses its own `caddy:<id>` roster bust instead). */
+function heraldPortraitFor(caddyId: string): string | undefined {
+  return heraldAgent(caddyId)?.portrait;
+}
+
 /**
  * The mid-round beat for the active quest round, or undefined when none applies (pure). Reads ONLY the run's
  * `storyQuest`, so a non-quest round (a tournament, a plain world clear, Voyage/Unending) never produces one.
@@ -59,7 +66,10 @@ export function questBeatFor(run: Run | undefined): QuestBeat | undefined {
     accent: herald ? '#c98adf' : '#e6b45a',
     kicker: 'At the turn',
     title: q.title,
-    portrait: `caddy:${q.caddyId}`,
+    // A WARDEN ally draws its `caddy:<id>` roster bust; a COIL inner-circle caddy (GS-story-herald-quests)
+    // has no `caddyArt` figure, so it draws its Coil lore portrait (`voss`/`venoma`/`coilkeeper`) — the same
+    // bust the Herald crew card uses. Both resolve on the shared beat card (`lorePortrait`).
+    portrait: heraldPortraitFor(q.caddyId) ?? `caddy:${q.caddyId}`,
     speaker: allyName(q.caddyId),
     lines: q.duringQuest,
     cta: 'Play on →',
