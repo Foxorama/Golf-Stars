@@ -39,7 +39,7 @@ describe('GS-story-caddy-quest-dialogue — the pure mid-round beat assembler', 
 
   // The caddies whose mid-round beat has SHIPPED (GS-story-caddy-quest-dialogue, one PR each). Each must
   // resolve a beat with the caddy's own portrait — extend this as each caddy lands so coverage never regresses.
-  const SHIPPED = ['quest-sandy', 'quest-chipinski', 'quest-sam', 'quest-penelope'];
+  const SHIPPED = ['quest-sandy', 'quest-chipinski', 'quest-sam', 'quest-penelope', 'quest-dan'];
   it('every shipped caddy quest resolves a mid-round beat with its own portrait', () => {
     for (const id of SHIPPED) {
       const beat = questBeatFor({ storyQuest: id } as unknown as Run)!;
