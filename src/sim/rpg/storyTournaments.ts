@@ -196,14 +196,13 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     // story is the betrayal brewing aboard YOUR ship, so the copy now carries the doubt thread instead.
     intro: [
       'Not a show — a vigil. At the edge of a black hole the Coil is trying to wake a lesser dreamer, and ' +
-        'the Wardens play the Sagittarius Core to hold it down. The Viper has failed to take a Sigil off you ' +
-        'twice, so the Coil has sent something quieter: Scorpius, "the Silent Sting" — an assassin in chitin ' +
-        'and shadow who has never once spoken, and never once missed. He does not stride onto the tee. He is ' +
-        'simply already there, waiting, when you arrive.',
+        'the Wardens play the Sagittarius Core to hold it down. This Sigil is strokeplay: no partner, no ' +
+        'gallery, just your card against one other. And the card set against yours belongs to the Coil’s ' +
+        'quietest weapon — Scorpius, "the Silent Sting", the hunter they send when gloating has failed.',
       'But the cold at your back is not the void, nor the hunter — it is the quiet on your own ship. ' +
         '{betrayer} has hardly spoken since the storm-world, and the Choice you made there is still being ' +
         'made, hole by hole, by everyone who followed you out here. The Coil’s favourite door is a doubting ' +
-        'heart, and its Sting knows exactly which one aboard your ship has been left ajar.',
+        'heart, and the Sting has already found which one aboard your ship stands ajar.',
       'Hold the vigil, outplay the Silent Sting, and take the Abyssal Sigil — and watch your friends, ' +
         'champion. The eye at the root is half-open now, and it is not only looking at you.',
     ],

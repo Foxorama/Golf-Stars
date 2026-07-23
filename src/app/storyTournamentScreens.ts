@@ -103,7 +103,7 @@ function rivalTaunt(rivalId: string): string {
     case 'venoma':
       return '"Another Sigil for the Warden? How quaint. I do so enjoy taking things from the hopeful."';
     case 'scorpius':
-      return '(The Silent Sting does not greet you. He sets a matte-black ball on the tee without a sound, lifts two fingers to the stinger arced over his shoulder, and points — once — at you. The gallery has gone very quiet.)';
+      return '(The Silent Sting does not greet you. He sets a matte-black ball on the tee without a sound, settles over it, and goes still — utterly, patiently still. He will not swing until you do. The gallery has stopped breathing.)';
     case 'voss':
       return '"I am not here to beat you. I am here so you finally SEE. Play. Watch what the true line costs."';
     case 'driver-dan':

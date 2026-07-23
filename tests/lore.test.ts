@@ -178,7 +178,8 @@ describe('GS-story-beats — story-round dialogue beats gate on the campaign', (
     expect(pickLoreEvent({ ...W, storyAlignment: 'herald' }, {})?.id).toBe('story-venoma-herald');
     // GS-story-scorpius: the Viper is now the Ch.5 shrine return (not Ch.4); Ch.4's rival-up-close is the Sting.
     expect(pickLoreEvent({ ...W, storyChapter: 5 }, seenDoubt)?.id).toBe(`story-venoma-warden`);
-    expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden' }, seenVow)?.id).toBe('story-scorpius-warden');
+    // The Sting is gated to the vigil tee-off (storyTournament), so it's your FIRST sighting on the tee.
+    expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden', storyTournament: true }, seenVow)?.id).toBe('story-scorpius-warden');
   });
 
   it('GS-story-scorpius: the Silent Sting is the Ch.4 Warden rival-up-close; the Viper returns at Ch.5', () => {
@@ -186,8 +187,10 @@ describe('GS-story-beats — story-round dialogue beats gate on the campaign', (
       'story-warden-vow': true,
       ...Object.fromEntries(CHARACTERS.flatMap((c) => [[`story-doubt-${c.id}`, true], [`story-distance-${c.id}`, true]])),
     };
-    // Chapter 4 Warden: after the doubt thread, the silent assassin Scorpius stands across the tee.
-    expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden' }, doubtSeen)?.id).toBe('story-scorpius-warden');
+    // Chapter 4 Warden: at the vigil tee-off (storyTournament), the silent assassin Scorpius stands across
+    // the tee — your first sighting of him. He never leaks into an ordinary practice-world arrival.
+    expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden', storyTournament: true }, doubtSeen)?.id).toBe('story-scorpius-warden');
+    expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden' }, doubtSeen)?.id).not.toBe('story-scorpius-warden');
     // Venoma no longer fires at Ch.4 (the "second Venoma" replay is gone) — she returns at the Ch.5 shrine.
     expect(pickLoreEvent({ ...STORY, storyChapter: 5, storyAlignment: 'warden' }, {})?.id).toBe('story-venoma-warden');
     // Herald keeps the Viper's welcome from Ch.4 (the Warden Sting is a Warden-path beat only).
@@ -246,7 +249,7 @@ describe('GS-story-ragnarok — the impending-Ragnarök escalation beats (one pe
   });
 
   it('Chapter 4 escalation lands AFTER the doubt thread + the Scorpius confrontation, branching by path', () => {
-    // The Warden Ch.4 sequence is vow → doubt → distance → Scorpius → the eye-half-opens omen.
+    // The Warden Ch.4 sequence is vow → doubt → distance → Scorpius (at the vigil) → the eye-half-opens omen.
     const seenWarden = {
       'story-warden-vow': true,
       'story-scorpius-warden': true,

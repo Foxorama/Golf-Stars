@@ -104,6 +104,10 @@ export function interludeScene(story: StoryState): InterludeScene {
         { who: 'friend', text: d0! },
         { who: 'you', text: `${name}. Put the ball down. That isn’t your voice — the Coil is wearing your swing like a glove.` },
         { who: 'friend', text: d1! },
+        // GS-story-scorpius: the payoff of the Silent Sting's wordless warning at the Vigil — he scratched
+        // this exact name on a card and tipped his stinger at your ship. You told yourself it was a
+        // mind-game. It wasn't.
+        { who: 'you', text: `The Silent Sting held this up on a card at the Vigil and pointed it at my ship. I called it a bluff. …He wasn’t reading the future, ${name}. He was reading you.` },
         {
           who: 'parrot',
           // GS-story-ambiguous-fate: the Parrot promises the CONFRONTATION, never the rescue — his foresight
