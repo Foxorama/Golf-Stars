@@ -1513,11 +1513,27 @@
       @keyframes gs-char-sheen { 0% { opacity: 0; transform: translateX(-120%); } 35% { opacity: .8; } 100% { opacity: 0; transform: translateX(120%); } }
       .gs-charcard > * { position: relative; z-index: 2; }
       .gs-charcard-top { flex: 0 0 auto; display: flex; gap: 9px; align-items: center; }
+      /* GS-char-lore: the portrait square is its OWN tap target — tapping it opens the golfer's lore
+         popup (the surrounding card still selects). A hover lift + an "ⓘ Lore" badge advertise it. */
       .gs-charcard-port {
-        flex: 0 0 auto; display: grid; place-items: center; width: 56px; height: 66px;
+        position: relative; flex: 0 0 auto; display: grid; place-items: center; width: 56px; height: 66px;
         border-radius: 10px; background: radial-gradient(60% 60% at 50% 40%, #1b2230, #0d1018);
-        border: 1px solid color-mix(in srgb, var(--cc) 30%, var(--gs-line));
+        border: 1px solid color-mix(in srgb, var(--cc) 30%, var(--gs-line)); cursor: pointer; padding: 0;
+        transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease;
       }
+      .gs-charcard-port:hover, .gs-charcard-port:focus-visible {
+        outline: none; transform: translateY(-2px);
+        border-color: color-mix(in srgb, var(--cc) 70%, transparent);
+        box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--cc) 60%, transparent);
+      }
+      .gs-charcard-lore {
+        position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%);
+        font-size: 8.5px; font-weight: 800; letter-spacing: .03em; white-space: nowrap;
+        padding: 1px 6px; border-radius: 999px; color: var(--cc);
+        background: color-mix(in srgb, #0d1018 82%, var(--cc)); border: 1px solid color-mix(in srgb, var(--cc) 55%, transparent);
+        opacity: .82; pointer-events: none;
+      }
+      .gs-charcard-port:hover .gs-charcard-lore, .gs-charcard-port:focus-visible .gs-charcard-lore { opacity: 1; }
       .gs-charcard-id { flex: 1 1 auto; min-width: 0; }
       .gs-charcard-name { display: block; font-size: 15px; line-height: 1.15; text-shadow: 0 0 14px color-mix(in srgb, var(--cc) 55%, transparent); }
       .gs-charcard-org { font-size: 10.5px; opacity: .65; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

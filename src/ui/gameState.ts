@@ -254,6 +254,10 @@ export interface UiState {
   /** GS-story-clubhouse: the golfer whose stats/abilities overlay is open in the Earth clubhouse (picker or
    *  prologue hub). Absent ⇒ no overlay. Transient (never persisted). */
   storyInspectId?: string;
+  /** GS-char-lore: the golfer whose LORE popup is open on a character-select screen (tap their portrait).
+   *  Mode-agnostic — set from the card grid (Voyage/Unending/Star Tour) and the Story clubhouse alike.
+   *  Absent ⇒ no popup. Transient (never persisted). */
+  characterLoreId?: string;
   /** GS-story-prologue: the just-finished Story world round's recap payload (the `storyResult` screen). The
    *  prologue's victory grows into the Mothership/Parrot scene here. Transient. */
   lastStoryRound?: {
@@ -430,6 +434,8 @@ export type Action =
   | { type: 'storyRoundContinue' } // GS-story-prologue: dismiss the world-round recap back to the campaign hub
   | { type: 'storyInspectGolfer'; characterId: string } // GS-story-clubhouse: open a golfer's stats/abilities overlay
   | { type: 'storyCloseInspect' } // GS-story-clubhouse: close the golfer stats overlay
+  | { type: 'showCharacterLore'; characterId: string } // GS-char-lore: open a golfer's lore popup from a select screen
+  | { type: 'closeCharacterLore' } // GS-char-lore: close the golfer lore popup
   | { type: 'storySwitchGolfer'; characterId: string } // GS-story-clubhouse: change your protagonist (pre-tee-off, prologue only)
   | { type: 'openStoryMap' } // GS-story-map: open the galaxy star-map navigator (the Star Tour screen, story context)
   | { type: 'exitStoryMap' } // GS-story-map: back to the clubhouse from the star map

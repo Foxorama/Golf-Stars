@@ -231,6 +231,7 @@ export function reduce(state: UiState, action: Action): UiState {
           story: defaultStoryState(action.characterId),
           pendingStoryNew: false,
           storyInspectId: undefined,
+          characterLoreId: undefined,
           screen: 'story',
         };
       }
@@ -268,12 +269,12 @@ export function reduce(state: UiState, action: Action): UiState {
       // flows to the map (to pick a world + fly the golfer's own ship) rather than straight to a stop
       // intro. The course pins on at `pickStarTourCourse`. Every other mode goes to the intro as before.
       if (state.run.formatId === STROKEPLAY_FORMAT) {
-        return { ...state, run, course: currentCourse(run), screen: 'starTour', bagTierByCharacter };
+        return { ...state, run, course: currentCourse(run), screen: 'starTour', bagTierByCharacter, characterLoreId: undefined };
       }
       // The Marmot's tip jar ACCUMULATES across runs (GS-tent-tips) — a new run does NOT empty it, so it
       // fills toward a half-dozen over successive marmot bonks. The clubhouse renders the fill-then-cash-out
       // cycle off this running total (`marmotTips % (CAP + 1)`), so the reducer just keeps counting.
-      return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', bagTierByCharacter });
+      return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', bagTierByCharacter, characterLoreId: undefined });
     }
 
     case 'backToCharacter': {
@@ -471,6 +472,18 @@ export function reduce(state: UiState, action: Action): UiState {
 
     case 'storyCloseInspect': {
       return state.storyInspectId ? { ...state, storyInspectId: undefined } : state;
+    }
+
+    case 'showCharacterLore': {
+      // GS-char-lore: tap a golfer's portrait on any select screen to read their dossier. UI-only, zero
+      // sim rng; open only where a golfer is being chosen (the card grid or the Story clubhouse).
+      const onSelect = state.screen === 'character' || state.screen === 'story';
+      if (!onSelect) return state;
+      return { ...state, characterLoreId: action.characterId };
+    }
+
+    case 'closeCharacterLore': {
+      return state.characterLoreId ? { ...state, characterLoreId: undefined } : state;
     }
 
     case 'storySwitchGolfer': {

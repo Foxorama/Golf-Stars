@@ -358,7 +358,13 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
   - Screen specifics: the settings cog rides EVERY screen (return-to-title parks the run as `resumable`,
     never snapshots the title's placeholder run). Character select fits ONE mobile screen with no scroll
     (GS-select-onescreen, viewport-locked flex column, the card IS the button on phones); Ascension + club
-    set are picked WITH the golfer via dropdown pills (GS-diffpills). The stop intro is two reducer sub-steps
+    set are picked WITH the golfer via dropdown pills (GS-diffpills). **Tapping a golfer's PORTRAIT (not the
+    card) opens a lore popup** (GS-char-lore, `characterLoreId` + `show/closeCharacterLore`, `render/
+    characterLore.ts`, own `.gs-charlore*` prefix) — name/age/blood/gender+pronouns/relationship/best wins/
+    lowest moment/fun fact over a procedural HOMETOWN backdrop keyed by `Character.origin`; the portrait
+    `stopPropagation`s so the surrounding card still SELECTS. Mode-agnostic: the card grid (Voyage/Unending/
+    Star Tour) and the Story clubhouse inspect both raise it; `Character.lore` is pure content-as-data (a new
+    golfer adds the block, zero save bump). The stop intro is two reducer sub-steps
     (`introStage`); past stop 0 every mode opens on the `'hole'` step (strokeplay skips the arc lobby
     entirely, GS-story-tour). The title is a hero wordmark + three GAME tiles over two doorways; CONTINUE RUN
     is thematic + mode-aware (GS-continue-button, own `.gs-resume*`). Star Tour mid-round resume carries live

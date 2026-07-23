@@ -277,7 +277,12 @@ export function golferInspectOverlayHTML(
           </div>
         </div>
 
-        <div style="margin-top:16px;">${btn}</div>
+        <button class="gs-eclub-lorebtn" data-action='${JSON.stringify({ type: 'showCharacterLore', characterId: ch.id })}'
+          style="margin-top:12px;width:100%;padding:9px;border-radius:10px;border:1px solid ${cap}66;
+            background:${cap}14;color:${cap};font-size:12.5px;font-weight:700;cursor:pointer;">
+          📖 Read ${ch.shortName}'s story
+        </button>
+        <div style="margin-top:10px;">${btn}</div>
       </div>
     </div>`;
 }
