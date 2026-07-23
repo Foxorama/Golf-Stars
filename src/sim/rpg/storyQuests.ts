@@ -330,12 +330,21 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
     offer: [
       '🐍 "You want to really know me? Come down into the Mire — the acid shrine, where the Coil raised me ' +
         'and I shed the girl I used to be. I have never taken a partner there."',
+      '"I was somebody\'s daughter once, you know. Somebody\'s prodigy, somebody\'s hope. The Mire took all of ' +
+        'that and gave me back something that doesn\'t break. I want you to see where the Viper was made."',
       '"Play the serpent\'s own green at my side. Beat it, and I will forge you a blade from the fang I keep. ' +
         'On this bag I never miss — let me make sure you never do either."',
+    ],
+    duringQuest: [
+      { kind: 'action', text: 'Down in the acid shrine Venoma trails a hand along a wall of shed skins — older and older, going back — and something almost tender crosses the Viper’s face before the edge slides back over it.' },
+      { kind: 'say', text: '🐍 "This is where they made me. Where the girl I used to be got left behind like one of these old skins. I hated her for years. Now I just… pity her. She didn’t know yet that shedding is how you survive."' },
+      { kind: 'say', text: '"Keep swinging, golden child. Play the serpent’s green like you belong on it — because you do now, whether your old Warden friends like it or not. Beat this place, and I forge you a fang of your own."' },
     ],
     complete: [
       '🐍 "Ha — you played the Mire like you were born in the mud. Maybe you were, and never knew. The old me ' +
         'would have hated you for it. I think she would be jealous."',
+      '"I brought you to the one place that made me, and you didn\'t flinch, and you didn\'t pity me. Do you ' +
+        'know how rare that is? Voss got a protégé. I think I just got the only friend I\'ve had since I shed my name."',
       '"The Viper\'s Fang — solar-forged, weighted to strike dead straight, and it bends the wind to its line. ' +
         'It does not waver. Neither do we, you and I. Not any more."',
     ],
