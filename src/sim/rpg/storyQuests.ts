@@ -193,12 +193,21 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
     offer: [
       '🎒 "There is a green on Coronae Prism so true it shows you your own mind. The Guild calls it the trial of ' +
         'stillness. I have passed it once. I think you are ready to try."',
+      '"I failed it the first time, you know. Read every grain, forced every line, and the crystal turned every ' +
+        'putt away. It does not reward the trying. It rewards the letting-go. That lesson took me ten years."',
       '"Come. Read nothing. Force nothing. Let the crystal tell you the line, and hole out from wherever the ' +
         'world puts you. Pass, and the Guild’s own putter is yours — and so is my full trust."',
+    ],
+    duringQuest: [
+      { kind: 'action', text: 'Penelope halts you on the crystal apron, where the whole green rings faintly like a struck glass, and simply waits until your breathing slows to match its tone.' },
+      { kind: 'say', text: '🎒 "You are trying. I can see you trying — reading, calculating, forcing the line. The crystal does not answer force. It answers stillness. Let the hands go quiet."' },
+      { kind: 'say', text: '"The trial is not to make the putt. It is to stop needing to. Play the rest as though the ball has already come to rest where it belongs. Then — and only then — it will."' },
     ],
     complete: [
       '🎒 "You let go at the top of the stroke. I felt it from here. The green went quiet for you. That is the ' +
         'whole art, and you have it."',
+      '"I have waited a long time to caddie for someone who could be still on that green. Longer than I will admit. ' +
+        'Thank you for being the one. The Guild will hear of this — and they will know your name from mine."',
       '"The Star-Reader — solar-true, weighted for surrender, not for effort. Every read it gives you is honest. ' +
         'Putt as if the ball has already stopped. It nearly has."',
     ],
