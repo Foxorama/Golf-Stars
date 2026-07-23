@@ -1274,3 +1274,181 @@ by projector, which *correctly* reframes world decor with the world, and nothing
 
 **The rule for any new animated decor twin:** obey BOTH — course-anchor it if it represents a world
 object, and drive it off the shared wall clock — or it will render differently in each view and jump.
+
+---
+
+## Migrated from CLAUDE.md — System-index bullets (2026-07-23 refactor)
+
+> These are the verbatim terse System-index bullets moved out of `CLAUDE.md` when it was
+> compressed back to a lean constitution. They are the tip-of-iceberg pointers that had grown
+> into full implementation histories in the root file. The durable *rule* now lives as a short
+> bullet in `CLAUDE.md`; the detail below (and the deeper narrative already in this doc) is the
+> archive. Nothing here is lost — it is just no longer cluttering the constitution.
+
+- **Render layer** — `docs/decisions/render.md`
+  - ONE pure projector (`render/project.ts`) both renderers share. ONE shared scene builder
+    (`render/style.ts buildScene` → `Prim[]`); SVG = static map, Canvas2D = animated play view.
+  - `style.ts` is the ORCHESTRATOR only (GS-style-split): `buildScene` keeps the seeded streams +
+    their draw ORDER, the two interpreters, and the unchanged public exports; the painters live in
+    per-domain `src/render/style/*` modules (shared / land / fairway / green / hazards / flora /
+    ground / platforms / effects). **A new painter = a new `style/` module**, and painter modules
+    never import style.ts (`shared.ts` is the dependency root — no cycles).
+  - All scene randomness is mulberry32 seeded from `hashHole()` on documented streams — adding a
+    draw must not perturb existing stream order. SVG clip/gradient ids are per-hole
+    (`holeIdPrefix`) — document-global ids cross-clip co-mounted SVGs.
+  - The scene is CAMERA-PROOF (the follow-cam rebuilds per frame): rng draw counts never read the
+    projection; `posHash` keys are course-space, never screen px; `archetypeDecor` pushes its prims
+    UNCONDITIONALLY. `tests/camera-stability.test.ts` guards.
+  - Rough is ROUGH; space starts at the OB frame: the land hull fills `playBounds`+apron with the
+    world's rough palette; every archetype's `rough.base` sits ≥30/255 brightness above its space
+    tone (machine-checked). The rough is the biome's ground COVERING (`GROUND_COVER` table — every
+    archetype has a row EXCEPT void/cetus, machine-checked). Easter-egg props (`EGGS`) hide in the
+    rough on their own stream, off-corridor, camera-proof; void/cetus excluded.
+  - DEPTH: over the covering, `biomeRelief` (`style/relief.ts`, `BIOME_RELIEF` table — EVERY
+    archetype has a row, machine-checked) lays directionally-lit relief mounds so the ground reads as
+    ROLLING terrain, not a flat slab (GS-biome-relief). Paired hi/lo lobes offset along `LIGHT_UL`
+    (a lit crest + an offset shaded hollow = a rise with volume; a lone bright blob is the "spotlight"
+    bug); tints are per-world (dunes/snow drifts/scorched swells/cosmic rises/gilded rolls), never
+    neutral. PURE geometry (ZERO rng — `posHash` variety only) → perturbs no seeded stream (contract
+    1) and the mound count is a function of the COURSE-space land bbox, never the projection
+    (camera-proof). Clipped to the land/lost-platforms and drawn UNDER the mown turf (undulation lives
+    in the rough); Rainbow Road rides its own `RAINBOW_RELIEF` sheen ON the ribbon. Rides `art.texture`
+    (no new `_gs*` hook). Re-shoot the gallery after touching it.
+  - Platforms + hazard families merge through `render/merge.ts`: platforms are
+    `dilateUnion(…, 14)` (never a mitred `offsetPoly` outset — it folds at concave bends);
+    sand/liquid families draw NEAR-body-CLOSED bodies (`unionClose`, course-space, WeakMap-cached,
+    GS-hazard-merge). Where `unionPolys` fuses only bodies that already TOUCH, `unionClose` also bridges
+    hazards within a `gap` (`HAZARD_MERGE_GAP` = sand 14 / water 11 / lava 11 yd) by dropping a slim neck
+    quad between each near pair — so a cluster of bunkers or a lake+pond reads as ONE organic complex with
+    a pinched waist, not a manky pile of individual stickers. Bodies keep their exact size (only a neck is
+    added → graphic ≈ physics); a lone hazard is untouched. Render-only, zero rng — sim penalty polys
+    (fairness/carry/aim) are unchanged, so no balance impact.
+  - A lost-rough platform's side-on CLIFF (`platformCliffs`, cetus/void/rainbow) extrudes from the
+    platform's REAL lower silhouette (`frontEdge(plat)`), NOT its convex hull (GS-void-cetus-cliffs): the
+    hull chorded across concave bays + the flanks of a narrow vertical island, so the supporting wall
+    showed only along the bottom bulge ("pillars only visible in some places") — the real edge wraps the
+    whole lower perimeter so the landmass reads walled all round. Height keys off `min(w,h)` (floor 44) so
+    a tall skinny island still gets a substantial wall. `CETUS_CLIFF`/`VOID_CLIFF` strata are SATURATED
+    (teal→blue→deep-blue→black / violet→black), not the old greyed ramp that washed out against the deep;
+    the animated `cetusFlow.fallLenFor` MIRRORS the cliff-height formula so the moving waterfall reaches
+    the same foot. Pure geometry, zero rng, camera-proof; the lit `lipA` is unchanged (guarded by
+    `tests/cetus.test.ts`).
+  - A crossing river/lava flow/crevice's DRAWN bank is roughened so it reads as a natural hazard,
+    not a uniform band-aid (GS-hazard-edges, `roughenHazardEdge`): course-space, `posHash`-derived,
+    MEAN-ZERO about the true edge + amplitude-capped (≤40% of the body's narrow span) → RENDER-ONLY,
+    the sim penalty poly (fairness/carry/aim-cone) is untouched and the graphic still tracks physics.
+    WATER meanders in smooth curves, LAVA cracks into jagged crust, a CREVICE cracks hardest.
+    ZERO rng (byte-stable streams), camera-proof, WeakMap-cached per body.
+  - The water LIQUID palette is per-WORLD via `waterLiqFor(arch)` (GS-toxic-pools): the Toxic Mire
+    (swamp) draws GLOWING neon-green/teal ACID pools (`TOXIC_LIQ` — caustic acid-lime shore, neon body,
+    luminous teal core, + an emissive `glow` halo the liquid family paints UNDER each body), every
+    other world keeps the classic blue `WATER_LIQ`; lava stays per-KIND (`LAVA_LIQ`). RENDER-ONLY —
+    the sim still plays these as ordinary `water` penalty (fairness/carry untouched), and the `glow`
+    prim is fixed/zero-rng so `styleLiquidFamily` draws the same flow/glint stream (feature-off worlds
+    byte-identical). `spawnLandFX` throws a matching neon acid splash on swamp. A new luminous liquid =
+    a `LiquidPalette` with `glow` + a `waterLiqFor` row.
+  - The BUNKER palette is per-WORLD via `sandLookFor(arch)` (GS-rusted-bunkers), the sand twin of
+    `waterLiqFor`: the Scrap Belt (metal) digs flaky orange-RUST pits (`RUST_SAND` — no pale beach
+    tan, dark corroded rake grooves) so the hazard fits the corroded machine graveyard; every other
+    world keeps ordinary `SAND`. Its firm `waste` SCATTER flats reskin to brushed grey-STEEL plates
+    (a `scatterLook` metal-waste case), and the rough/background carry grey steel too (`GROUND_COVER.
+    metal.steel` mottle patches + a steel grain fleck + a bare-steel shard, and grey plates/debris in
+    `styleFlora` metal) so the rust reads broken up by a cool third colour beside the MUTED-verdigris
+    fairway (`ARCHETYPE_TURF.metal` — a greyed patina teal, not a vibrant lime). ALL render-only, zero
+    rng (colour swaps + posHash-picked steel), so the sim plays these as ordinary sand/waste lies and
+    every non-metal world is byte-identical. `spawnLandFX` throws a rust-flake puff on metal. A new
+    world bunker skin = a `SandPalette` + a `sandLookFor` row.
+  - Carved features share ONE light (`LIGHT_UL` → `insetEmboss`/`embossChildren`). NO drop shadow
+    onto turf (reads as floating); the depression is a THIN lip capped by body radius; the green is
+    FLUSH with the fairway. Its OUTWARD fringe/collar apron rings (`styleGreenSurround`) draw UNDER
+    the fairway pass, so they ease the green into the ROUGH and never paint over the corridor (the
+    apron-over-fairway bug). Where the flared APRON fairway now wraps the green (GS-green-flare), that
+    rough-side surround is covered — so a second mown COLLAR ring (GS-green-blend, in the feature loop,
+    grounded worlds only) draws ON TOP of the fairway, two outward rings blended green↔fairway turf and
+    always LIGHTER-toward-fairway (never the dark ring GS-green-apron banished), melting the green→apron
+    junction (fairway → collar → fringe → green). The green's own perimeter ink softened to 0.5/1.1 so it
+    reads as a mown edge, not a hard outline. Void/cetus (glow rim / shelf) + rainbow (ribbon) keep their
+    own edge and stay byte-for-byte (the derelict is excluded too — its deck gets its own blend,
+    GS-ship-deck-blend); pure geometry, zero rng. `deeprough`/`fescue` blobs are per-ARCHETYPE (`DEEP_ROUGH` has a row for
+    every world incl. void/cetus; fescue derives its body/tufts from `turfShade('rough', arch)`) — the
+    GS-rough-gradient pass pours them onto every world, so neither may hardcode one world's palette.
+    Hazards get a soft grassy margin blended toward the hazard (never
+    darker than turf); internals deepen through smooth feathered ramps, not hard bands. The fairway
+    takes a first-cut `collar` + a FEATHERED cut grade + edge-ease strokes + two-band sheen on
+    parkland worlds only (void/cetus pass NO collar; edge bands are clipped STROKES, never deep
+    `offsetPoly` insets — those fold on a thin ribbon). All pure geometry, zero rng
+    (GS-fairway-2).
+  - Turf bases still emit `#3f8c3f`/`#5fd45a` (the holeView fill test).
+  - The aim-cone overlay is SCALE-HONEST: every layout decision reads the projector's px-per-yard;
+    blocked-zone shading probes the sim's OWN flight walks — never fork them, never hard-code px
+    into the sim. A line is shaded BINARY (clear, or blocked from the object to the cone's far
+    edge). The blocked-zone glyph is keyed to the WORLD archetype (`TREE_GLYPH` mirrors
+    `styleFlora`); tents stay ⛺. The cone's near/far ARCS are `shotSpread`'s `[low, high]` = exactly
+    `resolveShot`'s UN-shifted carry clamp; wind rides ONLY `expectedCarry` (the aim line), INSIDE the
+    cone — never add the wind term to the arcs (it draws a window the shot can't reach; invisible at
+    full power, wildly wrong at chip power — the "arc too long/short around the green" bug).
+  - The pull-to-power gesture redraws ONLY the spray-cone group (`#gs-shot-overlay` via
+    `renderShotOverlaySVG` / `shotConeParts`) + the power/legend HUD spans in place, NEVER a full
+    `render()` per drag frame — a full render rebuilds the whole `buildScene` (flora, rough gradient,
+    contour art) and lagged hard on close chips/putts. Focus/follow mode only (stable projector);
+    whole-hole fit mode falls back to `scheduleRender`. The sibling of the #281 putt-overlay swap.
+  - The PUTTS-ONLY watch-cam holds a STATIC frame (`follow: hadShots` in the animation mount — off for
+    a green putt), centred on the ball↔cup midpoint at `puttViewRadius` exactly like the putt aim
+    screen. The follow-cam rebuilds the projector every frame, which defeats playView's `cachedProj`
+    scene cache and re-ran the whole heavy `buildScene` 60×/sec — the putt-watch chug (worst on
+    frost/ice greens). A putt's whole span is already framed, so no follow is needed and the scene
+    builds ONCE (verified 19→1 on a short putt; larger on a long one). Shots still follow the ball in
+    flight. (GS-putt-watch-lag.)
+  - Per-world identity is table+dispatch, never a fork: flora, OB markers, signature decor, ambient
+    air, wind tint are ALL archetype-keyed (`tests/biome-identity.test.ts` guards full coverage); a
+    flora variant must consume EXACTLY the classic two rng draws (extra variation via `posHash`).
+  - The weather layer's pinned starfield masks off `landPolysCourseFor`; meteor strikes re-burn
+    EXISTING scorch marks fed by the play view's LIVE projector (never the aim overlay's).
+  - The Cetus star-waterfall MOVES in the Canvas2D play view (GS-cetus-flow, `render/cetusFlow.ts`):
+    the play view sets `SceneOpts.animateCetus` to suppress the static `cetusRiver` and instead draws
+    a live flow over the scene — stars drift source→spill, curtain streaks fall, the splash churns —
+    on the SAME course-space channel `cetusRiverPath` emits. Motion rides the SHARED WALL clock
+    (GS-decor-view-states), ZERO rng, so `animateCetus`-off (SVG map + tests) is byte-identical;
+    PERF-neutral (geometry cached at mount, per-frame = re-project a short polyline + ~90 capped particles,
+    NO `buildScene` rebuild — it replaces the equal static river the follow-cam rebuilt). Speed rides
+    `_gsFeel.cetusFlowSpeed`. The WATERFALL tips to the EDGE (GS-cetus-waterfall-angle,
+    `waterfallBasis` in `style/platforms.ts`, shared by BOTH the animated flow AND the static
+    `cetusRiver`): the curtain used to always drop straight screen-DOWN, so a rotated follow-cam sat a
+    flat horizontal lip across a river arriving on a slant. Now the lip + curtain lean along the river's
+    own PROJECTED downstream tangent at the spill, so they line up with the plateau edge — clamped to
+    ≤~34° off straight-down (never sideways/up, always reads as a gravity drop) and byte-for-byte
+    straight-down when the river arrives vertically (the perfectly-aligned case). Pure geometry, zero rng.
+  - DECOR IS VIEW-STATE-INVARIANT (GS-decor-view-states): the four gameplay views (aim / watch / chip /
+    putt) draw the animated decor through DIFFERENT projectors on DIFFERENT canvases, so any element that
+    is a pure function of `(worldPosition, wallClock)` reads IDENTICALLY in all four and never jumps on a
+    view switch — the projector just reframes it WITH the world. Two rules make that hold: (a) world decor
+    (Cetus river, ship junk + hull sections, meteor craters) is COURSE-anchored — projected + `proj.scale`-
+    sized each frame, NEVER screen-fraction anchored (`fx*W`, `sizeFrac*min(W,H)`); (b) ALL ambient decor
+    rides the SHARED WALL clock (`performance.now()` / the raw rAF timestamp — `playFx.ts`'s overlay AND
+    `playView.ts`'s watch), NOT the slo-mo virtual `vnow` (which stays for the ball/caddy/shake cinematic
+    only) — a per-mount clock that reset to 0 made the whole sky/river/junk teleport at the aim→watch cut.
+    Weather is screen-space SKY (viewport-anchored, at infinity) but continuous via the shared clock + the
+    two play canvases being the SAME full-bleed size. GUARDED: `tests/decor-consistency.test.ts` proves the
+    ship-drift MODEL is course-space + holds no screen-space fields; `tests/build.test.ts`'s headless-
+    Chromium `window.__gsDecorProbe` pans the camera and asserts the decor centroid moves WITH the world
+    (world-anchored), not against it. A new animated decor twin obeys BOTH rules or it will jump.
+  - AIM-OVERLAY DECOR (GS-overlay-decor): the animated world-decor twins (Cetus flow, derelict ship
+    drift) AND meteor STRIKES used to move only while WATCHING a shot — on the static aim/putt screen
+    the river/junk/craters sat frozen. `mountWeatherOverlay` (`app/playFx.ts`) now draws them over the
+    aim/putt map too, through a `alignedProjector` that composes the SVG map's OWN projector with the
+    CSS meet-fit letterbox transform, so the decor lines up pixel-for-pixel with the map beneath. Only
+    in FOCUS/FOLLOW mode (armed via `overlayDecor` in `app.ts`); whole-hole fit folds `extra` points the
+    overlay can't reproduce, so it stays static there. The Cetus river draws in `overlayOnly` mode (skips
+    the opaque channel BED — the SVG's static river IS the bed, so the ball marker + aim cone stay
+    readable under only the moving motes/waterfall). `drift` is OFF on the putt screen + the putts-only
+    green watch (`ambientDrift`): the tight ~25-yd zoom floated the ship SECTIONS weirdly over the cup.
+    Browser-only side layer (never the sim); no new hook (reuses `_gsFeel.cetus/shipDriftSpeed`).
+  - The decision map's framing holds still for the whole shot decision; the shot animation starts
+    at the decision map's exact `decisionRadius`. `playView`'s `spawnLandFX` answers the touchdown
+    per lie/penalty — extend it with any new penalty kind.
+  - Re-shoot the gallery (`node scripts/gallery.mjs`) after any `style.ts` / `style/*` change.
+  - Shop/reward CLUB cards draw a per-FAMILY head (GS-club-icons, `render/itemArt.ts`): `clubFamilyOf`
+    → `clubHead` (driver/wood/hybrid/iron/wedge/putter), shaft + head share ONE `HOSEL` anchor so the
+    shaft meets the HEEL (centre = the old shovel look). Gear-shaft items resolve via `SHAFT_FAMILY`,
+    reward clubs off their `<type>`; `itemArtKind` stays `'shaft'` (per-id emblems keep them distinct).
+    Pure SVG, no rng/save bump. Eyeball with `scripts/club-icons-preview.mjs`.

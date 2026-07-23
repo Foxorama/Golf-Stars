@@ -350,3 +350,303 @@ boot in one file. CLAUDE.md itself called it "the likeliest source of regression
 Rules of thumb this locked in: a NEW screen is a new `src/app/` module (never more app.ts); a
 helper used by 2+ screen families goes in `helpers.ts`; view-only UI state lives in the screen's
 exported view object so dispatch can reset it without owning it.
+
+---
+
+## Migrated from CLAUDE.md — System-index bullets (2026-07-23 refactor)
+
+> These are the verbatim terse System-index bullets moved out of `CLAUDE.md` when it was
+> compressed back to a lean constitution. They are the tip-of-iceberg pointers that had grown
+> into full implementation histories in the root file. The durable *rule* now lives as a short
+> bullet in `CLAUDE.md`; the detail below (and the deeper narrative already in this doc) is the
+> archive. Nothing here is lost — it is just no longer cluttering the constitution.
+
+- **UI layer** — `docs/decisions/ui-intro.md`
+  - The screen flow is a PURE reducer (`ui/game.ts`): `(UiState, Action) → UiState`, no DOM/time,
+    fully unit-tested. `app.ts`/`main.ts` render state + dispatch; save persistence + canvas mounts
+    + the intro cinematic are side-effects there, never in the reducer. `game.ts` is the re-export
+    BARREL + the `reduce` switch (GS-refactor-split): the state/action TYPES live in `gameState.ts`,
+    the per-golfer cosmetic resolvers in `gameCosmetics.ts`, and the shared run-end/endless/ace/Asgard
+    UPDATE helpers in `gameUpdates.ts` (siblings never import game.ts — no cycle). Extend a sibling,
+    not the barrel; every `import … from '../ui/game'` still resolves through the re-exports.
+  - The app shell is SPLIT (GS-app-split): `app.ts` keeps boot/dispatch/render wiring + the
+    interactive play screen; every other screen builder lives in `src/app/*` (title/intro/result/
+    shop/market/clubhouse/travel + `ctx.ts` with the live `state` binding, `duelHud`, `helpers`).
+    Screen modules read `state` from `ctx.ts` and NEVER dispatch or import app.ts (no cycles);
+    per-screen view state is an exported view object (`marketView`, `introView`, …) app.ts's
+    wiring mutates. A new screen = a new `src/app/` module, not more app.ts.
+  - Visual theme is the design-token CSS in `index.html`, not the SVG layer. The play screen is
+    full-bleed and never scrolls; pull-to-power is the only shot input.
+  - DEFAULT AIM is a smart assist (GS-default-aim): `selAim` seeds from the persisted `Settings.aimMode`
+    each new shot (default `'auto'`), resolved by the SHARED `aimTargetOf` in `play.ts` (so `previewShot`/
+    `takeShot`/auto-finish stay byte-identical, contract 2). `'auto'` = the pure `round.ts autoAimTarget`:
+    par 3 → the flag; par 4/5 TEE → down the fairway CENTRELINE (dogleg-aware station at ~drive reach, not
+    a straight line that cuts the corner into rough); par 4/5 NON-tee → the flag when the green's reachable,
+    else position down the corridor. Forced carries defer to `safeTarget` (clamped ≤ reach). `'attack'`
+    (flag) + `'safe'` (`layupTarget` corridor lay-up) are the old modes. INTERACTIVE-only — the headless
+    `playHole` keeps its own `layupTarget` line, so determinism (contract 1) + every seeded test are
+    untouched. Change it in play via the ◎ club-row button (cycles auto→attack→safe, persists) or the
+    settings-sheet 🎯 pill; the default club seeds to the mode's fit (`ShotView.autoClubId`). A free-drag
+    aim still overrides for that shot. `aimMode` is a `Settings` field (no save bump, no `_gs*`/URL hook →
+    no test-hub wiring). Guarded by `tests/default-aim.test.ts`. THREE follow-up fixes: (1) the shot map
+    now ORIENTS down the resolved aim line — `decisionView`'s `up` = `resolveAimTarget(…)` − ball, not the
+    hardcoded tee→PIN — so the framing AGREES with the default aim and reorients when the mode / free-drag
+    aim changes (the old pin-up pointed across a dogleg corner into the trees while the auto aim went down
+    the fairway). (2) the default CLUB is `round.ts autoAimClub` (NOT the auto sim's club-DOWN `aiClub`),
+    kept in lockstep with `autoAimTarget`: a green attack → the green-COVERAGE club (`suggestPlayerClub`,
+    so an approach never comes up a club short); an OPEN corridor positioning shot → the LONGEST usable
+    club (the driver off the tee, since the club sets the CARRY and the aim only the DIRECTION — it was
+    pre-arming a 5-wood); a forced-CARRY drive (the aim flies OVER a hazard to a landing beyond it) →
+    `longestCarryClub`, the LONGEST club that still clears the far bank AND lands penalty-free (more club
+    is the safer carry, not less — a long par-4 tee shot over a river is a DRIVER, not a clubbed-down
+    wood), stepping down only if the driver can't clear / would overshoot into a second hazard, and
+    falling back to `aiClub` only when NO club clears (a genuine lay-up short). This fixed the residual
+    "off-tee still defaults to a 5-wood on a carry hole" report: the old blocked-line branch handed the
+    forced carry straight to `aiClub` (shortest club that reaches), clubbing a driver down to a wood on
+    the ~58% of long par-4 tee shots that carry a creek/river; it also cured the sticky sibling symptom
+    (auto pre-armed the wood, then toggling aim to pin KEEPS the selection since it's still usable — so
+    an attack shot showed the wood too). (3) the
+    settings 🎯 dropdown was UNPICKABLE — a click on the `<select>` bubbled through the `[data-settings=
+    "keep"]` branch (which `return`ed WITHOUT `stopPropagation`) to the backdrop's close handler, tearing
+    the sheet down before you could choose; the keep branch now stops the event.
+  - The settings cog rides EVERY screen (appended once in `render()`); "Return to title" is
+    NON-destructive (an underway run parks as `resumable`). `persist()` snapshots the live run only
+    when one is underway, else passes `state.resumable` through — NEVER snapshot the title's
+    character-less placeholder run (it wipes saves).
+  - The settings SHEET's inner content is `settingsSheetInner()` (split from the `settingsOverlay`
+    backdrop/frame wrapper); an in-sheet toggle/aim tap updates it SURGICALLY via `refreshSettings()`
+    (swap `.gs-settings` innerHTML + re-`wireSettingsSheet(sheet)`) — NOT a full `render()`, which
+    re-mounts the `.gs-sheet` frame and replays its slide-up animation as a flicker (GS-settings-flicker,
+    the `puttAimRefresh` sibling). A Music toggle still calls `syncMusic()` in the handler (render() no
+    longer runs to do it). `wireSettingsSheet(root)` wires the sheet's descendants only, so the
+    persistent backdrop + frame are never double-listened. The Audio + Feel on/off prefs are compact icon
+    CHIPS (GS-settings-chips, `.gs-setchip` in a 2-col `.gs-chipgrid`, `TOGGLE_CHIPS` table) — icon +
+    label + a mini switch, descriptions on `title`/`aria-label` — replacing the tall full-width rows so
+    the sheet is far shorter; aim stays the segmented `.gs-seg` control.
+  - The title's CONTINUE RUN button (GS-continue-button, `titleScreens.ts continueRunHTML`/`resumeInfo`)
+    is THEMATIC + mode-aware: the character's cosmetic ship (`shipForCharacter`→`shipCardSVG`) + a message
+    read off the parked `RunSnapshot` — Voyage → `Arc N of 3` (`arcIndexOf(stopIndex)+1`), Unending →
+    `Hole N` (`holesSurvived+1`), Star Tour → a course medallion (`courseIconHTML`, archetype-tinted
+    planet+flag) + course name + `Hole N of 18`. Star Tour ONLY offers a continue once a course is teed
+    off (`staticCourseId` set) — a golfer-picked-but-no-course session shows no card. OWN class prefix
+    `.gs-resume*` (never the play HUD's `.gs-hud`). Pure render off `state.resumable`; no `_gs*`/URL hook.
+  - STAR TOUR mid-round resume (GS-star-tour-resume): the 18 holes are ONE stop, so the ordinary
+    restart-the-stop resume would bin a parked round. The snapshot now carries the live round progress
+    (`RunSnapshot.stopHoleIndex` + `stopPlayed`, captured in `persist`/`toTitle` from `state.play`/
+    `stopPlayed`, save **v29**); the reducer's `resume` restores the scorecard + tees up that hole (screen
+    `playing`, no lore gate) so you continue where you left off. `holeRng` reseeds fresh — a records chase
+    isn't determinism-guarded, so resumed holes just draw a new dispersion stream, no played score re-rolls.
+    STROKEPLAY-only (the fields are absent on every other format → byte-for-byte the old restart resume).
+  - Character select fits ONE mobile screen with NO scroll (GS-select-onescreen): the roster is a
+    self-contained `.gs-select` flex column inside a viewport-LOCKED page frame (`.gs-main--fit` →
+    `height:100dvh;overflow:hidden` on phones, app.ts `fit` flag). The header + difficulty pills sit at
+    natural height and the `.gs-charwrap` grid (`repeat(2,1fr)` phones / `repeat(4,1fr)` desktop,
+    `grid-auto-rows:1fr`) FILLS the rest — so adding future golfers REFLOWS into more rows that share
+    the height, never off-screen (no per-count redesign). Each card is a flex column whose ONE soft
+    region is the unlocked-clubs strip (`.gs-charcard-unlocks`): it flex-GROWS to fill spare height and
+    is the ONLY thing that clips on a short card — portrait/stats/hint never clip. On PHONES the footer
+    CTA (`.gs-charcard-cta`) is HIDDEN (`display:none`) — the whole card is the button (an `aria-label`
+    carries the action) — because it sat over the club chips and read as a scrollable footer that
+    instead selected the golfer; desktop keeps the CTA. No mask-fade (a bottom fade reads as
+    "scrollable"). The two difficulty pills share one row on phones (`flex:1` in `.gs-diffrow`, value
+    truncates). Guarded by a browser no-scroll assertion + `?screen=character` deep-link in
+    `tests/build.test.ts`. Ascension is picked WITH the golfer, never on the title, defaulting to your
+    LAST pick
+    (`Settings.lastAscension`). Difficulty is TWO native-select DROPDOWN pills on one compact row
+    (GS-diffpills, `.gs-selpill` / `[data-selasc]` + `[data-selclubset]`): ⚔ Ascension (voyage, when
+    tiers are unlocked) + 🎒 Club set / bag — the club-set pill shows on EVERY mode now (only when a
+    better-than-common bag is owned) so a per-run bag downgrade is one tap from any format. The pills
+    are view state (reducer-clamped); the club-set pick overrides + write-throughs only when CHANGED.
+    Each VOYAGE card's club-UNLOCK badge names that golfer's OWN easiest unlock tier (GS-ascension-clubs
+    display, off `maxAscensionByCharacter`): the mechanic (`runEndUpdates`) grants a club on a win at
+    Ascension `>= maxAscensionByCharacter[id]`, so the LOWEST uncleared tier `A{cleared}` is the easiest
+    unlock — and the badge ALWAYS names `A{cleared}` (INDEPENDENT per golfer; they read "all over the
+    place" by design). NOT the globally-selected difficulty (the fixed bug: it printed `A{sel}`, telling
+    you to grind A8 when this golfer unlocks at A1). The selected difficulty only tints it: 🔓 green "Win
+    A{cleared} → new club" when `sel ≥ cleared` (a win at your current pick unlocks), 🔒 "Next club: win
+    A{cleared}" when `sel < cleared` (raise the difficulty), ★ "Bag complete" when full. The whole card
+    is the button. GS-select-layout.
+  - The stop intro is TWO mobile steps on one reducer screen (`'intro'` + view state `introStage`);
+    `introShared()` derives world/notes/objective ONCE so the steps never drift. Past stop 0 EVERY
+    format opens on the `'hole'` step (map + Tee Off), so a route jump lands one tap from teeing off
+    instead of on a briefing/leaderboard the player just saw (GS-intro-endless for the Unending
+    Universe, GS-intro-voyage for the Voyage); the briefing stays one `‹ Briefing` tap away. Stop 0
+    (from character select) keeps the `'arc'` step — it's the mode lobby with `Change golfer`. STAR /
+    STORY TOUR (strokeplay) SKIPS the arc entirely (GS-story-tour): a records chase / campaign round has
+    NO "Change golfer" lobby (on the Story path it pointed at the wrong roster — you've already committed
+    to your champion + course on the star map), so every strokeplay launch (`pickStarTourCourse` /
+    `storyPlayWorld` / `playStoryQuest` / `storyStartQuest` / `storyPlayTournament`) opens straight on the
+    `'hole'` step with NO back-to-arc button. The entry sub-step is chosen by the shared `introEntryStage`
+    (used by BOTH the live dispatch entry and the `?screen=strokeintro` deep-link so they never disagree);
+    guarded by a `tests/build.test.ts` browser smoke (hole step + Tee Off, no arc chrome).
+  - The post-stop recap (`resultScreen`) is a pure render off `state` — rarity-framed panel, stat
+    tiles, clickable hole-by-hole strip.
+  - The title is a hero wordmark + THREE GAME tiles (GS-star-tour) reusing the doorway component
+    (`.gs-navtile--game`; whole tile = the button, distinct only via the `--mc` accent — never
+    regrow badges/launch bars/progress text) in a 3-across row (`.gs-navtiles--games`), over the two
+    Trade-Market/Clubhouse doorways (2-up `.gs-navtiles`). Voyage + Unending are auto-listed from
+    `FORMATS`; Star Tour is a BESPOKE tile (`openStarTour`, not the generic `start`) because it opens
+    its own course-picker star map first — so `strokeplay` is EXCLUDED from the auto-list.
+  - STAR TOUR star map (GS-star-tour / GS-star-tour-2, `app/starTourScreens.ts` + `render/starTourMap.ts`):
+    a full-bleed, free-roam celestial chart — every course plotted at its constellation's real J2000 sky
+    position (`THEME_SKY`) over a deep-space backdrop (seeded nebula washes + a Milky-Way band + tinted/
+    hero stars, all mulberry32-seeded, never Math.random). The viewport is `touch-action:none` and drives
+    BOTH gestures itself (`wireStarTourGestures`): one finger PANS (scroll), two fingers PINCH-ZOOM about
+    their midpoint (`starTourView.zoom`, the SVG's px width/height scale while the viewBox stays fixed, so
+    ship/world chart-coords are unchanged — only scroll conversions multiply by zoom; ⌘/Ctrl+wheel zooms on
+    desktop). This SUPERSEDED the old native-scroll `wireStarTourDrag`, whose second finger jittered into
+    the drag handler (the pinch "flicker jump" bug, no zoom at all). A moved drag/pinch sets
+    `starTourDragged` so the trailing click doesn't fly; the tap handler must NOT `setPointerCapture` (it
+    retargets the click off the world `<g>`, degrading every world-tap to a free flight). CHARACTER SELECT
+    COMES FIRST
+    (GS-star-tour-2): `openStarTour` opens the roster, `selectCharacter` (strokeplay branch) then lands on
+    the map, so the run carries the golfer and the map flies THEIR cosmetic ship (`shipForCharacter` →
+    `shipSVG`). You FLY the ship: a TAP orients + cruises it there (an app-layer rAF loop in `stepStarTour`
+    moving `starTourView.shipX/Y/heading`, chase-cam following, scroll preserved across renders via
+    `starTourView.scrollX/Y`). The chase-cam eases the scroll to keep the ship centred while
+    `starTourView.following` is set — armed by any fly*, cleared the instant the player takes manual control
+    (pan/pinch/wheel) — NOT the per-frame `cruising` flag (GS-star-map-jerky-movement): gating on `cruising`
+    hard-FROZE the map off-centre the moment a hop reached its target, so rapid "tap to keep moving" taps
+    stuttered freeze→lurch between hops. Following keeps the ease running across those gaps (converging to a
+    no-op once the ship is idle+centred, so it never fights a resting/panned view). The ship art faces +x, so heading = `atan2(dy,dx)` (0 = flying right) —
+    NOT the old `atan2(dx,−dy)` 0=up heading fed into a right-facing hull, which rendered a downward flight
+    upside-down. A LEFTWARD flight mirrors the hull vertically (`starTourView.flip` = −1, decided at launch
+    off the target side, held for the whole flight so it never snaps mid-cruise) so a wheeled/keeled craft
+    keeps its top up; docked heading is nose-UP (`SHIP_DOCK_HEADING` = −90). FLIGHT ORIENTATION IS PER-SHIP
+    (GS-ship-fly-orient, `ShipLook.fly`): the nose-along-heading rule above is `'nose'` (the default — every
+    car/cruiser has a front + tail exhaust). A nose-LESS HOVER craft (`'hover'` — the flying-saucer Little
+    Green Caddie + the Mothership, and any future disc/orb ship that isn't a vehicle shape) must NOT rotate to
+    the heading — that tumbled the disc and swung its downward under-beam out the side ("flames out the side,
+    moving sideways"). Instead the `#gs-st-ship` group carries POSITION only and splits into two oriented
+    children: `#gs-st-body` (the hull — NOSE → `rotate(heading) scale(1 flip)`; HOVER → stays UPRIGHT and only
+    `hoverBank(heading)` = `HOVER_BANK_MAX·cos(heading)`, a gentle lean into travel that never tumbles) and
+    `#gs-st-thrust-orient` (the plume — ALWAYS `rotate(heading)` so it streams BEHIND the hull whatever the
+    body does). Both `shipGroup` (initial paint) AND the app's per-frame `stepStarTour` write the same split
+    (branch on `starTourShipHovers()`); a new hover ship is just `fly: 'hover'` on its row. A hover craft
+    also gets a BESPOKE PROPULSION (GS-ship-hover-prop, `hoverThrust`) instead of the car jet: a downward
+    ANTI-GRAV REPULSOR (pulse rings rippling down-and-out + a plasma pad hugging the disc base + a flickering
+    ion column + falling charge motes, coloured off the ship's flame/accent) drawn UNDER the hull in the
+    body-local frame (so it banks with the disc + always points down, never a sideways tail flame); its
+    `#gs-st-thrust-orient` jet group is left EMPTY. Wears `.gs-st-thrust` so the `.gs-st-thrusting` cruise
+    fade powers it up (docked = the disc rests on its pad) + `.gs-st-hoverprop` as the marker. An engine PLUME
+    (`thrustTrail`, trailing off the tail, coloured off the ship's flame/accent) fades in via a
+    `.gs-st-thrusting` class the rAF loop toggles while cruising, so the ship reads as flying, not sliding.
+    FLIGHT SPEED
+    (GS-star-tour-map-improvements) is a near-CONSTANT flat cruise (`STAR_TOUR_BASE_STEP` 5.25 × the flown
+    ship's RARITY via `starTourShipSpeedMult` — common .9 / rare 1 / epic 1.1 / legendary 1.2 / mythic 1.3),
+    NOT the old `d*0.14` that rocketed distant hops off way too fast; only a haul with more than
+    `STAR_TOUR_LONG_HAUL` (750) chart units still to go earns a gentle acceleration (`*0.0375`) on top, so
+    short/medium flights stay deliberate on the small map. Base + accel were both dialled down 25% (7→5.25,
+    .05→.0375) for a calmer, more readable cruise — the reduction rides EVERY rarity uniformly (the mult is
+    applied on top). Tapping a WORLD flies to it
+    and OPENS its DOSSIER on arrival (flavour, tier,
+    record, WEATHER picker, Fly-here-&-play → `pickStarTourCourse` pins the course on the golfer's run →
+    `intro`). Ship starts docked at the clubhouse `SPACEPORT` (the view opens centred there, slightly more
+    zoomed OUT than intrinsic — `ST_OPEN_ZOOM`). The SPACEPORT is the map's way OUT (GS-star-tour-port): it's
+    a TAPPABLE station (`data-startour-port`, drawn as a proper docking port with gantries/pads + a "DOCK ·
+    CLUBHOUSE" hint) — flying home to it DOCKS the ship (`flyStarTourToPort` → `dockingAtPort`, arrival
+    dispatches `openClubhouseHall`) and opens the Clubhouse; the Clubhouse hall's "🚀 Depart to Star Tour"
+    button (`openStarTour`, now reachable from `clubhouseHall`) flies you back out — the spaceport ↔ clubhouse
+    loop. The cockpit HUD REUSES the journey bridge HUD
+    (GS-star-tour-hud, `stHud`): the star map renders a `.gs-bhud gs-bhud--st gs-bhud--<variant>` frame
+    piped `hudThemeForShip`/`hudThemeVars` + `hudChromeFor`, so it recolours to the flown ship AND inherits
+    the identical fleet ornaments (title plate = ship name, rails, nodes, wings, deck) — a themed bridge is
+    a table row (`render/hudTheme.ts`), never a Star-Tour edit. The `.gs-bhud--st` context modifier swaps
+    the travel controls for Star Tour's own. Star Tour has NO bank/run, so the CONSOLE (GS-star-tour-fuel)
+    carries NO exit switch and NO big golfer name plate (they crowded/obscured the dashboard): the RECORDS
+    board is baked into the top-left "✦ STAR TOUR · 🏆 n/N" id-pod LINK (`data-startour-records`, toggles
+    the board), and the bottom console is the ship's DASHBOARD — a compact pilot-swap DOT (left slot,
+    `openStarTour` → change golfer; a recap "Star map" KEEPS the golfer), the themed instrument DECK
+    (widened to the focus now the centre is compact), a NORMAL/FAST SPEED control in the focal CENTRE slot
+    (`data-startour-speed`, a throttle reading `--hud-*` so each ship's control is its livery colour), and
+    the live FUEL gauge RIGHT. Leaving the map is the settings-cog "Return to title". Star-Tour CONTENT
+    keeps the `.gs-sthud__` prefix; the FRAME/theme/ornaments are the shared `.gs-bhud` (this SUPERSEDED the
+    old standalone cyan `.gs-sthud` chrome). The class-collision guard is
+    unchanged: never `.gs-hud` (the play screen's), which the `tests/build.test.ts` play-HUD test proves.
+    `intro` is Star-Tour-branched (objective/field, Watch
+    hidden so a record is EARNED); the round resolves to `strokeResult` (`app/strokeResultScreens.ts`).
+    The in-round HUD shows STROKE scoring (running to-par + gross), not the Stableford-vs-cut chip.
+    Reducer: `openStarTour`/`pickStarTourCourse`/`exitStarTour` + `resolveStrokePlay` (banks the record
+    like Asgard resolves its tournament). Deep-linkable via `?screen=startour`/`?screen=strokeresult`
+    (GS-screen-deeplink, real reducer transitions); guarded by `tests/startour-flow.test.ts` +
+    `tests/build.test.ts` browser smoke. Star Tour never consumes the parked Voyage/Unending resume.
+    NO run economy: Star Tour is a records chase with no credits/handicap/stop/distance/scoring-fuel — so
+    `header()` (the between-hole recap) is `STROKEPLAY_FORMAT`-branched to show the course + running to-par
+    instead of the voyage stat rail, and the recap board shows `strokePlayProgressHTML` (running scorecard),
+    never the ghost competitor leaderboard. The star map's own FUEL (GS-star-tour-fuel) is a pure MAP-
+    EXPLORATION feel mechanic, NOT run economy: it lives ONLY in `starTourView` (app layer — never the sim,
+    a save, or the round), so records stay comparable. Flying burns fuel by DISTANCE (so the target holds
+    regardless of speed): FAST cruises +25% and burns 1.5× the fuel/distance of NORMAL, sized so a FAST
+    cruise empties over 3/4 of the chart width (NORMAL lasts 1.5× further). Coming to REST at any station (a
+    world / Earth / the spaceport, within `ST_REFUEL_STATION_R`) tops the tank to full; draining it in deep
+    space stalls the ship and flies in a space TANKER (`#gs-st-fueltruck` + hose, an rAF state machine in
+    `stepStarTour`) that hoses it up and departs, then the interrupted flight resumes. All app-layer/render
+    (no reducer/save/rng, no `_gs*`/URL hook → no test-hub wiring). Re-shoot `scripts/startour-preview.mjs`. The Daily button is parked off the title for now. SHIP WEAPONS
+    (GS-star-tour-weapons, `render/shipWeapons.ts`) — the console FIRE button (`data-startour-fire`) spits a
+    THEMATICALLY-MATCHED projectile from the ship's nose along its heading: a scatter-gun of golf-ball buckshot
+    (wagon), a railgun slug (racer), an abduction RAY (saucer), ice shards (comet), rockets (hauler), a plasma
+    death-orb (mothership), twin neon lasers (bike), a forked LIGHTNING/Bifröst cannon (chopper/Pegasus), an
+    aurora BLACK-HOLE nova (Infinity Ace), a phoenix fireball (Firebird). The gun is a `WEAPON_BY_KIND` row
+    keyed by `look.kind` (a new ship inherits a fitting gun, no engine edit); projectiles are authored facing
+    +x and driven by `stepStarTour`'s rAF loop into a `#gs-st-shots` SVG layer (the fuel-tanker/thrust
+    pattern) — pure geometry + SMIL, ZERO rng. Magazine = `WEAPON_AMMO_CAP` (2) charges on `starTourView.ammo`,
+    spent per fire, RELOADED wherever the tank refuels (any station arrival + the tanker top-up). Firing NEVER
+    calls `render()` (that rebuilds the chart + wipes live shots) — it appends shot `<g>`s + ticks the ammo
+    pips in place, exactly like the fuel gauge. All app-layer/render feel (no reducer/save/rng, no `_gs*`/URL
+    hook → no test-hub wiring); guarded by `tests/ship-weapons.test.ts` (weapon/style coverage) +
+    `tests/build.test.ts` (browser: fire spawns a shot + spends a charge). The star-map CONSOLE lays its five
+    controls (pilot · deck · speed · fire · fuel) out IN-FLOW (flex, own space each) — NOT the travel console's
+    absolute-floated deck, which the fire button crowded. DESTINATION ICONS
+    (GS-star-tour-destinations → GS-star-map-icon-consistency, `render/starTourMap.ts`) — the star map is a
+    DIFFERENT interface from the journey map: a course is the PLACE it's named for, not a biome skin, so
+    EVERY destination is its own luminous celestial object that EMITS into the star field via `softGlow`
+    (no hard tier ring, no dark halo bubble, no emoji sticker — those read as tokens on black). Each place
+    is BESPOKE, in-sync, and UNIQUE from same-biome siblings via a `SIGNATURE[themeId]` row (`{kind, size,
+    motif?, ring?, star?}`; fallback `signatureFor` infers off name+archetype). Three levers: (1) a
+    per-destination PALETTE — a deliberate `TINT_OVERRIDE` (Orion's blue forge vs Scorpius' red, Hydra's
+    toxic acid, Leo/Vela golds, Antlia/Pyxis greys) else a seeded HSL shift on the archetype base, so two
+    same-biome courses never share a colour; (2) a celestial KIND, one bespoke renderer each — `galaxy`
+    (grand spiral + black-hole heart, drawn LARGE so the Sagittarius Core never reads smaller than a
+    planet), `rift` (torn luminous crack), `wreck` (broken starship), `ringNebula` (Lyra = the green Ring
+    Nebula M57 smoke-ring), `dumbbell` (Vulpecula = the bi-lobed M27, so it's NOT a Lyra clone), `star`
+    (a TAMED sun — glow restrained so no icon overpowers — flavoured `forge` [blue + Orion's Belt] or
+    `sting` [red Antares + a curved stinger tail of stars]), `crown` (Corona Borealis = a jewelled arc-
+    tiara), `crystal` (a three-point wedge, for Triangulum), `maelstrom` (Draco = a dense multi-arm vortex
+    with a dark eye, the finished storm), `binary` (Gemini = twin icy worlds), `serpent` (Hydra = a toxic
+    many-headed water-serpent coiled in acid haze), or `planet`; and (3) a per-world planet MOTIF that
+    individuates the shared planet body — `mane` (Leo's golden lion mane), `companion` (Centaurus + bright
+    Alpha Centauri), `whale` (Cetus breaching the star-sea), `river` (Eridanus' star-stream), `dune`
+    (Vela's sail-wisp + dune bands), `scrap` (Antlia's junk belt + antenna, corroded), `foundry` (Pyxis'
+    molten seams + compass needle), plus `ring` styles (ice/ocean/metal). BIGGER CANVAS (GS-star-map-
+    bigger-canvas): the constellations project into a centred CONTENT box (`CONTENT_W` 2240 × `CONTENT_H`
+    1456 — the old chart size, so every J2000 position is byte-for-byte where it was) wrapped in a starry
+    `PAD` (`CHART_W`/`CHART_H` = content + pad; `projectSky`/`SPACEPORT_POS`/`EARTH_POS` all offset by the
+    pad so the whole cluster just TRANSLATES — flight/tap/dock/fuel math unchanged), so open starry space
+    surrounds the worlds to fly out into. Starfield/nebula/grid density scale with the larger area. Because
+    a portrait phone zoomed all the way out still letterboxes a landscape/square chart (contain-fit), the
+    `.gs-st-space` deep-space CSS backdrop (matching gradient + faint tiled stars, on BOTH `.gs-startour`
+    and its viewport) fills those margins so the WHOLE screen reads as continuous starry space, never black
+    bands. `EARTH_POS` plots a recognisable blue-marble HOME beside the
+    `SPACEPORT`. Tier is a small luminous BEACON dot (top-left), not a ring. Everything is `mulberry32`-
+    seeded off the world id (per-world clip ids via `idSafe`) — pure + byte-stable (the map has its OWN
+    seeded stream, not the sim rng). Eyeball via `scripts/startour-preview.mjs`.
+  - HIDDEN YGGDRASIL (GS-star-tour-yggdrasil, `render/starTourMap.ts` `yggdrasilGlyph`/`YGGDRASIL_REALMS`
+    + `starTourScreens.ts` `yggdrasilSheet`): the World Tree, drawn on the chart (`YGGDRASIL_POS`, high in the
+    open PAD above the constellations) ONLY once Thor's Hammer is owned (`showYggdrasil` gate → `ownedApparel`
+    includes `thors-hammer`; a Hammerless chart is byte-for-byte unchanged). A tappable object
+    (`data-startour-yggdrasil`) — flying to it (a fuel STATION when armed) opens the NINE REALMS overlay
+    (`starTourView.yggdrasilOpen`). The realms are a `YGGDRASIL_REALMS` TABLE hung as glowing fruit on the
+    tree; ASGARD (the crown, lit gold) is the ONLY `playable` one today, the other eight are BARE dashed
+    sockets — placeholder rows so **a new realm is a data flip** (`playable:true` + a launcher), never a
+    glyph edit. Tapping Asgard dispatches `playYggdrasilRealm` → a STANDALONE Asgard tournament
+    (`startAsgardRun`, the `crossBifrost` machinery) with NO suspended journey: `asgardFromStarTour` marks it
+    so `leaveAsgard` rebuilds a fresh strokeplay run and returns to the star MAP (not travel). Reducer-gated
+    HARD on the Hammer + `realmId==='asgard'` (both mismatches are no-ops), so it can't fire early or on an
+    unbloomed branch. App-layer/render + a reducer flow — no `_gs*`/URL hook (no test-hub wiring), no save
+    bump (`asgardFromStarTour` is transient). Guarded by `tests/startour-flow.test.ts`.
+  - **`app.ts` is still the hottest file (~2,200 lines: play screen + wiring) — prefer extending a
+    `src/app/` module over growing it, and re-read the relevant span before editing.**
+- **Intro cinematic** — `docs/decisions/ui-intro.md`. Cosmetic Canvas2D, not in the reducer;
+  degrades safely (every frame in try/catch → `finish()`); the many-instance glow uses a cached
+  sprite, never per-element `shadowBlur`. The real title boots first, the intro overlays it.
+

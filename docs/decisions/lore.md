@@ -182,3 +182,49 @@ The one-off is recorded in the main-save `seenLore` like every other beat (no ne
 Same as a plain beat, plus: set `effects` on the row. If it needs a NEW reward kind, add a field to
 `LoreEffects` and one branch in `dismissLore` (keep it side-effect-only — no rng). A ship reward is just
 a `SHIPS` row (secret, `cost:0`) named in `effects.unlockShip`.
+
+---
+
+## Migrated from CLAUDE.md — System-index bullets (2026-07-23 refactor)
+
+> These are the verbatim terse System-index bullets moved out of `CLAUDE.md` when it was
+> compressed back to a lean constitution. They are the tip-of-iceberg pointers that had grown
+> into full implementation histories in the root file. The durable *rule* now lives as a short
+> bullet in `CLAUDE.md`; the detail below (and the deeper narrative already in this doc) is the
+> archive. Nothing here is lost — it is just no longer cluttering the constitution.
+
+- **Lore / story beats** — `docs/decisions/lore.md`
+  - Lore is CONTENT-AS-DATA (GS-lore, `sim/rpg/lore.ts`): a beat is a `LoreEvent` ROW — a pure
+    `trigger(ctx: LoreContext)` predicate + the presentation (`title`/`kicker`/`lines`/`portrait`).
+    `pickLoreEvent(ctx, seen)` returns the first UNSEEN (`once`) beat whose trigger fires; a new beat is
+    a NEW ROW, never an engine edit. `LoreLine.kind` = `say` (a dialogue bubble) vs `action` (a stage
+    direction, dim italic). `LoreContext` (biome/archetype/caddyId/characterId/format/stopIndex/
+    reputation) is deliberately broad — extend it for a beat that gates on more, and populate it in the
+    gate. First row: `driver-dan-derelict` (`archetype === 'derelict' && caddyId === 'driver-dan'`).
+  - A beat can PAY OUT, not just speak (GS-lore-rewards): the optional `LoreEvent.effects` is applied
+    ONCE by `dismissLore` (still UI-only, zero sim rng) — `unlockShip` adds a secret ship to `ownedShips`
+    (the ace-ship pattern), `parrotForesight` arms the Prognostic Parrot's foresight at 100% for the
+    ARRIVED stop only. A new reward kind = a new `LoreEffects` field + one `dismissLore` branch. Second
+    row: `prognostic-parrot-derelict` (GS-lore-parrot-firebird — `derelict && caddyId ===
+    'prognostic-parrot'`): the parrot mourns his dead spirit-brother's wreck; dismiss grants the secret
+    MYTHIC **Firebird** ship (`ships.ts` `FIREBIRD_SHIP_ID`, a black Trans-Am cruiser with a golden
+    phoenix, `look.kind:'firebird'`) and 100% foresight here. The boon rides `run.parrotForesightStop`
+    (snapshotted; `foresightChance(run)` = 1 when it equals the live `stopIndex`, else the loadout chance
+    — so feature-off is byte-for-byte and it self-expires on travel), read by BOTH the headless
+    `playerHoleOpts` and the interactive proc (auto ≡ interactive). A caddy is one-at-a-time, so the two
+    derelict beats never collide.
+  - One-off tracking is PERSISTED (`SeenLore = Record<string,true>`, save **v28** `seenLore`, mapped in
+    BOTH `persist.ts` mappers): a beat fires exactly ONCE ever, across every run + mode, recorded on
+    DISMISS. Save bump is purely additive (existing seeded runs byte-identical).
+  - The gate `withLoreGate(next)` (`ui/gameUpdates.ts`, the `withAsgardPortal` sibling) wraps every
+    "→ intro" arrival return (`route`/`pickStarTourCourse`/`selectCharacter`/`resume`); an unseen
+    triggering beat diverts to the `'lore'` SCREEN (`pendingLoreId`), `dismissLore` marks it seen + lands
+    on the intro. MODE-AGNOSTIC: derelict via `course.biome === 'derelict-ship'`, caddy via
+    `namedCaddyOwned(perks)` — one gate covers Voyage/Unending/Star Tour, no run snapshot needed.
+  - The screen (`app/loreScreens.ts`, full-bleed cinematic) paints a banner + a bespoke close-up
+    portrait (`render/loreArt.ts lorePortraitSVG`, Dan's on-course palette) + the dialogue. CSS is
+    `.gs-lore*` (its OWN prefix, NEVER the play HUD's `.gs-hud`). UI/RENDER ONLY — zero sim rng
+    (determinism/auto≡interactive untouched); no `_gs*`/`?param` hook (only a new `?screen=lore`
+    deep-link VALUE for the layout smoke test), so no test-hub wiring. Guards: `tests/lore.test.ts`
+    (pure table + reducer flow) + `tests/build.test.ts` (`?screen=lore` smoke) + `tests/save.test.ts`
+    (v27→v28). A new speaker = a `lorePortraitSVG` case; a new beat = a `LORE_EVENTS` row.
