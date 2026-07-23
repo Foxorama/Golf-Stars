@@ -75,6 +75,37 @@
   follows the chosen format via `characterScreen(unlocked, { modeName, winnable })`: "Voyage as …"
   for the campaign, "Survive as …" for the Unending Universe, with the mode named in the header so
   you always know what you're picking for.
+## Character lore popup (GS-char-lore, 2026-07)
+Device feedback: the four golfers had a hometown + pronoun line on the card but no personality — you
+picked a play-style, not a *character*. So every select screen now lets you **tap a golfer's PORTRAIT**
+(the image square, not the card) to open a lore popup — a "golfer dossier" bottom-sheet (centred on
+desktop) telling you WHO they are: name, age, blood type, gender & pronouns, relationship status, best
+wins, lowest career moment, and a fun fact, over a subtle procedural silhouette of their HOMETOWN.
+- **The data is content-as-data.** `Character.lore` (`sim/rpg/characters.ts`) is a pure render-only
+  block the sim never reads (like `style`/`stats`) — a new golfer just adds it, NO save bump (the popup
+  is transient UI, rebuilt from the id). Name/hometown/pronouns already live on the row (`name`/`origin`/
+  `identity`); `lore` only carries the extra biographical beats.
+- **The popup is a self-contained overlay** (`render/characterLore.ts`, `characterLoreCardHTML`) with its
+  OWN `.gs-charlore*` prefix + inline `<style>` (never the play HUD's `.gs-hud`, per the class-collision
+  rule) — modelled on the `loreCard`/`eclub` bottom-sheets. The **hometown backdrop is assetless** (house
+  style): `hometownBackdropSVG(origin)` hand-places a flat-band skyline per city (Nairobi savanna at
+  golden hour · Busan's night bay + suspension bridge · Perth's riverfront skyline · Portland's Mt Hood
+  + evergreens), dimmed by the card gradient so it reads as atmosphere. A generic horizon covers an
+  unknown origin so a new golfer never shows a blank header. Zero rng — pure, byte-stable.
+- **Tap-the-image opens lore; tap-elsewhere still selects.** The select card stays a single
+  `<button data-action=selectCharacter>`; the portrait becomes a `<span role="button" data-action=
+  showCharacterLore onclick="event.stopPropagation()">` INSIDE it. The stopPropagation halts the bubble
+  so the card's own select click never fires when you tap the portrait — the exact `loreCard`/`eclub`
+  pattern. Everything else on the card selects as before (byte-for-byte the old select action).
+- **Mode-agnostic.** `characterLoreId` + `show/closeCharacterLore` (UI-only reducer, guarded to the
+  `character`/`story` screens) drive it. The card grid (Voyage / Unending Universe / Star Tour, all the
+  same `characterScreen`) taps the portrait directly; the Story clubhouse — whose select UI is the
+  graphic Earth clubhouse + `golferInspectOverlayHTML` inspect, not a card grid — gets a "📖 Read their
+  story" button in that inspect overlay that raises the SAME popup (z-index 80 > the inspect's 60, so it
+  layers on top and closing it returns to the inspect). `app.ts` appends the overlay to both select
+  branches. Guarded by `tests/character-lore.test.ts` (data completeness + every field renders + the
+  portrait carries the lore action + the reducer open/close/clear-on-pick).
+
 - **Title game tiles**: each format renders as a doorway tile — gold + 🚀 for the winnable Voyage,
   violet + 🌌 for the Unending Universe — data-driven off `FORMATS`, a new format gets a tile for
   free. (First shipped as a busier `.gs-modetile` hero card with badge + launch bar; unified onto

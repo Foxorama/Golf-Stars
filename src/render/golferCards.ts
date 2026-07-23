@@ -230,7 +230,13 @@ export function characterScreen(
         style="--cc:${cap};animation-delay:${i * 70}ms;">
         <span class="gs-charcard-sheen" aria-hidden="true"></span>
         <div class="gs-charcard-top">
-          <div class="gs-charcard-port">${golferSVG(ch.style, 56, 66)}</div>
+          <span class="gs-charcard-port" role="button"
+            data-action='${JSON.stringify({ type: 'showCharacterLore', characterId: ch.id })}'
+            aria-label="Read ${ch.name}'s story" title="Read ${ch.shortName}'s story"
+            onclick="event.stopPropagation()">
+            ${golferSVG(ch.style, 56, 66)}
+            <span class="gs-charcard-lore" aria-hidden="true">ⓘ Lore</span>
+          </span>
           <div class="gs-charcard-id">
             <b class="gs-charcard-name" style="color:${cap};">${ch.name}</b>
             <div class="gs-charcard-org">${ch.origin} · ${ch.identity}</div>

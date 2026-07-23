@@ -25,7 +25,8 @@ import { getFormat, ASGARD_FORMAT, STROKEPLAY_FORMAT } from './sim/rpg/formats';
 import { holeGateArmed, snapshotRun, currentCourse } from './sim/rpg/run';
 import { shopOffer, starmartOffer } from './sim/rpg/runShop';
 import { shopItem } from './sim/rpg/economy';
-import { CHARACTERS, characterShotMods } from './sim/rpg/characters';
+import { CHARACTERS, characterShotMods, getCharacter } from './sim/rpg/characters';
+import { characterLoreCardHTML } from './render/characterLore';
 import { endlessMilestonesCrossed, endlessMilestoneShards, endlessSetGateOverPar, endlessSetLabel, endlessUnlocksCrossed } from './sim/rpg/endless';
 import { liveLeaderboard } from './sim/rpg/league';
 import { holeResult } from './sim/rpg/play';
@@ -2419,13 +2420,17 @@ function render(): void {
   // they draw a focus-mode map (whole-hole fit can't be aligned, so it stays null → no aligned decor).
   overlayDecor = null;
 
+  // GS-char-lore: the golfer lore popup rides ON TOP of whichever select surface raised it (the card
+  // grid or the Story clubhouse) — a fixed-position overlay appended to that screen's body.
+  const charLoreOverlay = state.characterLoreId ? characterLoreCardHTML(getCharacter(state.characterLoreId)) : '';
+
   const body =
     state.screen === 'title'
       ? titleScreen()
       : state.screen === 'character' && state.pendingStoryNew
       ? // GS-story-clubhouse: picking your protagonist for a NEW campaign happens IN the graphic Earth
         // clubhouse — tap a golfer to open their stats/abilities overlay, then "Play as" them.
-        storyGolferPickerHTML()
+        storyGolferPickerHTML() + charLoreOverlay
       : state.screen === 'character'
       ? characterScreen(state.unlockedClubsByCharacter, {
           modeName: getFormat(state.run.formatId).name,
@@ -2450,7 +2455,7 @@ function render(): void {
           // Per-golfer Ascension-clear ladder (GS-ascension-clubs display) — drives each Voyage card's
           // "does a win here unlock a new club?" badge. Voyage-only (endless grants no club unlocks).
           unlockLadder: getFormat(state.run.formatId).winnable ? state.maxAscensionByCharacter : undefined,
-        })
+        }) + charLoreOverlay
       : state.screen === 'intro'
       ? introScreen()
       : state.screen === 'playing'
@@ -2480,7 +2485,7 @@ function render(): void {
       : state.screen === 'strokeResult'
       ? strokeResultScreen()
       : state.screen === 'story'
-      ? storyHubScreen()
+      ? storyHubScreen() + charLoreOverlay
       : state.screen === 'storyResult'
       ? storyResultScreen()
       : state.screen === 'storyShop'

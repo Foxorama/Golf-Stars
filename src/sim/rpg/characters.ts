@@ -67,16 +67,41 @@ export interface GolferStats {
   consistency: number;
 }
 
+/**
+ * Render-only biography for the character-select LORE popup (GS-char-lore). Pure content-as-data — the
+ * sim never reads it; it fills the tap-the-portrait "who is this golfer" card on every select screen.
+ * Name (`Character.name`), hometown (`origin`) and pronouns (`identity`) already live on the row, so
+ * `lore` only carries the extra biographical beats. A new golfer just adds this block.
+ */
+export interface CharacterLore {
+  /** Their age in years. */
+  age: number;
+  /** Blood type flavour (e.g. "O+", "AB−"). */
+  bloodType: string;
+  /** Gender identity, paired with `Character.identity` pronouns on the card ("Woman · she / her"). */
+  gender: string;
+  /** Relationship status flavour. */
+  relationship: string;
+  /** Career-best wins / honours — a short list of trophies. */
+  bestWins: string[];
+  /** Their lowest career moment — the humbling one. */
+  lowestMoment: string;
+  /** A fun, off-course fact about them. */
+  funFact: string;
+}
+
 export interface Character {
   id: string;
   name: string;
   /** The golfer's given name — used for the "Voyage as …" CTA (NOT always the first word of `name`:
    *  Longshot Larry → "Larry", Backspin Bo → "Bo"). */
   shortName: string;
-  /** Where they hail from — flavour shown on the select card. */
+  /** Where they hail from — flavour shown on the select card (also the lore popup's hometown backdrop). */
   origin: string;
   /** Their pronoun/identity line (flavour). */
   identity: string;
+  /** Render-only biography for the lore popup (GS-char-lore; the sim ignores this). */
+  lore: CharacterLore;
   /** One-line pitch of how they play. */
   blurb: string;
   /** Short pro / con tags for the select card. */
@@ -148,6 +173,15 @@ export const CHARACTERS: readonly Character[] = [
     shortName: 'Feather',
     origin: 'Nairobi, Kenya',
     identity: 'she / her',
+    lore: {
+      age: 29,
+      bloodType: 'O+',
+      gender: 'Woman',
+      relationship: 'In a long-distance relationship',
+      bestWins: ['Nairobi Open (×2)', 'Rift Valley Masters', 'Continental Order of Merit'],
+      lowestMoment: 'Four-putted the 72nd hole to hand back the Continental Cup by a single stroke.',
+      funFact: 'Learned to read wind flying kites over the Ngong Hills — she never tees off without a feather clipped to her cap.',
+    },
     blurb: 'A buttery, controlled fade on every shot — predictable shape, tidy dispersion.',
     pros: ['Tighter overall dispersion', 'Same shape every time'],
     cons: ['Everything drifts right — aim left to hold the line'],
@@ -173,6 +207,15 @@ export const CHARACTERS: readonly Character[] = [
     shortName: 'Huang-Woo',
     origin: 'Busan, South Korea',
     identity: 'he / she / they',
+    lore: {
+      age: 26,
+      bloodType: 'A+',
+      gender: 'Genderfluid',
+      relationship: 'Single',
+      bestWins: ['Busan Seaside Invitational', 'Korea Iron Championship', 'Asia-Pacific Approach Title'],
+      lowestMoment: 'Snap-hooked three straight tee shots into Gwangalli harbour on live television.',
+      funFact: 'Practises irons blindfolded and can name any club by the sound of the strike alone.',
+    },
     blurb: 'A surgeon with the irons, but the big sticks fight a snap-hook left.',
     pros: ['Pinpoint irons — far fewer wild misses', 'Deadly approach play'],
     cons: ['Drives & woods hook left and spray wider'],
@@ -195,6 +238,15 @@ export const CHARACTERS: readonly Character[] = [
     shortName: 'Larry',
     origin: 'Perth, Australia',
     identity: 'he / him',
+    lore: {
+      age: 34,
+      bloodType: 'B+',
+      gender: 'Man',
+      relationship: 'Married, two kids and a kelpie',
+      bestWins: ['Long Drive World Title (×3)', 'Outback Smash', 'Perth Power Open'],
+      lowestMoment: 'Bombed a drive clean out of the stadium onto a passing road train — disqualified, ball never found.',
+      funFact: 'Once carried a ball 439 yards downwind; he keeps the dented driver mounted over the mantelpiece.',
+    },
     blurb: 'Bombs it off the tee. Where it ends up is anyone’s guess.',
     pros: ['+14 yds on the distance clubs', 'Reaches par-5s in two'],
     cons: ['Wider dispersion — more orange & red misses, big clubs worst', 'Refuses to carry hybrids'],
@@ -220,6 +272,15 @@ export const CHARACTERS: readonly Character[] = [
     shortName: 'Bo',
     origin: 'Portland, USA',
     identity: 'they / them',
+    lore: {
+      age: 31,
+      bloodType: 'AB−',
+      gender: 'Non-binary',
+      relationship: 'It’s complicated',
+      bestWins: ['Willamette Wedge Classic', 'Cascade Short-Game Series', 'Portland Spin Invitational'],
+      lowestMoment: 'Spun a chip so hard it screwed back off the green into the water — losing the playoff to their own backspin.',
+      funFact: 'Roasts their own coffee and names each blend after its spin rate; the house pour is “10,000 RPM”.',
+    },
     blurb: 'Zips the short irons back on a string — pin-seekers that bite and hold.',
     pros: ['Heavy backspin from 5-iron down — approaches stop dead', 'Tighter scoring clubs'],
     cons: ['Slightly shorter off the tee'],
