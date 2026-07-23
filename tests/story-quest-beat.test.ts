@@ -42,7 +42,7 @@ describe('GS-story-caddy-quest-dialogue — the pure mid-round beat assembler', 
   // A WARDEN ally draws its `caddy:<id>` roster bust; a COIL caddy draws its Coil lore portrait id.
   const SHIPPED = [
     'quest-sandy', 'quest-chipinski', 'quest-sam', 'quest-penelope', 'quest-dan', 'quest-mole', // Warden
-    'quest-coil-voss', // Coil (Herald)
+    'quest-coil-voss', 'quest-coil-venoma', // Coil (Herald)
   ];
   it('every shipped caddy quest resolves a mid-round beat with a renderable portrait', () => {
     for (const id of SHIPPED) {
