@@ -9,6 +9,7 @@
 import { state, btn } from './ctx';
 import { loreBeatHTML } from './loreScreens';
 import { getCharacter } from '../sim/rpg/characters';
+import type { LoreLine } from '../sim/rpg/lore';
 
 /** Render the pending mid-round omen. Defensive fallback (a bare Continue) if it's missing, so a stale
  *  state can never blank the screen — continue just flows on to the halftime pop. */
@@ -28,5 +29,28 @@ export function storyMidBeatScreen(): string {
     { accent: omen.accent, kicker: omen.kicker, title: omen.title, speaker, portrait: omen.portrait, lines: omen.lines, cta: omen.cta },
     (t) => t,
     { type: 'storyMidBeatContinue' },
+  );
+}
+
+/**
+ * GS-story-caddy-quest-dialogue: the CADDY-QUEST mid-round beat screen — the ally speaking at the turn of
+ * THEIR quest round. Reuses the same shared `.gs-lore*` beat card, so it reads identically to every other
+ * story beat and forks no CSS. Reads `state.pendingQuestBeat` (the assembled beat with the caddy's portrait +
+ * `duringQuest` lines); its single CTA dispatches `storyQuestBeatContinue` (tee up the next hole, play on).
+ */
+export function storyQuestBeatScreen(): string {
+  const beat = state.pendingQuestBeat;
+  if (!beat) {
+    return `<div style="min-height:60vh;display:flex;align-items:center;justify-content:center;padding:24px;">${btn(
+      'Play on →',
+      { type: 'storyQuestBeatContinue' },
+      { variant: 'primary' },
+    )}</div>`;
+  }
+  const lines: readonly LoreLine[] = beat.lines;
+  return loreBeatHTML(
+    { accent: beat.accent, kicker: beat.kicker, title: beat.title, speaker: beat.speaker, portrait: beat.portrait, lines, cta: beat.cta },
+    (t) => t,
+    { type: 'storyQuestBeatContinue' },
   );
 }

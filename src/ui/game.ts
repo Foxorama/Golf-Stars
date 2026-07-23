@@ -88,6 +88,7 @@ import { finaleMatchup } from '../sim/rpg/storyBetrayal';
 import { finaleUnlocked, finaleResult, winFinale } from '../sim/rpg/storyFinale';
 import { interludeSeen, applyInterlude } from '../sim/rpg/storyInterlude';
 import { midroundOmen, applyMidroundOmen } from '../sim/rpg/storyMidround';
+import { questBeatFor, questBeatTurnIndex } from '../sim/rpg/storyQuestBeat';
 import type { GearSlot } from '../sim/rpg/story';
 import {
   autoDecision,
@@ -945,6 +946,18 @@ export function reduce(state: UiState, action: Action): UiState {
       };
     }
 
+    case 'storyQuestBeatContinue': {
+      // GS-story-caddy-quest-dialogue: dismiss the caddy's mid-round beat → tee up the next hole and play on.
+      // The next hole index is exactly how many holes have been banked so far (the turn hole), so this resumes
+      // the quest round cleanly. Guarded to the beat screen with live play state; defensive fallbacks keep a
+      // stale state from blanking (fall back to the clubhouse if the course/round is gone).
+      if (state.screen !== 'storyQuestBeat') return state;
+      const nextIdx = (state.stopPlayed ?? []).length;
+      const hole = state.course.holes[nextIdx];
+      if (!hole) return { ...state, screen: 'story', pendingQuestBeat: undefined };
+      return { ...state, screen: 'playing', pendingQuestBeat: undefined, play: beginHole(hole, nextIdx) };
+    }
+
     case 'storyTournamentContinue': {
       // GS-story-tournament: dismiss the tournament recap back to the clubhouse (already banked).
       // GS-story-chapters: winning Chapter 3 (the Storm Sigil) reaches THE CHOICE — divert to it once,
@@ -1497,6 +1510,16 @@ export function reduce(state: UiState, action: Action): UiState {
             ? { ...midBase, screen: 'storyMidBeat' as const, pendingMidBeat: omen }
             : { ...midBase, screen: 'storyTournamentPop' as const };
         }
+      }
+      // GS-story-caddy-quest-dialogue: at the TURN of an ally's QUEST round, pause once for the caddy's
+      // mid-round beat (their `duringQuest` scene on the shared beat card). Quest-only (`storyRound` +
+      // `storyQuest`, never a `storyTournament`/`match` — those branches returned above), a single
+      // dismissible pause that flows straight into the next hole on continue, so it can't interrupt the
+      // main story or flood the player. Interactive-only (the headless sim never runs `holeComplete`), so
+      // auto ≡ interactive holds. Absent `duringQuest` ⇒ `questBeatFor` is undefined ⇒ no pause.
+      if (state.run.storyQuest && nextIdx < total && nextIdx === questBeatTurnIndex(total)) {
+        const beat = questBeatFor(state.run);
+        if (beat) return { ...state, stopPlayed, screen: 'storyQuestBeat', pendingQuestBeat: beat };
       }
       // cumulative total (exactly as the headless `playStop` does), so auto ≡ interactive holds.
       if (nextIdx < total) {

@@ -15,6 +15,7 @@
  */
 
 import { NAMED_STORY_CLUBS, type StoryState, type StoryAlignment } from './story';
+import type { LoreLine } from './lore';
 import { allyHomeWorld, allyName } from './storyAllies';
 import { factionForCaddy, factionById } from './factions';
 import { storyCaddyHired, caddiedWith } from './storyCaddies';
@@ -70,6 +71,12 @@ export interface StoryQuest {
   hook: string;
   /** The ally's pitch when you tap the quest offer (dialogue). */
   offer: readonly string[];
+  /** GS-story-caddy-quest-dialogue: the ally's MID-ROUND beat — a short cinematic scene at the turn of the
+   *  quest round (the `.gs-lore*` beat card, `storyQuestBeat`), so the quest has a middle, not just a pitch
+   *  and a payoff. Optional (absent = no mid-round pause, byte-identical). Fires ONLY on the ally's own quest
+   *  round (`Run.storyQuest`), never a tournament/Sigil/main-story event, and is a single dismissible pause —
+   *  the player plays on with one tap, so it never floods or interrupts the main story. */
+  duringQuest?: readonly LoreLine[];
   /** What plays / what's said on the quest round's completion recap, then the reward. */
   complete: readonly string[];
   /** GS-story-reward-variety: the reward this quest hands over — a club, a piece of gear, a ship part, or a
@@ -125,11 +132,19 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
     offer: [
       '🎒 "There’s a lie out in the Vela dunes I’ve never gotten up-and-down from. Plugged, under a lip, ' +
         'facing the wrong way. Cost me a title, forty years back. It still keeps me up."',
+      '"I was twenty-two and certain, and that grain of sand made a liar out of certain. I’ve replayed the ' +
+        'swing ten thousand nights. Never once played the shot. Time I did."',
       '"Come out there with me. Watch me play it — or play it yourself. Either way, I’m not leaving those ' +
         'dunes owing them anything. And when it’s done, the wedge is yours."',
     ],
+    duringQuest: [
+      { kind: 'action', text: 'Sandy stops on the ridge above the dunes, wind hissing sand off the crests, and doesn’t take a club out of the bag for a long moment.' },
+      { kind: 'say', text: '🎒 "See that bunker on the far side? Left-hand lip, deep as a grave. That’s the one. Forty years I’ve carried it, and it turns out it’s just… a hole in the ground with sand in it."' },
+      { kind: 'say', text: '"Keep swinging clean, champion. Play me up close to it. I want to stand over that lie one more time — only this time I’ve got someone on the bag who believes it comes out."' },
+    ],
     complete: [
-      '🎒 "…Out. First try. Forty years, and it was OUT." (She laughs like a landslide.)',
+      '🎒 "…Out. First try. Forty years, and it was OUT." (She laughs like a landslide, wipes her eyes with a sandy glove, pretends it’s the grit.)',
+      '"You know what did it? Not the technique. I’ve had the technique since before your parents were born. It was standing there with someone who wasn’t waiting for me to fail. That was the missing club."',
       '"Take the wedge, champion. Sand-Saver’s Second — solar-forged, opens like a dream. From now on there’s ' +
         'no such thing as an unplayable lie. Sandy’s orders."',
     ],

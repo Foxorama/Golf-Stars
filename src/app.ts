@@ -36,6 +36,7 @@ import { storyPartnerBestBallScore } from './sim/rpg/storyTeams';
 import { storySigilProgressHTML } from './app/storySigilHud';
 import { TEAM_PARTNER_EDGE } from './sim/rpg/storyTournaments';
 import { midroundOmen } from './sim/rpg/storyMidround';
+import { questBeatFor } from './sim/rpg/storyQuestBeat';
 import { ACE_SHIP_ID } from './sim/rpg/ships';
 import { bagTierRank, type BagTier } from './sim/rpg/bag';
 import { endlessScoreCard } from './render/endlessCards';
@@ -105,7 +106,7 @@ import { mountStoryEnding, endingVariant } from './render/storyEnding';
 import { betrayerName } from './sim/rpg/storyBetrayal';
 import { finaleResult, finaleLoadout } from './sim/rpg/storyFinale';
 import { loreScreen } from './app/loreScreens';
-import { storyMidBeatScreen } from './app/storyMidroundScreens';
+import { storyMidBeatScreen, storyQuestBeatScreen } from './app/storyMidroundScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
 import { priceNoticeOverlay, scrambleChoiceOverlay, settingsOverlay, settingsSheetInner, shotPopupOverlay } from './app/overlays';
@@ -165,7 +166,7 @@ function boot(): void {
  *     come fast on the wide ribbon and the Bifröst trigger fires authentically when you make one).
  *   • `?asgard=1`  — jump STRAIGHT into the Bifröst interlude (the Himinbjörg map → cross → the nine-hole
  *     tournament → win/lose → return), from a real suspended run so "Return to your journey" works.
- *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storymidbeat|storyshop|storylocker|storyshipyard|shipinterior|storytournament|storyfinale|storychoice|storyinterlude|storybar` (GS-screen-deeplink) — mount a between-stop
+ *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storymidbeat|storyquestbeat|storyshop|storylocker|storyshipyard|shipinterior|storytournament|storyfinale|storychoice|storyinterlude|storybar` (GS-screen-deeplink) — mount a between-stop
  *     screen directly, so the browser LAYOUT smoke tests (tests/build.test.ts) can reach the travel /
  *     shop / market / clubhouse / lore surfaces WITHOUT playing a full stop (shot animations + watch screens
  *     are flaky to script). The report's highest-risk uncovered surface — the journey map was
@@ -444,6 +445,15 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const seeded: UiState = { ...base, story: { ...base.story, chapter: 3, sigil1Partner: others[0]!.id, sigil2Partner: others[1]!.id } };
       const omen = midroundOmen(seeded.story, 3);
       return omen ? { ...seeded, screen: 'storyMidBeat', pendingMidBeat: omen } : seeded;
+    }
+    case 'storyquestbeat': {
+      // GS-story-caddy-quest-dialogue: mount the caddy mid-round beat by assembling the beat the honest
+      // quest-round divert produces (a quest run carrying `storyQuest`), so the shared beat card renders in a
+      // headless smoke test. Sandy's quest is the reference (the first authored `duringQuest` scene).
+      const base = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      if (!base.story) return base;
+      const beat = questBeatFor({ ...base.run, storyQuest: 'quest-sandy' });
+      return beat ? { ...base, screen: 'storyQuestBeat', pendingQuestBeat: beat } : base;
     }
     default:
       return s; // unknown value → land on the normal title (no crash)
@@ -2515,6 +2525,8 @@ function render(): void {
       ? storyTournamentPopScreen()
       : state.screen === 'storyMidBeat'
       ? storyMidBeatScreen()
+      : state.screen === 'storyQuestBeat'
+      ? storyQuestBeatScreen()
       : state.screen === 'storyTournamentResult'
       ? storyTournamentResultScreen()
       : state.screen === 'storyFinale'
@@ -2538,7 +2550,8 @@ function render(): void {
     (state.screen === 'playing' && !!state.play && !state.play.done) ||
     state.screen === 'starTour' ||
     state.screen === 'lore' || // GS-lore: the story beat owns the full viewport (its own cinematic backdrop)
-    state.screen === 'storyMidBeat'; // GS-story-midround-omen: the mid-round foreshadow shares the lore card
+    state.screen === 'storyMidBeat' || // GS-story-midround-omen: the mid-round foreshadow shares the lore card
+    state.screen === 'storyQuestBeat'; // GS-story-caddy-quest-dialogue: the caddy mid-round beat shares it too
   // The character-select roster wants a wider frame so all four golfers line up across one screen,
   // and on phones it locks to the viewport (GS-select-onescreen) — the grid fills the space under the
   // header so the whole roster fits one mobile screen with no scroll.
