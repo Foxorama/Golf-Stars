@@ -65,18 +65,28 @@ positional `interludeFriend` ("first non-protagonist") and the hard-coded Ch.4/5
 ### What the betrayer does, per path
 
 - **WARDEN (you stayed loyal):** the odd-one-out **defects to the Coil** (corrupted costume). The Ch.5
-  finale is **2v2 best-ball matchplay: You + a LOYAL friend vs (the Betrayer + the Coil champion,
-  Venoma)**.
-  - Loyal final partner = a non-betrayer *other*: the `p2` partner if two distinct picks (both stayed
-    loyal); if same-partner-twice (your partner betrayed), a non-betrayer *other* rallies to you
-    (prefer the one whose character-quest you completed, else deterministic by roster order).
+  finale is **2v2 scramble matchplay: You + a LOYAL friend YOU CHOOSE vs (the Betrayer + the Coil LEADER
+  Malachi/Voss, the Apostate)** (GS-story-sigil5-npc — the Coil rep was Venoma; it is now the leader
+  Malachi at the traitor's shoulder, and you PICK which of the two non-betrayer tour-mates shares your
+  ball, `wardenAllyOptions`).
+  - Default loyal partner (skipped picker) = a non-betrayer *other*: the `p2` partner if two distinct
+    picks; if same-partner-twice, a non-betrayer *other* rallies to you (deterministic by roster order).
 - **HERALD (you turned):** YOU are the traitor. Your former friends stay Warden and come for you. The
-  Ch.5 finale is **2v2 best-ball matchplay: You + the top Coil champion who ISN'T your active guide
-  (Voss or Venoma) vs your two former friend-partners**.
+  Ch.5 finale is **2v2 scramble matchplay: You + a Coil champion YOU CHOOSE — Malachi/Voss, Venoma or
+  Scorpius (GS-story-sigil5-npc, `coilChampionOptions`), minus whichever is already on your bag as a caddy
+  — vs your two former friend-partners**.
   - Opposing pair = the friends who trusted you: `{p1, p2}` if distinct; if same-partner-twice, `{p1}` +
     one *other* who also stayed Warden (deterministic — the friend you always picked AND one you spurned
     both come for you). Ch.4 betrayal beats are keyed to your first COMPLETED caddy quest and whether you
     still wield its reward club (see PR H).
+
+> **GS-story-sigil5-npc (2026-07-24)** — the finale ally is now a player CHOICE, not a fixed slot. The
+> lobby shows a partner PICKER under the matchup box (`finalePartnerPickerHTML`): the two loyal tour-mates
+> on Warden, the Coil champions on Herald. The pick rides `state.storyFinalePartner` (transient, validated
+> on read) → carried onto the run as `storyTournamentPartner` at tee-off → threaded through
+> `sigilMatchThrough(…, {chosenAllyId})` so the live HUD, the reveal and the resolution all resolve the
+> SAME chosen ally. A skipped picker defaults to the deterministic `loyalAllyId`/`coilChampionExcluding`,
+> so every legacy save/caller is byte-identical.
 
 Edge-case defaults (documented, not asked): the "second seat" and same-partner cases resolve
 deterministically by roster order, biased toward a completed character/caddy quest so the beat is
@@ -84,10 +94,18 @@ personal where possible.
 
 ## Costumes
 
-The defector gets a **corrupted Coil look** — a reusable `corruptedGolferLook(character)` feeding
-`golferPreviewSVG` (Coil violet `shirtBase` + a serpent-hood, the venom palette `#b060c0`/`#7fe0a0`),
-shown in the Ch.4/5 betrayal beats, the Ch.5 lobby, and the finale figure. On the Herald path YOU are
-the corrupted one; the former friends stay clean Warden.
+The defector gets a **corrupted Coil look** — `corruptedLookOpts(character)` feeding `golferPreviewSVG`,
+shown in the Ch.4/5 betrayal beats, the Ch.5 lobby, and the finale figure. On the Herald path YOU are the
+corrupted one; the former friends stay clean Warden.
+
+> **GS-story-sigil5-look (2026-07-24)** — the corruption is now BAKED into the figure: a clear coil-violet
+> robe (`COIL_SHIRT` `#4a2775`) + an acid-green serpent accent (`COIL_ACCENT` `#8ef0b0`), over the golfer's
+> OWN skin + hair. The old near-black `#2e1840` robe under a `hue-rotate(258deg)` figure filter
+> (`COIL_FIGURE_TINT`, now retired) muddied the whole figure into an unreadable silhouette. In the Ch.5
+> matchup box the Coil CHAMPIONS are also drawn as full-body golfer figures (`championLookOpts` — Malachi
+> pale + violet, Venoma purple, Scorpius shadow), so the 2v2 lineup is four consistent figures instead of
+> a small floating portrait bust jammed next to full bodies. The distinctive portrait busts still front the
+> hero card + halftime pop, where they stand alone.
 
 ## Build order — SHIPPED (see `IDEAS.md` for the live one-liners)
 
@@ -131,7 +149,7 @@ the corrupted one; the former friends stay clean Warden.
   the new `heraldSeveredId` (the one tour-mate NOT in `heraldOpponentIds`), so the rival you crush at the
   Drowning Rite IS the friend the Severing interlude then cuts loose (`interludeFriend`'s Herald branch now
   reads it too — in the same-partner-twice case the trusted friend is preserved for the Ghost Harvest);
-  **Ch.5W** = the corrupted BETRAYER (Venoma at their shoulder — matches the matchup box + `finaleMatchup`);
+  **Ch.5W** = the corrupted BETRAYER (the Coil leader Malachi/Voss at their shoulder — matches the matchup box + `finaleMatchup`);
   **Ch.5H** = the lead former friend-partner. The effective rival feeds the ghost totals
   (`rivalTotal*`/`tournamentField`/`tournamentCompetitors` take an optional `rival`), the singles-match
   resolver, the halftime pop (payload carries `rivalGolferId`/`rivalVoice`/`rivalCorrupted`), the lobby
@@ -259,12 +277,27 @@ the corrupted one; the former friends stay clean Warden.
   `{betrayer}` name); **Ch.4 Herald** (LOSS only — the severed friend, still-reaching; a WIN already flows into
   "The Severing", whose rival IS that friend, so a beat there would duplicate); **Ch.5 Warden** (win = the Green
   Key forges + the Parrot's descent, the betrayer's ultimate fate left to the ending per GS-story-ambiguous-fate;
-  loss = Venoma keeps the door); **Ch.5 Herald** (win = the root opens + the Coil's anointing; loss = the two
+  loss = the Coil leader Malachi/Voss keeps the door); **Ch.5 Herald** (win = the root opens + the Coil's anointing; loss = the two
   friends bar the way). NOT a `seenStoryBeats` one-off — a won Sigil can't be replayed (`currentTournament` gates
   on `tournamentWon`), so a WIN beat fires once naturally, and a LOSS beat re-shows each retry (it IS that round's
   result, like the scorecard). Pure content-as-data + one screen + a reducer divert; zero sim rng, no save/
   STORY_VERSION bump. Guarded by `tests/story-aftermath.test.ts` (which majors get a beat, speaker/portrait per
   case, the reducer flow) + a `?screen=storyaftermath` browser smoke in `tests/build.test.ts`.
+- **GS-story-sigil5-npc / GS-story-sigil5-look** — ✅ (2026-07-24) the Ch.5 finale NPC pass (player report: the
+  betrayal outfit + the Coil rep "looked terrible", and the rep should be the leader Malachi, not Venoma; the
+  player should PICK the finale partner). Three changes, one PR: (1) the WARDEN Coil rep at the traitor's
+  shoulder is now the leader **Malachi/Voss** (`WARDEN_COIL_CHAMPION`), not Venoma — box label "The traitor &
+  the Apostate", intro/aftermath copy retargeted; (2) a finale **partner PICKER** (`finalePartnerPickerHTML`)
+  under the matchup box — the WARDEN chooses their loyal ally from the two non-betrayer tour-mates
+  (`wardenAllyOptions`), the HERALD chooses their champion from Malachi/Venoma/**Scorpius** now selectable
+  (`coilChampionOptions`), minus whichever Coil champion is on the bag as a caddy (`coilCaddyChampion`, fixing
+  the never-fired caddy-id exclusion). The pick rides `state.storyFinalePartner` → `run.storyTournamentPartner`
+  → `sigilMatchThrough(…, {chosenAllyId})` (live HUD ≡ resolution); skipped ⇒ deterministic default, so legacy
+  saves are byte-identical; (3) the ART — the corrupted robe is a readable coil-violet `#4a2775` + acid accent
+  `#8ef0b0` BAKED into the figure (the muddying `COIL_FIGURE_TINT` hue-rotate retired), and the finale box
+  draws the Coil champions as full-body Coil figures (`championLookOpts`) so the 2v2 lineup is four consistent
+  figures. Guarded by `tests/story-betrayal.test.ts` (options/exclusion/chosen-ally, Malachi-not-Venoma) +
+  `tests/story-finale-match.test.ts`. Zero sim rng, no save/STORY_VERSION bump.
 - **GS-story-betrayal-polish** — balance re-tune (the finale + team-major edges), any dialogue-depth follow-up,
   constitution/roadmap docs.
 

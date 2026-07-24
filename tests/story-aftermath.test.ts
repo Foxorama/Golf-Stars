@@ -70,7 +70,8 @@ describe('GS-story-aftermath — which majors get a confrontation beat', () => {
     expect(loss.speaker).toBe(shortName(sev));
   });
 
-  it('Ch.5 WARDEN — the Green Key forges on a win (the Parrot); Venoma keeps the door on a loss', () => {
+  it('Ch.5 WARDEN — the Green Key forges on a win (the Parrot); Malachi/Voss keeps the door on a loss', () => {
+    // GS-story-sigil5-npc: the Warden Coil rep is the leader Malachi/Voss (the Apostate), not Venoma.
     const t = tournamentForChapter(5, 'warden')!;
     const story = s('warden');
     const win = tournamentAftermath(t, story, true)!;
@@ -79,7 +80,8 @@ describe('GS-story-aftermath — which majors get a confrontation beat', () => {
     expect(win.portrait).toBe('prognostic-parrot');
     expect(win.lines.some((l) => l.text.includes(shortName(betrayerId(story))))).toBe(true); // names the betrayer
     expect(loss.id).toBe('aftermath-5warden-loss');
-    expect(loss.portrait).toBe('venoma');
+    expect(loss.portrait).toBe('voss');
+    expect(loss.speaker).toMatch(/Voss|Sable|Malachai/);
   });
 
   it('Ch.5 HERALD — the root opens on a win (the Coil); the two friends bar the way on a loss', () => {

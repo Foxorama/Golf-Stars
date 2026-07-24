@@ -177,12 +177,12 @@ function heraldSeveredAftermath(story: StoryState): TournamentAftermath {
   };
 }
 
-// ── Ch.5 Warden — The Serpent's Vigil (betrayer + Venoma). The final Sigil forges the key. ─────────────
+// ── Ch.5 Warden — The Serpent's Vigil (betrayer + the Apostate). The final Sigil forges the key. ───────
 
 /** The last Warden Sigil. WIN: the key ignites; the Parrot frames the descent to the root — the friend
  *  pulled back into the mire before you could reach them, their fate deliberately unresolved (the ending
- *  answers it, GS-story-ambiguous-fate). LOSS: Venoma keeps you from the key, the betrayer silent behind
- *  her. */
+ *  answers it, GS-story-ambiguous-fate). LOSS: the Coil leader Malachi/Voss keeps you from the key, the
+ *  betrayer silent behind him (GS-story-sigil5-npc — the Warden Coil rep is the Apostate, not the Viper). */
 function serpentVigilAftermath(story: StoryState, won: boolean): TournamentAftermath {
   const name = friendName(betrayerId(story));
   if (won) {
@@ -206,7 +206,7 @@ function serpentVigilAftermath(story: StoryState, won: boolean): TournamentAfter
         },
         {
           kind: 'action',
-          text: `You look for ${name} in the shed-scale robes, but the Coil’s remnant has already folded them back into the acid fog, Venoma’s hand at their shoulder. Gone before you could say a word. Whatever the whisper left standing over there, it did not stay to be counted.`,
+          text: `You look for ${name} in the shed-scale robes, but the Coil’s remnant has already folded them back into the acid fog, the Apostate’s hand at their shoulder. Gone before you could say a word. Whatever the whisper left standing over there, it did not stay to be counted.`,
         },
         {
           kind: 'say',
@@ -220,14 +220,14 @@ function serpentVigilAftermath(story: StoryState, won: boolean): TournamentAfter
     won: false,
     accent: COIL_VIOLET,
     kicker: 'The key stays out of reach',
-    title: 'She Kept the Door',
-    speaker: 'Venoma "the Viper" Krait',
-    portrait: 'venoma',
+    title: 'He Kept the Door',
+    speaker: 'Malachai "Sable" Voss',
+    portrait: 'voss',
     cta: 'Regroup →',
     lines: [
       {
         kind: 'action',
-        text: 'The last hole slides to the Viper’s side of the ledger, and she doesn’t hiss or crow — she simply keeps the door shut, the way you keep a promise.',
+        text: 'The last hole slides to the Coil’s side of the ledger, and the Apostate doesn’t gloat — he simply keeps the door shut, the way you keep a promise.',
       },
       {
         kind: 'say',
@@ -235,7 +235,7 @@ function serpentVigilAftermath(story: StoryState, won: boolean): TournamentAfter
       },
       {
         kind: 'action',
-        text: `Behind her, ${name} says nothing at all, standing in the fog in robes that fit them a little better than they did last time. Venoma tees a hissing ball and waits, patient as the dark. The shrine will be here when you can hold your nerve. Steady the ship, and come back for it.`,
+        text: `Behind him, ${name} says nothing at all, standing in the fog in robes that fit them a little better than they did last time. Voss sets a matte-black ball on the tee and waits, patient as the dark. The shrine will be here when you can hold your nerve. Steady the ship, and come back for it.`,
       },
     ],
   };

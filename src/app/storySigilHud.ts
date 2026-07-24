@@ -35,8 +35,8 @@ function currentSigil(): StoryTournament | undefined {
 /** The live match state over a set of finished holes (matchplay Sigils only). */
 /** GS-story-sigil5-play: the 2v2 finale is PLAYED as an interactive scramble, so the played strokes are
  *  already the side's team score — every live surface passes the same flag the final resolution uses. */
-function sigilMatchOpts(): { teamPlayed: boolean } {
-  return { teamPlayed: state.run.storyTeamFormat === 'scramble' };
+function sigilMatchOpts(): { teamPlayed: boolean; chosenAllyId?: string } {
+  return { teamPlayed: state.run.storyTeamFormat === 'scramble', chosenAllyId: state.run.storyTournamentPartner };
 }
 
 function sigilMatchOver(played: readonly PlayedHole[]): SigilMatch | undefined {

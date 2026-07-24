@@ -109,22 +109,61 @@ export function heraldSeveredId(story: StoryState): string {
   return others.find((id) => !opponents.includes(id)) ?? others[0] ?? story.characterId;
 }
 
-// ── The Coil champion who partners you on the Herald finale / opposes you on the Warden finale ──────────
+// ── The Coil champions who partner you on the Herald finale / oppose you on the Warden finale ───────────
 
-/** The two top Coil champions (their lore-portrait / ghost ids). */
-export const COIL_CHAMPIONS = ['voss', 'venoma'] as const;
+/** The Coil champions the player may take as a finale partner (Herald) or face (Warden) — their
+ *  lore-portrait / ghost ids. GS-story-sigil5-npc: Scorpius joins Voss + Venoma so the Coil finale partner
+ *  is a real CHOICE (the leader Malachi/Voss, the Viper, or the Silent Sting), not a fixed slot. */
+export const COIL_CHAMPIONS = ['voss', 'venoma', 'scorpius'] as const;
 export type CoilChampionId = (typeof COIL_CHAMPIONS)[number];
 
+/** Is this id one of the Coil champions (a portrait/ghost id, not a playable friend)? */
+export function isCoilChampionId(id: string | undefined): id is CoilChampionId {
+  return !!id && (COIL_CHAMPIONS as readonly string[]).includes(id);
+}
+
+/** The Coil champion a HERALD caddy/crew id corresponds to (`coil-voss` → `voss`, `coil-venoma` →
+ *  `venoma`), so the champion you already have carrying your bag is excluded from the finale partner pool.
+ *  Scorpius is never a caddy, so he is always selectable. Returns undefined for a non-champion caddy. */
+export function coilCaddyChampion(caddyId?: string): CoilChampionId | undefined {
+  if (caddyId === 'coil-voss') return 'voss';
+  if (caddyId === 'coil-venoma') return 'venoma';
+  return isCoilChampionId(caddyId) ? caddyId : undefined;
+}
+
+/** GS-story-sigil5-npc: the Coil champions the Herald may CHOOSE as a finale partner — all of them, minus
+ *  the one already on your bag as a caddy (you can't partner a champion who's already your caddy). */
+export function coilChampionOptions(story: StoryState): CoilChampionId[] {
+  const held = coilCaddyChampion(story.activeCaddyId);
+  return COIL_CHAMPIONS.filter((id) => id !== held);
+}
+
 /** The top Coil champion who ISN'T your active guide (GS-story-betrayer): on the Herald finale this is the
- *  champion who partners YOU; pass your active caddy/guide id (a herald agent id) to exclude them. Falls
- *  back to Voss (the Apostate, your mentor) when neither/both match. */
+ *  default champion who partners YOU; pass your active caddy/guide id (a herald crew id like `coil-venoma`,
+ *  or a champion id) to exclude them. Falls back to Voss (the Apostate, your mentor) when none match. */
 export function coilChampionExcluding(activeGuideId?: string): CoilChampionId {
-  return COIL_CHAMPIONS.find((id) => id !== activeGuideId) ?? 'voss';
+  const exclude = coilCaddyChampion(activeGuideId) ?? activeGuideId;
+  return COIL_CHAMPIONS.find((id) => id !== exclude) ?? 'voss';
 }
 
 /** Display names for the Coil champions (used in finale copy + pair labels). */
 export function coilChampionName(id: CoilChampionId): string {
-  return id === 'venoma' ? 'Venoma "the Viper" Krait' : 'Malachai "Sable" Voss';
+  return id === 'venoma'
+    ? 'Venoma "the Viper" Krait'
+    : id === 'scorpius'
+    ? 'Scorpius "the Silent Sting"'
+    : 'Malachai "Sable" Voss';
+}
+
+/** GS-story-sigil5-npc: the Coil leader who opposes you at the WARDEN finale, at the traitor's shoulder —
+ *  Malachai "Sable" Voss, the Apostate (was Venoma). One source for the matchup, the recap and the copy. */
+export const WARDEN_COIL_CHAMPION: CoilChampionId = 'voss';
+
+/** GS-story-sigil5-npc: the two LOYAL friends the Warden may pick from as their finale ally — the tour-mates
+ *  who did NOT betray you (always exactly two of the three others). */
+export function wardenAllyOptions(story: StoryState): string[] {
+  const betrayer = betrayerId(story);
+  return otherGolferIds(story).filter((id) => id !== betrayer);
 }
 
 /** A golfer's short name (for finale pair labels), or the raw id. */
@@ -149,13 +188,22 @@ export interface FinaleMatchup {
 }
 
 /**
- * Resolve the Ch.5 2v2 finale teams (pure). WARDEN: You + a loyal friend vs (the Betrayer + Venoma the
- * Coil champion). HERALD: You + the top Coil champion who isn't your guide vs the two friends who partnered
- * you. `activeGuideId` is your active caddy/guide (a Coil agent on Herald) — the champion excludes them.
+ * Resolve the Ch.5 2v2 finale teams (pure). WARDEN: You + a loyal friend (you CHOOSE which of the two
+ * non-betrayer tour-mates) vs (the Betrayer + Malachi/Voss the Coil leader). HERALD: You + a Coil champion
+ * (you CHOOSE Voss / Venoma / Scorpius, minus whichever is on your bag) vs the two friends who partnered you.
+ *
+ * `activeGuideId` is your active caddy/guide (a Coil crew id on Herald) — excluded from the Herald champion
+ * pool. `chosenAllyId` (GS-story-sigil5-npc) is the player's lobby pick: honoured when it's a valid ally for
+ * the path, else the sensible default (`loyalAllyId` on Warden, `coilChampionExcluding` on Herald), so a
+ * skipped picker still tees off cleanly and every legacy caller is unchanged.
  */
-export function finaleMatchup(story: StoryState, activeGuideId?: string): FinaleMatchup {
+export function finaleMatchup(story: StoryState, activeGuideId?: string, chosenAllyId?: string): FinaleMatchup {
   if (story.alignment === 'herald') {
-    const champ = coilChampionExcluding(activeGuideId ?? story.activeCaddyId);
+    const options = coilChampionOptions(story);
+    const champ =
+      isCoilChampionId(chosenAllyId) && options.includes(chosenAllyId)
+        ? chosenAllyId
+        : coilChampionExcluding(activeGuideId ?? story.activeCaddyId);
     const opp = heraldOpponentIds(story);
     return {
       herald: true,
@@ -166,9 +214,10 @@ export function finaleMatchup(story: StoryState, activeGuideId?: string): Finale
       oppNames: [golferName(opp[0]), golferName(opp[1])],
     };
   }
-  const ally = loyalAllyId(story);
+  const options = wardenAllyOptions(story);
+  const ally = chosenAllyId && options.includes(chosenAllyId) ? chosenAllyId : loyalAllyId(story);
   const betrayer = betrayerId(story);
-  const champ: CoilChampionId = 'venoma'; // the Warden climax champion (the Viper, at the traitor's shoulder)
+  const champ = WARDEN_COIL_CHAMPION; // the Warden climax champion (Malachi/Voss, at the traitor's shoulder)
   return {
     herald: false,
     allyId: ally,
@@ -558,16 +607,32 @@ export function everyGolferHasBetrayalVoice(): boolean {
   });
 }
 
-// ── The corrupted (Coil) costume for a defector (GS-story-betrayer) ────────────────────────────────────
+// ── The corrupted (Coil) costume for a defector (GS-story-betrayer / GS-story-sigil5-look) ──────────────
 
-/** Deep Coil-violet garb + an acid-green accent — the shed-scale look a defector wears. Keeps the golfer's
- *  own HAIR (identity is above the neck, per the avatar rule) so they still read as themselves, corrupted. */
-export const COIL_SHIRT = '#2e1840';
-export const COIL_ACCENT = '#7fe0a0';
-/** A CSS filter that venom-shifts a normal golfer figure toward the Coil palette (for the standee tint). */
-export const COIL_FIGURE_TINT = 'saturate(1.15) hue-rotate(258deg) brightness(0.92)';
+/** A defector's shed-scale robe — a clear, readable Coil-VIOLET (was a near-black `#2e1840` that, under the
+ *  old hue-rotate figure tint, muddied the whole figure into an unreadable silhouette). Now the corruption
+ *  is BAKED into the look (no outer filter): a distinct violet robe + acid-green serpent accent, over the
+ *  golfer's OWN skin + hair (identity is above the neck), so they read as "familiar and wrong all at once". */
+export const COIL_SHIRT = '#4a2775';
+export const COIL_ACCENT = '#8ef0b0';
 
-/** `golferPreviewSVG` opts that draw a golfer in corrupted Coil garb (their hair kept). */
+/** `golferPreviewSVG` opts that draw a golfer in corrupted Coil garb (their own skin + hair kept). */
 export function corruptedLookOpts(character: Character): { skin: string; shirtBase: string; capColor: string; hair: Character['style']['hair'] } {
   return { skin: character.style.skin, shirtBase: COIL_SHIRT, capColor: COIL_ACCENT, hair: character.style.hair };
+}
+
+/** GS-story-sigil5-look: `golferPreviewSVG` opts that draw a Coil CHAMPION as a full-body golfer figure —
+ *  a per-champion palette so the finale lineup is FOUR consistent figures (was a small floating portrait
+ *  bust jammed next to full figures). The distinctive portrait busts still front the hero card + halftime
+ *  pop, where they stand alone and read beautifully. */
+export function championLookOpts(id: CoilChampionId): { skin: string; shirtBase: string; capColor: string; hair: Character['style']['hair'] } {
+  switch (id) {
+    case 'venoma':
+      return { skin: '#a679c8', shirtBase: '#2e1840', capColor: COIL_ACCENT, hair: { style: 'sweep', color: '#5a1f6e' } };
+    case 'scorpius':
+      return { skin: '#3a3450', shirtBase: '#1a1226', capColor: '#7fe0a0', hair: { style: 'crop', color: '#141018' } };
+    case 'voss':
+    default:
+      return { skin: '#b9b0bd', shirtBase: '#33244a', capColor: '#7fe0a0', hair: { style: 'sweep', color: '#20202e' } };
+  }
 }
