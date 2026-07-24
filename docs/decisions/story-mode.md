@@ -575,6 +575,18 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   `app.ts` toggles it. A compact illustrated locker-room banner (locker bank + bench + bag, pure byte-stable
   SVG) tops the screen. Pure render/view + one app handler — no sim/save/rng touch. Guarded by the existing
   `?screen=storylocker` browser smoke (bag panel open ⇒ `.gs-lock-grid` + "Your bag").
+- **GS-story-locker-tiles** — ✅ *shipped* (`app/storyLockerScreens.ts`). Player feedback: "the locker room,
+  icons and layout for all sections is messy, long, awkward and difficult to use." The three sections had
+  drifted into three DIFFERENT layouts — clubs in a card grid, gear as full-width stacked rows (one strip per
+  owned piece × nine slots = a page of scroll), crew as ragged variable-width flex-wrap pills. Now ONE tile
+  visual language (`tile()` + `.gs-lock-tile` in the shared `.gs-lock-grid`) draws clubs, gear pieces AND
+  caddies identically: a square art thumb, a 2-line-clamped name, a small meta line (carry / rarity /
+  aboard-state), a rarity-accent top edge, and a single ＋/✕/🔒 corner button. The equipped/active tile gets
+  an accent ring + a badge (🎒 for the club bag & the crew's active caddy, ✓ for gear). Gear is grouped per
+  slot behind a slim header + owned-count chip with the equipped piece sorted first, collapsing a nine-slot
+  wardrobe from full-width strips to a few dense rows. Pure render/view (own `.gs-lock*` prefix) — no
+  sim/save/rng/action change (every `data-action` and the accordion wiring are unchanged); preview via
+  `node scripts/locker-preview.mjs`; guarded by the same `?screen=storylocker` browser smoke.
 - **GS-story-objective** — ✅ *shipped* (`sim/rpg/storyGuide.ts` + the clubhouse mission log + a new-game
   premise card). Player feedback: "the new game start gives you no indication of what's happening or why
   you are playing" and "after becoming world champion the game gives you nothing to go on — what do you
