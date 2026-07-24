@@ -65,8 +65,9 @@ export interface StoryTournament {
    *  stands across the tee is derived from the betrayal arc (your team-Sigil partner picks + path):
    *    • `severed`  — Ch.4 Herald: the Warden friend sent to stop you at the Drowning Rite — the SAME
    *      friend the Severing interlude then cuts loose (rival ≡ the one you betray).
-   *    • `betrayer` — Ch.5 Warden: the friend who turned on you, in corrupted Coil garb (Venoma at
-   *      their shoulder — the matchup box shows the pair; the FEATURED rival is the traitor).
+   *    • `betrayer` — Ch.5 Warden: the friend who turned on you, in corrupted Coil garb (the Coil
+   *      leader Malachi/Voss at their shoulder — the matchup box shows the pair; the FEATURED rival is
+   *      the traitor).
    *    • `heraldPair` — Ch.5 Herald: the two former friends who partnered you, come to end you (the
    *      featured rival is the first of them — the more personal face).
    *  Absent = the static row rival (the shared trunk + Ch.4 Warden). */
@@ -242,11 +243,11 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     venueId: 'swamp-18',
     name: 'The Serpent’s Vigil',
     host: 'The Fairway Wardens',
-    // GS-story-sigil-rivals: the FEATURED rival is the friend who turned on you (corrupted Coil garb),
-    // with Venoma at their shoulder — the matchup box shows the pair. Fallback only.
+    // GS-story-sigil-rivals: the FEATURED rival is the friend who turned on you (corrupted Coil garb), with
+    // the Coil leader Malachi/Voss at their shoulder — the matchup box shows the pair. Fallback only.
     dynamicRival: 'betrayer',
-    rivalId: 'venoma',
-    rivalName: 'Venoma "the Viper" Krait',
+    rivalId: 'voss',
+    rivalName: 'Malachai "Sable" Voss',
     rivalEdge: 0.29,
     unlockAfterClears: 2,
     sigilId: 'sigil-vigil',
@@ -256,11 +257,12 @@ export const STORY_TOURNAMENTS: readonly StoryTournament[] = [
     intro: [
       'The acid shrine of Hydra Mire, where the Coil means to complete their rite — and {rival}, the ' +
         'friend who turned on you, stands with them now in shed-scale robes, familiar and wrong all at ' +
-        'once. Venoma is at their shoulder, wearing your grief like a trophy.',
+        'once. Malachai Voss, the Apostate, is at their shoulder, wearing your grief like a trophy.',
       // GS-story-ambiguous-fate: no promised redemption — winning is for the Sigil; what winning leaves of
       // the friend is deliberately unknowable (the ending resolves where they went, not who they are now).
+      // GS-story-sigil5-npc: you choose which loyal tour-mate shares your ball; the Coil sends its leader.
       'It’s a 2-vs-2 SCRAMBLE MATCHPLAY: you and a loyal friend SHARE a ball — the best of your every shot — ' +
-        'against {rival} and the Viper sharing theirs, hole by hole, the lower team score takes it. Win ' +
+        'against {rival} and the Apostate sharing theirs, hole by hole, the lower team score takes it. Win ' +
         'the match and the last Sigil is yours. As for {rival} — nobody can say how deep the whisper has ' +
         'gone, or what winning will leave standing on the far side of it.',
       'Five Sigils forge the Green Key — and above the mire the sky is already cracking. Win here and Ragnarök stops at the door; the key becomes a lock you carry down to the root to seal it forever.',
@@ -343,7 +345,7 @@ export function tournamentRival(t: StoryTournament, story?: StoryState): Effecti
       return { id, name: friendName(id), golferId: id, voice: 'confront' };
     }
     case 'betrayer': {
-      // Ch.5 Warden — the friend who fell to the Coil, in corrupted garb (Venoma at their shoulder).
+      // Ch.5 Warden — the friend who fell to the Coil, in corrupted garb (Malachi/Voss at their shoulder).
       const id = betrayerId(story);
       return { id, name: friendName(id), golferId: id, corrupted: true, voice: 'corrupt' };
     }
@@ -544,15 +546,18 @@ export function sigilMatchThrough(
   /** GS-story-sigil5-play: `teamPlayed` = the played strokes are already the TEAM's scramble score (the
    *  round was played with the interactive/auto scramble armed — ally ball hit + better kept per shot),
    *  so the resolver must NOT fold an ally ghost on top. Absent/false = the legacy ghost fold, so every
-   *  pre-existing caller/save is byte-identical. */
-  opts?: { teamPlayed?: boolean },
+   *  pre-existing caller/save is byte-identical.
+   *  GS-story-sigil5-npc: `chosenAllyId` = the player's finale partner pick (carried on
+   *  `run.storyTournamentPartner`), so the live HUD, the reveal and the resolution all resolve the SAME
+   *  chosen ally as the lobby. Absent ⇒ the deterministic default (loyal friend / excluded champion). */
+  opts?: { teamPlayed?: boolean; chosenAllyId?: string },
 ): SigilMatch | undefined {
   const rival = tournamentRival(t, story);
   if (isSinglesMatchTournament(t)) {
     return { kind: 'singles', rival, res: resolveStorySinglesMatch(playerHoleStrokes, rival.id, t.rivalEdge, seed, pars) };
   }
   if (isTeamMatchTournament(t) && story) {
-    const m = finaleMatchup(story, story.activeCaddyId);
+    const m = finaleMatchup(story, story.activeCaddyId, opts?.chosenAllyId);
     const res = resolveStory2v2Match(
       playerHoleStrokes,
       m.allyId,

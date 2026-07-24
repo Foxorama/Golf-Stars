@@ -84,7 +84,7 @@ import { acceptQuest, completeQuest, activeQuest, questWorld, startableQuestForW
 import { isStoryShipId, buyStoryShip, equipStoryShip, worldIsShipVendor } from '../sim/rpg/storyShips';
 import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
 import { currentTournament, tournamentForChapter, tournamentRival, sigilMatchThrough, rivalTotalThrough, isTeamTournament, isTeamMatchTournament, teamPartnerOrDefault } from '../sim/rpg/storyTournaments';
-import { finaleMatchup } from '../sim/rpg/storyBetrayal';
+import { finaleMatchup, coilChampionOptions, wardenAllyOptions, type CoilChampionId } from '../sim/rpg/storyBetrayal';
 import { finaleUnlocked, finaleResult, winFinale } from '../sim/rpg/storyFinale';
 import { interludeSeen, applyInterlude } from '../sim/rpg/storyInterlude';
 import { midroundOmen, applyMidroundOmen } from '../sim/rpg/storyMidround';
@@ -910,6 +910,21 @@ export function reduce(state: UiState, action: Action): UiState {
       return { ...state, storyPartnerPick: action.characterId };
     }
 
+    case 'selectFinalePartner': {
+      // GS-story-sigil5-npc: pick your Ch.5 2v2 finale ally in the lobby — a loyal tour-mate (Warden) or a
+      // Coil champion (Herald: Voss/Venoma/Scorpius, minus your caddy). Reject anything not a valid option
+      // for the path so the pick can never desync the matchup.
+      if (state.screen !== 'storyTournament' || !state.story) return state;
+      const t = currentTournament(state.story);
+      if (!t || !isTeamMatchTournament(t)) return state;
+      const valid =
+        state.story.alignment === 'herald'
+          ? coilChampionOptions(state.story).includes(action.characterId as CoilChampionId)
+          : wardenAllyOptions(state.story).includes(action.characterId);
+      if (!valid) return state;
+      return { ...state, storyFinalePartner: action.characterId };
+    }
+
     case 'storyPlayTournament': {
       // GS-story-tournament: tee off the tournament round at the venue vs the rival. Builds a story round
       // (campaign bag + gear) MARKED as the chapter's tournament so it resolves vs the rival for the Sigil.
@@ -930,7 +945,8 @@ export function reduce(state: UiState, action: Action): UiState {
       const partner = isTeamTournament(t)
         ? teamPartnerOrDefault(state.story, state.storyPartnerPick)
         : teamMatch
-        ? finaleMatchup(state.story, state.story.activeCaddyId).allyId
+        ? // GS-story-sigil5-npc: carry the chosen finale ally (loyal friend / Coil champion) onto the run.
+          finaleMatchup(state.story, state.story.activeCaddyId, state.storyFinalePartner).allyId
         : undefined;
       // GS-story-sigil-play: a TEAM Sigil carries its co-op FORMAT so the round plays interactively — a
       // SCRAMBLE arms the per-shot pick card, a BEST-BALL the per-hole reveal (the 2v2 finale is a scramble).
@@ -1508,6 +1524,7 @@ export function reduce(state: UiState, action: Action): UiState {
           const pars = state.course.holes.map((h) => h.par);
           const m = sigilMatchThrough(t, state.story, stopPlayed.map((p) => p.record.strokes), String(state.run.seed), pars, {
             teamPlayed: state.run.storyTeamFormat === 'scramble',
+            chosenAllyId: state.run.storyTournamentPartner,
           });
           if (m?.res.state.decided) return resolveStoryTournament({ ...state, stopPlayed }, stopPlayed);
         }
@@ -1523,6 +1540,7 @@ export function reduce(state: UiState, action: Action): UiState {
           // resolver streams as the finish), never a stroke count the format doesn't score by.
           const m = sigilMatchThrough(t, state.story, stopPlayed.map((p) => p.record.strokes), String(state.run.seed), pars, {
             teamPlayed: state.run.storyTeamFormat === 'scramble',
+            chosenAllyId: state.run.storyTournamentPartner,
           });
           // GS-story-midround-omen: BEFORE the rival pop, at the Chapter-3 major's turn (both partner picks
           // locked, path unchosen), divert ONCE to the pre-Choice betrayal foreshadow — the future betrayer's

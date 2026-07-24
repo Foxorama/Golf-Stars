@@ -9,7 +9,7 @@
 import { state } from './ctx';
 import { golferPreviewSVG } from '../render/apparelArt';
 import { interludeBeat, interludeScene, interludeFriend, type InterludeSpeaker } from '../sim/rpg/storyInterlude';
-import { corruptedLookOpts, COIL_FIGURE_TINT } from '../sim/rpg/storyBetrayal';
+import { corruptedLookOpts } from '../sim/rpg/storyBetrayal';
 
 const SPEAKER: Record<InterludeSpeaker, { label: (friend: string, you: string) => string; col: string }> = {
   friend: { label: (f) => f, col: '#7fd8ff' },
@@ -32,7 +32,8 @@ export function storyInterludeScreen(): string {
   const friend = interludeFriend(story);
   const you = 'You';
   // GS-story-betrayal-warden: on the Warden defection the betrayer's portrait is drawn in corrupted Coil
-  // garb (shed-scale + venom tint); on the Herald severing the friend stays a clean Warden.
+  // garb (the coil-violet robe + acid accent baked into the look, GS-story-sigil5-look — no muddying outer
+  // tint); on the Herald severing the friend stays a clean Warden.
   const look = scene.corrupt
     ? { ...corruptedLookOpts(friend), uid: `inter${friend.id.replace(/[^a-z0-9]/gi, '')}`, w: 120, h: 210 }
     : { skin: friend.style.skin, shirtBase: friend.style.shirt, capColor: friend.style.cap, hair: friend.style.hair, uid: `inter${friend.id.replace(/[^a-z0-9]/gi, '')}`, w: 120, h: 210 };
@@ -56,7 +57,7 @@ export function storyInterludeScreen(): string {
       <p class="gs-hero-tag">${beat.kicker}</p>
     </header>
     <section class="gs-inter-wrap" style="--ac:${accent};">
-      <div class="gs-inter-portrait" aria-hidden="true"${scene.corrupt ? ` style="filter:${COIL_FIGURE_TINT};"` : ''}>${portrait}</div>
+      <div class="gs-inter-portrait" aria-hidden="true">${portrait}</div>
       <div class="gs-inter-dialogue">${dialogue}</div>
     </section>
     <p class="gs-inter-outcome" style="--ac:${accent};">${scene.outcome}</p>

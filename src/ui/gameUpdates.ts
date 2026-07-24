@@ -554,6 +554,7 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
     // strokes — tell the resolver so it doesn't ALSO fold an ally ghost on top.
     const match = sigilMatchThrough(t, base, played.map((p) => p.record.strokes), String(run.seed), pars, {
       teamPlayed: run.storyTeamFormat === 'scramble',
+      chosenAllyId: run.storyTournamentPartner,
     })!;
     const res = match.res;
     won = res.playerAdvances; // win OR halve advances (the campaign's matchplay convention)

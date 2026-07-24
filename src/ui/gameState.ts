@@ -409,6 +409,11 @@ export interface UiState {
    *  before you tee off. Transient (carried onto the run at tee-off; the locked pick persists on StoryState).
    *  Absent ⇒ default to your first tour-mate. */
   storyPartnerPick?: string;
+  /** GS-story-sigil5-npc: the FINALE partner chosen in the Ch.5 2v2 lobby — a loyal tour-mate (Warden) or a
+   *  Coil champion (Herald: Voss/Venoma/Scorpius, minus the one on your bag). Transient (carried onto the run
+   *  at tee-off as `storyTournamentPartner`; validated on read, so a stale pick from a prior run is ignored).
+   *  Absent ⇒ the deterministic default (`loyalAllyId` / `coilChampionExcluding`). */
+  storyFinalePartner?: string;
   /** GS-story-allies: the recruited crew ally whose talk card is open on the clubhouse (undefined ⇒ none).
    *  Transient (never persisted). */
   storyAllyInspectId?: string;
@@ -493,6 +498,7 @@ export type Action =
   | { type: 'exitStoryTournament' } // GS-story-tournament: back to the clubhouse from the lobby
   | { type: 'storyPlayTournament' } // GS-story-tournament: tee off the tournament round (vs the rival)
   | { type: 'selectStoryPartner'; characterId: string } // GS-story-partners: pick your team-Sigil partner in the lobby
+  | { type: 'selectFinalePartner'; characterId: string } // GS-story-sigil5-npc: pick your Ch.5 finale ally (loyal friend / Coil champion)
   | { type: 'tournamentPopContinue' } // GS-story-tournament-midpop: dismiss the halftime rival pop, play on
   | { type: 'storyMidBeatContinue' } // GS-story-midround-omen: dismiss the pre-Choice foreshadow → the pop
   | { type: 'storyAftermathContinue' } // GS-story-aftermath: dismiss the post-Sigil confrontation beat → interlude/clubhouse

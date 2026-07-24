@@ -47,13 +47,14 @@ describe('GS-story-sigil-formats — the finale MECHANISM (through the reducer)'
     expect(tournamentForChapter(5, 'herald')!.format).toBe('scramble-match');
   });
 
-  it('WARDEN recap: the opponents are the betrayer + Venoma; you have a loyal ally', () => {
+  it('WARDEN recap: the opponents are the betrayer + Malachi/Voss; you have a loyal ally', () => {
+    // GS-story-sigil5-npc: the Warden Coil rep is the leader Malachi/Voss (the Apostate), not Venoma.
     const r = resolveCh5('warden', -1).lastStoryTournament!;
     expect(r.match).toBeTruthy();
     expect(r.match!.kind).toBe('team');
     expect(r.match!.herald).toBe(false);
     expect(r.match!.scoreline.length).toBeGreaterThan(0);
-    expect(r.match!.oppNames!.join(' ')).toMatch(/Venoma|Viper/);
+    expect(r.match!.oppNames!.join(' ')).toMatch(/Voss|Sable|Malachai/);
     expect(r.match!.allyName).toBeTruthy();
   });
 
