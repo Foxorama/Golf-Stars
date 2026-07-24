@@ -25,6 +25,7 @@ import { heraldCrew, type HeraldAgent } from '../sim/rpg/storyHeraldCrew';
 import { storyBarName, type StoryState } from '../sim/rpg/story';
 import { questOfferable } from '../sim/rpg/storyQuests';
 import { otherGolfers } from '../sim/rpg/storyCast';
+import { betrayerId, betrayerHasDefected } from '../sim/rpg/storyBetrayal';
 import { characterQuestOfferable } from '../sim/rpg/characterQuests';
 import type { Character } from '../sim/rpg/characters';
 
@@ -492,11 +493,19 @@ export function spaceportSceneHTML(story: StoryState): string {
   // clubhouse (mid-deck, in front of the bar), each tappable → their friend talk card. On the HERALD path
   // they've turned away from you (they stay Wardens, and become your Ch.5 opponents), so the sanctum shows
   // none of them — their absence IS the betrayal. Only past the prologue (chapter ≥ 1), like the crew.
+  // GS-story-defection-clubhouse: on the WARDEN path, once the odd-one-out DEFECTS (after "The Defection"),
+  // they're gone from the deck — you can no longer talk to them. Their empty spot shows only their hat, left
+  // behind on the floor, until you face them corrupted at the shrine.
+  const defectedId = !herald && betrayerHasDefected(story) ? betrayerId(story) : undefined;
   const friendStandees =
     !herald && story.chapter >= 1
       ? otherGolfers(story)
           .slice(0, FRIEND_SPOTS.length)
-          .map((ch, i) => friendStandee(ch, FRIEND_SPOTS[i]!, characterQuestOfferable(story, ch.id)))
+          .map((ch, i) =>
+            ch.id === defectedId
+              ? abandonedHatHTML(ch, FRIEND_SPOTS[i]!)
+              : friendStandee(ch, FRIEND_SPOTS[i]!, characterQuestOfferable(story, ch.id)),
+          )
           .join('')
       : '';
 
@@ -558,6 +567,36 @@ function friendStandee(ch: Character, spot: { left: number; top: number }, hasQu
       ${figure}
       <span class="gs-sclub-plate gs-sclub-plate--friend">${ch.shortName}</span>
     </button>`;
+}
+
+/** GS-story-defection-clubhouse: the DEFECTOR's cap, left lying on the clubhouse floor where they used to
+ *  stand — the wordless mark that the friend is gone to the Coil. Drawn in their signature cap colour, tilted
+ *  and abandoned on the deck; non-interactive (you can't talk to a hat), with a wistful title/aria. */
+function abandonedHatHTML(ch: Character, spot: { left: number; top: number }): string {
+  const cap = ch.style.cap;
+  const brim = shadeHex(cap, -0.34);
+  const label = `${ch.shortName}'s hat, left behind`;
+  return `<span class="gs-sclub-lefthat" role="img" aria-label="${label}" title="${label}"
+      style="left:${spot.left}%;top:${spot.top - 1}%;">
+      <svg viewBox="0 0 48 26" width="100%" aria-hidden="true">
+        <ellipse cx="24" cy="22" rx="19" ry="3.6" fill="#000" opacity="0.34"/>
+        <g transform="rotate(-13 24 15)">
+          <path d="M11,16 Q9,9.5 17,7.4 Q24,5.8 29,8.2 Q33,10 33,16 Z" fill="${cap}" stroke="#0c1116" stroke-width="1" stroke-linejoin="round"/>
+          <path d="M15,8.4 Q20,6.6 26,7.8 Q22,8.8 18.5,9.8 Z" fill="#ffffff" opacity="0.2"/>
+          <ellipse cx="33" cy="16.4" rx="11.5" ry="3.4" fill="${brim}" stroke="#0c1116" stroke-width="1" stroke-linejoin="round"/>
+          <circle cx="20.5" cy="7" r="1.1" fill="${brim}" stroke="#0c1116" stroke-width="0.7"/>
+        </g>
+      </svg>
+    </span>`;
+}
+
+/** Small hex shade helper (lighten amt>0 / darken amt<0) for the abandoned-hat brim; non-hex passes through. */
+function shadeHex(hex: string, amt: number): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return hex;
+  const n = parseInt(m[1]!, 16);
+  const c = (v: number): number => Math.max(0, Math.min(255, Math.round(amt >= 0 ? v + (255 - v) * amt : v * (1 + amt))));
+  return `#${((c((n >> 16) & 255) << 16) | (c((n >> 8) & 255) << 8) | c(n & 255)).toString(16).padStart(6, '0')}`;
 }
 
 /** Herald crew deck spots — Voss (index 0) at your side, the rest gathered along the deck. */
@@ -674,4 +713,9 @@ const SPACEPORT_STYLE = `<style>
   .gs-sclub-friend:hover,.gs-sclub-friend:focus-visible{z-index:23;filter:drop-shadow(0 9px 8px #000b) brightness(1.05);}
   .gs-sclub-plate--friend{background:linear-gradient(180deg,#5a7fb0,#2f4a6e);border-color:#1b2c42;color:#eaf2ff;
     box-shadow:inset 0 1px 0 #bcd6ff77,0 1px 2px #0008;font-family:inherit;}
+  /* GS-story-defection-clubhouse: the defector's hat left on the floor — small, feet-line anchored, no
+     hover/tap (it's not interactable), a touch desaturated so it reads as "abandoned". */
+  .gs-sclub-lefthat{position:absolute;width:10cqw;max-width:64px;transform:translate(-50%,-50%);
+    pointer-events:none;z-index:13;filter:drop-shadow(0 3px 3px #0009) saturate(.8) brightness(.9);}
+  .gs-sclub-lefthat svg{width:100%;height:auto;display:block;}
 </style>`;

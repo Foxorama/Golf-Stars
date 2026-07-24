@@ -14,7 +14,9 @@ import {
   friendRivalTaunt,
   friendRivalHalftime,
   everyGolferHasBetrayalVoice,
+  betrayerHasDefected,
   COIL_SHIRT,
+  COIL_ACCENT,
 } from '../src/sim/rpg/storyBetrayal';
 import { tournamentForChapter, tournamentRival, tournamentIntroLines } from '../src/sim/rpg/storyTournaments';
 import { interludeFriend } from '../src/sim/rpg/storyInterlude';
@@ -174,11 +176,26 @@ describe('GS-story-betrayer — the Coil champion partner + costume', () => {
     expect(coilChampionName('voss')).toContain('Voss');
   });
 
-  it('the corrupted look keeps the golfer\'s hair but swaps to Coil-violet garb', () => {
+  it('betrayerHasDefected flips only once "The Defection" interlude has played (GS-story-defection-clubhouse)', () => {
+    expect(betrayerHasDefected(s(A, B))).toBe(false); // picks locked, but not yet defected
+    const defected = { ...s(A, B), seenStoryBeats: { 'interlude-warden': true as const } };
+    expect(betrayerHasDefected(defected)).toBe(true);
+    // the Herald severing beat does NOT count as a Warden defection
+    const severed = { ...s(A, B), seenStoryBeats: { 'interlude-herald': true as const } };
+    expect(betrayerHasDefected(severed)).toBe(false);
+  });
+
+  it('the corrupted look KEEPS the golfer\'s own shirt/hair/skin and layers Coil garb over it (GS-story-coil-garb)', () => {
     const ch = getCharacter(A)!;
     const look = corruptedLookOpts(ch);
-    expect(look.shirtBase).toBe(COIL_SHIRT);
-    expect(look.hair).toBe(ch.style.hair); // identity stays above the neck
+    // switched sides must still read as THEM — their identity colour, face and hair are preserved…
+    expect(look.shirtBase).toBe(ch.style.shirt);
+    expect(look.shirtBase).not.toBe(COIL_SHIRT); // no longer the old flat violet reskin
+    expect(look.hair).toBe(ch.style.hair);
     expect(look.skin).toBe(ch.style.skin);
+    // …and the Coil is worn OVER the top (robe + hood + accent) so the defection still lands.
+    expect(look.coilGarb.robe).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(look.coilGarb.hood).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(look.coilGarb.accent).toBe(COIL_ACCENT);
   });
 });

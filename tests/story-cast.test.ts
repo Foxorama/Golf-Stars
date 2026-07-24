@@ -18,6 +18,7 @@ import { defaultStoryState, type StoryState } from '../src/sim/rpg/story';
 import { CHARACTERS, DEFAULT_CHARACTER_ID } from '../src/sim/rpg/characters';
 import { spaceportSceneHTML } from '../src/render/storySpaceport';
 import { friendInspectOverlayHTML } from '../src/render/storyCastOverlay';
+import { betrayerId } from '../src/sim/rpg/storyBetrayal';
 import { initState, reduce } from '../src/ui/game';
 
 function story(over: Partial<StoryState> = {}): StoryState {
@@ -99,6 +100,42 @@ describe('GS-story-cast — clubhouse + card render', () => {
   it('the Herald sanctum shows no friend standees — they have left you', () => {
     const html = spaceportSceneHTML(story({ chapter: 4, alignment: 'herald' }));
     expect(html).not.toContain(FRIEND_BTN);
+  });
+
+  it('after The Defection the betrayer is gone from the clubhouse — a hat is left in their place (GS-story-defection-clubhouse)', () => {
+    // Warden, both picks locked (huang/larry) → betrayer = backspin-bo; defection interlude played.
+    const s = story({
+      chapter: 5,
+      alignment: 'warden',
+      sigil1Partner: 'huang-woo-hook',
+      sigil2Partner: 'longshot-larry',
+      seenStoryBeats: { 'interlude-warden': true },
+    });
+    const betrayer = betrayerId(s); // backspin-bo
+    const html = spaceportSceneHTML(s);
+    // the two loyal friends still stand, tappable…
+    const count = html.split(FRIEND_BTN).length - 1;
+    expect(count).toBe(2);
+    // …the defector is no longer a talkable standee…
+    expect(html).not.toContain(`"caddyId":"${betrayer}"`);
+    // …and their abandoned hat is on the floor instead (the rendered element, not just the CSS rule).
+    expect(html).toContain('class="gs-sclub-lefthat"');
+    expect(html).toContain('hat, left behind');
+  });
+
+  it('before The Defection all three friends (incl. the eventual betrayer) still stand in the clubhouse', () => {
+    const s = story({
+      chapter: 4,
+      alignment: 'warden',
+      sigil1Partner: 'huang-woo-hook',
+      sigil2Partner: 'longshot-larry',
+      // no interlude-warden yet → nobody has defected
+    });
+    const html = spaceportSceneHTML(s);
+    expect(html.split(FRIEND_BTN).length - 1).toBe(3);
+    // 'gs-sclub-lefthat' is always present in the <style> block, so assert on the rendered element's text.
+    expect(html).not.toContain('hat, left behind');
+    expect(html).toContain(`"caddyId":"${betrayerId(s)}"`);
   });
 
   it('the friend talk card renders the golfer, a banter line, and a close action', () => {

@@ -84,10 +84,12 @@ personal where possible.
 
 ## Costumes
 
-The defector gets a **corrupted Coil look** — a reusable `corruptedGolferLook(character)` feeding
-`golferPreviewSVG` (Coil violet `shirtBase` + a serpent-hood, the venom palette `#b060c0`/`#7fe0a0`),
-shown in the Ch.4/5 betrayal beats, the Ch.5 lobby, and the finale figure. On the Herald path YOU are
-the corrupted one; the former friends stay clean Warden.
+The defector gets a **corrupted Coil look** — `corruptedLookOpts(character)` feeding `golferPreviewSVG`,
+shown in the Ch.4/5 betrayal beats, the Ch.5 lobby, and the finale figure. **Superseded by GS-story-coil-garb
+(2026-07-23):** rather than repaint the figure Coil-violet, it KEEPS the golfer's own shirt/face/hair and
+layers an open serpent robe + cobra hood + serpent circlet OVER the top (`coilGarb` opt), so the defector
+still reads as themselves — switched sides. On the Herald path YOU are the corrupted one; the former friends
+stay clean Warden.
 
 ## Build order — SHIPPED (see `IDEAS.md` for the live one-liners)
 
@@ -232,6 +234,31 @@ the corrupted one; the former friends stay clean Warden.
   `story-scorpius-warden` takes the old Ch.4 Warden rival-up-close slot (after the doubt thread, carrying the
   same `{betrayer}` knife wordlessly). Pure content-as-data + render; zero sim rng, no save/STORY_VERSION bump.
   Guarded by `tests/lore.test.ts` + `tests/story-tournament.test.ts`.
+- **GS-story-coil-garb / GS-story-defection-clubhouse** — ✅ (2026-07-23) the switched-sides motif is now
+  properly SOLD on both surfaces (player ask):
+  - **The costume keeps the person.** `corruptedLookOpts` no longer repaints the whole figure Coil-violet
+    (the old flat reskin + `COIL_FIGURE_TINT` hue-shift made a defector a generic Coil silhouette). It now
+    KEEPS the golfer's own **shirt colour** (their signature identity hue), face and hair, and layers the
+    Coil OVER the top via a new `golferPreviewSVG` opt `coilGarb: {robe, hood, accent}`: an OPEN serpent
+    robe (two violet panels down the outer sides + a raised shawl-collar mantle with a coil-sigil clasp,
+    leaving the shirt visible down the centre — the "robe that doesn't obscure the shirt colour"), a raised
+    **cobra hood** flaring behind the head (drawn behind the head so the face + hair still read), and a
+    spiky **serpent circlet** on the brow (the "spiffy Coil hat", replacing the signature cap). Palette:
+    `COIL_ROBE`/`COIL_HOOD`/`COIL_ACCENT` in `storyBetrayal.ts`; the robe panels draw BEFORE the arms so
+    the golfer's arms hang naturally in front of the open robe. Used identically by the Ch.4 Defection
+    interlude portrait, the Ch.5 friend-rival card, and the Sigil-5 finale matchup box (the three old
+    `COIL_FIGURE_TINT` call sites, now un-tinted so the true shirt colour shows). Re-shoot with
+    `node scripts/coil-garb-preview.mjs`.
+  - **The defector leaves.** `betrayerHasDefected(story)` (= `seenStoryBeats['interlude-warden']`) gates
+    the Warden-path removal: once **The Defection** plays (after the Ch.4 major), the odd-one-out is gone
+    from the clubhouse deck (`storySpaceport.ts`, replaced by their `abandonedHatHTML` cap lying on the
+    floor at their old spot — non-interactive, wistful title) AND the ship lounge (`shipInteriorScreens.ts`
+    filters them from `otherGolfers`). You can no longer talk to them anywhere; the two loyal friends
+    remain. Before the interlude, all three still stand (they're drifting, not gone — the doubt thread).
+  - Pure render + a persisted-flag predicate; zero sim rng, no `STORY_VERSION`/save bump. Guarded by
+    `tests/story-betrayal.test.ts` (`betrayerHasDefected`, the costume keeps the shirt) +
+    `tests/story-cast.test.ts` (before/after The Defection: 3 standees → 2 + a left-behind hat).
+
 - **GS-story-betrayal-polish** — balance re-tune (the finale + team-major edges), any dialogue-depth follow-up,
   constitution/roadmap docs.
 

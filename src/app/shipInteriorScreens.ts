@@ -23,6 +23,7 @@ import { allyInspectOverlayHTML } from '../render/storyCrew';
 import { isHeraldAgent } from '../sim/rpg/storyHeraldCrew';
 import { heraldAgentOverlayHTML } from '../render/storyHeraldOverlay';
 import { otherGolfers, isOtherGolfer } from '../sim/rpg/storyCast';
+import { betrayerId, betrayerHasDefected } from '../sim/rpg/storyBetrayal';
 import { friendInspectOverlayHTML } from '../render/storyCastOverlay';
 import { golferPreviewSVG } from '../render/apparelArt';
 import type { Character } from '../sim/rpg/characters';
@@ -86,9 +87,13 @@ export function shipInteriorScreen(): string {
 
   // GS-story-cast: your three friend golfers travel with you and relax in the LOUNGE (Warden/undecided path,
   // past the prologue), each tappable → their friend talk card. On the Herald path they've left you.
+  // GS-story-defection-clubhouse: once the Warden-path betrayer DEFECTS ("The Defection"), they no longer
+  // travel aboard — you can't talk to them anywhere; only the two loyal friends remain in the lounge.
+  const defectedId = story.alignment !== 'herald' && betrayerHasDefected(story) ? betrayerId(story) : undefined;
+  const loungeFriends = otherGolfers(story).filter((ch) => ch.id !== defectedId);
   const friendsHere =
     room === 'lounge' && story.alignment !== 'herald' && story.chapter >= 1
-      ? otherGolfers(story).map((ch, i, arr) => friendStandeeSI(ch, arr.length, i)).join('')
+      ? loungeFriends.map((ch, i, arr) => friendStandeeSI(ch, arr.length, i)).join('')
       : '';
 
   // The room's content panel (below the scene): outfitting in weapons/engine, the locker door, flavour.

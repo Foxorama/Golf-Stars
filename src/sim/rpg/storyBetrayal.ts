@@ -558,16 +558,51 @@ export function everyGolferHasBetrayalVoice(): boolean {
   });
 }
 
-// ── The corrupted (Coil) costume for a defector (GS-story-betrayer) ────────────────────────────────────
+/** GS-story-defection-clubhouse: has the WARDEN-path betrayer already DEFECTED and walked off? True once
+ *  "The Defection" interlude (`interlude-warden`) has played — from the Chapter-4 major on, the odd-one-out
+ *  has gone into the mire, so they no longer stand in the clubhouse / aboard the ship (their hat is left
+ *  behind) and instead face you, Coil-garbed, at the Ch.5 shrine. Reads the persisted flag directly to keep
+ *  this module free of a `storyInterlude` import cycle (interlude imports this). */
+export function betrayerHasDefected(story: StoryState): boolean {
+  return story.seenStoryBeats['interlude-warden'] === true;
+}
 
-/** Deep Coil-violet garb + an acid-green accent — the shed-scale look a defector wears. Keeps the golfer's
- *  own HAIR (identity is above the neck, per the avatar rule) so they still read as themselves, corrupted. */
-export const COIL_SHIRT = '#2e1840';
+// ── The corrupted (Coil) costume for a defector (GS-story-betrayer / GS-story-coil-garb) ────────────────
+//
+// The switched-sides read has to land WITHOUT erasing who the friend was: they keep their own SHIRT COLOUR
+// (their signature identity hue), their face, and their hair — you still recognise them across the tee — and
+// the Coil is worn OVER the top as an open serpent robe + a raised cobra hood + a spiky serpent circlet
+// (the "spiffy Coil hat"). That is a far stronger betrayal beat than the old flat violet reskin, which
+// repainted the whole figure and made the defector a generic Coil silhouette.
+
+/** Acid-green venom accent — the Coil's signature. */
 export const COIL_ACCENT = '#7fe0a0';
-/** A CSS filter that venom-shifts a normal golfer figure toward the Coil palette (for the standee tint). */
-export const COIL_FIGURE_TINT = 'saturate(1.15) hue-rotate(258deg) brightness(0.92)';
+/** The open robe / mantle a defector wears over their own outfit (deep Coil violet). */
+export const COIL_ROBE = '#3a1a52';
+/** The raised cobra hood behind the head (a shade darker than the robe). */
+export const COIL_HOOD = '#241038';
+/** Kept for back-compat / any legacy reference — the old flat Coil-violet shirt swap (no longer used by the
+ *  costume, which now preserves the golfer's own shirt colour). */
+export const COIL_SHIRT = '#2e1840';
 
-/** `golferPreviewSVG` opts that draw a golfer in corrupted Coil garb (their hair kept). */
-export function corruptedLookOpts(character: Character): { skin: string; shirtBase: string; capColor: string; hair: Character['style']['hair'] } {
-  return { skin: character.style.skin, shirtBase: COIL_SHIRT, capColor: COIL_ACCENT, hair: character.style.hair };
+/** The `coilGarb` payload `golferPreviewSVG` reads to drape a golfer in Coil robes + hood + circlet. */
+export interface CoilGarb {
+  robe: string;
+  hood: string;
+  accent: string;
+}
+
+/** `golferPreviewSVG` opts that draw a golfer as a Coil DEFECTOR (GS-story-coil-garb): their OWN shirt,
+ *  skin and hair kept (so they still read as themselves), with an open serpent robe + cobra hood + serpent
+ *  circlet layered over the top. */
+export function corruptedLookOpts(
+  character: Character,
+): { skin: string; shirtBase: string; capColor: string; hair: Character['style']['hair']; coilGarb: CoilGarb } {
+  return {
+    skin: character.style.skin,
+    shirtBase: character.style.shirt, // KEEP their identity colour — the robe frames it, never hides it
+    capColor: character.style.cap,
+    hair: character.style.hair,
+    coilGarb: { robe: COIL_ROBE, hood: COIL_HOOD, accent: COIL_ACCENT },
+  };
 }

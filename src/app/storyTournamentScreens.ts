@@ -10,7 +10,7 @@ import { state } from './ctx';
 import { getCharacter } from '../sim/rpg/characters';
 import { STORY_CHAPTER_COUNT, type StoryState } from '../sim/rpg/story';
 import { currentTournament, sigilCount, tournamentCompetitors, tournamentRival, tournamentIntroLines, isTeamTournament, isSinglesMatchTournament, isTeamMatchTournament, teamPartnerPool, type StoryTournament } from '../sim/rpg/storyTournaments';
-import { finaleMatchup, corruptedLookOpts, friendRivalTaunt, friendRivalHalftime, COIL_FIGURE_TINT } from '../sim/rpg/storyBetrayal';
+import { finaleMatchup, corruptedLookOpts, friendRivalTaunt, friendRivalHalftime } from '../sim/rpg/storyBetrayal';
 import { golferPreviewSVG } from '../render/apparelArt';
 import { storyClubEffectLabel } from '../sim/rpg/storyClubEffects';
 import { shipUpgradeById, upgradeDetail } from '../sim/rpg/storyShipUpgrades';
@@ -59,8 +59,7 @@ function friendRivalFigure(golferId: string, corrupted: boolean, uid: string): s
   const opts = corrupted
     ? { ...corruptedLookOpts(ch), uid, w: 84, h: 220 }
     : { skin: ch.style.skin, shirtBase: ch.style.shirt, capColor: ch.style.cap, hair: ch.style.hair, uid, w: 84, h: 220 };
-  const fig = golferPreviewSVG(undefined, undefined, undefined, opts);
-  return corrupted ? `<span style="display:block;filter:${COIL_FIGURE_TINT};">${fig}</span>` : fig;
+  return golferPreviewSVG(undefined, undefined, undefined, opts);
 }
 
 /** GS-story-tournament-midpop: the halftime line — the rival BRAGS when they're ahead, or CURSES you when
@@ -166,7 +165,7 @@ function matchFigure(charId: string, corrupt: boolean, uid: string): string {
     ? { ...corruptedLookOpts(ch), uid, w: 52, h: 140 }
     : { skin: ch.style.skin, shirtBase: ch.style.shirt, capColor: ch.style.cap, hair: ch.style.hair, uid, w: 52, h: 140 };
   const fig = golferPreviewSVG(undefined, undefined, undefined, opts);
-  return `<span class="gs-tourn-mfig"${corrupt ? ` style="filter:${COIL_FIGURE_TINT};"` : ''}>${fig}</span>`;
+  return `<span class="gs-tourn-mfig">${fig}</span>`;
 }
 
 /** GS-story-sigil5-look: a Coil CHAMPION in the matchup box is their real portrait bust (Venoma / Voss),

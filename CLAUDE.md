@@ -270,6 +270,15 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     Choice, both picks locked — diverting `holeComplete` to the shared `.gs-lore*` beat card (`storyMidBeat`,
     `loreBeatHTML`) then on to the halftime pop. A new golfer = new `BETRAYAL_VOICE` rows; never an engine
     edit. Zero sim rng, no `STORY_VERSION` bump (rides `seenStoryBeats`).
+  - **Switched sides is SHOWN** (GS-story-defection-clubhouse / GS-story-coil-garb). The defector's Coil
+    costume (`corruptedLookOpts`) KEEPS the golfer's own shirt colour + face + hair and layers an open
+    serpent robe + raised cobra hood + serpent circlet OVER it (`golferPreviewSVG`'s `coilGarb` opt), so
+    they still read as themselves — a far stronger betrayal than the old flat-violet reskin (the
+    `COIL_FIGURE_TINT` hue-shift is retired). Once **The Defection** interlude plays
+    (`betrayerHasDefected` = `seenStoryBeats['interlude-warden']`), the Warden-path betrayer is GONE from the
+    clubhouse deck AND the ship lounge (you can't talk to them anywhere) — their hat lies abandoned on the
+    clubhouse floor where they stood, until you face them, corrupted, at the Ch.5 shrine. Pure render +
+    predicate; zero sim rng, no save bump. Guards: `tests/story-betrayal.test.ts` + `tests/story-cast.test.ts`.
 
 - **Putting** — `docs/decisions/putting.md`
   - Manual pace-meter by default; AUTO only via the Penelope Putter caddy (`takePutt(…, control?)`;

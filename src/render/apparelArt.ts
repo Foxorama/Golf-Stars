@@ -965,6 +965,10 @@ export function golferPreviewSVG(
      *  need distinct prefixes. Defaults to a hash of the figure's inputs, which makes an accidental
      *  collision harmless (two figures hashing alike are wearing the identical look anyway). */
     uid?: string;
+    /** GS-story-coil-garb: draw a Coil DEFECTOR — an open serpent robe + a raised cobra hood + a spiky
+     *  serpent circlet layered OVER the golfer's own outfit, keeping their shirt colour/face/hair so they
+     *  still read as themselves, switched sides. Suppresses the signature cap (the circlet is the hat). */
+    coilGarb?: { robe: string; hood: string; accent: string };
   } = {},
 ): string {
   const { skin = '#f0c49a', shirtBase = '#3f7fd0', w = 110, h = 132, capColor } = opts;
@@ -1369,12 +1373,72 @@ export function golferPreviewSVG(
     <path d="M${f(cx - px(3.6))},${f(headY + px(6))} Q${f(cx)},${f(headY + px(9))} ${f(cx + px(3.6))},${f(headY + px(6))}" fill="none" stroke="#0c1116" stroke-width="${sw(1.3)}" stroke-linecap="round" opacity="0.75"/>
     <ellipse cx="${f(cx - px(8))}" cy="${f(headY + px(4.5))}" rx="${f(px(2.4))}" ry="${f(px(1.4))}" fill="#ff7b6b" opacity="0.22"/>
     <ellipse cx="${f(cx + px(8))}" cy="${f(headY + px(4.5))}" rx="${f(px(2.4))}" ry="${f(px(1.4))}" fill="#ff7b6b" opacity="0.22"/>`;
-  // A cosmetic hat, or the golfer's signature cap (same default as on-course) when none is worn.
-  const hatG = hat
-    ? hatGlyph(hat.look, cx, headY, headR, uid)
-    : capColor
-      ? hatGlyph({ shape: 'cap', color: capColor, accent: shade(capColor, -0.3) }, cx, headY, headR, `dc${uid}`)
-      : '';
+  // ── GS-story-coil-garb: the Coil DEFECTOR overlay (an open serpent robe + a raised cobra hood + a
+  //    serpent circlet) drawn OVER the golfer's own outfit, so their shirt colour, face and hair still
+  //    read — the same person, switched to the Coil. All in the passed Coil palette; zero rng, pure. ──
+  const coil = opts.coilGarb;
+  let coilRobePanels = '';
+  let coilCollar = '';
+  let coilHoodBack = '';
+  let coilCirclet = '';
+  if (coil) {
+    const { robe, hood, accent } = coil;
+    const robeDark = shade(robe, -0.3);
+    const cInk = `stroke="#0c1116" stroke-width="${sw(1.2)}" stroke-linejoin="round"`;
+    // Open robe: two panels hanging from the shoulders down the OUTER sides to mid-shin, leaving the shirt
+    // (the identity colour) visible down the centre. Drawn BEFORE the arms, so the golfer's arms and hands
+    // hang naturally in front of the open robe.
+    const hemY = hipY + (footY - hipY) * 0.52;
+    const panel = (o: 1 | -1): string =>
+      `<path d="M${f(cx + o * px(20))},${f(shoY - px(1))} ` +
+      `Q${f(cx + o * px(24))},${f(waistY)} ${f(cx + o * px(16.5))},${f(hemY)} ` +
+      `L${f(cx + o * px(6.5))},${f(hemY)} L${f(cx + o * px(8.5))},${f(shoY + px(3))} Z" fill="${robe}" ${cInk}/>` +
+      // accent trim + a fold shade down the open inner edge
+      `<path d="M${f(cx + o * px(8.5))},${f(shoY + px(4))} L${f(cx + o * px(6.7))},${f(hemY - px(1))}" fill="none" stroke="${accent}" stroke-width="${sw(1.3)}" stroke-linecap="round" opacity="0.85"/>`;
+    coilRobePanels = panel(-1) + panel(1);
+    // Shawl collar — a raised Coil mantle across the shoulders, drawn OVER the torso at the neckline, with a
+    // coil-sigil clasp at the throat.
+    coilCollar =
+      `<path d="M${f(cx - px(11))},${f(shoY - px(2))} Q${f(cx)},${f(shoY + px(4))} ${f(cx + px(11))},${f(shoY - px(2))} ` +
+      `L${f(cx + px(20))},${f(shoY)} Q${f(cx + px(13))},${f(shoY - px(9))} ${f(cx)},${f(shoY - px(8))} ` +
+      `Q${f(cx - px(13))},${f(shoY - px(9))} ${f(cx - px(20))},${f(shoY)} Z" fill="${robeDark}" ${cInk}/>` +
+      `<g transform="translate(${f(cx)} ${f(shoY - px(1.5))})">` +
+      `<circle r="${f(px(2.4))}" fill="${robe}" stroke="${accent}" stroke-width="${sw(1)}"/>` +
+      `<path d="M0,${f(-px(1.5))} A ${f(px(1.5))} ${f(px(1.5))} 0 1 1 ${f(-px(1))},${f(px(1.05))}" fill="none" stroke="${accent}" stroke-width="${sw(0.9)}" stroke-linecap="round"/>` +
+      `</g>`;
+    // Cobra hood flaring behind the head (drawn behind the head so the face + hair still read).
+    coilHoodBack =
+      `<path d="M${f(cx)},${f(headY - px(17))} ` +
+      `Q${f(cx - px(27))},${f(headY - px(9))} ${f(cx - px(21))},${f(headY + px(11))} ` +
+      `Q${f(cx - px(11))},${f(headY + px(6))} ${f(cx)},${f(headY + px(4))} ` +
+      `Q${f(cx + px(11))},${f(headY + px(6))} ${f(cx + px(21))},${f(headY + px(11))} ` +
+      `Q${f(cx + px(27))},${f(headY - px(9))} ${f(cx)},${f(headY - px(17))} Z" fill="${hood}" ${cInk}/>` +
+      `<path d="M${f(cx - px(20))},${f(headY + px(8))} Q${f(cx - px(24))},${f(headY - px(8))} ${f(cx)},${f(headY - px(15))} Q${f(cx + px(24))},${f(headY - px(8))} ${f(cx + px(20))},${f(headY + px(8))}" fill="none" stroke="${accent}" stroke-width="${sw(1.2)}" opacity="0.7"/>` +
+      `<circle cx="${f(cx - px(11))}" cy="${f(headY - px(4))}" r="${f(px(1.9))}" fill="${accent}" opacity="0.45"/>` +
+      `<circle cx="${f(cx + px(11))}" cy="${f(headY - px(4))}" r="${f(px(1.9))}" fill="${accent}" opacity="0.45"/>`;
+    // The serpent CIRCLET (the "spiffy Coil hat") — a dark brow band with an accent highlight and a small
+    // rising cobra crest at centre-front. Drawn last on the head (in place of the signature cap).
+    const crest =
+      `<g transform="translate(${f(cx)} ${f(headY - px(9))})">` +
+      `<path d="M0,${f(px(2))} Q${f(-px(2))},${f(-px(2))} 0,${f(-px(4))} Q${f(px(2.4))},${f(-px(6))} ${f(px(1))},${f(-px(8.4))}" fill="none" stroke="${accent}" stroke-width="${sw(2)}" stroke-linecap="round"/>` +
+      `<path d="M${f(px(1))},${f(-px(8.4))} q${f(px(2.4))},${f(-px(0.6))} ${f(px(2.9))},${f(px(1.5))} q${f(-px(1.3))},${f(px(1.3))} ${f(-px(2.9))},${f(px(0.6))} z" fill="${accent}" ${cInk}/>` +
+      `<circle cx="${f(px(2.5))}" cy="${f(-px(7.7))}" r="${f(px(0.5))}" fill="#0a0410"/>` +
+      `</g>`;
+    coilCirclet =
+      `<path d="M${f(cx - px(13))},${f(headY - px(4.5))} Q${f(cx)},${f(headY - px(11.5))} ${f(cx + px(13))},${f(headY - px(4.5))}" fill="none" stroke="${robeDark}" stroke-width="${sw(4)}" stroke-linecap="round"/>` +
+      `<path d="M${f(cx - px(13))},${f(headY - px(4.5))} Q${f(cx)},${f(headY - px(11.5))} ${f(cx + px(13))},${f(headY - px(4.5))}" fill="none" stroke="${accent}" stroke-width="${sw(1.2)}" stroke-linecap="round" opacity="0.9"/>` +
+      crest;
+  }
+
+  // A cosmetic hat, or the golfer's signature cap (same default as on-course) when none is worn. A Coil
+  // defector wears the serpent circlet instead, so the signature cap is suppressed.
+  const hatG = coil
+    ? ''
+    : hat
+      ? hatGlyph(hat.look, cx, headY, headR, uid)
+      : capColor
+        ? hatGlyph({ shape: 'cap', color: capColor, accent: shade(capColor, -0.3) }, cx, headY, headR, `dc${uid}`)
+        : '';
 
   // The golfer's chosen hairstyle (GS-avatar-gender) — the only per-character gender-presentation cue,
   // drawn strictly above the neck. A SEALED helmet encloses the head, so it hides hair entirely: every
@@ -1397,6 +1461,6 @@ export function golferPreviewSVG(
       : '';
 
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="your golfer" style="display:block;">
-    ${defs}${glowAura}${pantsGlow}${bagG}${legs}${legDetail}${shoes}${armUnit(-1)}${armUnit(1)}${neck}${torso}${torsoShade}${detail}${belt}${hairL.back}${ears}${head}${headShade}${hairL.top}${face}${hairL.face}${hatG}${driverG}${flair}
+    ${defs}${glowAura}${pantsGlow}${bagG}${legs}${legDetail}${shoes}${coilRobePanels}${armUnit(-1)}${armUnit(1)}${neck}${torso}${torsoShade}${detail}${belt}${coilCollar}${coilHoodBack}${hairL.back}${ears}${head}${headShade}${hairL.top}${face}${hairL.face}${hatG}${coilCirclet}${driverG}${flair}
   </svg>`;
 }
