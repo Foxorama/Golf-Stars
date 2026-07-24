@@ -1,9 +1,17 @@
 /**
  * The Story-Tour LOCKER (GS-story-locker). Reached from the spaceport clubhouse ("🎒 Locker"): manage
- * everything the campaign owns — build the 14-club BAG from your owned clubs (green + bought themed), and
- * swap the equipped GEAR per slot. Every owned item is tappable → the reusable lore card (read-only here,
- * with an equip/unequip footer). Built from design tokens + a self-contained `.gs-lock*` style block (own
- * prefix — no global CSS collision). Reads the live `state`; actions dispatch via `data-action` wiring.
+ * everything the campaign owns — build the 14-club BAG from your owned clubs (green + bought themed), swap
+ * the equipped GEAR per slot, and pick which crew friend carries the bag. Every owned item is tappable → the
+ * reusable lore card (read-only here, with an equip/unequip footer).
+ *
+ * GS-story-locker-tiles: ONE tile visual language across every section (bag / crew / gear / bench). Clubs,
+ * gear pieces and caddies all draw as the same compact square tile in a dense `.gs-lock-grid`; the
+ * equipped/active tile carries an accent ring + a badge, and a single corner button equips/removes. This
+ * replaced three mismatched layouts (a club-card grid, full-width stacked gear rows, ragged crew pills) that
+ * made the screen long, awkward and inconsistent. Gear is grouped per slot behind a slim header + count so a
+ * nine-slot wardrobe is a few dense rows instead of a page of full-width strips. Built from design tokens +
+ * a self-contained `.gs-lock*` style block (own prefix — no global CSS collision). Reads the live `state`;
+ * actions dispatch via `data-action` wiring.
  */
 
 import { state } from './ctx';
@@ -74,6 +82,40 @@ function clubArt(id: string): string {
   return itemArtSVG(clubArtId(id), club?.rarity ?? 'common', clubTheme(id));
 }
 
+/** GS-story-locker-tiles: the ONE tile every section draws — a square art thumb, a name, a small meta line,
+ *  a rarity-accent top edge, one corner button, and (when `on`) an accent ring + a badge marking the
+ *  equipped/active pick. Tapping the art opens the lore card (`inspect`); the corner `btn` equips/removes. */
+function tile(opts: {
+  art: string;
+  name: string;
+  meta?: string;
+  ac: string;
+  on?: boolean;
+  badge?: string;
+  inspect?: string; // JSON payload for a storyInspectItem action; art becomes a button when present
+  ariaName: string;
+  btn: string; // ready-made corner button/lock markup
+}): string {
+  const { art, name, meta = '', ac, on, badge, inspect, ariaName, btn } = opts;
+  const artInner = inspect
+    ? `<span class="gs-lock-art" data-action='${inspect}' role="button" aria-label="${ariaName}">${art}</span>`
+    : `<span class="gs-lock-art">${art}</span>`;
+  return `
+    <div class="gs-lock-tile${on ? ' gs-lock-tile--on' : ''}" style="--ac:${ac};">
+      ${on && badge ? `<span class="gs-lock-badge" aria-hidden="true">${badge}</span>` : ''}
+      ${artInner}
+      <span class="gs-lock-name">${name}</span>
+      <span class="gs-lock-meta">${meta}</span>
+      ${btn}
+    </div>`;
+}
+
+/** A ＋/✕/🔒 corner button (or a static ✓ lock note) for a tile. */
+function cornerBtn(kind: 'on' | 'off' | 'dim', glyph: string, title: string, action?: string): string {
+  if (kind === 'dim') return `<span class="gs-lock-btn gs-lock-btn--dim" title="${title}">${glyph}</span>`;
+  return `<button class="gs-lock-btn gs-lock-btn--${kind}" data-action='${action}' title="${title}">${glyph}</button>`;
+}
+
 export function storyLockerScreen(): string {
   const story = state.story;
   if (!story) {
@@ -90,14 +132,16 @@ export function storyLockerScreen(): string {
   const full = storyBagFull(story);
 
   const bagCards = bagIds.length
-    ? bagIds.map((id) => clubChip(id, 'bag')).join('')
+    ? `<div class="gs-lock-grid">${bagIds.map((id) => clubTile(id, 'bag')).join('')}</div>`
     : `<div class="gs-lock-empty">Your bag is empty — equip clubs from the bench.</div>`;
   const benchCards = benchIds.length
-    ? benchIds.map((id) => clubChip(id, 'bench', full)).join('')
+    ? `<div class="gs-lock-grid">${benchIds.map((id) => clubTile(id, 'bench', full)).join('')}</div>`
     : `<div class="gs-lock-empty">Nothing on the bench. Buy clubs at a world's Pro Shop to build up your set.</div>`;
 
   // ── Gear ──
-  const gearRows = LOCKER_SLOTS.map((slot) => gearSlotRow(slot)).join('');
+  const gearBody =
+    `<div class="gs-lock-gearnote">One item per slot — you carry a single glove, cap, shoes and ball. A higher-tier piece beats stacking, so chase the upgrade.</div>` +
+    `<div class="gs-lock-gearwrap">${LOCKER_SLOTS.map((slot) => gearSlotRow(slot)).join('')}</div>`;
   const gearCount = LOCKER_SLOTS.filter((s) => story.equippedGear[s]).length;
 
   // ── Crew ──
@@ -111,10 +155,10 @@ export function storyLockerScreen(): string {
   // GS-story-locker-sections: collapsible panels (Bag / Crew / Gear / Bench), so the crew + gear are one tap
   // from the top instead of a long scroll past the whole bag. Crew is high (the "gather your friends" ask).
   const sections =
-    accordion('bag', '🎒', 'Your bag', `${bagIds.length} / ${MAX_STORY_BAG}`, `<div class="gs-lock-grid">${bagCards}</div>`) +
+    accordion('bag', '🎒', 'Your bag', `${bagIds.length} / ${MAX_STORY_BAG}`, bagCards) +
     accordion('crew', '🫂', 'Your crew', crewSummary, crewBodyHTML(story)) +
-    accordion('gear', '🧤', 'Gear', gearCount ? `${gearCount} equipped` : 'none', `<div style="font-size:12px;color:#8fa0b8;line-height:1.4;margin:0 0 8px;">One item per slot — like your clubs, you carry a single glove, cap, shoes and ball. A higher-tier piece is strong enough to beat stacking, so chase the upgrade.</div><div class="gs-lock-gear">${gearRows}</div>`) +
-    accordion('bench', '📦', 'Bench', benchIds.length ? `${benchIds.length} spare` : 'empty', `<div class="gs-lock-grid">${benchCards}</div>`);
+    accordion('gear', '🧤', 'Gear', gearCount ? `${gearCount} equipped` : 'none', gearBody) +
+    accordion('bench', '📦', 'Bench', benchIds.length ? `${benchIds.length} spare` : 'empty', benchCards);
 
   return `
     <header class="gs-hero gs-storyhub">
@@ -161,29 +205,33 @@ function lockerRoomHeaderSVG(): string {
   </div>`;
 }
 
-/** A club chip in the bag or on the bench. Tap art → lore card; the ✕/＋ equips/unequips inline. */
-function clubChip(id: string, where: 'bag' | 'bench', bagFull = false): string {
+/** A club tile in the bag or on the bench. Tap art → lore card; the ✕/＋ equips/unequips inline. */
+function clubTile(id: string, where: 'bag' | 'bench', bagFull = false): string {
   const club = resolveStoryClub(id);
   if (!club) return '';
   const ac = rarCol(club.rarity ?? 'common');
   const type = storyClubType(id);
-  const carry = type === 'putter' ? '' : `${club.carry} yd`;
+  const carry = type === 'putter' ? 'Putter' : `${club.carry} yd`;
   // A bench club can be equipped unless the bag is full for a NEW type (a same-type swap is always allowed).
   const sameTypeInBag = state.story!.equippedBagIds.some((b) => storyClubType(b) === type);
   const canEquip = !bagFull || sameTypeInBag;
-  const action =
+  const btn =
     where === 'bag'
-      ? `<button class="gs-lock-btn gs-lock-btn--off" data-action='${JSON.stringify({ type: 'storyUnequipClub', clubId: id })}' title="Take out of the bag">✕</button>`
+      ? cornerBtn('off', '✕', 'Take out of the bag', JSON.stringify({ type: 'storyUnequipClub', clubId: id }))
       : canEquip
-      ? `<button class="gs-lock-btn gs-lock-btn--on" data-action='${JSON.stringify({ type: 'storyEquipClub', clubId: id })}' title="Put in the bag">＋</button>`
-      : `<span class="gs-lock-btn gs-lock-btn--dim" title="Bag full — take one out first">🔒</span>`;
-  return `
-    <div class="gs-lock-chip" style="--ac:${ac};">
-      <span class="gs-lock-art" data-action='${JSON.stringify({ type: 'storyInspectItem', itemId: lorableId(id) })}' role="button" aria-label="${club.name}">${clubArt(id)}</span>
-      <span class="gs-lock-name">${club.name}</span>
-      <span class="gs-lock-meta">${carry}</span>
-      ${action}
-    </div>`;
+        ? cornerBtn('on', '＋', 'Put in the bag', JSON.stringify({ type: 'storyEquipClub', clubId: id }))
+        : cornerBtn('dim', '🔒', 'Bag full — take one out first');
+  return tile({
+    art: clubArt(id),
+    name: club.name,
+    meta: carry,
+    ac,
+    on: where === 'bag',
+    badge: '🎒',
+    inspect: JSON.stringify({ type: 'storyInspectItem', itemId: lorableId(id) }),
+    ariaName: club.name,
+    btn,
+  });
 }
 
 /** GS-story-quality: a caddy's display name — a Coil VOLUNTEER (Herald path) reads off the agent roster,
@@ -197,59 +245,79 @@ function caddyBustSVG(id: string): string {
   return a ? lorePortraitSVG(a.portrait) : caddyPortraitSVG(id);
 }
 
-/** GS-story-caddies: the caddy ROSTER body — the friends you've gathered. One carries the bag (tap ＋ to make
- *  a friend active, ✕ to bench all). Empty until you recruit one out at the worlds where they wait. Returns
- *  just the panel body (the accordion supplies the header). */
+/** GS-story-caddies: the caddy ROSTER body — the friends you've gathered, as the shared tile grid. One
+ *  carries the bag (tap ＋ to make a friend active, ✕ to bench all). Empty until you recruit one out at the
+ *  worlds where they wait. Returns just the panel body (the accordion supplies the header). */
 function crewBodyHTML(story: StoryState): string {
   if (!story.hiredCaddyIds.length) {
     return `<div class="gs-lock-empty">No friends aboard yet — recruit them out in the galaxy, at the worlds where each one waits.</div>`;
   }
   const active = activeStoryCaddy(story);
-  const chips = story.hiredCaddyIds
+  const tiles = story.hiredCaddyIds
     .map((id) => {
       const name = caddyDisplayName(id);
       const on = id === active;
       const btn = on
-        ? `<button class="gs-lock-btn gs-lock-btn--off" data-action='${JSON.stringify({ type: 'setStoryCaddy' })}' title="Bench (nobody carries the bag)">✕</button>`
-        : `<button class="gs-lock-btn gs-lock-btn--on" data-action='${JSON.stringify({ type: 'setStoryCaddy', caddyId: id })}' title="Carry my bag">＋</button>`;
-      return `<div class="gs-lock-gchip${on ? ' gs-lock-gchip--on' : ''}" style="--ac:#f0a8c8;">
-          <span class="gs-lock-gart" data-action='${JSON.stringify({ type: 'storyInspectItem', itemId: id })}' role="button" aria-label="${name} — view their effect">${caddyBustSVG(id)}</span>
-          <span class="gs-lock-gname" data-action='${JSON.stringify({ type: 'storyInspectItem', itemId: id })}' role="button">🎒 ${name}${on ? ' · on the bag' : ''}</span>
-          ${btn}
-        </div>`;
+        ? cornerBtn('off', '✕', 'Bench (nobody carries the bag)', JSON.stringify({ type: 'setStoryCaddy' }))
+        : cornerBtn('on', '＋', 'Carry my bag', JSON.stringify({ type: 'setStoryCaddy', caddyId: id }));
+      return tile({
+        art: caddyBustSVG(id),
+        name,
+        meta: on ? 'On the bag' : 'Aboard',
+        ac: '#f0a8c8',
+        on,
+        badge: '🎒',
+        inspect: JSON.stringify({ type: 'storyInspectItem', itemId: id }),
+        ariaName: `${name} — view their effect`,
+        btn,
+      });
     })
     .join('');
-  return `<div class="gs-lock-gitems">${chips}</div>`;
+  return `<div class="gs-lock-grid">${tiles}</div>`;
 }
 
-/** One gear slot: the equipped item (or empty) + owned alternatives to switch to, and a remove. */
+/** One gear slot: a slim header (icon · label · owned count) over a tile grid of the owned pieces, the
+ *  equipped one first + ringed. Empty slots show a short hint. */
 function gearSlotRow(slot: GearSlot): string {
   const story = state.story!;
   const owned = ownedGearForSlot(story, slot);
   const equippedId = story.equippedGear[slot];
-  const items = owned.length
-    ? owned
+  // Equipped piece leads its slot so the active choice reads first (view-only sort; re-orders on swap).
+  const ordered = [...owned].sort((a, b) => (a.id === equippedId ? -1 : b.id === equippedId ? 1 : 0));
+  const grid = ordered.length
+    ? `<div class="gs-lock-grid">${ordered
         .map((g) => {
           const on = g.id === equippedId;
-          const ac = rarCol(g.rarity);
-          return `
-        <div class="gs-lock-gchip${on ? ' gs-lock-gchip--on' : ''}" style="--ac:${ac};">
-          <span class="gs-lock-gart" data-action='${JSON.stringify({ type: 'storyInspectItem', itemId: g.id })}' role="button" aria-label="${g.name}">${itemArtSVG(g.id, g.rarity)}</span>
-          <span class="gs-lock-gname">${g.name}</span>
-          ${
-            on
-              ? `<button class="gs-lock-btn gs-lock-btn--off" data-action='${JSON.stringify({ type: 'storyUnequipGear', slot })}' title="Take off">✕</button>`
-              : `<button class="gs-lock-btn gs-lock-btn--on" data-action='${JSON.stringify({ type: 'storyEquipGear', gearId: g.id })}' title="Equip">＋</button>`
-          }
-        </div>`;
+          const btn = on
+            ? cornerBtn('off', '✕', 'Take off', JSON.stringify({ type: 'storyUnequipGear', slot }))
+            : cornerBtn('on', '＋', 'Equip', JSON.stringify({ type: 'storyEquipGear', gearId: g.id }));
+          return tile({
+            art: itemArtSVG(g.id, g.rarity),
+            name: g.name,
+            meta: rarLabel(g.rarity),
+            ac: rarCol(g.rarity),
+            on,
+            badge: '✓',
+            inspect: JSON.stringify({ type: 'storyInspectItem', itemId: g.id }),
+            ariaName: g.name,
+            btn,
+          });
         })
-        .join('')
-    : `<span class="gs-lock-none">None owned — buy some at a Pro Shop.</span>`;
+        .join('')}</div>`
+    : `<div class="gs-lock-none">None owned — buy some at a Pro Shop.</div>`;
   return `
     <div class="gs-lock-slot">
-      <div class="gs-lock-slothdr">${SLOT_LABEL[slot]}</div>
-      <div class="gs-lock-gitems">${items}</div>
+      <div class="gs-lock-slothdr">
+        <span class="gs-lock-slotname">${SLOT_LABEL[slot]}</span>
+        <span class="gs-lock-slotcount">${owned.length || '–'}</span>
+      </div>
+      ${grid}
     </div>`;
+}
+
+/** A short capitalized rarity label for a gear tile's meta line. */
+function rarLabel(r: string): string {
+  return r ? r.charAt(0).toUpperCase() + r.slice(1) : '';
 }
 
 /** The id to inspect for a club: themed + NAMED reward ids (quest / major / charquest) carry lore directly;
@@ -343,12 +411,12 @@ function lockerCard(id: string): StoryCard | undefined {
   return storyCardFor(id);
 }
 
-/** The read-only lore card for an owned item, footer = its equip state (managed inline on the chips). */
+/** The read-only lore card for an owned item, footer = its equip state (managed inline on the tiles). */
 function inspectOverlay(itemId: string): string {
   const story = state.story;
   const card = lockerCard(itemId);
   if (!story || !card) return '';
-  // A gear card can be equipped from here too; a caddy can be put on the bag; clubs are managed on their chips.
+  // A gear card can be equipped from here too; a caddy can be put on the bag; clubs are managed on their tiles.
   let footer = '';
   if (card.kind === 'gear') {
     const g = storyGearById(itemId);
@@ -403,33 +471,36 @@ const LOCKER_STYLE = `
       overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     .gs-lock-accchev{flex:0 0 auto;color:#8a97ad;font-size:12px;width:1em;text-align:center;}
     .gs-lock-accbody{padding:11px 12px 13px;}
-    .gs-lock-sec{font-size:13px;font-weight:800;letter-spacing:.04em;color:var(--gs-ink,#eaf1fb);
-      margin:14px 0 8px;display:flex;align-items:center;gap:8px;}
-    .gs-lock-count{font-size:12px;font-weight:800;color:#7fe0a0;background:#12211a;border:1px solid #244a37;border-radius:20px;padding:1px 9px;}
-    .gs-lock-count--full{color:#e9c46a;background:#26200f;border-color:#5a4a22;}
-    .gs-lock-hint{font-size:11px;font-weight:600;color:var(--gs-dim,#9fb0c8);text-transform:none;letter-spacing:0;}
-    .gs-lock-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;}
-    .gs-lock-chip{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center;
+
+    /* One dense tile grid for every section (bag / crew / gear / bench). */
+    .gs-lock-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(98px,1fr));gap:8px;}
+    .gs-lock-tile{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center;
       background:linear-gradient(180deg,#141926,#0f131c);border:1px solid #262f42;border-top:3px solid var(--ac,#5b8bd0);
-      border-radius:11px;padding:8px 6px 7px;}
-    .gs-lock-art{width:56px;height:56px;cursor:pointer;}
-    .gs-lock-art svg,.gs-lock-gart svg{width:100%;height:100%;}
-    .gs-lock-name{font-size:11.5px;font-weight:700;color:var(--gs-ink,#eaf1fb);line-height:1.15;}
-    .gs-lock-meta{font-size:10.5px;color:var(--gs-dim,#9fb0c8);min-height:1em;}
+      border-radius:11px;padding:8px 6px 7px;min-height:118px;transition:box-shadow .12s ease,border-color .12s ease;}
+    .gs-lock-tile--on{border-color:var(--ac,#5b8bd0);box-shadow:0 0 0 1px var(--ac,#5b8bd0) inset,0 0 12px -4px var(--ac,#5b8bd0);
+      background:linear-gradient(180deg,#182338,#10151f);}
+    .gs-lock-badge{position:absolute;top:5px;left:5px;font-size:11px;line-height:1;filter:drop-shadow(0 1px 1px #000);}
+    .gs-lock-art{width:52px;height:52px;cursor:pointer;flex:0 0 auto;margin-top:2px;}
+    .gs-lock-art svg{width:100%;height:100%;}
+    .gs-lock-name{font-size:11.5px;font-weight:700;color:var(--gs-ink,#eaf1fb);line-height:1.15;
+      display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+    .gs-lock-meta{font-size:10px;color:var(--gs-dim,#9fb0c8);min-height:1em;margin-top:auto;}
     .gs-lock-btn{position:absolute;top:5px;right:5px;width:24px;height:24px;border-radius:50%;border:1px solid #333c50;
-      background:#0d1119;color:#cdd8ea;font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;}
-    .gs-lock-btn--on{color:#7fe0a0;border-color:#2a5a40;}
-    .gs-lock-btn--off{color:#c98a8a;border-color:#5a2a2a;}
+      background:#0d1119;color:#cdd8ea;font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;
+      padding:0;}
+    .gs-lock-btn--on{color:#7fe0a0;border-color:#2a5a40;background:#0e1a13;}
+    .gs-lock-btn--on:hover{background:#12271a;}
+    .gs-lock-btn--off{color:#e0a0a0;border-color:#5a2a2a;background:#1a0f0f;}
+    .gs-lock-btn--off:hover{background:#271414;}
     .gs-lock-btn--dim{color:#5a6478;cursor:default;}
-    .gs-lock-empty,.gs-lock-none{color:var(--gs-dim,#9fb0c8);font-size:12px;line-height:1.5;padding:10px 4px;}
-    .gs-lock-gear{display:flex;flex-direction:column;gap:8px;}
-    .gs-lock-slot{background:#0d1119;border:1px solid #232b3b;border-radius:12px;padding:9px 11px;}
-    .gs-lock-slothdr{font-size:12px;font-weight:800;color:var(--gs-ink,#eaf1fb);margin-bottom:7px;}
-    .gs-lock-gitems{display:flex;flex-wrap:wrap;gap:7px;}
-    .gs-lock-gchip{position:relative;display:flex;align-items:center;gap:7px;background:linear-gradient(180deg,#141926,#0f131c);
-      border:1px solid #262f42;border-left:3px solid var(--ac,#5b8bd0);border-radius:10px;padding:5px 30px 5px 6px;}
-    .gs-lock-gchip--on{box-shadow:0 0 0 1px var(--ac,#5b8bd0) inset;}
-    .gs-lock-gart{width:34px;height:34px;cursor:pointer;flex:0 0 auto;}
-    .gs-lock-gname{font-size:12px;font-weight:700;color:var(--gs-ink,#eaf1fb);}
-    .gs-lock-gchip .gs-lock-btn{width:22px;height:22px;top:50%;transform:translateY(-50%);right:5px;font-size:12px;}
+    .gs-lock-empty,.gs-lock-none{color:var(--gs-dim,#9fb0c8);font-size:12px;line-height:1.5;padding:8px 4px;}
+
+    /* Gear: slots stacked, each a slim header over the shared tile grid. */
+    .gs-lock-gearnote{font-size:11.5px;color:#8fa0b8;line-height:1.45;margin:0 0 10px;}
+    .gs-lock-gearwrap{display:flex;flex-direction:column;gap:12px;}
+    .gs-lock-slot{background:#0c1017;border:1px solid #1e2636;border-radius:12px;padding:9px 10px 10px;}
+    .gs-lock-slothdr{display:flex;align-items:center;gap:8px;margin:0 0 8px;}
+    .gs-lock-slotname{font-size:12px;font-weight:800;letter-spacing:.02em;color:var(--gs-ink,#eaf1fb);}
+    .gs-lock-slotcount{margin-left:auto;font-size:11px;font-weight:800;color:#8fa0b8;background:#111826;
+      border:1px solid #26314a;border-radius:20px;padding:1px 8px;min-width:22px;text-align:center;}
   </style>`;
