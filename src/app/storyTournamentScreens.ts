@@ -6,7 +6,7 @@
  * from design tokens + a self-contained `.gs-tourn*` style block (own prefix). Reads the live `state`.
  */
 
-import { state } from './ctx';
+import { state, btn } from './ctx';
 import { getCharacter } from '../sim/rpg/characters';
 import { STORY_CHAPTER_COUNT, type StoryState } from '../sim/rpg/story';
 import { currentTournament, sigilCount, tournamentCompetitors, tournamentRival, tournamentIntroLines, isTeamTournament, isSinglesMatchTournament, isTeamMatchTournament, teamPartnerPool, type StoryTournament } from '../sim/rpg/storyTournaments';
@@ -16,6 +16,8 @@ import { storyClubEffectLabel } from '../sim/rpg/storyClubEffects';
 import { shipUpgradeById, upgradeDetail } from '../sim/rpg/storyShipUpgrades';
 import { venomaPortraitSVG, vossPortraitSVG, scorpiusPortraitSVG, driverDanPortraitSVG } from '../render/loreArt';
 import { penelopePortraitSVG } from '../render/caddyPortraits';
+import { loreBeatHTML } from './loreScreens';
+import { betrayerName } from '../sim/rpg/storyBetrayal';
 
 /** The rival's glyph for the field/lobby (a portrait shows when one exists; else this reads them). */
 function rivalGlyph(rivalId: string): string {
@@ -547,3 +549,29 @@ const TOURN_STYLE = `
     @keyframes gs-tourn-rise{to{opacity:1;transform:translateY(0);}}
     @media(prefers-reduced-motion:reduce){.gs-tourn-in{animation:none;opacity:1;transform:none;}}
   </style>`;
+
+/**
+ * GS-story-aftermath: the post-result CONFRONTATION beat for a back-half Sigil (the Silent Sting
+ * withdrawing, the Green Key forging, the harvest). Reuses the shared `.gs-lore*` cinematic beat card
+ * (`loreBeatHTML`), so it reads identically to every other story beat and forks no CSS. Reads
+ * `state.pendingAftermath` (built by the reducer from the just-finished major + win/loss); the `{betrayer}`
+ * token resolves to the campaign's actual odd-one-out. Its single CTA dispatches `storyAftermathContinue`
+ * (→ the interlude on a Ch.4 win, else the clubhouse). Defensive fallback so a stale state can't blank it.
+ */
+export function storyTournamentAftermathScreen(): string {
+  const beat = state.pendingAftermath;
+  if (!beat) {
+    return `<div style="min-height:60vh;display:flex;align-items:center;justify-content:center;padding:24px;">${btn(
+      'Continue →',
+      { type: 'storyAftermathContinue' },
+      { variant: 'primary' },
+    )}</div>`;
+  }
+  const resolve = (t: string): string =>
+    t.replaceAll('{betrayer}', state.story ? betrayerName(state.story) : 'a friend');
+  return loreBeatHTML(
+    { accent: beat.accent, kicker: beat.kicker, title: beat.title, speaker: beat.speaker, portrait: beat.portrait, lines: beat.lines, cta: beat.cta },
+    resolve,
+    { type: 'storyAftermathContinue' },
+  );
+}
