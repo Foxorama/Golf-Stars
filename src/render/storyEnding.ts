@@ -2,10 +2,13 @@
  * The four STORY ENDINGS cinematic (GS-story-endings) — Canvas2D, render-only, a full-screen overlay played
  * after the Jörmungandr finale resolves, one of four ways depending on your PATH (Warden / Herald) and the
  * OUTCOME (win / lose):
- *   'good-win'  — the Wardens win (THE RESEAL): the serpent is sung back to SLEEP — it settles, the seal
- *                 takes, its eye slides shut — while dawn breaks across every world saved… and the Coil's
- *                 last wyrm-ship (the lost friend aboard) jets away to THE DESTINATION
- *                 (GS-story-unending-tease — the named unknown deep a future mode will open).
+ *   'good-win'  — the Wardens win (THE RESEAL, GS-story-reseal-tree): a longer, WORDLESS three-beat sequence —
+ *                 the serpent is sung back to SLEEP and the golden seal LOCKS over its coils; then YGGDRASIL,
+ *                 the World-Tree, grows up around it (a luminous trunk + canopy behind, roots cradling in
+ *                 front, the saved worlds lit as star-fruit); and it HOLDS as dawn breaks while the Coil's
+ *                 last wyrm-ship (the lost friend aboard) jets away to THE DESTINATION (GS-story-unending-
+ *                 tease — the named unknown deep a future mode will open). The narrative TEXT is not baked
+ *                 over the art — it's the readable RECAP this cinematic dismisses onto (advance when read).
  *   'good-lose' — the Wardens fall: the CROW — the Coil's true prophet — reveals it let you win all along so
  *                 you'd free the World-Eater with the Keystone; the maw opens and swallows the stars.
  *   'cult-win'  — the Herald wins: the serpent uncoils around the galaxy; Ragnarok; the lights go out, one by
@@ -43,6 +46,100 @@ const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 const easeOut = (t: number): number => 1 - Math.pow(1 - t, 3);
 const easeInOut = (t: number): number => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+
+// ── YGGDRASIL (GS-story-reseal-tree) — the World-Tree that grows up around the sleeping serpent in the
+//    Reseal ending. A recursively-branched skeleton, pre-built once (deterministic, private rng) at mount:
+//    a luminous trunk + CANOPY rising behind the settled coils, and a root system that curls in FRONT to
+//    cradle the beast. Each segment carries a reveal window [t0,t1] over the growth 0..1 so the tree
+//    unfurls trunk-first, tips-last. Star-blossoms (the worlds you saved, hung as fruit) light at the tips.
+interface TBranch {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  w: number;
+  t0: number;
+  t1: number;
+  depth: number;
+}
+interface TBloss {
+  x: number;
+  y: number;
+  t0: number;
+  r: number;
+  hue: number;
+}
+interface TFoliage {
+  x: number;
+  y: number;
+  t0: number;
+  r: number;
+}
+interface Yggdrasil {
+  canopy: TBranch[];
+  canopyBloss: TBloss[];
+  foliage: TFoliage[];
+  roots: TBranch[];
+  rootBloss: TBloss[];
+}
+
+function buildYggdrasil(rand: () => number): Yggdrasil {
+  const canopy: TBranch[] = [];
+  const canopyBloss: TBloss[] = [];
+  const foliage: TFoliage[] = [];
+  const roots: TBranch[] = [];
+  const rootBloss: TBloss[] = [];
+  const grow = (
+    x: number,
+    y: number,
+    ang: number,
+    len: number,
+    depth: number,
+    t0: number,
+    tSpan: number,
+    arr: TBranch[],
+    bloss: TBloss[],
+    maxD: number,
+    wrap: boolean,
+  ): void => {
+    // Roots curl toward the beast's midline so the tendrils embrace it (a gravity-like inward drift).
+    const drift = wrap ? (x < 500 ? 1 : -1) * 0.4 : 0;
+    const a = ang + drift;
+    const x1 = x + Math.cos(a) * len;
+    const y1 = y + Math.sin(a) * len;
+    const w = Math.max(1.4, (wrap ? 8 : 14) * Math.pow(0.72, depth));
+    arr.push({ x0: x, y0: y, x1, y1, w, t0, t1: t0 + tSpan * 0.5, depth });
+    // Canopy foliage — soft leaf-mass blobs seed from the mid-canopy outward, giving the crown volume.
+    if (!wrap && depth >= 2) foliage.push({ x: x1, y: y1, t0: t0 + tSpan * 0.35, r: len * (0.7 + rand() * 0.5) });
+    if (depth >= maxD || len < (wrap ? 22 : 15)) {
+      bloss.push({ x: x1, y: y1, t0: t0 + tSpan * 0.42, r: 3 + rand() * 3.6, hue: rand() });
+      return;
+    }
+    const kids = 2 + (rand() < 0.5 ? 1 : 0);
+    const cs = t0 + tSpan * 0.4;
+    const csp = tSpan * 0.62;
+    const spread = wrap ? 0.4 : 0.6;
+    for (let i = 0; i < kids; i++) {
+      const f = kids === 1 ? 0 : i / (kids - 1) - 0.5;
+      const a2 = a + f * spread * 2 + (rand() - 0.5) * 0.26;
+      grow(x1, y1, a2, len * (0.68 + rand() * 0.14), depth + 1, cs, csp, arr, bloss, maxD, wrap);
+    }
+  };
+  // TRUNK + CANOPY — a stout trunk up from the base, forking into a broad, high crown.
+  grow(500, 606, -Math.PI / 2, 172, 0, 0, 1, canopy, canopyBloss, 5, false);
+  // ROOTS — tendrils fanning UP and OUT from the base, curling inward to CRADLE the sleeping coils.
+  for (const a of [-2.62, -2.18, -0.96, -0.52]) grow(500, 560, a, 124, 0, 0.3, 0.66, roots, rootBloss, 3, true);
+  return { canopy, canopyBloss, foliage, roots, rootBloss };
+}
+
+/** Star-blossom palette (the saved worlds hung in the canopy as fruit). */
+const BLOSS_HUE: [number, number, number][] = [
+  [150, 235, 175],
+  [240, 212, 110],
+  [120, 200, 255],
+  [232, 140, 200],
+  [180, 240, 150],
+];
 
 /** Copy for each ending: a title + a subtitle + one line of the speaker's voice (Parrot or the Crow).
  *  `{betrayer}` (GS-story-unending-tease) resolves at mount to the campaign's actual odd-one-out. */
@@ -110,7 +207,10 @@ export function mountStoryEnding(opts: {
   document.body.appendChild(overlay);
   const ctx = canvas.getContext('2d');
 
-  const P = { scene: 4600, hold: 2400 };
+  // GS-story-reseal-tree: the Reseal ending runs LONGER — the seal applies, then Yggdrasil grows up around
+  // the sleeping serpent, and it holds so the moment can land — before dismissing to the readable recap.
+  const good = variant === 'good-win';
+  const P = good ? { scene: 7200, hold: 2800 } : { scene: 4600, hold: 2400 };
   const TOTAL = P.scene + P.hold;
 
   const rng = mulberry32(0x5e0d ^ variant.length ^ (variant.charCodeAt(0) << 8));
@@ -118,6 +218,8 @@ export function mountStoryEnding(opts: {
   const stars: Star[] = Array.from({ length: 220 }, () => ({ x: rng() * DW, y: rng() * DH, r: 0.4 + rng() * 1.6, tw: rng() * 6.28 }));
   // A scatter of worlds (little planets) for the dawn / devour beats.
   const worlds = Array.from({ length: 9 }, () => ({ x: 120 + rng() * 760, y: 90 + rng() * 300, r: 8 + rng() * 16, hue: rng() }));
+  // The World-Tree skeleton, pre-built once (own private rng, so it never perturbs the star/world scatter).
+  const tree: Yggdrasil | null = good ? buildYggdrasil(mulberry32(0x9a7cf1)) : null;
 
   let raf = 0;
   let start = 0;
@@ -250,6 +352,149 @@ export function mountStoryEnding(opts: {
     ctx.ellipse(-30, 0, 8 + Math.sin(t * 12) * 2, 3.4, 0, 0, 6.283);
     ctx.fill();
     ctx.restore();
+  }
+
+  // ── YGGDRASIL painters (GS-story-reseal-tree) — draw the pre-built skeleton, revealed by `grow` 0..1. ──
+  /** Draw a set of branches, each unfurling over its own reveal window. `warm` tints the bark (trunk brown
+   *  → luminous emerald-gold at the tips), `glow` scales the aura. */
+  function drawTree(arr: TBranch[], grow: number, glow: number): void {
+    if (!ctx) return;
+    ctx.lineCap = 'round';
+    for (const b of arr) {
+      const span = Math.max(0.0001, b.t1 - b.t0);
+      const rev = clamp01((grow - b.t0) / span);
+      if (rev <= 0) continue;
+      const ex = lerp(b.x0, b.x1, easeOut(rev));
+      const ey = lerp(b.y0, b.y1, easeOut(rev));
+      // luminous aura underlay
+      ctx.strokeStyle = `rgba(130,220,160,${0.1 * glow})`;
+      ctx.lineWidth = b.w + 4;
+      ctx.beginPath();
+      ctx.moveTo(b.x0, b.y0);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      // bark — warm gold-brown heartwood low, brightening to living gold-green out at the twigs
+      const lit = Math.min(1, b.depth * 0.22);
+      const r = Math.round(96 + lit * 70);
+      const g = Math.round(72 + lit * 150);
+      const bl = Math.round(40 + lit * 60);
+      ctx.strokeStyle = `rgb(${r},${g},${bl})`;
+      ctx.lineWidth = b.w;
+      ctx.beginPath();
+      ctx.moveTo(b.x0, b.y0);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      // a bright grain highlight down one side of the thicker limbs
+      if (b.w > 3) {
+        ctx.strokeStyle = `rgba(200,255,210,${0.28 * glow})`;
+        ctx.lineWidth = Math.max(0.8, b.w * 0.28);
+        ctx.beginPath();
+        ctx.moveTo(b.x0, b.y0 - b.w * 0.22);
+        ctx.lineTo(ex, ey - b.w * 0.22);
+        ctx.stroke();
+      }
+    }
+    ctx.lineCap = 'butt';
+  }
+  /** Canopy foliage — soft luminous leaf-masses that give the crown volume, unfurling with the growth. */
+  function foliage(arr: TFoliage[], grow: number, glow: number, t: number): void {
+    if (!ctx) return;
+    for (const f of arr) {
+      const rev = clamp01((grow - f.t0) / 0.3);
+      if (rev <= 0) continue;
+      const breathe = 0.92 + 0.08 * Math.sin(t * 1.3 + f.x * 0.02);
+      const rr = f.r * rev * breathe;
+      const g = ctx.createRadialGradient(f.x, f.y, 1, f.x, f.y, rr);
+      g.addColorStop(0, `rgba(140,235,165,${0.3 * glow * rev})`);
+      g.addColorStop(0.55, `rgba(74,182,116,${0.2 * glow * rev})`);
+      g.addColorStop(1, 'rgba(20,80,50,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, rr, 0, 6.283);
+      ctx.fill();
+    }
+  }
+  /** Star-blossoms — the saved worlds hung in the tree as glowing fruit, lit as the growth reaches them. */
+  function blossoms(arr: TBloss[], grow: number, glow: number, t: number): void {
+    if (!ctx) return;
+    for (const bl of arr) {
+      const rev = clamp01((grow - bl.t0) / 0.16);
+      if (rev <= 0) continue;
+      const hue = BLOSS_HUE[(bl.hue * BLOSS_HUE.length) | 0]!;
+      const [hr, hg, hb] = hue;
+      const tw = 0.6 + 0.4 * Math.sin(t * 2.6 + bl.x * 0.05 + bl.y * 0.03);
+      const a = rev * glow * (0.6 + 0.4 * tw);
+      const rr = bl.r * (0.65 + 0.35 * rev);
+      const gr = ctx.createRadialGradient(bl.x, bl.y, 0.5, bl.x, bl.y, rr * 3.6);
+      gr.addColorStop(0, `rgba(${hr},${hg},${hb},${0.8 * a})`);
+      gr.addColorStop(0.4, `rgba(${hr},${hg},${hb},${0.28 * a})`);
+      gr.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = gr;
+      ctx.beginPath();
+      ctx.arc(bl.x, bl.y, rr * 3.6, 0, 6.283);
+      ctx.fill();
+      ctx.fillStyle = `rgba(255,255,246,${0.9 * a})`;
+      ctx.beginPath();
+      ctx.arc(bl.x, bl.y, rr * 0.7, 0, 6.283);
+      ctx.fill();
+    }
+  }
+  /** The applied SEAL — a golden bind-rune ring seated over the sleeping coils, brightening as it locks;
+   *  `seat` 0..1 is how set the seal is, `flash` a one-shot bloom when it seizes. */
+  function sealSigil(cx: number, cy: number, seat: number, flash: number, t: number): void {
+    if (!ctx || seat <= 0) return;
+    const R = 150;
+    const spin = t * 0.25;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(1, 0.42); // seat the rune flat over the coils
+    // the lock bloom
+    if (flash > 0.01) {
+      const fg = ctx.createRadialGradient(0, 0, 2, 0, 0, R * 1.8);
+      fg.addColorStop(0, `rgba(255,240,190,${0.5 * flash})`);
+      fg.addColorStop(1, 'rgba(255,220,140,0)');
+      ctx.fillStyle = fg;
+      ctx.beginPath();
+      ctx.arc(0, 0, R * 1.8, 0, 6.283);
+      ctx.fill();
+    }
+    ctx.rotate(spin);
+    const a = 0.2 + seat * 0.55;
+    // twin rings
+    for (const rr of [R, R * 0.72]) {
+      ctx.strokeStyle = `rgba(244,206,120,${a})`;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, rr, 0, 6.283);
+      ctx.stroke();
+    }
+    // bind-runes around the ring
+    ctx.strokeStyle = `rgba(255,232,160,${a})`;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 8; i++) {
+      const ang = (i / 8) * 6.283;
+      const c = Math.cos(ang);
+      const s = Math.sin(ang);
+      ctx.beginPath();
+      ctx.moveTo(c * R * 0.72, s * R * 0.72);
+      ctx.lineTo(c * R, s * R);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  /** The Reseal title, laid cleanly at the TOP of the frame — clear of the tree + serpent (the readable
+   *  narrative is the recap that follows). Fades in late, once the tree has taken. */
+  function titleCard(a: number): void {
+    if (!ctx || a <= 0) return;
+    ctx.globalAlpha = a;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#f4ecd6';
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 14;
+    ctx.font = '800 46px Georgia, "Times New Roman", serif';
+    ctx.fillText(copy.title, DW / 2, 74);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
   }
 
   /** The Crow — the Coil's true prophet, the dark mirror of the Parrot. A great black bird with a pale
@@ -434,37 +679,55 @@ export function mountStoryEnding(opts: {
     ctx.scale(scale, scale);
 
     if (variant === 'good-win') {
-      // GS-story-unending-tease — THE RESEAL: dawn sweeps up from the bottom while the serpent is sung
-      // back to SLEEP (it settles, the sway stills, the burning eye slides shut — it never shatters);
-      // golden seal-rings tighten over it, worlds brighten… and the Coil's last wyrm-ship runs dark
-      // ahead of the dawn, jetting off-frame toward The Destination with the lost friend aboard.
+      // GS-story-reseal-tree — THE RESEAL, in three beats: (1) the serpent settles to SLEEP while golden
+      // seal-rings converge and LOCK (a bind-rune seats over the coils with a bloom); (2) YGGDRASIL, the
+      // World-Tree, grows up around it — a luminous trunk + canopy rising behind, roots curling in front to
+      // cradle the beast, and the worlds you saved lighting as star-fruit in the crown; (3) it HOLDS as dawn
+      // breaks, while the Coil's last wyrm-ship runs dark ahead of the light toward The Destination.
+      const seat = easeOut(clamp01(e / 3000)); // the seal seats over the first 3s
+      const lockFlash = Math.sin(clamp01((e - 2200) / 900) * Math.PI); // one-shot bloom as it seizes
+      const sleep = easeInOut(clamp01(e / 2600)); // the beast slides into dreamless sleep
+      const growT = easeOut(clamp01((e - 2900) / 4200)); // the tree unfurls, 2.9s → 7.1s
+      const dawnP = clamp01((e - 2600) / (TOTAL - 2600)); // dawn brightens behind the risen tree
       const dawn = ctx.createLinearGradient(0, DH, 0, 0);
-      dawn.addColorStop(0, `rgba(255,${180 + sp * 40},120,${0.25 + sp * 0.35})`);
-      dawn.addColorStop(0.5, `rgba(120,180,255,${0.1 + sp * 0.2})`);
+      dawn.addColorStop(0, `rgba(255,${180 + dawnP * 40},120,${0.22 + dawnP * 0.38})`);
+      dawn.addColorStop(0.5, `rgba(120,180,255,${0.08 + dawnP * 0.22})`);
       dawn.addColorStop(1, '#060814');
       ctx.fillStyle = '#060814';
       ctx.fillRect(0, 0, DW, DH);
       ctx.fillStyle = dawn;
       ctx.fillRect(0, 0, DW, DH);
-      starfield(t, 1 - sp * 0.7);
-      // the serpent settles into its dreamless sleep
-      const sleep = easeInOut(clamp01(sp * 1.4));
+      starfield(t, 1 - dawnP * 0.65);
+      for (const w of worlds) planet(w.x, w.y, w.r, w.hue, easeOut(dawnP));
+      // (2a) canopy BEHIND the serpent — the beast nestles into the World-Tree
+      if (tree) {
+        foliage(tree.foliage, growT, 0.5 + growT * 0.5, t);
+        drawTree(tree.canopy, growT, 0.5 + growT * 0.5);
+        blossoms(tree.canopyBloss, growT, 0.5 + growT * 0.5, t);
+      }
+      // (1) the serpent settles into its dreamless sleep
       serpent(t, DW / 2, 300, 500, 0.4 * (1 - sleep), 0, sleep);
-      // the seal takes: amber rings converging on the sleeping coils, then holding steady
+      // (1b) the seal takes: amber rings converging on the sleeping coils, then the bind-rune locking
+      const cySeal = 330 + sleep * 60;
       const ringN = 3;
       for (let i = 0; i < ringN; i++) {
-        const converge = easeOut(clamp01(sp * 1.6 - i * 0.18));
+        const converge = easeOut(clamp01(seat * 1.6 - i * 0.18));
         if (converge <= 0) continue;
         const rr = lerp(430 + i * 70, 250 + i * 26, converge);
         ctx.strokeStyle = `rgba(240,200,110,${0.16 + converge * 0.3})`;
         ctx.lineWidth = 2 + converge * 1.5;
         ctx.beginPath();
-        ctx.ellipse(DW / 2, 330 + sleep * 60, rr, rr * 0.42, 0, 0, 6.283);
+        ctx.ellipse(DW / 2, cySeal, rr, rr * 0.42, 0, 0, 6.283);
         ctx.stroke();
       }
+      sealSigil(DW / 2, cySeal, seat, lockFlash, t);
       ctx.globalAlpha = 1;
-      for (const w of worlds) planet(w.x, w.y, w.r, w.hue, easeOut(sp));
-      // one dark sail, running for the deep — it lifts once the seal is taking and is still flying
+      // (2b) roots IN FRONT, curling up to cradle the sleeping serpent
+      if (tree) {
+        drawTree(tree.roots, growT, 0.5 + growT * 0.5);
+        blossoms(tree.rootBloss, growT, 0.5 + growT * 0.5, t);
+      }
+      // (3) one dark sail, running for the deep — it lifts once the seal is taking and is still flying
       // through the HOLD (paced on the whole cinematic, not the scene, so the jet-off reads to the end)
       coilShipFlees(t, clamp01((e / TOTAL - 0.3) / 0.75));
     } else if (variant === 'good-lose') {
@@ -532,9 +795,15 @@ export function mountStoryEnding(opts: {
       bustedShip(t, lerp(560, 900, easeInOut(sp)), lerp(300, 210, sp));
     }
 
-    // caption block — fades in over the back half of the scene, holds through the end
-    const capA = e < P.scene * 0.45 ? 0 : easeOut(clamp01((e - P.scene * 0.45) / (P.scene * 0.55)));
-    captionBlock(capA);
+    // Captions. GS-story-reseal-tree: the Reseal is WORDLESS but for a clean title laid at the top, clear of
+    // the art — the full narrative is the readable RECAP the cinematic dismisses onto (advance when you've
+    // finished reading). The other three endings keep their in-frame caption block.
+    if (good) {
+      titleCard(easeOut(clamp01((e - P.scene * 0.62) / (P.scene * 0.38))));
+    } else {
+      const capA = e < P.scene * 0.45 ? 0 : easeOut(clamp01((e - P.scene * 0.45) / (P.scene * 0.55)));
+      captionBlock(capA);
+    }
 
     ctx.restore();
     if (e >= TOTAL) {

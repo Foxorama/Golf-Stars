@@ -695,6 +695,22 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   sclera, bloodshot veins, a slit pupil, a cold glint) under a shadowed brow (a cast-occlusion socket),
   directionally-lit head SCALES, a nostril slit, and a green RIM-LIGHT along the top silhouette. The maw +
   eye + horns all animate open with `wake`/`focusHead`.
+- **GS-story-reseal-tree** — ✅ *shipped* (`render/storyEnding.ts`; player report: the Reseal ending was
+  "unreadable and doesn't look fantastic" — a wall of caption text painted straight over the serpent art).
+  The `good-win` cinematic was redesigned into a longer, **WORDLESS** three-beat sequence: (1) the serpent
+  settles to SLEEP and the golden seal-rings converge into a locking **bind-rune** over its coils (a one-shot
+  bloom as it seizes); (2) **YGGDRASIL**, the World-Tree, GROWS up around it — a pre-built recursive skeleton
+  (own private mulberry32, so it never perturbs the star/world scatter), a stout luminous trunk + broad canopy
+  BEHIND the beast, root tendrils curling in FRONT to cradle the coils, soft foliage masses for crown volume,
+  and the saved worlds lit as star-fruit blossoms; (3) it HOLDS as dawn breaks while the Coil's wyrm-ship jets
+  off toward The Destination. Timeline lengthened (`good` path: scene 7200 + hold 2800 = **10s**, vs the 7s
+  shared default the three other variants keep). The narrative TEXT is no longer baked over the art — the
+  cinematic shows only a clean title at the TOP, clear of the art, and dismisses onto the existing **readable
+  recap** (`storyFinaleResultScreen`, "Roll the credits ›"), which the player advances once they've read it.
+  The other three endings (loss/cult) are untouched — they keep their in-frame `captionBlock`. Eyes-on preview:
+  `scripts/story-ending-preview.mjs` (mounts the ending, shoots the beats wide + portrait). Pure Canvas2D,
+  zero sim rng, no save/reducer impact (the outcome is already resolved); `tests/story-endings.test.ts` still
+  guards the path×outcome → variant mapping.
 - **GS-story-serpent-2** — ✅ *shipped* (`render/sigilCeremony.ts` `paintSerpent` + `SerpentOpts`). The
   BODY rebuilt as Jörmungandr with an eldritch CONSTELLATION flare (the player ask: close the head-body
   gap, longer + more serpentine + coiled, star-ified). The spine is now MARCHED tail-ward from a FIXED
