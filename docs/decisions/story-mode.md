@@ -1318,6 +1318,29 @@ shops / stock.
   clothing effects + the Coil curse), and the existing story-flow/locker suites. **Follow-ups:** more themed
   sets (a per-world "kit" look), and bespoke `ShirtShape`/`PantsShape` silhouettes for the flagship outfits.
 
+- **GS-story-wedge-slot / GS-story-driver-gear** — ✅ *shipped* (`sim/rpg/story.ts` + `sim/rpg/storyGear.ts`
+  + `app/storyLockerScreens.ts` + `sim/rpg/storyShop.ts` + `render/itemArt.ts`). Player ask: expand the Story
+  Pro Shop's equipment/clubs — MORE store-bought WEDGES at blue/purple/orange (rare/epic/legendary), and MORE
+  slice-reduction / hook-reduction / distance / min-distance gear for DRIVERS & WOODS. Delivered as pure
+  content on the proven Story-gear economy (Story-only, no-op default, so Voyage/Unending stay byte-for-byte).
+  A ninth `GearSlot` — **`wedge`**, the SHORT-GAME slot (the `shaft` distance slot's counterpart) — holds four
+  wedges (`groove`/`milled`/`spin`/`master`, common→legendary) whose value is a real STAT, never carry: a
+  tighter `wedgeWindow` (lands on the number), more `backspinBoost` (checks), and at the apex a `chipInBoost`.
+  This is the **putter-precedent** applied to wedges (a same-carry wedge is no upgrade, so the value has to be
+  a stat) — which is exactly why wedges are NOT a shared reward-club type; a stat-bearing wedge belongs in the
+  Story-scoped gear layer, not the shared taxonomy. The wedge slot is EFFECT-ONLY (no `avatar`, so it's absent
+  from the `story-avatar` `SHAPES` map and needs no golfer-render plumbing). For the big sticks: the missing
+  **hook fixer** glove (`antihook`) + a strong single-side **draw/fade** glove pair, a purple two-way-miss
+  **trouser** (`pants:calibrated`, trims both sides + tightens), and driver/wood **distance + min-carry**
+  shafts (`shaft:driver` driver-family min-carry, `shaft:matched` driver+wood min-carry, `shaft:bomber` +18
+  distance). All reuse the proven no-op-default `PlayerLoadout` levers (`shapeMod` · `minCarryBoostByClass` ·
+  `boostDistanceClubs`) so an un-geared campaign is unchanged, and each obeys the item-authoring rule (art via
+  the slot + rarity, a mechanical detail, bespoke lore). Because a new slot is a no-op default in
+  `equippedGear`, there's NO `STORY_VERSION` bump (`gearMap` picks `wedge` up free). Stocked across the worlds'
+  `STORY_GEAR_STOCK` (green/blue early on the home parkland + dunes, purples mid-campaign, the Master's Wedge
+  in the serpent's reaches). Guarded by `tests/story-shop.test.ts` (nine-slot span + the wedge ladder + the
+  slice/hook/distance/min-carry effects) and the existing story-flow/locker/avatar suites.
+
 ## Open questions / deferred (revisit as chunks land)
 - **A genuinely-new gas-giant BIOME** (play on gas cloud-tops) — the player's optional "if we need to add
   more" ask. Deferred as its OWN focused session: a new `BiomeArchetype` fans out to ~16 compile-forced

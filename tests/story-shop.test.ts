@@ -409,9 +409,9 @@ describe('the deep catalogue (GS-story-shop-depth)', () => {
     }
   });
 
-  it('the catalogue spans all eight slots and a green→legendary rarity ladder', () => {
+  it('the catalogue spans all nine slots and a green→legendary rarity ladder', () => {
     const slots = new Set(STORY_GEAR.map((g) => g.slot));
-    for (const s of ['glove', 'hat', 'shoes', 'ball', 'shaft', 'bag', 'jacket', 'pants'] as const) expect(slots.has(s), `${s} has gear`).toBe(true);
+    for (const s of ['glove', 'hat', 'shoes', 'ball', 'shaft', 'wedge', 'bag', 'jacket', 'pants'] as const) expect(slots.has(s), `${s} has gear`).toBe(true);
     const rarities = new Set(STORY_GEAR.map((g) => g.rarity));
     for (const r of ['common', 'rare', 'epic', 'legendary'] as const) expect(rarities.has(r), `${r} gear exists`).toBe(true);
     // green + blue variety exists EARLY (a common item sits on a Chapter-1 world)
@@ -516,5 +516,61 @@ describe('gear tiers + one-per-slot (GS-story-gear-tiers)', () => {
     // still only one glove owned-equipped: the ladder makes stacking unnecessary, not possible
     expect(ownedGearForSlot(eq, 'glove')).toHaveLength(2); // both OWNED
     expect(Object.values(eq.equippedGear).filter((id) => storyGearById(id!)?.slot === 'glove')).toHaveLength(1); // one EQUIPPED
+  });
+});
+
+describe('wedge + driver/wood gear (GS-story-wedge-slot / GS-story-driver-gear)', () => {
+  const unit = (): PlayerLoadout => ({
+    bag: [], handicap: 10, dispersionMult: 1, creditMult: 1, perks: [], shapeMod: {},
+    minCarryBoost: 0, wedgeWindow: 0, distanceClubBonus: 0, puttBoost: 0, birdieCredit: 0, eagleCredit: 0, comebackCredit: 0,
+  });
+
+  it('the wedge slot exists, is effect-only, and climbs a green→legendary short-game ladder', () => {
+    expect(GEAR_SLOTS).toContain('wedge');
+    const win = (id: string) => storyGearById(id)!.apply(unit()).wedgeWindow;
+    // a tighter wedge window rises with rarity (better short-game control)
+    expect(win('gear:wedge:groove')).toBeGreaterThan(0);
+    expect(win('gear:wedge:milled')).toBeGreaterThan(win('gear:wedge:groove'));
+    expect(win('gear:wedge:spin')).toBeGreaterThan(win('gear:wedge:milled'));
+    expect(win('gear:wedge:master')).toBeGreaterThan(win('gear:wedge:spin'));
+    // the ladder spans blue/purple/orange (rare/epic/legendary) as requested
+    expect(storyGearById('gear:wedge:milled')!.rarity).toBe('rare');
+    expect(storyGearById('gear:wedge:spin')!.rarity).toBe('epic');
+    expect(storyGearById('gear:wedge:master')!.rarity).toBe('legendary');
+    // the apex wedge also folds check + a chip-in edge; wedges carry NO avatar (effect-only)
+    const master = storyGearById('gear:wedge:master')!.apply(unit());
+    expect(master.backspinBoost).toBeGreaterThan(0);
+    expect(master.chipInBoost).toBeGreaterThan(0);
+    for (const g of STORY_GEAR.filter((x) => x.slot === 'wedge')) expect(g.avatar).toBeUndefined();
+  });
+
+  it('slice AND hook reducers exist across tiers, and a two-way-miss trouser trims both', () => {
+    const slice = (id: string) => storyGearById(id)!.apply(unit()).shapeMod.sliceR ?? 0;
+    const hook = (id: string) => storyGearById(id)!.apply(unit()).shapeMod.hookL ?? 0;
+    // the missing hook fixer now exists (mirror of the slice glove), and a strong single-side pair
+    expect(hook('gear:glove:antihook')).toBeLessThan(0);
+    expect(slice('gear:glove:draw')).toBeLessThan(slice('gear:glove:antislice')); // stronger slice cure (blue)
+    expect(hook('gear:glove:fade')).toBeLessThan(0);
+    // the purple trouser trims BOTH sides and tightens dispersion
+    const cal = storyGearById('gear:pants:calibrated')!.apply(unit());
+    expect(cal.shapeMod.sliceR).toBeLessThan(0);
+    expect(cal.shapeMod.hookL).toBeLessThan(0);
+    expect(cal.dispersionMult).toBeLessThan(1);
+  });
+
+  it('driver & wood distance + min-carry gear folds the right family levers', () => {
+    // a driver-only min-carry (mirror of the woods shaft)
+    const drv = storyGearById('gear:shaft:driver')!.apply(unit());
+    expect(drv.minCarryBoostByClass?.driver).toBeGreaterThan(0);
+    expect(drv.minCarryBoostByClass?.wood ?? 0).toBe(0);
+    // the matched long set raises BOTH driver and wood min-carry
+    const matched = storyGearById('gear:shaft:matched')!.apply(unit());
+    expect(matched.minCarryBoostByClass?.driver).toBeGreaterThan(0);
+    expect(matched.minCarryBoostByClass?.wood).toBeGreaterThan(0);
+    // the bomber shaft adds distance-club carry (between the +12 power and +24 nova shafts)
+    const base = { ...unit(), bag: [{ id: 'D', name: 'Driver', carry: 250 } as never] };
+    const bomber = storyGearById('gear:shaft:bomber')!.apply(base);
+    expect(bomber.distanceClubBonus).toBe(18);
+    expect((bomber.bag[0] as { carry: number }).carry).toBe(268);
   });
 });

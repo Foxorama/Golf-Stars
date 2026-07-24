@@ -213,10 +213,13 @@ export const MAX_STORY_BAG = 14;
  *  GS-story-shop-depth added `shaft` (distance/power) — a sixth build slot so the deep Pro Shop has a home
  *  for the distance/carry gear; the long-empty `bag` slot became the ECONOMY slot (credit-earning gear).
  *  GS-story-clothing added the two APPAREL slots `jacket` (upper-body garment) + `pants` (legwear) — worn
- *  clothing that both changes the on-course avatar AND folds a real effect (wind / stance / economy). A new
- *  slot is a no-op default in `equippedGear` (absent = unequipped), so NO save/`STORY_VERSION` bump. */
-export type GearSlot = 'glove' | 'hat' | 'shoes' | 'ball' | 'shaft' | 'bag' | 'jacket' | 'pants';
-export const GEAR_SLOTS: readonly GearSlot[] = ['glove', 'hat', 'shoes', 'ball', 'shaft', 'bag', 'jacket', 'pants'];
+ *  clothing that both changes the on-course avatar AND folds a real effect (wind / stance / economy).
+ *  GS-story-wedge-slot added `wedge` — the SHORT-GAME slot (the `shaft` distance slot's counterpart): a
+ *  home for store-bought wedges whose value is a real STAT (a tighter wedge window / more check / a chip-in
+ *  edge), never carry (the putter-precedent — a same-carry wedge is no upgrade). Effect-only (no avatar). A
+ *  new slot is a no-op default in `equippedGear` (absent = unequipped), so NO save/`STORY_VERSION` bump. */
+export type GearSlot = 'glove' | 'hat' | 'shoes' | 'ball' | 'shaft' | 'wedge' | 'bag' | 'jacket' | 'pants';
+export const GEAR_SLOTS: readonly GearSlot[] = ['glove', 'hat', 'shoes', 'ball', 'shaft', 'wedge', 'bag', 'jacket', 'pants'];
 
 /** A per-world best score, for the revisit "play again" chase (records fold into revisit, no global board). */
 export interface StoryWorldBest {

@@ -1244,6 +1244,242 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     ],
     apply: (m) => ({ ...m, minCarryBoost: m.minCarryBoost + 0.12, dispersionMult: m.dispersionMult * 0.95 }),
   },
+
+  // ════════════════════════════════════════════════════════════════════════════════════════════════
+  // GS-story-wedge-slot — the SHORT-GAME slot (the `shaft` distance slot's counterpart). Store-bought
+  // WEDGES whose value is a real STAT, never carry: a tighter wedge carry window (`wedgeWindow` — lands
+  // where you aim), more approach check (`backspinBoost` — bites and holds), and at the apex a chip-in edge
+  // (`chipInBoost`). This is the putter-precedent applied to wedges — everyone carries a wedge, so a themed
+  // one is only an upgrade through the make-window-style stat, not a same-carry copy that would overshoot.
+  // Effect-only (no `avatar`), a clean green→legendary ladder, stocked from the home parkland to the
+  // serpent's reaches. Story-only, no-op default, so Voyage/Unending are byte-for-byte unchanged.
+  {
+    id: 'gear:wedge:groove',
+    slot: 'wedge',
+    name: 'Grooved Pitching Wedge',
+    rarity: 'common',
+    price: 80,
+    blurb: 'Sharper grooves — approaches land softer.',
+    detail: ['Tightens the wedge carry window a touch — short irons land closer to your number.'],
+    lore: [
+      'A plain forged wedge with freshly-cut grooves, the first thing a travelling pro re-sharpens at every ' +
+        'Pro Shop. It won’t spin the ball back off a cliff, but it takes the flyer out of your pitches so the ' +
+        'ball comes down where you looked instead of ten feet long.',
+      'The short game is where a lean bag saves its strokes. Start here.',
+    ],
+    apply: (m) => ({ ...m, wedgeWindow: Math.min(0.85, m.wedgeWindow + 0.14) }),
+  },
+  {
+    id: 'gear:wedge:milled',
+    slot: 'wedge',
+    name: 'Milled Tour Wedge',
+    rarity: 'rare',
+    price: 160,
+    blurb: 'Pin-point pitches — tighter AND biting.',
+    detail: ['Tightens the wedge carry window, and rips a touch more backspin (+6%) so approaches check up.'],
+    lore: [
+      'CNC-milled from a single billet on the Warden benches, every groove to a thousandth — so the face grabs ' +
+        'the cover the same way every time and the ball flies its number, then sits. On a firm green in a ' +
+        'crosswind that repeatability is worth more than any extra yard.',
+      'You picked the distance. The wedge is done arguing about it.',
+    ],
+    apply: (m) => ({
+      ...m,
+      wedgeWindow: Math.min(0.85, m.wedgeWindow + 0.24),
+      backspinBoost: (m.backspinBoost ?? 0) + 0.06,
+    }),
+  },
+  {
+    id: 'gear:wedge:spin',
+    slot: 'wedge',
+    name: 'High-Spin Lob Wedge',
+    rarity: 'epic',
+    price: 240,
+    blurb: 'Vicious check — flag-hunting short irons.',
+    detail: ['Strongly tightens the wedge window AND +10% backspin — approaches bite hard and stop by the pin.'],
+    lore: [
+      'A high-toe lob wedge with a face laser-etched into a micro-grid, so raw the rules officials on the tour ' +
+        'worlds squint at it. It flights a pitch flat and hot, then the moment it lands it snaps to a stop, ' +
+        'sometimes hunting back toward the cup. A back pin has never been so gettable — a front pin, so dangerous.',
+      'Respect the spin. It stops on a coin, and sometimes rolls the coin back to you.',
+    ],
+    apply: (m) => ({
+      ...m,
+      wedgeWindow: Math.min(0.85, m.wedgeWindow + 0.3),
+      backspinBoost: (m.backspinBoost ?? 0) + 0.1,
+    }),
+  },
+  {
+    id: 'gear:wedge:master',
+    slot: 'wedge',
+    name: 'Master’s Wedge',
+    rarity: 'legendary',
+    price: 460,
+    blurb: 'The surest short game in the galaxy.',
+    detail: [
+      'The tightest wedge window made, +14% backspin, AND a real chip-in edge — a short iron that lands like a ' +
+        'putt and sometimes drops like one.',
+    ],
+    lore: [
+      'The last wedge Custodian Pim ever ground, its sole hand-relieved for every lie in the near stars and its ' +
+        'face milled so true it seems to know where the flag is. Champions who carry one stop thinking of the ' +
+        'short game as damage control and start thinking of it as offence — every pitch a birdie chance, every ' +
+        'chip a threat to go in.',
+      'One perfect wedge beats a bag full of good intentions.',
+    ],
+    apply: (m) => ({
+      ...m,
+      wedgeWindow: Math.min(0.85, m.wedgeWindow + 0.4),
+      backspinBoost: (m.backspinBoost ?? 0) + 0.14,
+      chipInBoost: (m.chipInBoost ?? 0) + 0.12,
+    }),
+  },
+
+  // ════════════════════════════════════════════════════════════════════════════════════════════════
+  // GS-story-driver-gear — MORE shot-shape + distance control for the big sticks (driver & woods). The pool
+  // was thin on the two-way miss: only a common slice-fixer glove and the plus-fours (both). This adds the
+  // missing HOOK fixer, a strong single-side draw/fade glove pair, a purple two-way-miss trouser, and the
+  // driver/wood DISTANCE + MIN-CARRY gear the deep bags wanted (a driver-family min-carry, a matched long
+  // set, an epic bomber shaft). Shape mods are grip/stance levers (glove/pants); the distance/min-carry gear
+  // lives in the `shaft` slot. All strictly-helpful (no curse), no-op default, Story-only.
+
+  // ── GLOVE — the two-way miss. The missing hook fixer + a strong draw/fade pair (single-side control).
+  {
+    id: 'gear:glove:antihook',
+    slot: 'glove',
+    name: 'Anti-Hook Grip',
+    avatar: { shape: 'glove', color: '#6a4a8a', accent: '#e0d0ff' },
+    rarity: 'common',
+    price: 90,
+    blurb: 'Kills the snap-hook — no more dive left.',
+    detail: ['Trims the HOOK miss (left) — that big diving pull off the driver straightens up.'],
+    lore: [
+      'A glove padded along the fingers so the trail hand can’t flip the face shut at the bottom — the one fault ' +
+        'behind the ugly snap-hook that dives into the trees left. Wear it and the driver stops turning over on ' +
+        'you; the miss becomes a shot you can play from.',
+      'It only fixes the hook. The rest of the swing is still your problem.',
+    ],
+    apply: (m) => ({ ...m, shapeMod: combineShapeMods(m.shapeMod, { hookL: -0.08 }) }),
+  },
+  {
+    id: 'gear:glove:draw',
+    slot: 'glove',
+    name: 'Draw-Bias Glove',
+    avatar: { shape: 'glove', color: '#2f6a4a', accent: '#c8f0d8' },
+    rarity: 'rare',
+    price: 150,
+    blurb: 'Straightens the weak fade — hard.',
+    detail: ['Strongly trims the SLICE miss (right) — the block-right off the driver is all but gone.'],
+    lore: [
+      'A weighted-heel tour glove that trains the lead wrist to bow through impact, squaring — even closing — the ' +
+        'face where a slicer leaves it open. The ball stops leaking right off the tee and starts holding the left ' +
+        'edge of the fairway, the way the long hitters do it.',
+      'A driver that never goes right is a driver you can finally aim.',
+    ],
+    apply: (m) => ({ ...m, shapeMod: combineShapeMods(m.shapeMod, { sliceR: -0.14 }) }),
+  },
+  {
+    id: 'gear:glove:fade',
+    slot: 'glove',
+    name: 'Fade-Bias Glove',
+    avatar: { shape: 'glove', color: '#8a5a2a', accent: '#f0dcb8' },
+    rarity: 'rare',
+    price: 150,
+    blurb: 'Straightens the diving hook — hard.',
+    detail: ['Strongly trims the HOOK miss (left) — the driver stops turning over into trouble.'],
+    lore: [
+      'The mirror of the draw glove: a firmer trail-hand panel that holds the face from flipping shut, so the ball ' +
+        'rides a soft fade instead of diving left. The players who’ve fought a hook their whole lives swear a ' +
+        'round in one feels like someone finally took the trapdoor out of the tee box.',
+      'A driver that never goes left is a driver you can finally trust.',
+    ],
+    apply: (m) => ({ ...m, shapeMod: combineShapeMods(m.shapeMod, { hookL: -0.14 }) }),
+  },
+
+  // ── PANTS — the two-way miss, purple tier (above the rare plus-fours): trims BOTH sides and tightens.
+  {
+    id: 'gear:pants:calibrated',
+    slot: 'pants',
+    name: 'Calibrated Tour Trousers',
+    avatar: { shape: 'trousers', color: '#20304a', accent: '#8fb0e0' },
+    rarity: 'epic',
+    price: 230,
+    blurb: 'Both misses gone — a stripe show.',
+    detail: ['Trims BOTH the slice AND the hook, and tightens dispersion (×0.96) — a genuine two-way-miss cure.'],
+    lore: [
+      'Sensor-threaded trousers that read the sway and slide of the lower body and cinch, micro-second by ' +
+        'micro-second, to keep the hips turning on plane — so neither the flip that hooks it nor the stall that ' +
+        'slices it ever gets started. The driver comes out of a base that simply refuses to make the big miss.',
+      'Kill both sides of the fairway and the hole gets a lot wider.',
+    ],
+    apply: (m) => ({
+      ...m,
+      shapeMod: combineShapeMods(m.shapeMod, { sliceR: -0.07, hookL: -0.07 }),
+      dispersionMult: m.dispersionMult * 0.96,
+    }),
+  },
+
+  // ── SHAFT — driver/wood DISTANCE + MIN-CARRY. A driver-family min-carry (mirrors the woods shaft), a
+  // matched long set (driver + woods min-carry together), and an epic bomber between the power & nova shafts.
+  {
+    id: 'gear:shaft:driver',
+    slot: 'shaft',
+    name: 'Calibrated Driver Shaft',
+    avatar: { shape: 'clubskin', color: '#c0402a', accent: '#ffb08a' },
+    rarity: 'rare',
+    price: 150,
+    blurb: 'A driver that never comes up short.',
+    detail: ['Raises the MIN carry of your DRIVER only — your mishit tee shots fly close to your best, no trade-off.'],
+    lore: [
+      'A low-torque driver shaft tuned to refuse a lazy load, so the drive you catch a groove thin still climbs ' +
+        'and carries instead of falling out of the sky forty short. You give up the freak "I flushed one" outlier ' +
+        'and gain a driver whose bad ones are barely bad — which is the trade every scoring golfer makes off the tee.',
+      'The best drive is the one you can count on.',
+    ],
+    apply: (m) => ({ ...m, minCarryBoostByClass: addFamilyMinCarry(m.minCarryBoostByClass, 'driver', 0.14) }),
+  },
+  {
+    id: 'gear:shaft:matched',
+    slot: 'shaft',
+    name: 'Matched Long Set',
+    avatar: { shape: 'clubskin', color: '#3a6ea5', accent: '#bfe0ff' },
+    rarity: 'epic',
+    price: 220,
+    blurb: 'Driver AND woods — every long club repeats.',
+    detail: ['Raises the MIN carry of your DRIVER and your WOODS — the whole long-club stack lands on its number.'],
+    lore: [
+      'A frequency-matched set from the driver through the fairway woods, each stick tuned to the last, so your ' +
+        'big clubs fly stackable, trustworthy distances instead of a spread of hopeful guesses. On a long par-5 ' +
+        'you finally know the layup wood carries the water and the driver clears the corner — because they always do.',
+      'When every long club repeats, the whole back of the bag becomes a scoring tool.',
+    ],
+    apply: (m) => ({
+      ...m,
+      minCarryBoostByClass: addFamilyMinCarry(addFamilyMinCarry(m.minCarryBoostByClass, 'driver', 0.12), 'wood', 0.14),
+    }),
+  },
+  {
+    id: 'gear:shaft:bomber',
+    slot: 'shaft',
+    name: 'Bomber Tour Shaft',
+    avatar: { shape: 'clubskin', color: '#c8902a', accent: '#ffe0a0' },
+    rarity: 'epic',
+    price: 250,
+    blurb: 'Big free yards — +18 and steadier.',
+    detail: ['+18 yds carry on your distance clubs, and a steadier tempo (×0.95 dispersion). A real bomb.'],
+    lore: [
+      'A stouter, hotter sibling of the graphite power shaft, kick-point shoved low to sling the head through the ' +
+        'ball — eighteen honest yards on every wood and long stick, and a counter-weight that keeps the extra speed ' +
+        'from costing you the fairway. On the low-grav bomber worlds it turns a reachable par-5 into a two-shot birdie.',
+      'Eighteen yards is a whole club. Sometimes it’s the whole hole.',
+    ],
+    apply: (m) => ({
+      ...m,
+      bag: boostDistanceClubs(m.bag, 18),
+      distanceClubBonus: (m.distanceClubBonus ?? 0) + 18,
+      dispersionMult: m.dispersionMult * 0.95,
+    }),
+  },
 ];
 
 /** Per-world gear stock (content-as-data) — a curated 1–2 items per world, tiered by chapter, so travel
@@ -1258,23 +1494,25 @@ export const STORY_GEAR_STOCK: Record<string, readonly string[]> = {
   // ── Chapter 1 — GREENS & BLUES, the staples (home parkland + the dunes). Start the economy engine + the
   // distance/reading basics here so an early credit has an exciting, lasting home.
   // GS-story-clothing: the CLOTHING staples start here too — a windbreaker + tour trousers on the home parkland.
-  'verdant-18': ['gear:glove:worn', 'gear:shaft:stiff', 'gear:ball:range', 'gear:bag:sponsor', 'gear:jacket:windbreak', 'gear:pants:tour'],
-  'verdant2-18': ['gear:hat:reader', 'gear:hat:visor', 'gear:glove:antislice', 'gear:shoes:turf', 'gear:jacket:compression'],
-  'desert-18': ['gear:shoes:spikes', 'gear:shoes:balance', 'gear:hat:range', 'gear:shaft:power', 'gear:pants:flex'],
+  // GS-story-wedge-slot / GS-story-driver-gear — the short-game wedge + the two-way-miss & driver/wood
+  // distance gear seed into the early racks too, so the green/blue tiers are buyable from stop one.
+  'verdant-18': ['gear:glove:worn', 'gear:glove:antihook', 'gear:shaft:stiff', 'gear:ball:range', 'gear:bag:sponsor', 'gear:jacket:windbreak', 'gear:pants:tour'],
+  'verdant2-18': ['gear:hat:reader', 'gear:hat:visor', 'gear:glove:antislice', 'gear:glove:draw', 'gear:wedge:groove', 'gear:shoes:turf', 'gear:jacket:compression'],
+  'desert-18': ['gear:shoes:spikes', 'gear:shoes:balance', 'gear:hat:range', 'gear:shaft:power', 'gear:shaft:driver', 'gear:glove:fade', 'gear:pants:flex'],
   // GS-story-world-variety — the extra Ch.1 qualifier (Gemini Ice): reading + footing for slick, exposed ice.
-  'frost2-18': ['gear:hat:reader', 'gear:shoes:balance', 'gear:glove:sweet', 'gear:jacket:rain'],
+  'frost2-18': ['gear:hat:reader', 'gear:shoes:balance', 'gear:glove:sweet', 'gear:wedge:milled', 'gear:jacket:rain'],
 
   // ── Chapter 2 — BLUES + the first PURPLES (the fire-worlds + the frozen links). Themed: MAGMA balls at
   // the lava, the whippy power shaft where you need to bomb it, the WIND ball on the exposed frost links.
-  'inferno-18': ['gear:ball:magma', 'gear:glove:tacky', 'gear:shaft:woods', 'gear:pants:knickers'],
-  'inferno2-18': ['gear:shaft:overdrive', 'gear:ball:soft', 'gear:bag:lucky', 'gear:jacket:sponsor'],
+  'inferno-18': ['gear:ball:magma', 'gear:glove:tacky', 'gear:shaft:woods', 'gear:shaft:matched', 'gear:pants:knickers'],
+  'inferno2-18': ['gear:shaft:overdrive', 'gear:shaft:bomber', 'gear:ball:soft', 'gear:bag:lucky', 'gear:jacket:sponsor'],
   'frost-18': ['gear:ball:wind', 'gear:hat:spin', 'gear:glove:sweet'],
   // GS-story-world-variety — the extra Ch.2 qualifier (Pyxis Foundry): low-grav bomber's kit + an economy bag.
   'metal2-18': ['gear:shaft:power', 'gear:glove:tacky', 'gear:bag:lucky', 'gear:jacket:thermal'],
 
   // ── Chapter 3 — the PURPLE line fills in (the gale, the crystal precision greens, the spore-jungle rough).
-  'tempest-18': ['gear:ball:wind', 'gear:glove:vice', 'gear:shaft:irons', 'gear:pants:power'],
-  'crystal-18': ['gear:hat:computer', 'gear:glove:vice', 'gear:bag:tour'],
+  'tempest-18': ['gear:ball:wind', 'gear:glove:vice', 'gear:shaft:irons', 'gear:pants:power', 'gear:pants:calibrated'],
+  'crystal-18': ['gear:hat:computer', 'gear:glove:vice', 'gear:wedge:spin', 'gear:bag:tour'],
   'fungal-18': ['gear:shoes:gravlock', 'gear:hat:focus', 'gear:ball:zip'],
   // GS-story-world-variety — the extra Ch.3 qualifier (Delphinus Tides): the FLOATER ball early, sea-storm kit.
   'ocean2-18': ['gear:ball:floater', 'gear:ball:wind', 'gear:shoes:gravlock'],
@@ -1293,7 +1531,7 @@ export const STORY_GEAR_STOCK: Record<string, readonly string[]> = {
   // ── Chapter 5 — the LEGENDARY apex + the last route relics, in the serpent's reaches. The Comet ball, the
   // Void-Anchor boots, the Seer's Circlet, the Cosmic bag — the grail rack of the campaign.
   'swamp-18': ['gear:ball:comet', 'gear:shoes:anchor', 'gear:shoes:coil', 'gear:shoes:hallowed', 'gear:jacket:champion'],
-  'derelict-18': ['gear:hat:seer', 'gear:ball:void', 'gear:bag:cosmic', 'gear:pants:cosmic'],
+  'derelict-18': ['gear:hat:seer', 'gear:ball:void', 'gear:wedge:master', 'gear:bag:cosmic', 'gear:pants:cosmic'],
   'cetus-18': ['gear:ball:comet', 'gear:shaft:nova', 'gear:glove:power'],
   // GS-story-world-variety — the extra Ch.5 qualifier (Antlia Scrapworks): the grail low-grav bomber's rack.
   'metal-18': ['gear:shaft:nova', 'gear:bag:cosmic', 'gear:glove:power'],
