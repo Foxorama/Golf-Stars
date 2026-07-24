@@ -30,12 +30,12 @@ import { activeStoryCaddy } from '../sim/rpg/storyCaddies';
 import { storyCardFor, type StoryCard } from '../sim/rpg/storyShop';
 
 const SLOT_LABEL: Record<GearSlot, string> = {
-  glove: '🧤 Glove', hat: '🧢 Cap', shoes: '👟 Shoes', ball: '🏐 Ball', shaft: '🏒 Shaft', bag: '💰 Sponsor Bag',
-  jacket: '🧥 Jacket', pants: '👖 Pants',
+  glove: '🧤 Glove', hat: '🧢 Cap', shoes: '👟 Shoes', ball: '🏐 Ball', shaft: '🏒 Shaft', wedge: '⛳ Wedge',
+  bag: '💰 Sponsor Bag', jacket: '🧥 Jacket', pants: '👖 Pants',
 };
 // Gear slots the locker manages (all effect-bearing slots — GS-story-shop-depth added shaft + the economy
-// bag; GS-story-clothing added the jacket + pants apparel slots).
-const LOCKER_SLOTS: GearSlot[] = ['glove', 'hat', 'shoes', 'ball', 'shaft', 'bag', 'jacket', 'pants'];
+// bag; GS-story-clothing added the jacket + pants apparel slots; GS-story-wedge-slot added the short-game wedge).
+const LOCKER_SLOTS: GearSlot[] = ['glove', 'hat', 'shoes', 'ball', 'shaft', 'wedge', 'bag', 'jacket', 'pants'];
 
 // GS-story-locker-sections: which accordion panels are open. A module-level view object (the marketView /
 // clubhouseView pattern) so it survives the re-render an equip/unequip triggers — a native <details> would
