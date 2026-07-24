@@ -105,6 +105,17 @@ default). One focused, tested, auto-merged PR each:
   planted — the tempted friend falls to it on Warden, resists it on Herald. (The Warden linkage was already
   delivered by the omen itself — the player SAW the friend recruited/tempted, then they defect.) Extends
   `BETRAYAL_VOICE`; no new screen, no save bump; guarded in `tests/story-midround.test.ts`.
+- **GS-story-aftermath** — ✅ *shipped* (player report: the Ch.4 Warden Sigil "shows the scorecard then goes to
+  the betrayer leaving — no win/loss Scorpius screen, feels empty"). A post-result CONFRONTATION beat for the
+  back-half Sigils (`storyAftermath.ts` `tournamentAftermath(t, story, won)` → the shared `.gs-lore*` card;
+  reducer diverts `storyTournamentContinue` on a Ch.4/5 result → `storyTournamentAftermath`, then
+  `storyAftermathContinue` → interlude/clubhouse via the extracted `continuePastTournament`). **Ch.4 Warden**
+  Scorpius win + loss (the wordless Sting, the black card's `{betrayer}` name); **Ch.4 Herald** loss only (the
+  severed friend still reaching — a win is owned by "The Severing"); **Ch.5 Warden/Herald** win + loss (the Green
+  Key forges / the root opens; the betrayer's ultimate fate stays for the ending, GS-story-ambiguous-fate). Not a
+  `seenStoryBeats` one-off (a won Sigil can't be replayed → win fires once; a loss re-shows each retry). Pure +
+  one screen + a reducer divert; zero sim rng, no save bump. Guarded by `tests/story-aftermath.test.ts` +
+  `?screen=storyaftermath` browser smoke.
 - **GS-story-betrayal-polish** — balance, dialogue depth, costume polish, docs.
 - **GS-the-destination** — the FUTURE game mode the Warden ending now names: the Coil's remnant (and the
   betrayed friend) fled "past the edge of every chart" to **The Destination** — an unknown-deep voyage mode

@@ -21,6 +21,7 @@ import type { ReputationByCharacter } from '../sim/rpg/factions';
 import type { SeenLore } from '../sim/rpg/lore';
 import type { StoryState } from '../sim/rpg/story';
 import type { MidroundOmen } from '../sim/rpg/storyMidround';
+import type { TournamentAftermath } from '../sim/rpg/storyAftermath';
 import type { QuestBeat } from '../sim/rpg/storyQuestBeat';
 import type { AimMode, HolePlay, ScrambleShot } from '../sim/rpg/play';
 import type { HoleDuel } from '../sim/rpg/match';
@@ -68,6 +69,9 @@ export type Screen =
   // GS-story-tournament: a chapter's Galaxy Tournament — the lobby (host/rival/Sigil) and the win/lose recap.
   | 'storyTournament'
   | 'storyTournamentResult'
+  // GS-story-aftermath: the post-result confrontation beat for a back-half Sigil (Scorpius withdraws, the
+  // key forges, …), win or loss, shown after the scorecard and before the interlude / clubhouse.
+  | 'storyTournamentAftermath'
   // GS-story-tournament-midpop: the halftime (after hole 9) rival brag/curse pop in an 18-hole major.
   | 'storyTournamentPop'
   // GS-story-midround-omen: the pre-Choice betrayal foreshadow at the Ch.3 major's turn (before the pop).
@@ -355,6 +359,10 @@ export interface UiState {
    *  `storyMidBeat` screen), BEFORE the halftime rival pop. Carries the assembled beat (the future
    *  betrayer + why + their voice lines); on continue it's marked seen and flows into the pop. Transient. */
   pendingMidBeat?: MidroundOmen;
+  /** GS-story-aftermath: the post-result confrontation beat for a back-half Sigil (the `storyTournamentAftermath`
+   *  screen), shown after the scorecard and before the interlude / clubhouse. Set on the divert, cleared on
+   *  continue. Transient; back-half (Ch.4/5) majors only, so a trunk major never carries it. */
+  pendingAftermath?: TournamentAftermath;
   /** GS-story-caddy-quest-dialogue: the caddy's mid-round beat shown at the turn of their quest round (the
    *  `storyQuestBeat` screen). Set on the divert, cleared on continue → the next hole tees up. Transient;
    *  quest-only, so it never appears in a tournament / main-story round. */
@@ -487,6 +495,7 @@ export type Action =
   | { type: 'selectStoryPartner'; characterId: string } // GS-story-partners: pick your team-Sigil partner in the lobby
   | { type: 'tournamentPopContinue' } // GS-story-tournament-midpop: dismiss the halftime rival pop, play on
   | { type: 'storyMidBeatContinue' } // GS-story-midround-omen: dismiss the pre-Choice foreshadow → the pop
+  | { type: 'storyAftermathContinue' } // GS-story-aftermath: dismiss the post-Sigil confrontation beat → interlude/clubhouse
   | { type: 'storyQuestBeatContinue' } // GS-story-caddy-quest-dialogue: dismiss the caddy mid-round beat → play on
   | { type: 'storyQuestOfferContinue' } // GS-story-quest-offer-beat: dismiss the ally's pitch → fly out, tee up the quest round
   | { type: 'storyTournamentContinue' } // GS-story-tournament: dismiss the win/lose recap

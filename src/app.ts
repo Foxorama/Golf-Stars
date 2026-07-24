@@ -36,6 +36,8 @@ import { storyPartnerBestBallScore } from './sim/rpg/storyTeams';
 import { storySigilProgressHTML } from './app/storySigilHud';
 import { TEAM_PARTNER_EDGE } from './sim/rpg/storyTournaments';
 import { midroundOmen } from './sim/rpg/storyMidround';
+import { tournamentAftermath } from './sim/rpg/storyAftermath';
+import { tournamentForChapter } from './sim/rpg/storyTournaments';
 import { questBeatFor, questOfferBeatFor } from './sim/rpg/storyQuestBeat';
 import { ACE_SHIP_ID } from './sim/rpg/ships';
 import { bagTierRank, type BagTier } from './sim/rpg/bag';
@@ -95,7 +97,7 @@ import { storyShopScreen } from './app/storyShopScreens';
 import { storyLockerScreen, storyLockerView } from './app/storyLockerScreens';
 import { storyShipyardScreen } from './app/storyShipyardScreens';
 import { shipInteriorScreen } from './app/shipInteriorScreens';
-import { storyTournamentScreen, storyTournamentPopScreen, storyTournamentResultScreen } from './app/storyTournamentScreens';
+import { storyTournamentScreen, storyTournamentPopScreen, storyTournamentResultScreen, storyTournamentAftermathScreen } from './app/storyTournamentScreens';
 import { storyFinaleScreen, storyFinaleResultScreen } from './app/storyFinaleScreens';
 import { storyChoiceScreen } from './app/storyChoiceScreens';
 import { storyInterludeScreen } from './app/storyInterludeScreens';
@@ -166,7 +168,7 @@ function boot(): void {
  *     come fast on the wide ribbon and the Bifröst trigger fires authentically when you make one).
  *   • `?asgard=1`  — jump STRAIGHT into the Bifröst interlude (the Himinbjörg map → cross → the nine-hole
  *     tournament → win/lose → return), from a real suspended run so "Return to your journey" works.
- *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storymidbeat|storyquestbeat|storyquestoffer|storyshop|storylocker|storyshipyard|shipinterior|storytournament|storyfinale|storychoice|storyinterlude|storybar` (GS-screen-deeplink) — mount a between-stop
+ *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storymidbeat|storyquestbeat|storyquestoffer|storyshop|storylocker|storyshipyard|shipinterior|storytournament|storyfinale|storychoice|storyinterlude|storyaftermath|storybar` (GS-screen-deeplink) — mount a between-stop
  *     screen directly, so the browser LAYOUT smoke tests (tests/build.test.ts) can reach the travel /
  *     shop / market / clubhouse / lore surfaces WITHOUT playing a full stop (shot animations + watch screens
  *     are flaky to script). The report's highest-risk uncovered surface — the journey map was
@@ -419,6 +421,17 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const base = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
       if (!base.story) return base;
       return { ...base, story: { ...base.story, chapter: 5, alignment: 'herald', trophyIds: ['sigil-emerald', 'sigil-ember', 'sigil-storm', 'sigil-drowned'] }, screen: 'storyInterlude' };
+    }
+    case 'storyaftermath': {
+      // GS-story-aftermath: mount the post-Sigil confrontation beat by seeding a Warden campaign that just
+      // WON its Chapter-4 major (Scorpius / The Abyssal Vigil), so a headless smoke can render the shared
+      // beat card the honest result→continue divert produces.
+      const base = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      if (!base.story) return base;
+      const story = { ...base.story, chapter: 5, alignment: 'warden' as const, trophyIds: ['sigil-emerald', 'sigil-ember', 'sigil-storm', 'sigil-abyssal'] };
+      const t = tournamentForChapter(4, 'warden');
+      const beat = t ? tournamentAftermath(t, story, true) : undefined;
+      return beat ? { ...base, story, screen: 'storyTournamentAftermath', pendingAftermath: beat } : base;
     }
     case 'shipinterior': {
       // GS-story-ship-interior: board the ship the honest way — prologue → Chapter 1, open the star map,
@@ -2540,6 +2553,8 @@ function render(): void {
       ? storyQuestOfferScreen()
       : state.screen === 'storyTournamentResult'
       ? storyTournamentResultScreen()
+      : state.screen === 'storyTournamentAftermath'
+      ? storyTournamentAftermathScreen()
       : state.screen === 'storyFinale'
       ? storyFinaleScreen()
       : state.screen === 'storyFinaleResult'
@@ -2562,6 +2577,7 @@ function render(): void {
     state.screen === 'starTour' ||
     state.screen === 'lore' || // GS-lore: the story beat owns the full viewport (its own cinematic backdrop)
     state.screen === 'storyMidBeat' || // GS-story-midround-omen: the mid-round foreshadow shares the lore card
+    state.screen === 'storyTournamentAftermath' || // GS-story-aftermath: the post-Sigil confrontation beat shares it
     state.screen === 'storyQuestBeat' || // GS-story-caddy-quest-dialogue: the caddy mid-round beat shares it too
     state.screen === 'storyQuestOffer'; // GS-story-quest-offer-beat: the ally's pre-round pitch shares it too
   // The character-select roster wants a wider frame so all four golfers line up across one screen,

@@ -247,6 +247,24 @@ the corrupted one; the former friends stay clean Warden.
   them; (4) **betrayal payoff** — the Defection interlude now calls back the Sting's card ("he wasn't reading the
   future… he was reading you"), so the wordless naming at the Vigil actually pays off when the friend turns.
   Pure content-as-data + render; zero sim rng, no save/STORY_VERSION bump. Guards updated in `tests/lore.test.ts`.
+- **GS-story-aftermath** — ✅ the post-result CONFRONTATION beat for the back-half Sigils (player report: winning
+  the Ch.4 Warden major cut STRAIGHT from the scorecard to the betrayer's Defection — Scorpius, who stalks you so
+  vividly at the tee, just VANISHED with no win/loss payoff, and a loss gave nothing at all). A new pure module
+  `storyAftermath.ts` (`tournamentAftermath(t, story, won)`) builds a `BeatView`-shaped beat rendered through the
+  shared `.gs-lore*` card (`storyTournamentAftermathScreen`, no forked CSS); the reducer diverts
+  `storyTournamentContinue` on a Ch.4/5 result to the `storyTournamentAftermath` screen (win OR loss), whose
+  `storyAftermathContinue` runs the SAME continuation via the extracted `continuePastTournament` helper (→ the
+  interlude on a Ch.4 win, else the clubhouse). Per the audit ("make sure all the story beats land well" for Coil
+  Sigil 4/5 + Warden): **Ch.4 Warden** (Scorpius, win + loss — wordless stage directions, the black card's
+  `{betrayer}` name); **Ch.4 Herald** (LOSS only — the severed friend, still-reaching; a WIN already flows into
+  "The Severing", whose rival IS that friend, so a beat there would duplicate); **Ch.5 Warden** (win = the Green
+  Key forges + the Parrot's descent, the betrayer's ultimate fate left to the ending per GS-story-ambiguous-fate;
+  loss = Venoma keeps the door); **Ch.5 Herald** (win = the root opens + the Coil's anointing; loss = the two
+  friends bar the way). NOT a `seenStoryBeats` one-off — a won Sigil can't be replayed (`currentTournament` gates
+  on `tournamentWon`), so a WIN beat fires once naturally, and a LOSS beat re-shows each retry (it IS that round's
+  result, like the scorecard). Pure content-as-data + one screen + a reducer divert; zero sim rng, no save/
+  STORY_VERSION bump. Guarded by `tests/story-aftermath.test.ts` (which majors get a beat, speaker/portrait per
+  case, the reducer flow) + a `?screen=storyaftermath` browser smoke in `tests/build.test.ts`.
 - **GS-story-betrayal-polish** — balance re-tune (the finale + team-major edges), any dialogue-depth follow-up,
   constitution/roadmap docs.
 

@@ -88,6 +88,7 @@ import { finaleMatchup } from '../sim/rpg/storyBetrayal';
 import { finaleUnlocked, finaleResult, winFinale } from '../sim/rpg/storyFinale';
 import { interludeSeen, applyInterlude } from '../sim/rpg/storyInterlude';
 import { midroundOmen, applyMidroundOmen } from '../sim/rpg/storyMidround';
+import { tournamentAftermath } from '../sim/rpg/storyAftermath';
 import { questBeatFor, questBeatTurnIndex, questOfferBeatFor } from '../sim/rpg/storyQuestBeat';
 import type { GearSlot } from '../sim/rpg/story';
 import {
@@ -195,6 +196,20 @@ export function initState(
 export const REROLL_BASE_COST = 30;
 export function rerollCost(rerolls: number): number {
   return Math.round(REROLL_BASE_COST * Math.pow(1.6, Math.max(0, rerolls)));
+}
+
+/**
+ * GS-story-aftermath: the continuation AFTER a back-half Sigil recap (and its confrontation beat) — the
+ * Chapter-4 emotional INTERLUDE (win a friend back / sever one) on a fresh win, else the clubhouse. Shared
+ * by `storyTournamentContinue` (trunk / no-aftermath path) and `storyAftermathContinue` (after the beat),
+ * so both read the identical branch. Clears the transient tournament payloads.
+ */
+function continuePastTournament(state: UiState): UiState {
+  const r = state.lastStoryTournament;
+  if (r?.won && r.chapter === 4 && state.story?.alignment && !interludeSeen(state.story, state.story.alignment)) {
+    return { ...state, screen: 'storyInterlude', lastStoryTournament: undefined, pendingAftermath: undefined };
+  }
+  return { ...state, screen: 'story', lastStoryTournament: undefined, pendingAftermath: undefined };
 }
 
 export function reduce(state: UiState, action: Action): UiState {
@@ -988,12 +1003,22 @@ export function reduce(state: UiState, action: Action): UiState {
       if (r?.won && r.chapter === 3 && state.story && !state.story.alignment) {
         return { ...state, screen: 'storyChoice', lastStoryTournament: undefined };
       }
-      // GS-story-midchapter: winning the Chapter-4 route major reaches the emotional INTERLUDE (win a
-      // friend back / sever one) — divert to it once, before the clubhouse.
-      if (r?.won && r.chapter === 4 && state.story?.alignment && !interludeSeen(state.story, state.story.alignment)) {
-        return { ...state, screen: 'storyInterlude', lastStoryTournament: undefined };
+      // GS-story-aftermath: a back-half Sigil (Ch.4/5) lands a post-result CONFRONTATION beat — win OR loss
+      // — before the interlude / clubhouse (Scorpius withdrawing, the key forging, the harvest), so the
+      // result carries weight instead of cutting straight on. Trunk majors return undefined ⇒ unchanged.
+      if (r && state.story) {
+        const t = tournamentForChapter(r.chapter, state.story.alignment);
+        const beat = t ? tournamentAftermath(t, state.story, r.won) : undefined;
+        if (beat) return { ...state, screen: 'storyTournamentAftermath', pendingAftermath: beat };
       }
-      return { ...state, screen: 'story', lastStoryTournament: undefined };
+      return continuePastTournament(state);
+    }
+
+    case 'storyAftermathContinue': {
+      // GS-story-aftermath: dismiss the post-Sigil confrontation beat → the interlude (a Ch.4 win) or the
+      // clubhouse (everything else). Runs the SAME continuation the aftermath diverted from.
+      if (state.screen !== 'storyTournamentAftermath') return state;
+      return continuePastTournament({ ...state, pendingAftermath: undefined });
     }
 
     case 'storyInterludeContinue': {
