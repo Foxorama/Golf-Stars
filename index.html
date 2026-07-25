@@ -1034,6 +1034,18 @@
       .gs-shot--full .gs-bigmap {
         position: absolute; inset: 0; border: none; border-radius: 0; box-shadow: none;
       }
+      /* SAFE AREA on the full-bleed play screen (GS-play-safearea). `.gs-bigmap` here is
+         `inset: 0` — it deliberately covers the WHOLE viewport, status bar and gesture bar
+         included — so anything positioned against its edges lands UNDERNEATH the system UI.
+         The map/zoom/settings column was `top: 8px` and sat beneath the Pixel's status bar,
+         where the OS eats the taps: the button was visible but could not be pressed.
+         Scoped to `--full` on purpose. Outside full-bleed, `.gs-bigmap` lives inside
+         `.gs-main`, which already pads by the same insets — applying them here too would
+         double-count and push the column into the map. */
+      .gs-shot--full .gs-mapctrl {
+        top: calc(8px + env(safe-area-inset-top));
+        right: calc(8px + env(safe-area-inset-right));
+      }
       /* Overlays float above the map. Most are pass-through (pointer-events:none) so a pull
          can START anywhere on the map even under a readout; only real buttons capture taps. */
       .gs-hud { position: absolute; z-index: 6; pointer-events: none; }
