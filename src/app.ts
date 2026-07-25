@@ -169,7 +169,7 @@ function boot(): void {
  *     come fast on the wide ribbon and the Bifröst trigger fires authentically when you make one).
  *   • `?asgard=1`  — jump STRAIGHT into the Bifröst interlude (the Himinbjörg map → cross → the nine-hole
  *     tournament → win/lose → return), from a real suspended run so "Return to your journey" works.
- *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storymidbeat|storyquestbeat|storyquestoffer|storyshop|storylocker|storyshipyard|shipinterior|storytournament|storyfinale|storychoice|storyinterlude|storyaftermath|storyqualresult|storyqualmatch|storybar` (GS-screen-deeplink) — mount a between-stop
+ *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storymidbeat|storyquestbeat|storyquestoffer|storyshop|storylocker|storyshipyard|shipinterior|storytournament|storyfinale|storychoice|storyinterlude|storyaftermath|storyqualresult|storyqualmatch|storyqualmatchlive|storybar` (GS-screen-deeplink) — mount a between-stop
  *     screen directly, so the browser LAYOUT smoke tests (tests/build.test.ts) can reach the travel /
  *     shop / market / clubhouse / lore surfaces WITHOUT playing a full stop (shot animations + watch screens
  *     are flaky to script). The report's highest-risk uncovered surface — the journey map was
@@ -282,6 +282,23 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const hub = hub0.story ? { ...hub0, story: { ...hub0.story, campaignSeed: seed } } : hub0;
       const ch1 = reduce(reduce(reduce(hub, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' }), { type: 'storyRoundContinue' });
       return reduce(pastLore(reduce(ch1, { type: 'storyPlayWorld', courseId: 'verdant2-18' })), { type: 'play' });
+    }
+    case 'storyqualmatchlive': {
+      // GS-story-qualifier-match-live: mount the play HUD MID-ROUND of a `pair-match` qualifier, so the
+      // browser smoke can see the live match chip + the per-hole match panel (new chrome on the play
+      // screen). Built the honest way — prologue → Chapter 1 → tee off the matchplay event (seed pinned so
+      // the draw is always that format) → auto-play two holes and stop on the end-of-hole screen.
+      const hub0 = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      const hub = hub0.story ? { ...hub0, story: { ...hub0.story, campaignSeed: 'q0' } } : hub0;
+      const ch1 = reduce(reduce(reduce(hub, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' }), { type: 'storyRoundContinue' });
+      let s = reduce(pastLore(reduce(ch1, { type: 'storyPlayWorld', courseId: 'verdant2-18' })), { type: 'playInteractive' });
+      let guard = 0;
+      // Two full holes, then leave the state parked on the second hole's end-of-hole screen.
+      for (let h = 0; h < 2 && s.screen === 'playing'; h++) {
+        while (s.play && !s.play.done && guard++ < 2000) s = reduce(s, { type: 'autoShotHole' });
+        if (h === 0) s = reduce(s, { type: 'holeComplete' });
+      }
+      return s;
     }
     case 'storymap': {
       // GS-story-map: reach the galaxy star map in STORY mode the honest way — play the prologue to Chapter
@@ -1200,7 +1217,9 @@ function playingBody(animating: boolean): string {
     // GS-story-sigil-live: a Sigil round shows its COMPETITION live every hole — the running match
     // (scoreline + W/L/½ pips on the matchplay Sigils, with the close-out call) or the team standings
     // vs the opposing pairs (scramble/best-ball) — from the SAME resolver streams as the finish.
-    const sigilLive = state.run.storyTournament ? storySigilProgressHTML(playedSoFar) : '';
+    // GS-story-qualifier-match-live: a `pair-match` QUALIFYING EVENT is a real hole-by-hole match too, so
+    // it drives the identical panel (it used to play out blind, with the result only on the recap).
+    const sigilLive = state.run.storyTournament || state.run.storyQualifier ? storySigilProgressHTML(playedSoFar) : '';
     const progress = sigilLive
       ? `${sigilLive}<div style="margin-top:10px;">${strokePlayProgressHTML(playedSoFar)}</div>`
       : state.run.formatId === STROKEPLAY_FORMAT

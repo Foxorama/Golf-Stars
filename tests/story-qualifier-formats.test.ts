@@ -8,6 +8,7 @@ import {
   qualifierFormatName,
   qualifierFormatBlurb,
   qualifierTeamHoleScores,
+  qualifierMatchThrough,
   resolveQualifierRound,
   isPairedFormat,
   campaignDrawSeed,
@@ -348,3 +349,65 @@ describe('the qualifying event, end to end through the reducer', () => {
     throw new Error('no Chapter-1 matchplay draw found across five campaign seeds');
   });
 });
+
+describe('a pair-match qualifier plays as a LIVE match (GS-story-qualifier-match-live)', () => {
+  const matchPlan = plan('pair-match', { pairing: 'bestball' });
+
+  it('the live state through N holes is exactly the PREFIX of the finish (live ≡ final)', () => {
+    const strokes = round(0);
+    const full = qualifierMatchThrough(matchPlan, strokes, PARS, 'seed')!;
+    for (let n = 1; n <= strokes.length; n++) {
+      const live = qualifierMatchThrough(matchPlan, strokes.slice(0, n), PARS, 'seed')!;
+      // every duel the live state has read must be identical to the finished one
+      for (let i = 0; i < live.duels.length; i++) expect(live.duels[i]).toEqual(full.duels[i]);
+      expect(live.thru).toBeLessThanOrEqual(full.thru);
+    }
+    // …and the finished match is the same object the recap scores, so the chip can never drift from it.
+    const res = resolveQualifierRound(matchPlan, strokes, PARS, 'seed');
+    expect(res.match!.scoreline).toBe(full.scoreline);
+    expect(res.match!.thru).toBe(full.thru);
+  });
+
+  it('the opponent card for a hole is knowable BEFORE you play it (the chip probes with a dummy stroke)', () => {
+    // The HUD reads the opponent's number on the hole in play by appending a placeholder for your own
+    // ball — their card must not depend on yours, or the chip would lie about what you have to beat.
+    const strokes = round(0);
+    const real = qualifierMatchThrough(matchPlan, strokes, PARS, 'seed')!;
+    for (const dummy of [1, 9]) {
+      const probe = qualifierMatchThrough(matchPlan, [...strokes.slice(0, 3), dummy], PARS, 'seed')!;
+      expect(probe.duels[3]!.bossStrokes).toBe(real.duels[3]!.bossStrokes);
+    }
+  });
+
+  it('a decided match CLOSES OUT mid-round, banking only the holes it ran and no partial record', () => {
+    // Drive the REAL interactive loop on a campaign whose Chapter-1 event is drawn as a matchplay.
+    for (const seed of ['q0', 'q2', 'q4', 'q5', 'campaign-a', 'campaign-b', 'campaign-c']) {
+      const story = { ...CAMPAIGN(seed), unlockedWorldIds: STORY_WORLDS.map((w) => w.courseId) };
+      const map = { ...initState('run-seed', {}, undefined, story), screen: 'starTour' as const };
+      if (activeQualifierPlan(map.story!, 'verdant2-18')?.format !== 'pair-match') continue;
+
+      let s: UiState = reduce(map, { type: 'storyPlayWorld', courseId: 'verdant2-18' });
+      while (s.screen === 'lore') s = reduce(s, { type: 'dismissLore' });
+      expect(s.course.holes.length).toBe(QUALIFIER_HOLES);
+      s = reduce(s, { type: 'playInteractive' });
+      let guard = 0;
+      while (s.screen === 'playing') {
+        if (guard++ > 400) throw new Error('round never resolved');
+        while (s.play && !s.play.done && guard++ < 4000) s = reduce(s, { type: 'autoShotHole' });
+        s = reduce(s, { type: 'holeComplete' });
+      }
+      expect(s.screen).toBe('storyResult');
+
+      // Whatever the outcome, the invariant holds: the banked holes are exactly the holes the match ran,
+      // and a round cut short never writes a record measuring a shorter test than the full event.
+      const q = s.lastStoryRound!.qualifier!;
+      expect(q.match).toBeTruthy();
+      expect(s.played!.length).toBe(q.match!.thru);
+      if (q.match!.thru < QUALIFIER_HOLES) expect(s.story!.worldBest['verdant2-18']).toBeUndefined();
+      else expect(s.story!.worldBest['verdant2-18']).toBeTruthy();
+      return;
+    }
+    throw new Error('no Chapter-1 matchplay draw found across the probed campaign seeds');
+  });
+});
+

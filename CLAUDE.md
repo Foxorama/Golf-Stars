@@ -269,7 +269,11 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     mechanic. Every format resolves to ONE currency (a place in the chapter field) so the top-N gate + record
     are one shape. Format balance is MEASURED (`scripts/qualifier-balance.ts`) and priced by `PAIRING_BAR_SHIFT`
     so variety is never a difficulty dice-roll; a qualifier partner is deliberately WEAKER than a Sigil partner
-    (`QUALIFIER_PARTNER_EDGE`) or a best-ball card stops being about how YOU played.
+    (`QUALIFIER_PARTNER_EDGE`) or a best-ball card stops being about how YOU played. A `pair-match` qualifier
+    drives the SAME live surfaces as a matchplay Sigil (chip, per-hole panel, mid-round close-out) off ONE
+    pure source, `qualifierMatchThrough` — which `resolveQualifierRound` also calls, so live ≡ final by
+    construction; the two sources build one shared `LiveMatch` view so there is one renderer, never a fork
+    (GS-story-qualifier-match-live).
   - **The Story-Tour betrayal is per-character + foreshadowed** (`docs/decisions/story-betrayal-arc.md`).
     `betrayerId(story)` = the friend standing apart in the PARTNER TALLY — team-Sigil picks (weight 2) plus
     every paired qualifying event (weight 1); the bigger gap, top or bottom, names them and `betrayerOddness`

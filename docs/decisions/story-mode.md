@@ -992,12 +992,28 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
     measuring a different test, so the new form supersedes it rather than being judged against a to-par it
     can never fairly beat. Guarded by `tests/story-qualifier-formats.test.ts` +
     `tests/story-partner-tally.test.ts` + `?screen=storyqualresult|storyqualmatch` browser smokes.
-  - **Known gap / follow-up:** a `pair-match` qualifier has no LIVE match state on the play HUD — the round
-    plays out and the recap delivers the scoreline. The Sigil match chip + per-hole panel
-    (`storySigilMatchChip` / GS-story-sigil-live) are built around a `StoryTournament` row, so wiring them to
-    a qualifier plan is its own change; the format is complete and correct without it, just less legible
-    mid-round than the Sigils are. (The paired stroke/Stableford events DO show their per-shot scramble pick
-    card / per-hole best-ball reveal, since those ride the existing team machinery unchanged.)
+- **GS-story-qualifier-match-live** — ✅ *shipped* (`storyQualifierFormats.ts` + `app/storySigilHud.ts` +
+  `playHud.ts`/`app.ts` + reducer). Closes the one gap GS-story-qualifier-formats shipped with: a `pair-match`
+  qualifier played out BLIND — you learned the result on the recap — while the Sigils showed their match live
+  every hole. It is a real hole-by-hole match, so it now drives the identical surfaces.
+  - **One pure source.** `qualifierMatchThrough(plan, strokes, pars, seed)` — hand it the holes played so far
+    for the live state or the whole round for the finish, and the two agree by construction (each hole's
+    ghost cards are keyed by hole index, so a prefix of the strokes is exactly a prefix of the duels).
+    `resolveQualifierRound` now calls it too, so the recap literally cannot drift from the chip.
+  - **One renderer, not a fork.** `storySigilHud.ts` gained a small `LiveMatch` view that BOTH sources build
+    (`sigilLiveMatch` / `qualifierLiveMatch`); the chip and the per-hole panel read only that, so a third
+    source later is a builder, never a change to the chrome. The caption/title/side-labels come off the view,
+    so a qualifier reads "Two-ball best-ball matchplay · You & Larry vs Bogey & Chip" rather than the Sigil's
+    hard-coded "2v2 scramble matchplay". The opponent's card for the hole IN PLAY is probed the same way the
+    Sigils do (a dummy stroke for your own ball — their card doesn't depend on yours, machine-checked).
+  - **Mid-round CLOSE-OUT**, like real matchplay and like the Sigils: once your side is up by more than the
+    holes that remain, the round resolves through the SAME `resolveStoryRound` path, banking only the holes
+    the match ran. Measured on the auto path: matches close out at 7–8 of the 9 holes with honest scorelines
+    ("2 & 1", "3 & 2"). `recordWorldClear` is skipped on a partial round (the quest-round rule extended) so a
+    seven-hole card can never masquerade as the world's nine-hole record.
+  - Guarded in `tests/story-qualifier-formats.test.ts` (prefix-consistency live≡final, the opponent probe,
+    and the full interactive close-out flow — banked holes ≡ `thru`, no partial record) + a
+    `?screen=storyqualmatchlive` browser smoke that mounts the chip + panel mid-round.
 - **GS-story-gear-tiers** — ✅ *shipped* (`sim/rpg/storyGear.ts`). Player ask: gear should be ONE per slot
   (like clubs — you already can't stack two gloves in `equippedGear`/`applyStoryGear`), with the higher tier
   strong enough to make up for no stacking. Completed the ladder with a clean LEGENDARY apex per slot —

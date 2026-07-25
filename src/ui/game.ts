@@ -89,7 +89,7 @@ import { finaleUnlocked, finaleResult, winFinale } from '../sim/rpg/storyFinale'
 import { interludeSeen, applyInterlude } from '../sim/rpg/storyInterlude';
 import { midroundOmen, applyMidroundOmen } from '../sim/rpg/storyMidround';
 import { tournamentAftermath } from '../sim/rpg/storyAftermath';
-import { activeQualifierPlan } from '../sim/rpg/storyQualifierFormats';
+import { activeQualifierPlan, qualifierMatchThrough } from '../sim/rpg/storyQualifierFormats';
 import { questBeatFor, questBeatTurnIndex, questOfferBeatFor } from '../sim/rpg/storyQuestBeat';
 import type { GearSlot } from '../sim/rpg/story';
 import {
@@ -1544,6 +1544,19 @@ export function reduce(state: UiState, action: Action): UiState {
           });
           if (m?.res.state.decided) return resolveStoryTournament({ ...state, stopPlayed }, stopPlayed);
         }
+      }
+      // GS-story-qualifier-match-live: a `pair-match` QUALIFYING EVENT closes out the same way — once your
+      // side is up by more than the holes that remain, the match is over and walking in is the honest
+      // ending (the panel has already called it). Resolves through the SAME `resolveStoryRound` path, which
+      // scores the holes the match actually ran and skips the partial `worldBest` write.
+      if (state.run.storyQualifier?.format === 'pair-match' && nextIdx < total) {
+        const res = qualifierMatchThrough(
+          state.run.storyQualifier,
+          stopPlayed.map((p) => p.record.strokes),
+          state.course.holes.map((h) => h.par),
+          String(state.run.seed),
+        );
+        if (res?.state.decided) return resolveStoryRound({ ...state, stopPlayed }, stopPlayed);
       }
       if (state.run.storyTournament && total === 18 && nextIdx === 9) {
         const t = tournamentForChapter(state.run.storyTournament, state.story?.alignment);
