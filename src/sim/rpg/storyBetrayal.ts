@@ -214,11 +214,30 @@ export function coilCaddyChampion(caddyId?: string): CoilChampionId | undefined 
   return isCoilChampionId(caddyId) ? caddyId : undefined;
 }
 
-/** GS-story-sigil5-npc: the Coil champions the Herald may CHOOSE as a finale partner — all of them, minus
- *  the one already on your bag as a caddy (you can't partner a champion who's already your caddy). */
+/**
+ * GS-story-champion-met: which Coil champions this campaign has actually MET (pure).
+ *
+ * Voss and Venoma cross every campaign's path before the fifth Sigil — the Viper crashes the Chapter-2
+ * Forge, the Apostate shows himself at the Chapter-3 Storm and makes the Offer at The Choice — so they are
+ * always on the list. **Scorpius only exists on the WARDEN road**: he is the Chapter-4 Abyssal Vigil rival,
+ * the hunter sent when the Viper has failed twice. A Herald never sees the Vigil, never meets him, and was
+ * still being offered him as their Sigil-5 partner — a stranger walking out of nowhere to share your ball
+ * in the climax (the player report). Now you can only pick a champion you have stood across from.
+ */
+export function metCoilChampions(story: StoryState): CoilChampionId[] {
+  return COIL_CHAMPIONS.filter((id) => id !== 'scorpius' || (story.alignment !== 'herald' && story.chapter >= 4));
+}
+
+/** GS-story-sigil5-npc: the Coil champions the Herald may CHOOSE as a finale partner — the ones this
+ *  campaign has actually met, minus the one already on your bag as a caddy (a champion can't carry your bag
+ *  and play beside you). Switching who caddies for you in the locker changes who is free to tee it up —
+ *  which is exactly how you get the Viper at your side instead of behind it. */
 export function coilChampionOptions(story: StoryState): CoilChampionId[] {
   const held = coilCaddyChampion(story.activeCaddyId);
-  return COIL_CHAMPIONS.filter((id) => id !== held);
+  const met = metCoilChampions(story).filter((id) => id !== held);
+  // Never hand back an empty picker: if the only champion you have met is the one on your bag, they step
+  // out from behind it rather than the lobby offering nothing.
+  return met.length > 0 ? met : metCoilChampions(story);
 }
 
 /** The top Coil champion who ISN'T your active guide (GS-story-betrayer): on the Herald finale this is the
@@ -335,6 +354,12 @@ interface BetrayalVoice {
    *  when they lead (brag), halftime when you lead (curse/plea)]. */
   confront: readonly [string, string, string];
   corrupt: readonly [string, string, string];
+  /** GS-story-pair-voice — the Ch.5 HERALD climax (the Ghost Harvest), where the two friends who shared a
+   *  ball with you come back TOGETHER and share one against you. The `confront` lines were written for the
+   *  Ch.4 Drowning Rite, where the Wardens send ONE champion — so a friend ended up standing beside their
+   *  partner saying "they told me not to come alone, came alone anyway" (the player report). These are the
+   *  same heartbreak spoken by a PAIR: the other Warden is right there, and they say so. */
+  confrontPair: readonly [string, string, string];
   /** GS-story-doubt — the Warden-path FORESHADOW, before the defection is revealed: the whisper working on
    *  this friend during the Chapter-4 qualifiers. `doubt` = the first strange question (a crack showing);
    *  `distance` = the eve-of-the-vigil beat (they're slipping away). Each references the same motifs their
@@ -387,6 +412,13 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       '"The Wardens asked who would stand against you. Nobody spoke. So I did — because if it has to be anyone, it should be someone who still loves you. Aim true. I will."',
       '"You’re pressing. I can hear it in your tempo. The friend I knew never pressed… come back, and I’ll stop having to win."',
       '"You’re ahead. Of course you’re ahead — I taught you half of what you know. Just tell me the golfer beating me is still in there somewhere."',
+    ],
+    // GS-story-pair-voice: the Ghost Harvest — she is not alone this time, and the arithmetic of that is
+    // the whole point: there used to be four of us on that ship, and now there are two, and then you.
+    confrontPair: [
+      '"They told us not to come at all. So we came together — one ball between the two of us, the way you and I played the Emerald. Count the tee, and then count the ship. Two left. That is what you have cost."',
+      '"We’re up, and we’re holding hands to do it, and I have never been less proud of a lead in my life. Lay one up. Walk in with us. Please."',
+      '"You’re beating both of us at once — reading the wind for two. There is the golfer I came up with, still in there, still that good. Turn it on THEM, not on all of this."',
     ],
     corrupt: [
       '"I don’t need to read the wind anymore. There is no wind where the serpent is taking us. Only the long, still green — and you, standing in the way of everyone’s rest."',
@@ -465,6 +497,12 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       '"No gallery today. No noise. Just you, me, and the water you want to drown this world under. I came because your hype man is the only one who can still reach you — so REACH."',
       '"I’m beating you and I HATE it! Do you understand? I have waited my whole life to beat you and it was never supposed to feel like this!"',
       '"There you are! THAT swing — that’s my friend’s swing! Keep hitting it like that and maybe you’ll remember whose side you’re on!"',
+    ],
+    // GS-story-pair-voice: the hype man's gallery is down to ONE person, and they're standing next to him.
+    confrontPair: [
+      '"Look at my gallery! Two of us! That’s it, that’s the whole crowd — the rest are gone or worse, and we’re still here, sharing a ball, chanting your name like idiots. So swing at us. See if we stop."',
+      '"We’re UP. Both of us. And there is no noise, friend — I’m winning in total silence and I’d give it back for one bowl of noodles and you at the table."',
+      '"You’re taking down the two of us on your own! HA! That’s my— that WAS my— …that’s my friend down there. Somewhere. Keep swinging like that and maybe they hear me."',
     ],
     corrupt: [
       '"You want to know the secret? The serpent’s gallery never stops roaring. Never! I just had to stop caring who it was roaring FOR. Tee it up — the noise is on my side now."',
@@ -545,6 +583,13 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       '"I’m up on ya. First time ever, and it’s the worst day of me life. Concede, eh? Come home. Noodles on Woo, bunkers on me."',
       '"Course you’re beating me. You always beat me. So beat THIS out of yourself while you’re at it — the mate I know is still swinging in there."',
     ],
+    // GS-story-pair-voice: the Ch.4 line was "came alone anyway" — here he pointedly did NOT, and it costs
+    // him to admit it: Larry has never once in his life needed a second bloke on the tee.
+    confrontPair: [
+      '"Didn’t come alone this time, mate. Learned that lesson the hard way, didn’t I. Two of us, one ball, and neither of us is walkin’ off this tee — so you’ll have to go THROUGH us. Rip it."',
+      '"We’re up on ya. Two of us and one ball and we’re still up, and it’s the worst round of me life. Concede it. Come home. Bunkers on me, forever, I swear."',
+      '"Beatin’ the pair of us. Course you are — you’re the best there’s ever been. That’s what makes this such a rotten waste, ya great galah. Turn the ship around."',
+    ],
     corrupt: [
       '"The void kept every ball I ever fed it, mate. Reckon it’s time I went and got ’em back — all of ’em, and everything else besides. Stand clear or get carried."',
       '"Longest front nine of me life, and every yard of it went MY way. The serpent likes a big send. Sit down, mate."',
@@ -623,6 +668,12 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       '"I read this green a hundred times on the flight out, hoping the line would break your way. It never did. So I’m here — the last still thing between you and the drowning. Play me true."',
       '"Your putts are dying low. They always die low when you’re ashamed. I’m ahead because you can’t look at what you’re doing — so LOOK at it."',
       '"You’re winning. Even now, you’re winning. That’s what breaks my heart — all that grace, spent on THIS."',
+    ],
+    // GS-story-pair-voice: Bo counts what is left, quietly, the way he reads a green.
+    confrontPair: [
+      '"Two of us on this tee. There were four, and one is out there in the dark with the Coil, and one is you. I am not here to shout about it. I am here because somebody has to stand still in front of you and say it out loud."',
+      '"We are ahead. Two balls, one card, and no joy in it at all. You could put your putter down right now and it would be the finest thing you ever did."',
+      '"You are beating both of us, reading two greens at once, and it is beautiful, and I want to be sick. Wait. Just once, wait — the way I taught you. See what the ball is telling you."',
     ],
     corrupt: [
       '"I told you once: the ball always tells you the truth if you wait. I waited. The truth is rest — every ball, every world, still at last. Let me show you the final read."',
@@ -798,7 +849,7 @@ export function betrayalFarewell(charId: string): readonly string[] {
 
 /** GS-story-sigil-rivals: a friend-rival's voice CONTEXT — a heartbroken Warden barring your way (Herald
  *  Ch.4) vs the corrupted defector across the shrine tee (Warden Ch.5). */
-export type FriendRivalVoice = 'confront' | 'corrupt';
+export type FriendRivalVoice = 'confront' | 'corrupt' | 'confrontPair';
 
 const FALLBACK_RIVAL_LINES: Record<FriendRivalVoice, readonly [string, string, string]> = {
   confront: [
@@ -810,6 +861,11 @@ const FALLBACK_RIVAL_LINES: Record<FriendRivalVoice, readonly [string, string, s
     '"The Coil showed me the end of every line, and every one comes to rest. Stand aside, or be played through."',
     '"Feel the mire pulling? Nine holes more and you’ll stop fighting it."',
     '"You’re ahead… the old me would have been proud. Don’t let up now."',
+  ],
+  confrontPair: [
+    '"The Wardens didn’t send us — we came. Both of us, one ball between us, the way you taught us to play it. Look at who is standing here and then tell us this is worth it."',
+    '"We’re ahead, and neither of us can look at the board. Walk in. Cross to our side of the tee and this stops right here."',
+    '"You’re beating the two of us at once. Of course you are. So take the shot that ends this — just not the one you came here to take."',
   ],
 };
 
@@ -834,6 +890,7 @@ export function everyGolferHasBetrayalVoice(): boolean {
       v.farewell.length >= 2 &&
       v.confront.length === 3 &&
       v.corrupt.length === 3 &&
+      v.confrontPair.length === 3 &&
       v.doubt.length >= 3 &&
       v.distance.length >= 3 &&
       v.sidelined.length >= 3 &&

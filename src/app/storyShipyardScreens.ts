@@ -181,7 +181,7 @@ function yardCard(shipId: string): string {
   const ac = shipAccent(shipId);
   const owned = shipId === DEFAULT_SHIP_ID || storyShipOwned(story, shipId);
   const flying = storyShipEquipped(story, shipId);
-  const badge = row ? acquireBadge(row) : '';
+  const badge = row ? acquireBadge(row, owned) : '';
   let stateLine: string;
   if (flying) stateLine = `<span class="gs-yard-state gs-yard-state--flying">✈ Flying</span>`;
   else if (owned) stateLine = `<span class="gs-yard-state gs-yard-state--owned">Owned · tap to fly</span>`;
@@ -215,12 +215,22 @@ function upgradeCard(u: StoryShipUpgrade): string {
     </div>`;
 }
 
-/** A little corner badge naming the acquisition approach. */
-function acquireBadge(row: StoryShip): string {
+/**
+ * A little corner badge naming HOW a ship is acquired — so it only ever appears where that is still a
+ * question (GS-story-yard-badge). Two fixes to the same player report ("the ships show 'Earned' and that
+ * badge doesn't make any sense here"):
+ *   • a MILESTONE ship is revealed by renown and then BOUGHT, so stamping it "Earned" beside its price read
+ *     as a claim about something you already own — it now says what it is, `Renown`;
+ *   • an OWNED ship is answered: the card already says Flying / Owned, so the acquisition badge is dropped
+ *     entirely in the Hangar (where every ship is yours by definition).
+ */
+function acquireBadge(row: StoryShip, owned: boolean): string {
+  if (owned) return '';
   const label =
     row.acquire === 'ace' ? 'Ace'
-    : row.acquire === 'milestone' ? 'Earned'
+    : row.acquire === 'milestone' ? 'Renown'
     : row.acquire === 'secret' ? 'Grail'
+    : row.acquire === 'reward' ? 'Sigil'
     : '';
   return label ? `<span class="gs-yard-badge">${label}</span>` : '';
 }

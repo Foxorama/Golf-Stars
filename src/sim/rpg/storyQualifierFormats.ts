@@ -37,8 +37,7 @@
 
 import { Rng } from '../rng';
 import { stablefordPoints } from '../score';
-import { otherGolferIds } from './storyCast';
-import { getCharacter } from './characters';
+import { storyPartnerIds, storyPartnerName, storyPartnerPool, type StoryPartnerOption } from './storyPartners';
 import { storyWorldById, type StoryState } from './story';
 import { resolveStory2v2Match, storyPartnerBestBallScore, type StoryMatchResult, type StoryTeamFormat } from './storyTeams';
 import {
@@ -167,7 +166,11 @@ export function qualifierPlan(
   const rng = new Rng(`qualplan:${campaignDrawSeed(story)}:${courseId}`);
   const format = QUALIFIER_FORMATS[Math.min(QUALIFIER_FORMATS.length - 1, Math.floor(rng.float() * QUALIFIER_FORMATS.length))]!;
   const pairing: QualifierPairing = rng.float() < 0.5 ? 'scramble' : 'bestball';
-  const others = otherGolferIds(story);
+  // GS-story-coil-partners: WHO is available follows the path — your three tour-mates on the Warden road,
+  // the Coil inner circle once you are the Herald (the tour-mates deserted the bag when you turned; two of
+  // them come for you at the Ghost Harvest). Both pools are the same size and the draw is off this event's
+  // own keyed stream, so the sheet's shape — and every existing Warden campaign's draw — is unchanged.
+  const others = storyPartnerIds(story);
   const drawn = others[Math.min(others.length - 1, Math.floor(rng.float() * Math.max(1, others.length)))];
   const partnerId = chosenPartnerId && others.includes(chosenPartnerId) ? chosenPartnerId : drawn;
   const paired = isPairedFormat(format);
@@ -180,10 +183,10 @@ export function qualifierPlan(
   };
 }
 
-/** The tour-mates you may pick to play a qualifying event beside — your three friends (id + short name),
- *  the same pool the team Sigils offer. Empty-safe. */
-export function qualifierPartnerPool(story: StoryState): { id: string; name: string }[] {
-  return otherGolferIds(story).map((id) => ({ id, name: getCharacter(id)?.shortName ?? id }));
+/** Who you may pick to play a qualifying event beside — your three tour-mates, or the Coil circle on the
+ *  Herald path (GS-story-coil-partners). Id + short name; empty-safe. */
+export function qualifierPartnerPool(story: StoryState): StoryPartnerOption[] {
+  return storyPartnerPool(story);
 }
 
 /**
@@ -217,7 +220,7 @@ export function qualifierFormatName(plan: QualifierPlan): string {
 
 /** One line of "how this event is won", for the dossier + the round intro. */
 export function qualifierFormatBlurb(plan: QualifierPlan): string {
-  const partner = plan.partnerId ? getCharacter(plan.partnerId)?.shortName ?? 'your partner' : '';
+  const partner = plan.partnerId ? storyPartnerName(plan.partnerId) : '';
   const share =
     plan.pairing === 'scramble'
       ? `You and ${partner} share one ball — the best of every shot.`

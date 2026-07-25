@@ -20,6 +20,8 @@ import { QUALIFIER_HOLES, qualifierField, qualifyTop, qualifierFieldSize } from 
 import { storyPartnerBestBallScore } from '../src/sim/rpg/storyTeams';
 import { TEAM_PARTNER_EDGE, tournamentForChapter } from '../src/sim/rpg/storyTournaments';
 import { otherGolferIds } from '../src/sim/rpg/storyCast';
+import { HERALD_CREW } from '../src/sim/rpg/storyHeraldCrew';
+import { storyPartnerName } from '../src/sim/rpg/storyPartners';
 import { getCharacter } from '../src/sim/rpg/characters';
 import { defaultStoryState, STORY_WORLDS, type StoryState } from '../src/sim/rpg/story';
 import { initState, reduce } from '../src/ui/game';
@@ -115,6 +117,26 @@ describe('the qualifier DRAW SHEET (GS-story-qualifier-formats)', () => {
     expect(activeQualifierPlan(s, 'standrews-18')).toBeUndefined(); // the Earth prologue is off-chart
     const event = STORY_WORLDS.find((w) => w.unlockChapter === 1 && w.courseId !== venue)!;
     expect(activeQualifierPlan(s, event.courseId)).toBeTruthy();
+  });
+
+  it('GS-story-coil-partners: the partner pool follows the PATH — tour-mates, or the Coil circle', () => {
+    const warden: StoryState = { ...CAMPAIGN(), chapter: 4, alignment: 'warden' };
+    expect(qualifierPartnerPool(warden).map((p) => p.id)).toEqual(otherGolferIds(warden));
+    // Turn Herald and the tour-mates are the people you betrayed — they desert the bag, and two of them come
+    // for you at the Ghost Harvest. The Coil circle sails with you instead, so they are who you tee off with.
+    const herald: StoryState = { ...CAMPAIGN(), chapter: 4, alignment: 'herald' };
+    const pool = qualifierPartnerPool(herald);
+    expect(pool.map((p) => p.id)).toEqual(HERALD_CREW.map((a) => a.id));
+    expect(pool.map((p) => p.name)).toContain('Venoma');
+    for (const id of otherGolferIds(herald)) expect(pool.map((p) => p.id)).not.toContain(id);
+    // The DRAWN partner of a paired event comes from that pool too, and a picked Coil agent is honoured.
+    const event = STORY_WORLDS.find((w) => w.unlockChapter === 4 && qualifierPlan(herald, w.courseId)?.partnerId)!;
+    const drawn = qualifierPlan(herald, event.courseId)!.partnerId!;
+    expect(HERALD_CREW.map((a) => a.id)).toContain(drawn);
+    expect(qualifierPlan(herald, event.courseId, 'coil-ouros')!.partnerId).toBe('coil-ouros');
+    // …and every surface names them properly (never a raw id).
+    expect(storyPartnerName('coil-ouros')).toBe('Ouros');
+    expect(qualifierFormatBlurb(qualifierPlan(herald, event.courseId, 'coil-ouros')!)).toContain('Ouros');
   });
 
   it('GS-story-qualifier-chapter-gate: a world charted AHEAD of its chapter is not an event yet', () => {

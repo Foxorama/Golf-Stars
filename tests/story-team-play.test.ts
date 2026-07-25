@@ -158,13 +158,17 @@ describe('GS-story-sigil5-play — the 2v2 scramble-matchplay finale plays as a 
     expect(rejected.storyFinalePartner).toBeUndefined();
   });
 
-  it('the HERALD finale lets you pick Scorpius as your Coil champion', () => {
+  it('the HERALD finale lets you pick a Coil champion you have MET — and refuses one you have not', () => {
     const lobby = reduce(heraldFinaleReady(), { type: 'openStoryTournament' });
-    expect(coilChampionOptions(lobby.story!)).toContain('scorpius');
-    const picked = reduce(lobby, { type: 'selectFinalePartner', characterId: 'scorpius' });
-    expect(picked.storyFinalePartner).toBe('scorpius');
+    // GS-story-champion-met: Scorpius is the Chapter-4 WARDEN rival. A Herald never plays the Abyssal Vigil,
+    // so he would be walking into the campaign's climax as a total stranger — the player report.
+    expect(coilChampionOptions(lobby.story!)).not.toContain('scorpius');
+    expect(reduce(lobby, { type: 'selectFinalePartner', characterId: 'scorpius' }).storyFinalePartner).toBeUndefined();
+    const champ = coilChampionOptions(lobby.story!)[0]!;
+    const picked = reduce(lobby, { type: 'selectFinalePartner', characterId: champ });
+    expect(picked.storyFinalePartner).toBe(champ);
     const armed = pastLore(reduce(picked, { type: 'storyPlayTournament' }));
-    expect(armed.run.storyTournamentPartner).toBe('scorpius');
+    expect(armed.run.storyTournamentPartner).toBe(champ);
   });
 
   it('a full swing raises the pick-your-ball card, exactly like the Sigil-1 scramble', () => {

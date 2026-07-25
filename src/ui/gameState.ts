@@ -20,6 +20,7 @@ import type { ClubUnlockReward } from '../sim/rpg/club-unlock';
 import type { ReputationByCharacter } from '../sim/rpg/factions';
 import type { SeenLore } from '../sim/rpg/lore';
 import type { StoryState } from '../sim/rpg/story';
+import type { FriendRivalVoice } from '../sim/rpg/storyBetrayal';
 import type { MidroundOmen } from '../sim/rpg/storyMidround';
 import type { TournamentAftermath } from '../sim/rpg/storyAftermath';
 import type { QuestBeat } from '../sim/rpg/storyQuestBeat';
@@ -373,7 +374,7 @@ export interface UiState {
      *  their real figure) + which betrayal-voice context they speak (`confront` = the heartbroken Warden
      *  friend, `corrupt` = the Coil-garbed defector, who also wears the corrupted tint). */
     rivalGolferId?: string;
-    rivalVoice?: 'confront' | 'corrupt';
+    rivalVoice?: FriendRivalVoice;
     rivalCorrupted?: boolean;
     /** GS-story-sigil-live: set on a MATCHPLAY Sigil — the halftime standing is the MATCH state (holes
      *  up, from the same resolver streams as the finish); `playerThru`/`rivalThru` then carry holes WON

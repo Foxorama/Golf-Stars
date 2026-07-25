@@ -18,6 +18,10 @@ export type HeraldPortrait = 'voss' | 'venoma' | 'coilkeeper';
 export interface HeraldAgent {
   id: string;
   name: string;
+  /** The one-word name the game speaks them by (a partner chip, a scramble card, a draw sheet) — the
+   *  `Character.shortName` twin, so a Coil agent reads exactly like a tour-mate wherever a partner is
+   *  named (GS-story-coil-partners). */
+  shortName: string;
   title: string;
   /** Which existing lore portrait bust to draw (all in the Coil palette). */
   portrait: HeraldPortrait;
@@ -37,6 +41,7 @@ export const HERALD_CREW: readonly HeraldAgent[] = [
   {
     id: 'coil-voss',
     name: 'Malachai "Sable" Voss',
+    shortName: 'Voss',
     title: 'The Apostate · your mentor',
     portrait: 'voss',
     lines: [
@@ -48,6 +53,7 @@ export const HERALD_CREW: readonly HeraldAgent[] = [
   {
     id: 'coil-venoma',
     name: 'Venoma "the Viper" Krait',
+    shortName: 'Venoma',
     title: 'The Viper · your lieutenant',
     portrait: 'venoma',
     lines: [
@@ -59,6 +65,7 @@ export const HERALD_CREW: readonly HeraldAgent[] = [
   {
     id: 'coil-ouros',
     name: 'Brother Ouros',
+    shortName: 'Ouros',
     title: 'The Whisperer',
     portrait: 'coilkeeper',
     tint: 'hue-rotate(-40deg) saturate(1.1)',
@@ -71,6 +78,7 @@ export const HERALD_CREW: readonly HeraldAgent[] = [
   {
     id: 'coil-ecdysis',
     name: 'Sister Ecdysis',
+    shortName: 'Ecdysis',
     title: 'The Shedmaker',
     portrait: 'coilkeeper',
     tint: 'hue-rotate(60deg) saturate(1.2) brightness(1.05)',

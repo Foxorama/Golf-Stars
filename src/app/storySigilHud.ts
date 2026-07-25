@@ -27,6 +27,7 @@ import {
   type SigilMatch,
 } from '../sim/rpg/storyTournaments';
 import { qualifierMatchThrough, qualifierMatchOpponents } from '../sim/rpg/storyQualifierFormats';
+import { storyPartnerName } from '../sim/rpg/storyPartners';
 import { opposingField } from '../sim/rpg/storyTeams';
 import { matchScoreline } from '../sim/rpg/match';
 import type { PlayedHole } from '../sim/round';
@@ -97,7 +98,7 @@ function qualifierLiveMatch(strokes: readonly number[]): LiveMatch | undefined {
     .split(' & ')
     .map((n) => n.split(' ')[0] ?? n)
     .join(' & ');
-  const mate = plan.partnerId ? getCharacter(plan.partnerId)?.shortName ?? 'your partner' : 'your partner';
+  const mate = storyPartnerName(plan.partnerId);
   return {
     res,
     oppShort,

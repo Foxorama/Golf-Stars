@@ -350,9 +350,12 @@ export function tournamentRival(t: StoryTournament, story?: StoryState): Effecti
       return { id, name: friendName(id), golferId: id, corrupted: true, voice: 'corrupt' };
     }
     case 'heraldPair': {
-      // Ch.5 Herald — the two former friends who partnered you; the first is the featured face.
+      // Ch.5 Herald — the two former friends who partnered you; the first is the featured face. GS-story-
+      // pair-voice: they speak as a PAIR (they share a ball against you), never the lone-champion `confront`
+      // voice of the Ch.4 rite — a friend saying "they told me not to come alone, came alone anyway" while
+      // their partner stands beside them was the player report.
       const [a] = heraldOpponentIds(story);
-      return { id: a, name: friendName(a), golferId: a, voice: 'confront' };
+      return { id: a, name: friendName(a), golferId: a, voice: 'confrontPair' };
     }
   }
 }

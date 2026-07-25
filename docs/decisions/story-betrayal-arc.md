@@ -464,6 +464,44 @@ sidelined case, the Warden path, or off a story round; `everyGolferHasBetrayalVo
 - **Halftime pop** on the Stableford Ch.3 still compares thru-9 STROKES (approximate) — a points pop is a
   polish nicety.
 
+## Whose side you are on decides who stands beside you (2026-07-25)
+Three reports from one Coil play-through, all the same shape: the campaign's *fork* was never taught to the
+surfaces that pick a partner or write a line.
+
+**GS-story-coil-partners — the partner pool follows the path.** Every paired story event drew its partner
+from `otherGolferIds` — your three Earth tour-mates. That is right up to The Choice and wrong the moment
+after it: turn Herald and those three desert the bag (`applyHeraldCaddies` swaps the whole crew for the Coil
+inner circle) and two of them come for you at the Ghost Harvest. The dossier was still offering "play this
+qualifier with Larry". `storyPartners.ts` is now the one seam: `storyPartnerIds(story)` returns the three
+tour-mates on the Warden/undecided road and the four Coil agents (Voss, Venoma, Ouros, Ecdysis) on the
+Herald one, and `storyPartnerName(id)` resolves a display name for *any* partner the game can hand it —
+golfer, Coil agent, or the Sigil-5 Coil champion — so the picker, the draw sheet, the intro banner, the
+scramble card, the best-ball reveal and the recap all read one source. The pool is a pure function of
+`alignment` (nothing mutable like the active caddy), so a campaign's draw sheet stays fixed, and it is the
+same size as the old one, so the draw's shape — and every Warden campaign's existing sheet — is unchanged.
+Coil ids in `qualifierPartners` are simply not counted by the partner tally (`bump` only counts tour-mates),
+which is correct: by the time you are the Herald the betrayer is long settled.
+
+**GS-story-champion-met — you can only partner a champion you have met.** The Sigil-5 Coil picker offered
+Voss, Venoma *and Scorpius* — but Scorpius is the Chapter-4 **Warden** rival, the hunter sent to the Abyssal
+Vigil. A Herald never plays the Vigil, so he walked into the campaign's climax as a total stranger.
+`metCoilChampions(story)` keeps Voss and Venoma (both cross every campaign's path — the Forge, the Storm,
+The Choice) and admits Scorpius only on a Warden road that has reached Chapter 4. The choice stays real:
+a champion cannot carry your bag *and* play beside you, so swapping who caddies in the locker is how you
+free the one you want at your side.
+
+**GS-story-pair-voice — they did not come alone.** The Ch.5 Herald rivals reused the `confront` voice
+written for the Ch.4 Drowning Rite, where the Wardens send exactly ONE champion. At the Ghost Harvest two
+friends share a ball against you — so Larry was saying *"they told me not to come alone, mate. Came alone
+anyway"* with his partner standing next to him. `confrontPair` is a fourth voice row per golfer (taunt +
+both halftime lines), written for a pair: each of them counts what is left of the ship out loud, in their
+own idiom, which is a sharper knife than the solo lines ever were.
+
+**GS-story-yard-badge.** Same session, smaller: the shipyard stamped "Earned" on `milestone` ships — which
+are revealed by renown and then *bought* — so the badge read as a claim about a ship you already had, next
+to its price. It now says `Renown`, `reward` ships say `Sigil`, and an OWNED ship shows no acquisition badge
+at all (the card already says Flying / Owned, and in the Hangar every ship is yours by definition).
+
 ## Key reuse points (from the code map)
 
 - Team scoring: `src/sim/rpg/match.ts` — `bestBallHole`, `playSideHole('scramble'|'bestball')`,
