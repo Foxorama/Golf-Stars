@@ -285,6 +285,9 @@ describe('build output (real browser)', () => {
     { screen: 'storyquestoffer', sel: '.gs-lore', text: 'The Buried Lie', label: "the Story caddy-quest OFFER beat (the ally's pre-round pitch)" },
     { screen: 'storytournamentresult', sel: '.gs-storyres', text: 'Emerald', label: 'the Story tournament result recap' },
     { screen: 'storyfinale', sel: '.gs-fin-gate', text: 'Jörmungandr', label: 'the Story finale battle briefing' },
+    // GS-story-warden-ark: the Coil road's finale is a DIFFERENT enemy — the Wardens' capital ship, holding
+    // the root you mean to open — so the briefing names the Ark, not the serpent.
+    { screen: 'storyfinaleherald', sel: '.gs-fin-gate', text: 'Warden Ark', label: 'the Herald finale briefing (the Warden Ark blockade)' },
     { screen: 'storyfinaleresult', sel: '.gs-storyres', text: 'Universe', label: 'the Story finale victory recap' },
     { screen: 'storychoice', sel: '.gs-choice-grid', text: 'The Choice', label: 'the Story alignment fork (The Choice)' },
     { screen: 'storyinterlude', sel: '.gs-inter-dialogue', text: 'The Severing', label: 'the Story emotional interlude' },
@@ -470,6 +473,40 @@ describe('build output (real browser)', () => {
         expect(errors, `pageerror: ${errors[0] ?? ''}`).toEqual([]);
         expect(txt).toContain('Star Tour is unlocked');
         expect(done).toBe(true);
+      } finally {
+        await browser.close();
+      }
+    },
+    60_000,
+  );
+
+  // THE HERALD'S BOSS IS THE WARDEN ARK (GS-story-warden-ark). The Coil road fights the Order's capital
+  // ship — a different painter, a different muzzle seam and different projectile art — so it gets its own
+  // end-to-end mount: engage from the Herald briefing, hold in the interactive assault (the Ark's flak /
+  // lances / torpedoes drawing every frame without a page error), then skip to the Coil ending.
+  it.runIf(chromePath)(
+    'the HERALD finale engages the Warden Ark and resolves to the Long Rest ending',
+    async () => {
+      const { chromium } = await import('playwright-core');
+      const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
+      try {
+        const page = await browser.newPage({ viewport: { width: 414, height: 896 }, reducedMotion: 'no-preference' });
+        const errors: string[] = [];
+        page.on('pageerror', (e) => errors.push(e.message));
+        await page.goto('file://' + dist + '?screen=storyfinaleherald&intro=0&seed=7', { waitUntil: 'load' });
+        await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', { timeout: 8000 });
+        await page.getByText('Engage the Warden Ark', { exact: false }).first().click();
+        await page.waitForSelector('[data-gs-storyfinale]', { timeout: 4000 });
+        // Hold long enough for the Ark to paint, open fire and escalate a phase — every frame is drawn.
+        await page.waitForTimeout(7000);
+        expect(await page.$('[data-gs-storyfinale]')).not.toBeNull();
+        await page.click('button:has-text("Skip")');
+        await page.waitForSelector('[data-gs-storyfinale]', { state: 'detached', timeout: 6000 });
+        await page.waitForSelector('.gs-storyres', { timeout: 4000 });
+        const txt = await page.evaluate(() => document.getElementById('app')?.textContent ?? '');
+        expect(errors, `pageerror: ${errors[0] ?? ''}`).toEqual([]);
+        expect(txt).toContain('The Ark breaks'); // the Ark, not the serpent's seal
+        expect(txt).toContain('Long Rest');
       } finally {
         await browser.close();
       }

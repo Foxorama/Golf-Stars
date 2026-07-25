@@ -483,6 +483,43 @@ Ordered so each ships something playable and nothing lands before its foundation
   eye SLOWLY open across the five ceremonies (sealed → sliver → cracked → watching → wide), and give the
   battle serpent its wide-awake glare.
 
+- **GS-story-warden-ark** — ✅ *shipped* (the Herald's boss is the WARDEN ARK, not the serpent). Player
+  report: *"the final spaceship boss battle has you fighting the serpent instead of the Warden's spaceship
+  — and the boss weapons should reflect the Warden ship's loadout; it doesn't make sense that the Warden
+  ship would be firing acid blasts."* Both halves were right, and the second one gave the fix away. On the
+  Coil road you are the serpent's **liberator**; the thing that can actually stop you is the Order's
+  capital ship, run out of the deep sky with your old friends at its helm. The Herald fight was reusing the
+  serpent painter with the copy re-labelled ("the bound World-Eater", wards straining) — so you spent the
+  campaign's climax shooting the very thing you had come to set free, while it spat venom at you.
+  1. **A new boss painter** (`render/wardenArk.ts`, ~250 lines, pure + zero rng — a deterministic hash
+     places the scorch so damage never crawls between frames). The Ark is drawn in the Warden fleet's own
+     palette (the Radiant Warden Cruiser's ivory hull / pale glass / gold trim / cyan drive) as an ORDERED
+     thing: a long wedge hull, plating seams, a keel stripe, a row of lit windows, a dorsal spine carrying
+     three lance turrets, a bridge dome, twin nacelles and a gold shrine-ring. It takes VISIBLE damage —
+     breaches tear open and burn, windows go dark, the halo gutters — so the health bar is readable off the
+     hull itself, which the serpent could never do.
+  2. **One anchors seam, two bosses.** `paintWardenArk` returns the same `BossAnchors` (= `SerpentAnchors`)
+     shape, so the battle module holds ONE anchors variable: `browX/browY` is what your guns shoot at,
+     `eyeX/eyeY` is what the golf finisher strikes (the Ark's exposed REACTOR CORE / the serpent's bared
+     eye), and `arkBatteryPos(anchors)` / the maw share one `muzzlePos()`. `drawSerpent` → `drawBoss`,
+     `sealPos`/`drawSeal` → `coreTarget`/`drawCoreTarget`. No forked fight loop.
+  3. **Warship weapons on the same timings.** The three attack shapes are untouched — the fan, the
+     telegraphed line, the fused heavy round — so every timing, speed, spawn count and dodge window (and
+     therefore the whole balance of the fight) is IDENTICAL; only the weapon changed: venom globes →
+     **FLAK** shells (a bright slug, a smoke-and-spark trail, a gold burst), the called lightning →
+     **LANCE** lock-ons that now FIRE FROM the Ark's batteries out past you rather than arriving from
+     off-screen, and void orbs → seeker **TORPEDOES** detonating into white shock rings. Phase banners,
+     the health-bar name (`THE WARDEN ARK`), the overwhelm caption and the finisher prompt all follow.
+  4. **The climax is the Ark coming apart**: the reactor takes the ball, gold shock-rings and hull debris
+     are thrown across the field, and the root the blockade was holding shut wells up green from below —
+     *"The blockade is gone — the root lies open, and something vast begins to stir."* The briefing and both
+     recaps were rewritten to match (the Ark, its armour, its batteries, its bridge).
+  Render + copy only: the gates, the phase script, the finisher, the reducer contract and every sim number
+  are untouched, and the WARDEN path is byte-for-byte the fight it was. Guarded by two new browser smokes
+  (`?screen=storyfinaleherald` mounts the Ark briefing; engaging it mounts the overlay, holds through the
+  assault with no page error, and skips to the Long Rest ending) plus `scripts/battle-preview.mjs`, which
+  now shoots the Herald fight phase by phase (open / flak / lance / torpedo / overwhelm → aim → climax).
+
 **Phase G — Polish**
 - **GS-story-beats** — ✅ *shipped* (the story-round dialogue beats). Campaign NPC scenes threaded through
   the EXISTING generic LORE machinery (`sim/rpg/lore.ts`), so a beat is a DATA ROW and the gate/screen/

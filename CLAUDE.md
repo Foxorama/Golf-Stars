@@ -471,6 +471,14 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     yggdrasil, shown only once Thor's Hammer is owned; Asgard is the only playable realm, others are
     data-flip placeholders). `intro`/`strokeResult` are strokeplay-branched; deep-linkable + guarded by
     `tests/startour-flow.test.ts`. Re-shoot `scripts/startour-preview.mjs`.
+  - **The finale battle has TWO bosses, one engine** (GS-story-battle-3 / GS-story-warden-ark,
+    `render/storyBattle.ts`): the Warden fights **Jörmungandr**; the Herald fights the **Warden Ark**, the
+    Order's capital ship holding the root (`render/wardenArk.ts`) — you cannot make the player shoot the
+    serpent they came to free. Both painters return the same `BossAnchors`, so targeting, `muzzlePos()` and
+    the golf finisher (bared eye / exposed reactor core) are ONE code path, and the three attack shapes keep
+    identical timings/speeds/counts — only the WEAPON art changes (venom→flak, called lightning→lance
+    lock-ons fired FROM the ship, void orbs→torpedoes). A new boss = a new painter + a `herald`-style branch,
+    never a forked fight loop. Re-shoot `scripts/battle-preview.mjs`.
   - **Intro cinematic** (`docs/decisions/ui-intro.md`) — cosmetic Canvas2D, not in the reducer; degrades
     safely (every frame in try/catch → `finish()`); the many-instance glow uses a cached sprite, never
     per-element `shadowBlur`. The real title boots first; the intro overlays it.

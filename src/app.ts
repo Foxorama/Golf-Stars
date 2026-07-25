@@ -180,7 +180,7 @@ function boot(): void {
  *     come fast on the wide ribbon and the Bifröst trigger fires authentically when you make one).
  *   • `?asgard=1`  — jump STRAIGHT into the Bifröst interlude (the Himinbjörg map → cross → the nine-hole
  *     tournament → win/lose → return), from a real suspended run so "Return to your journey" works.
- *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storymidbeat|storyquestbeat|storyquestoffer|storyshop|storylocker|storyshipyard|shipinterior|storytournament|storyfinale|storychoice|storyinterlude|storyaftermath|storyqualresult|storyqualmatch|storyqualmatchlive|storyqualpick|storybar` (GS-screen-deeplink) — mount a between-stop
+ *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storymidbeat|storyquestbeat|storyquestoffer|storyshop|storylocker|storyshipyard|shipinterior|storytournament|storyfinale|storyfinaleherald|storychoice|storyinterlude|storyaftermath|storyqualresult|storyqualmatch|storyqualmatchlive|storyqualpick|storybar` (GS-screen-deeplink) — mount a between-stop
  *     screen directly, so the browser LAYOUT smoke tests (tests/build.test.ts) can reach the travel /
  *     shop / market / clubhouse / lore surfaces WITHOUT playing a full stop (shot animations + watch screens
  *     are flaky to script). The report's highest-risk uncovered surface — the journey map was
@@ -436,6 +436,7 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       };
     }
     case 'storyfinale':
+    case 'storyfinaleherald':
     case 'storyfinaleresult': {
       // GS-story-yggdrasil: reach the finale by seeding a five-Sigil campaign directly (the honest tournament
       // grind is long; the finale gate is `keyToOtherRealm`, which we set via trophies). `storyfinaleresult`
@@ -447,6 +448,9 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
             story: {
               ...base.story,
               chapter: 5,
+              // GS-story-warden-ark: `storyfinaleherald` seeds the COIL path, whose finale is a different
+              // enemy entirely — the Warden Ark blockade, not the serpent — so the layout smoke reaches it.
+              ...(screen === 'storyfinaleherald' ? { alignment: 'herald' as const } : {}),
               trophyIds: ['sigil-emerald', 'sigil-ember', 'sigil-storm', 'sigil-abyssal', 'sigil-serpent'],
               // arm the ship so the finale is winnable (the result deep-link lands on the victory recap)
               ownedShipUpgradeIds: ['upg:weapon:scatter', 'upg:weapon:railgun', 'upg:engine:ion', 'upg:shield:deflector', 'upg:shield:aegis'],
@@ -454,7 +458,7 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
           }
         : base;
       const briefing = reduce({ ...armed, screen: 'story' }, { type: 'openStoryFinale' });
-      if (screen === 'storyfinale') return briefing;
+      if (screen === 'storyfinale' || screen === 'storyfinaleherald') return briefing;
       return reduce(briefing, { type: 'engageStoryFinale' });
     }
     case 'storychoice': {
@@ -2940,7 +2944,8 @@ function render(): void {
         loadout: finaleLoadout(state.story),
         shipId: state.story?.equippedShipId, // the fighter is YOUR equipped ship's real art
         interactive: true,
-        herald: alignment === 'herald', // the Herald frees the bound serpent under the blockade's lances
+        // GS-story-warden-ark: on the Coil road the boss is the WARDEN ARK, with a warship's weapons.
+        herald: alignment === 'herald',
         // the app layer owns audio — the overlay stays node-clean like its cinematic siblings
         onFire: (style) => sfx.redirectFire(style === 'scatter' || style === 'pea' ? 'boomerang' : 'laser', 480),
         onShipHit: () => sfx.penalty(),

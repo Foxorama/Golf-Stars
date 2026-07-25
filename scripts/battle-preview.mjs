@@ -81,9 +81,13 @@ await shot('warden-3-lightning', { hpFrac: 0.48, shipId: 'hauler-barge', waits: 
 await shot('warden-4-void', { hpFrac: 0.22, shipId: 'hauler-barge', waits: [[3600, '']] });
 // The overwhelm fires as soon as the autopilot's first volley lands below 5% (waits are DELTAS).
 await shot('warden-5-overwhelm', { hpFrac: 0.055, shipId: 'hauler-barge', waits: [[3300, ''], [3200, 'aim'], [1500, 'climax']] });
-// The Herald fight (saucer): gold lances + the waking bound serpent.
-await shot('herald-1-open', { herald: true, hpFrac: 0.74, shipId: 'ufo-saucer', waits: [[3400, '']] });
-await shot('herald-2-late', { herald: true, hpFrac: 0.22, shipId: 'ufo-saucer', waits: [[3600, '']] });
+// The Herald fight (saucer) — a DIFFERENT boss (GS-story-warden-ark): the Warden Ark's flak, spinal
+// lances and torpedoes, the hull taking visible damage, then the bared reactor core + the climax.
+await shot('herald-1-open', { herald: true, hpFrac: 1, shipId: 'ufo-saucer', waits: [[2600, '']] });
+await shot('herald-2-flak', { herald: true, hpFrac: 0.74, shipId: 'ufo-saucer', waits: [[3400, '']] });
+await shot('herald-3-lance', { herald: true, hpFrac: 0.48, shipId: 'ufo-saucer', waits: [[3600, '']] });
+await shot('herald-4-torpedo', { herald: true, hpFrac: 0.22, shipId: 'ufo-saucer', waits: [[3600, '']] });
+await shot('herald-5-overwhelm', { herald: true, hpFrac: 0.055, shipId: 'ufo-saucer', waits: [[3300, ''], [3200, 'aim'], [1500, 'climax']] });
 
 console.log('battle preview →', outDir);
 await browser.close();
