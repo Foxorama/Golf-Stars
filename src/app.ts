@@ -33,9 +33,12 @@ import { holeResult } from './sim/rpg/play';
 import type { PlayedHole } from './sim/round';
 import { betterPlayedHole } from './sim/rpg/match';
 import { storyPartnerBestBallScore } from './sim/rpg/storyTeams';
+import { QUALIFIER_PARTNER_EDGE } from './sim/rpg/storyQualifierFormats';
 import { storySigilProgressHTML } from './app/storySigilHud';
 import { TEAM_PARTNER_EDGE } from './sim/rpg/storyTournaments';
 import { midroundOmen } from './sim/rpg/storyMidround';
+import { tournamentAftermath } from './sim/rpg/storyAftermath';
+import { tournamentForChapter } from './sim/rpg/storyTournaments';
 import { questBeatFor, questOfferBeatFor } from './sim/rpg/storyQuestBeat';
 import { ACE_SHIP_ID } from './sim/rpg/ships';
 import { bagTierRank, type BagTier } from './sim/rpg/bag';
@@ -95,7 +98,7 @@ import { storyShopScreen } from './app/storyShopScreens';
 import { storyLockerScreen, storyLockerView } from './app/storyLockerScreens';
 import { storyShipyardScreen } from './app/storyShipyardScreens';
 import { shipInteriorScreen } from './app/shipInteriorScreens';
-import { storyTournamentScreen, storyTournamentPopScreen, storyTournamentResultScreen } from './app/storyTournamentScreens';
+import { storyTournamentScreen, storyTournamentPopScreen, storyTournamentResultScreen, storyTournamentAftermathScreen } from './app/storyTournamentScreens';
 import { storyFinaleScreen, storyFinaleResultScreen } from './app/storyFinaleScreens';
 import { storyChoiceScreen } from './app/storyChoiceScreens';
 import { storyInterludeScreen } from './app/storyInterludeScreens';
@@ -166,7 +169,7 @@ function boot(): void {
  *     come fast on the wide ribbon and the Bifröst trigger fires authentically when you make one).
  *   • `?asgard=1`  — jump STRAIGHT into the Bifröst interlude (the Himinbjörg map → cross → the nine-hole
  *     tournament → win/lose → return), from a real suspended run so "Return to your journey" works.
- *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storymidbeat|storyquestbeat|storyquestoffer|storyshop|storylocker|storyshipyard|shipinterior|storytournament|storyfinale|storychoice|storyinterlude|storybar` (GS-screen-deeplink) — mount a between-stop
+ *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storymidbeat|storyquestbeat|storyquestoffer|storyshop|storylocker|storyshipyard|shipinterior|storytournament|storyfinale|storychoice|storyinterlude|storyaftermath|storyqualresult|storyqualmatch|storyqualmatchlive|storyqualpick|storybar` (GS-screen-deeplink) — mount a between-stop
  *     screen directly, so the browser LAYOUT smoke tests (tests/build.test.ts) can reach the travel /
  *     shop / market / clubhouse / lore surfaces WITHOUT playing a full stop (shot animations + watch screens
  *     are flaky to script). The report's highest-risk uncovered surface — the journey map was
@@ -266,12 +269,36 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const intro = reduce(hub, { type: 'storyPlayWorld', courseId: 'standrews-18' });
       return reduce(intro, { type: 'play' });
     }
-    case 'storyqualresult': {
+    case 'storyqualresult':
+    case 'storyqualmatch': {
       // GS-story-qualifiers: mount a QUALIFYING-EVENT recap the honest way — prologue → Chapter 1, then play a
       // non-venue Chapter-1 world (a qualifier) and resolve it, so the smoke exercises the qualifier board.
-      const hub = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      // GS-story-qualifier-formats: the event's FORMAT is drawn off the campaign seed, so the seed is PINNED
+      // here — otherwise each page load would smoke a different recap shape at random. `storyqualresult`
+      // pins a two-ball best-ball (a board with a partner + pair rows); `storyqualmatch` pins a matchplay
+      // (no board at all — a scoreline card), which is the shape most likely to break the recap layout.
+      const seed = screen === 'storyqualmatch' ? 'q0' : 'q6';
+      const hub0 = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      const hub = hub0.story ? { ...hub0, story: { ...hub0.story, campaignSeed: seed } } : hub0;
       const ch1 = reduce(reduce(reduce(hub, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' }), { type: 'storyRoundContinue' });
       return reduce(pastLore(reduce(ch1, { type: 'storyPlayWorld', courseId: 'verdant2-18' })), { type: 'play' });
+    }
+    case 'storyqualmatchlive': {
+      // GS-story-qualifier-match-live: mount the play HUD MID-ROUND of a `pair-match` qualifier, so the
+      // browser smoke can see the live match chip + the per-hole match panel (new chrome on the play
+      // screen). Built the honest way — prologue → Chapter 1 → tee off the matchplay event (seed pinned so
+      // the draw is always that format) → auto-play two holes and stop on the end-of-hole screen.
+      const hub0 = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      const hub = hub0.story ? { ...hub0, story: { ...hub0.story, campaignSeed: 'q0' } } : hub0;
+      const ch1 = reduce(reduce(reduce(hub, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' }), { type: 'storyRoundContinue' });
+      let s = reduce(pastLore(reduce(ch1, { type: 'storyPlayWorld', courseId: 'verdant2-18' })), { type: 'playInteractive' });
+      let guard = 0;
+      // Two full holes, then leave the state parked on the second hole's end-of-hole screen.
+      for (let h = 0; h < 2 && s.screen === 'playing'; h++) {
+        while (s.play && !s.play.done && guard++ < 2000) s = reduce(s, { type: 'autoShotHole' });
+        if (h === 0) s = reduce(s, { type: 'holeComplete' });
+      }
+      return s;
     }
     case 'storymap': {
       // GS-story-map: reach the galaxy star map in STORY mode the honest way — play the prologue to Chapter
@@ -283,6 +310,19 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const club = reduce(result, { type: 'storyRoundContinue' });
       starTourView.storyMode = true; // dispatch normally sets this; the deep-link builds state directly
       return reduce(club, { type: 'openStoryMap' });
+    }
+    case 'storyqualpick': {
+      // GS-story-qualifier-partner-pick: open the chart with a PAIRED qualifying event's dossier showing,
+      // so the browser smoke sees the partner picker chips (new dossier chrome). Built the honest way —
+      // prologue → Chapter 1 → open the star map → select the world (the seed is pinned so the draw is
+      // always a paired format).
+      const hub0 = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      const hub = hub0.story ? { ...hub0, story: { ...hub0.story, campaignSeed: 'q6' } } : hub0;
+      const ch1 = reduce(reduce(reduce(hub, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' }), { type: 'storyRoundContinue' });
+      starTourView.storyMode = true; // dispatch normally sets this; the deep-link builds state directly
+      const map = reduce(ch1, { type: 'openStoryMap' });
+      starTourView.selectedId = 'verdant2-18';
+      return map;
     }
     case 'storyshop': {
       // GS-story-econ: mount a world's Pro Shop the honest way — play the prologue to Chapter 1, then
@@ -419,6 +459,17 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const base = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
       if (!base.story) return base;
       return { ...base, story: { ...base.story, chapter: 5, alignment: 'herald', trophyIds: ['sigil-emerald', 'sigil-ember', 'sigil-storm', 'sigil-drowned'] }, screen: 'storyInterlude' };
+    }
+    case 'storyaftermath': {
+      // GS-story-aftermath: mount the post-Sigil confrontation beat by seeding a Warden campaign that just
+      // WON its Chapter-4 major (Scorpius / The Abyssal Vigil), so a headless smoke can render the shared
+      // beat card the honest result→continue divert produces.
+      const base = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      if (!base.story) return base;
+      const story = { ...base.story, chapter: 5, alignment: 'warden' as const, trophyIds: ['sigil-emerald', 'sigil-ember', 'sigil-storm', 'sigil-abyssal'] };
+      const t = tournamentForChapter(4, 'warden');
+      const beat = t ? tournamentAftermath(t, story, true) : undefined;
+      return beat ? { ...base, story, screen: 'storyTournamentAftermath', pendingAftermath: beat } : base;
     }
     case 'shipinterior': {
       // GS-story-ship-interior: board the ship the honest way — prologue → Chapter 1, open the star map,
@@ -567,6 +618,9 @@ function dispatch(action: Action): void {
       starTourView.storyMode = action.type === 'openStoryMap';
       starTourView.selectedId = null;
       starTourView.effect = 'none';
+      // GS-story-qualifier-partner-pick: partner picks are per-chart-session view state, like the weather —
+      // a fresh entry starts from each event's drawn suggestion again.
+      starTourView.qualifierPartnerBy = {};
       starTourView.recordsOpen = false;
       starTourView.yggdrasilOpen = false;
       starTourView.centred = false;
@@ -1115,9 +1169,13 @@ function playingBody(animating: boolean): string {
     // the running team total match the finished recap to the stroke; `stopPlayed` stays the player's solo
     // hole, and the resolution folds the ghost, so auto ≡ interactive is untouched).
     const storyBestBall = state.run.storyTeamFormat === 'bestball' && !!state.run.storyTournamentPartner;
+    // GS-story-qualifier-formats: a QUALIFYING EVENT's two-ball carries a deliberately weaker partner than a
+    // Sigil's (your card must decide your own qualifier), so the reveal reads the round's OWN edge — draw the
+    // Sigil ghost here and the revealed ball would not be the ball that scored.
+    const storyPartnerEdge = state.run.storyQualifier ? QUALIFIER_PARTNER_EDGE : TEAM_PARTNER_EDGE;
     const storyPartnerHoleAt = (holeIndex: number, holePar: number): PlayedHole =>
       synthGhostHole(
-        storyPartnerBestBallScore(state.run.storyTournamentPartner!, TEAM_PARTNER_EDGE, String(state.run.seed), holeIndex, holePar),
+        storyPartnerBestBallScore(state.run.storyTournamentPartner!, storyPartnerEdge, String(state.run.seed), holeIndex, holePar),
         holePar,
       );
     const partnerHole =
@@ -1175,7 +1233,9 @@ function playingBody(animating: boolean): string {
     // GS-story-sigil-live: a Sigil round shows its COMPETITION live every hole — the running match
     // (scoreline + W/L/½ pips on the matchplay Sigils, with the close-out call) or the team standings
     // vs the opposing pairs (scramble/best-ball) — from the SAME resolver streams as the finish.
-    const sigilLive = state.run.storyTournament ? storySigilProgressHTML(playedSoFar) : '';
+    // GS-story-qualifier-match-live: a `pair-match` QUALIFYING EVENT is a real hole-by-hole match too, so
+    // it drives the identical panel (it used to play out blind, with the result only on the recap).
+    const sigilLive = state.run.storyTournament || state.run.storyQualifier ? storySigilProgressHTML(playedSoFar) : '';
     const progress = sigilLive
       ? `${sigilLive}<div style="margin-top:10px;">${strokePlayProgressHTML(playedSoFar)}</div>`
       : state.run.formatId === STROKEPLAY_FORMAT
@@ -2540,6 +2600,8 @@ function render(): void {
       ? storyQuestOfferScreen()
       : state.screen === 'storyTournamentResult'
       ? storyTournamentResultScreen()
+      : state.screen === 'storyTournamentAftermath'
+      ? storyTournamentAftermathScreen()
       : state.screen === 'storyFinale'
       ? storyFinaleScreen()
       : state.screen === 'storyFinaleResult'
@@ -2562,6 +2624,7 @@ function render(): void {
     state.screen === 'starTour' ||
     state.screen === 'lore' || // GS-lore: the story beat owns the full viewport (its own cinematic backdrop)
     state.screen === 'storyMidBeat' || // GS-story-midround-omen: the mid-round foreshadow shares the lore card
+    state.screen === 'storyTournamentAftermath' || // GS-story-aftermath: the post-Sigil confrontation beat shares it
     state.screen === 'storyQuestBeat' || // GS-story-caddy-quest-dialogue: the caddy mid-round beat shares it too
     state.screen === 'storyQuestOffer'; // GS-story-quest-offer-beat: the ally's pre-round pitch shares it too
   // The character-select roster wants a wider frame so all four golfers line up across one screen,
@@ -2869,6 +2932,18 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-startour-weather]').forEach((el) => {
     el.addEventListener('click', () => {
       starTourView.effect = (el.getAttribute('data-startour-weather') ?? 'none') as CourseEffectId;
+      sfx.click();
+      render();
+    });
+  });
+  // GS-story-qualifier-partner-pick: tapping a partner chip on a qualifying event's dossier records the
+  // pick for THAT world and re-renders in place (the `data-startour-weather` idiom — view state + render,
+  // never a reducer round-trip, so the chart's camera/zoom are untouched).
+  app.querySelectorAll<HTMLElement>('[data-startour-qpartner]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const worldId = el.getAttribute('data-startour-qworld');
+      const partnerId = el.getAttribute('data-startour-qpartner');
+      if (worldId && partnerId) starTourView.qualifierPartnerBy[worldId] = partnerId;
       sfx.click();
       render();
     });

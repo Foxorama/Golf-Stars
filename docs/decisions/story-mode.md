@@ -575,6 +575,18 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   `app.ts` toggles it. A compact illustrated locker-room banner (locker bank + bench + bag, pure byte-stable
   SVG) tops the screen. Pure render/view + one app handler — no sim/save/rng touch. Guarded by the existing
   `?screen=storylocker` browser smoke (bag panel open ⇒ `.gs-lock-grid` + "Your bag").
+- **GS-story-locker-tiles** — ✅ *shipped* (`app/storyLockerScreens.ts`). Player feedback: "the locker room,
+  icons and layout for all sections is messy, long, awkward and difficult to use." The three sections had
+  drifted into three DIFFERENT layouts — clubs in a card grid, gear as full-width stacked rows (one strip per
+  owned piece × nine slots = a page of scroll), crew as ragged variable-width flex-wrap pills. Now ONE tile
+  visual language (`tile()` + `.gs-lock-tile` in the shared `.gs-lock-grid`) draws clubs, gear pieces AND
+  caddies identically: a square art thumb, a 2-line-clamped name, a small meta line (carry / rarity /
+  aboard-state), a rarity-accent top edge, and a single ＋/✕/🔒 corner button. The equipped/active tile gets
+  an accent ring + a badge (🎒 for the club bag & the crew's active caddy, ✓ for gear). Gear is grouped per
+  slot behind a slim header + owned-count chip with the equipped piece sorted first, collapsing a nine-slot
+  wardrobe from full-width strips to a few dense rows. Pure render/view (own `.gs-lock*` prefix) — no
+  sim/save/rng/action change (every `data-action` and the accordion wiring are unchanged); preview via
+  `node scripts/locker-preview.mjs`; guarded by the same `?screen=storylocker` browser smoke.
 - **GS-story-objective** — ✅ *shipped* (`sim/rpg/storyGuide.ts` + the clubhouse mission log + a new-game
   premise card). Player feedback: "the new game start gives you no indication of what's happening or why
   you are playing" and "after becoming world champion the game gives you nothing to go on — what do you
@@ -695,6 +707,22 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   sclera, bloodshot veins, a slit pupil, a cold glint) under a shadowed brow (a cast-occlusion socket),
   directionally-lit head SCALES, a nostril slit, and a green RIM-LIGHT along the top silhouette. The maw +
   eye + horns all animate open with `wake`/`focusHead`.
+- **GS-story-reseal-tree** — ✅ *shipped* (`render/storyEnding.ts`; player report: the Reseal ending was
+  "unreadable and doesn't look fantastic" — a wall of caption text painted straight over the serpent art).
+  The `good-win` cinematic was redesigned into a longer, **WORDLESS** three-beat sequence: (1) the serpent
+  settles to SLEEP and the golden seal-rings converge into a locking **bind-rune** over its coils (a one-shot
+  bloom as it seizes); (2) **YGGDRASIL**, the World-Tree, GROWS up around it — a pre-built recursive skeleton
+  (own private mulberry32, so it never perturbs the star/world scatter), a stout luminous trunk + broad canopy
+  BEHIND the beast, root tendrils curling in FRONT to cradle the coils, soft foliage masses for crown volume,
+  and the saved worlds lit as star-fruit blossoms; (3) it HOLDS as dawn breaks while the Coil's wyrm-ship jets
+  off toward The Destination. Timeline lengthened (`good` path: scene 7200 + hold 2800 = **10s**, vs the 7s
+  shared default the three other variants keep). The narrative TEXT is no longer baked over the art — the
+  cinematic shows only a clean title at the TOP, clear of the art, and dismisses onto the existing **readable
+  recap** (`storyFinaleResultScreen`, "Roll the credits ›"), which the player advances once they've read it.
+  The other three endings (loss/cult) are untouched — they keep their in-frame `captionBlock`. Eyes-on preview:
+  `scripts/story-ending-preview.mjs` (mounts the ending, shoots the beats wide + portrait). Pure Canvas2D,
+  zero sim rng, no save/reducer impact (the outcome is already resolved); `tests/story-endings.test.ts` still
+  guards the path×outcome → variant mapping.
 - **GS-story-serpent-2** — ✅ *shipped* (`render/sigilCeremony.ts` `paintSerpent` + `SerpentOpts`). The
   BODY rebuilt as Jörmungandr with an eldritch CONSTELLATION flare (the player ask: close the head-body
   gap, longer + more serpentine + coiled, star-ified). The spine is now MARCHED tail-ward from a FIXED
@@ -925,6 +953,87 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   format); `storyQualifiers` imports only `story` (the alignment-aware wrappers live in `storyTournaments` →
   no cycle). Guarded by `tests/story-qualifiers.test.ts` + updated tournament/guide/state/flow tests + a
   `?screen=storyqualresult` recap smoke.
+- **GS-story-qualifier-formats** — ✅ *shipped* (`sim/rpg/storyQualifierFormats.ts` + `storyQualifiers.ts` +
+  `storyBetrayal.ts` + `storyAftermath.ts` + `storyMapNav.ts` + run/reducer/screens). Player ask: qualifying
+  rounds should be NINE holes and drawn at random into one of five formats — single stroke, single Stableford,
+  paired stroke, paired Stableford, paired matchplay — with a paired event played as a random scramble or
+  best-ball, and every pairing TRACKED to feed the odd-one-out betrayer.
+  - **Nine holes.** `QUALIFIER_HOLES` 9; `currentCourse` regenerates the world's static spec on a `:qualifier`
+    salt (the `:quest` mechanism, generalised), deterministic per world so a replay is the same test. Three
+    events a chapter × five chapters was fifteen full rounds of "shoot a number" standing between you and the
+    Sigils; at nine holes an event is one sitting and the majors keep the 18 that makes them majors. The bar
+    scales with the round (`ghostToPar` takes `holes`, quoted over an 18-hole reference), so the golf asked
+    PER HOLE is unchanged and the classic 18-hole call is byte-for-byte the original ladder.
+  - **Five formats, one currency.** `qualifierPlan(story, courseId, chosenPartnerId?)` is a pure keyed hash
+    off a new `StoryState.campaignSeed` + the world (zero sequential rng on any play stream), so the sheet is
+    fixed for the campaign's life, SHOWN on the star-map dossier before you fly, and different per campaign.
+    The draw owns the FORMAT + PAIRING; the PARTNER is the player's (see GS-story-qualifier-partner-pick). Every
+    format resolves to the same thing — a finishing place in the chapter's field — so the top-N gate, the
+    `qualifierResults` record and the recap stay one shape. Matchplay has no board, so it earns a synthetic
+    place off the campaign's win-or-halve convention (win → 1, halve → the bar, loss → one outside it).
+  - **No new engine.** A paired event arms the SAME co-op machinery the team Sigils use — `storyTeamFormat` +
+    `storyTournamentPartner` on the run, so a scramble raises the per-shot pick card and `scrambleOptsFor`
+    plays best-of-two on the auto path (auto ≡ interactive), and a best-ball reveals the partner's ball per
+    hole off the same `storyPartnerBestBallScore` stream the resolution folds (live ≡ final).
+  - **Balance is MEASURED, not guessed** (`scripts/qualifier-balance.ts`, re-run after any retune). A shared
+    ball is worth ≈4.5 strokes over the real nine-hole layout (measured through `playCourse` with and without
+    the partner's shot mods); a best-ball partner ≈1–2. `PAIRING_BAR_SHIFT` sharpens the ghost ladder by that
+    much so a two-ball is VARIETY, never a discount. Landed: solo 36/44/57%, scramble 45/52/63%, best-ball
+    35/35/40%, matchplay 42–63% across Ch.1/3/5 — a 35–63% band with no walkover and no wall. The one real
+    design fix found by measuring: at Sigil partner strength (`TEAM_PARTNER_EDGE`) the ghost is as good as
+    you are, so a best-ball card becomes `min(you, someone-as-good-as-you)` and the qualifying rate stopped
+    responding to how the player actually played. `QUALIFIER_PARTNER_EDGE` is deliberately weaker — a
+    qualifier partner is company and a safety net, not a carry — and `app.ts` reads that same edge for the
+    reveal on a qualifier round, so the ball you see revealed is the ball that scored.
+  - **The pairing FEEDS the betrayal** (`StoryState.qualifierPartners`, STORY_VERSION 6→7 with
+    `campaignSeed`; both default to no-ops so a v6 arc is unchanged). See `story-betrayal-arc.md`
+    *"The partner tally"* + *"The Chapter 1–3 thread"* — the friend you keep drawing, or keep leaving on the
+    ship, is the one who ends up standing apart, and the first two Sigil wins now pay that off in scene.
+  - `recordWorldClear` became par-AWARE: when a world changes length under the player the old record is
+    measuring a different test, so the new form supersedes it rather than being judged against a to-par it
+    can never fairly beat. Guarded by `tests/story-qualifier-formats.test.ts` +
+    `tests/story-partner-tally.test.ts` + `?screen=storyqualresult|storyqualmatch` browser smokes.
+- **GS-story-qualifier-partner-pick** — ✅ *shipped* (`storyQualifierFormats.ts` + `storyMapNav.ts` +
+  `starTourScreens.ts`/`app.ts` + the `storyPlayWorld` action). Player call: *"the player needs to be able to
+  pick their playing partner for each qualifier like the Sigil tournaments to really sell the player agency"* —
+  and they were right. The partner was part of the DRAW, which meant the partner tally (and so the betrayal it
+  decides) was steered by dice as much as by the player: the arc read as something that happened TO you.
+  - `qualifierPlan` gained a `chosenPartnerId` parameter, honoured whenever it names one of your three
+    tour-mates and ignored otherwise, so a skipped picker (or a legacy caller, or the headless path) still
+    tees off with the drawn suggestion — byte-for-byte the previous behaviour. The draw keeps the format and
+    the pairing; only the company moved.
+  - The star-map dossier grew the picker (`qualifierPartnerPickerHTML`) — three tour-mate chips, the chosen
+    one ringed, the team-Sigil lobby's picker in the dossier's own chip idiom. It rides `starTourView.
+    qualifierPartnerBy` (view-only, keyed by world so each event remembers its own pick) via the established
+    `data-startour-*` listener → `render()` path, so tapping a chip never round-trips the reducer and the
+    chart's camera/zoom are untouched. Reset on chart entry, like the weather pick.
+  - The pick is carried into `{ type: 'storyPlayWorld', courseId, partnerId }` and validated inside the plan,
+    so the reducer stays pure and the run/tally/recap all read the friend you actually chose.
+  - Guarded in `tests/story-qualifier-formats.test.ts` (the override, the fallback for every invalid pick,
+    and an end-to-end assertion that a pick *other than* the draw's suggestion is what lands in
+    `qualifierPartners`) + a `?screen=storyqualpick` browser smoke on the dossier chrome.
+- **GS-story-qualifier-match-live** — ✅ *shipped* (`storyQualifierFormats.ts` + `app/storySigilHud.ts` +
+  `playHud.ts`/`app.ts` + reducer). Closes the one gap GS-story-qualifier-formats shipped with: a `pair-match`
+  qualifier played out BLIND — you learned the result on the recap — while the Sigils showed their match live
+  every hole. It is a real hole-by-hole match, so it now drives the identical surfaces.
+  - **One pure source.** `qualifierMatchThrough(plan, strokes, pars, seed)` — hand it the holes played so far
+    for the live state or the whole round for the finish, and the two agree by construction (each hole's
+    ghost cards are keyed by hole index, so a prefix of the strokes is exactly a prefix of the duels).
+    `resolveQualifierRound` now calls it too, so the recap literally cannot drift from the chip.
+  - **One renderer, not a fork.** `storySigilHud.ts` gained a small `LiveMatch` view that BOTH sources build
+    (`sigilLiveMatch` / `qualifierLiveMatch`); the chip and the per-hole panel read only that, so a third
+    source later is a builder, never a change to the chrome. The caption/title/side-labels come off the view,
+    so a qualifier reads "Two-ball best-ball matchplay · You & Larry vs Bogey & Chip" rather than the Sigil's
+    hard-coded "2v2 scramble matchplay". The opponent's card for the hole IN PLAY is probed the same way the
+    Sigils do (a dummy stroke for your own ball — their card doesn't depend on yours, machine-checked).
+  - **Mid-round CLOSE-OUT**, like real matchplay and like the Sigils: once your side is up by more than the
+    holes that remain, the round resolves through the SAME `resolveStoryRound` path, banking only the holes
+    the match ran. Measured on the auto path: matches close out at 7–8 of the 9 holes with honest scorelines
+    ("2 & 1", "3 & 2"). `recordWorldClear` is skipped on a partial round (the quest-round rule extended) so a
+    seven-hole card can never masquerade as the world's nine-hole record.
+  - Guarded in `tests/story-qualifier-formats.test.ts` (prefix-consistency live≡final, the opponent probe,
+    and the full interactive close-out flow — banked holes ≡ `thru`, no partial record) + a
+    `?screen=storyqualmatchlive` browser smoke that mounts the chip + panel mid-round.
 - **GS-story-gear-tiers** — ✅ *shipped* (`sim/rpg/storyGear.ts`). Player ask: gear should be ONE per slot
   (like clubs — you already can't stack two gloves in `equippedGear`/`applyStoryGear`), with the higher tier
   strong enough to make up for no stacking. Completed the ladder with a clean LEGENDARY apex per slot —
@@ -1301,6 +1410,29 @@ shops / stock.
   `tests/story-avatar.test.ts` (avatar mapping + coverage), `tests/story-shop.test.ts` (eight-slot span +
   clothing effects + the Coil curse), and the existing story-flow/locker suites. **Follow-ups:** more themed
   sets (a per-world "kit" look), and bespoke `ShirtShape`/`PantsShape` silhouettes for the flagship outfits.
+
+- **GS-story-wedge-slot / GS-story-driver-gear** — ✅ *shipped* (`sim/rpg/story.ts` + `sim/rpg/storyGear.ts`
+  + `app/storyLockerScreens.ts` + `sim/rpg/storyShop.ts` + `render/itemArt.ts`). Player ask: expand the Story
+  Pro Shop's equipment/clubs — MORE store-bought WEDGES at blue/purple/orange (rare/epic/legendary), and MORE
+  slice-reduction / hook-reduction / distance / min-distance gear for DRIVERS & WOODS. Delivered as pure
+  content on the proven Story-gear economy (Story-only, no-op default, so Voyage/Unending stay byte-for-byte).
+  A ninth `GearSlot` — **`wedge`**, the SHORT-GAME slot (the `shaft` distance slot's counterpart) — holds four
+  wedges (`groove`/`milled`/`spin`/`master`, common→legendary) whose value is a real STAT, never carry: a
+  tighter `wedgeWindow` (lands on the number), more `backspinBoost` (checks), and at the apex a `chipInBoost`.
+  This is the **putter-precedent** applied to wedges (a same-carry wedge is no upgrade, so the value has to be
+  a stat) — which is exactly why wedges are NOT a shared reward-club type; a stat-bearing wedge belongs in the
+  Story-scoped gear layer, not the shared taxonomy. The wedge slot is EFFECT-ONLY (no `avatar`, so it's absent
+  from the `story-avatar` `SHAPES` map and needs no golfer-render plumbing). For the big sticks: the missing
+  **hook fixer** glove (`antihook`) + a strong single-side **draw/fade** glove pair, a purple two-way-miss
+  **trouser** (`pants:calibrated`, trims both sides + tightens), and driver/wood **distance + min-carry**
+  shafts (`shaft:driver` driver-family min-carry, `shaft:matched` driver+wood min-carry, `shaft:bomber` +18
+  distance). All reuse the proven no-op-default `PlayerLoadout` levers (`shapeMod` · `minCarryBoostByClass` ·
+  `boostDistanceClubs`) so an un-geared campaign is unchanged, and each obeys the item-authoring rule (art via
+  the slot + rarity, a mechanical detail, bespoke lore). Because a new slot is a no-op default in
+  `equippedGear`, there's NO `STORY_VERSION` bump (`gearMap` picks `wedge` up free). Stocked across the worlds'
+  `STORY_GEAR_STOCK` (green/blue early on the home parkland + dunes, purples mid-campaign, the Master's Wedge
+  in the serpent's reaches). Guarded by `tests/story-shop.test.ts` (nine-slot span + the wedge ladder + the
+  slice/hook/distance/min-carry effects) and the existing story-flow/locker/avatar suites.
 
 ## Open questions / deferred (revisit as chunks land)
 - **A genuinely-new gas-giant BIOME** (play on gas cloud-tops) — the player's optional "if we need to add

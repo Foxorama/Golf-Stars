@@ -1,0 +1,11 @@
+{
+	"appId": "com.foxorama.golfstars",
+	"appName": "Golf Stars",
+	"webDir": "dist",
+	"android": {
+		"backgroundColor": "#0b0d12"
+	},
+	"server": {
+		"androidScheme": "https"
+	}
+}

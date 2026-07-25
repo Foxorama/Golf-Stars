@@ -6,16 +6,28 @@
  * from design tokens + a self-contained `.gs-tourn*` style block (own prefix). Reads the live `state`.
  */
 
-import { state } from './ctx';
+import { state, btn } from './ctx';
 import { getCharacter } from '../sim/rpg/characters';
 import { STORY_CHAPTER_COUNT, type StoryState } from '../sim/rpg/story';
 import { currentTournament, sigilCount, tournamentCompetitors, tournamentRival, tournamentIntroLines, isTeamTournament, isSinglesMatchTournament, isTeamMatchTournament, teamPartnerPool, type StoryTournament } from '../sim/rpg/storyTournaments';
-import { finaleMatchup, corruptedLookOpts, friendRivalTaunt, friendRivalHalftime } from '../sim/rpg/storyBetrayal';
+import {
+  finaleMatchup,
+  corruptedLookOpts,
+  championLookOpts,
+  friendRivalTaunt,
+  friendRivalHalftime,
+  isCoilChampionId,
+  coilChampionOptions,
+  coilChampionName,
+  wardenAllyOptions,
+} from '../sim/rpg/storyBetrayal';
 import { golferPreviewSVG } from '../render/apparelArt';
 import { storyClubEffectLabel } from '../sim/rpg/storyClubEffects';
 import { shipUpgradeById, upgradeDetail } from '../sim/rpg/storyShipUpgrades';
 import { venomaPortraitSVG, vossPortraitSVG, scorpiusPortraitSVG, driverDanPortraitSVG } from '../render/loreArt';
 import { penelopePortraitSVG } from '../render/caddyPortraits';
+import { loreBeatHTML } from './loreScreens';
+import { betrayerName } from '../sim/rpg/storyBetrayal';
 
 /** The rival's glyph for the field/lobby (a portrait shows when one exists; else this reads them). */
 function rivalGlyph(rivalId: string): string {
@@ -51,8 +63,9 @@ function rivalPortraitSVG(rivalId: string): string {
   }
 }
 
-/** GS-story-sigil-rivals: a FRIEND rival's portrait — their real golfer figure (corrupted Coil garb +
- *  venom tint when they've fallen), sized for the rival-card slot. */
+/** GS-story-sigil-rivals: a FRIEND rival's portrait — their real golfer figure (corrupted Coil garb when
+ *  they've fallen — the coil-violet robe + acid accent is BAKED into the look now, GS-story-sigil5-look, so
+ *  no muddying outer tint), sized for the rival-card slot. */
 function friendRivalFigure(golferId: string, corrupted: boolean, uid: string): string {
   const ch = getCharacter(golferId);
   if (!ch) return '';
@@ -102,7 +115,7 @@ function rivalTaunt(rivalId: string): string {
     case 'venoma':
       return '"Another Sigil for the Warden? How quaint. I do so enjoy taking things from the hopeful."';
     case 'scorpius':
-      return '(The Silent Sting does not greet you. He sets a matte-black ball on the tee without a sound, lifts two fingers to the stinger arced over his shoulder, and points — once — at you. The gallery has gone very quiet.)';
+      return '(The Silent Sting does not greet you. He sets a matte-black ball on the tee without a sound, settles over it, and goes still — utterly, patiently still. He will not swing until you do. The gallery has stopped breathing.)';
     case 'voss':
       return '"I am not here to beat you. I am here so you finally SEE. Play. Watch what the true line costs."';
     case 'driver-dan':
@@ -157,38 +170,42 @@ function partnerPickerHTML(t: StoryTournament, story: StoryState): string {
     </div>`;
 }
 
-/** A small golfer figure (their signature look, or corrupted Coil garb) for the finale matchup box. */
+/** A golfer figure (their signature look, or corrupted Coil garb) for the finale matchup box. Coil garb is
+ *  the baked coil-violet robe + acid accent (GS-story-sigil5-look) — no muddying outer filter. */
 function matchFigure(charId: string, corrupt: boolean, uid: string): string {
   const ch = getCharacter(charId);
-  if (!ch) return championFigure(charId);
+  if (!ch) return isCoilChampionId(charId) ? championFigure(charId) : '';
   const opts = corrupt
-    ? { ...corruptedLookOpts(ch), uid, w: 52, h: 140 }
-    : { skin: ch.style.skin, shirtBase: ch.style.shirt, capColor: ch.style.cap, hair: ch.style.hair, uid, w: 52, h: 140 };
+    ? { ...corruptedLookOpts(ch), uid, w: 52, h: 150 }
+    : { skin: ch.style.skin, shirtBase: ch.style.shirt, capColor: ch.style.cap, hair: ch.style.hair, uid, w: 52, h: 150 };
   const fig = golferPreviewSVG(undefined, undefined, undefined, opts);
   return `<span class="gs-tourn-mfig">${fig}</span>`;
 }
 
-/** GS-story-sigil5-look: a Coil CHAMPION in the matchup box is their real portrait bust (Venoma / Voss),
- *  never a cute emoji — the player report: "Sigil 5 had a little snake icon instead of Venoma". */
+/** GS-story-sigil5-look: a Coil CHAMPION in the matchup box is drawn as a FULL golfer figure in their own
+ *  Coil palette (Malachi/Voss pale + violet, Venoma purple, Scorpius shadow), so the 2v2 lineup is four
+ *  consistent figures — not a small portrait bust jammed next to full bodies. Their distinctive portrait
+ *  busts still front the hero card + halftime pop, where they stand alone. */
 function championFigure(id: string): string {
-  const bust = rivalPortraitSVG(id);
-  return bust ? `<span class="gs-tourn-mport">${bust}</span>` : `<div class="gs-tourn-mfglyph">${rivalGlyph(id)}</div>`;
+  if (!isCoilChampionId(id)) return `<div class="gs-tourn-mfglyph">${rivalGlyph(id)}</div>`;
+  const fig = golferPreviewSVG(undefined, undefined, undefined, { ...championLookOpts(id), uid: `ch${id}`, w: 52, h: 150 });
+  return `<span class="gs-tourn-mfig">${fig}</span>`;
 }
 
-/** GS-story-betrayer: the Ch.5 2v2 best-ball MATCHPLAY matchup box — YOUR team (you + a loyal friend /
- *  a Coil champion) across from THE OPPOSING pair (the betrayer in corrupted garb + Venoma, or your two
- *  former friends). Shows who turned, and who stands with you, before you tee off. */
+/** GS-story-betrayer: the Ch.5 2v2 SCRAMBLE MATCHPLAY matchup box — YOUR team (you + your CHOSEN loyal
+ *  friend / Coil champion) across from THE OPPOSING pair (the betrayer in corrupted garb + the Coil leader
+ *  Malachi/Voss, or your two former friends). All four are consistent full figures (GS-story-sigil5-look).
+ *  Reflects the live lobby pick (`state.storyFinalePartner`), so the box updates as you choose your ally. */
 function finaleMatchupBox(story: StoryState): string {
-  const m = finaleMatchup(story, story.activeCaddyId);
+  const m = finaleMatchup(story, story.activeCaddyId, state.storyFinalePartner);
   const you = getCharacter(story.characterId);
   const youFig = you ? matchFigure(you.id, false, 'mfyou') : '';
-  // your partner: a friend (Warden) drawn as a figure, or a Coil champion (Herald) drawn as their portrait
+  // your partner: a friend (Warden) drawn as a figure, or a Coil champion (Herald) drawn as a Coil figure.
   const allyFig = m.allyIsChampion ? championFigure(m.allyId) : matchFigure(m.allyId, false, 'mfally');
-  // opponents: on the Warden path the first is the DEFECTOR (corrupted); a champion opponent is their
-  // real portrait bust (GS-story-sigil5-look — Venoma is VENOMA, never a snake emoji)
+  // opponents: on the Warden path the first is the DEFECTOR (corrupted garb); a Coil champion opponent
+  // (the leader Malachi/Voss) is drawn as a Coil figure (GS-story-sigil5-look).
   const oppFig = (id: string, i: number) => {
-    const isChampion = id === 'venoma' || id === 'voss';
-    if (isChampion) return championFigure(id);
+    if (isCoilChampionId(id)) return championFigure(id);
     const corrupt = !m.herald && id === m.betrayerGolferId; // the Warden-path defector wears Coil garb
     return matchFigure(id, corrupt, `mfopp${i}`);
   };
@@ -200,10 +217,41 @@ function finaleMatchupBox(story: StoryState): string {
       </div>
       <div class="gs-tourn-mvs">vs</div>
       <div class="gs-tourn-mteam gs-tourn-mteam--them">
-        <div class="gs-tourn-mlabel">${m.herald ? 'Your former friends' : 'The traitor & the Viper'}</div>
+        <div class="gs-tourn-mlabel">${m.herald ? 'Your former friends' : 'The traitor & the Apostate'}</div>
         <div class="gs-tourn-mfigs">${oppFig(m.oppIds[0], 0)}${oppFig(m.oppIds[1], 1)}</div>
         <div class="gs-tourn-mnames">${m.oppNames.map((n) => n.split(' ')[0]).join(' & ')}</div>
       </div>
+    </div>`;
+}
+
+/**
+ * GS-story-sigil5-npc: the Ch.5 finale PARTNER picker — the player chooses who shares their ball. On the
+ * WARDEN path it's the two loyal tour-mates (the friends who did NOT betray you); on the HERALD path it's
+ * the Coil champions (Malachi/Voss, the Viper, the Silent Sting), minus whichever is already carrying your
+ * bag as a caddy. Each option is drawn in the SAME figure style as the matchup box; the chosen one is ringed
+ * and the box above updates to match. Tapping dispatches `selectFinalePartner`.
+ */
+function finalePartnerPickerHTML(story: StoryState): string {
+  const herald = story.alignment === 'herald';
+  const m = finaleMatchup(story, story.activeCaddyId, state.storyFinalePartner);
+  const options: { id: string; name: string; fig: string }[] = herald
+    ? coilChampionOptions(story).map((id) => ({ id, name: coilChampionName(id).replace(/\s*".*"\s*/, ' ').trim(), fig: championFigure(id) }))
+    : wardenAllyOptions(story).map((id) => ({ id, name: getCharacter(id)?.shortName ?? id, fig: matchFigure(id, false, `pk${id}`) }));
+  const label = herald ? '🐍 Choose your Coil champion — who shares your ball' : '🤝 Choose the friend at your side — who shares your ball';
+  const cards = options
+    .map((o) => {
+      const on = o.id === m.allyId;
+      return `<button class="gs-tourn-pp${on ? ' gs-tourn-pp--on' : ''}" aria-label="Partner with ${o.name}"
+          data-action='${JSON.stringify({ type: 'selectFinalePartner', characterId: o.id })}'>
+          <span class="gs-tourn-ppfig">${o.fig}</span>
+          <span class="gs-tourn-ppname">${o.name.split(' ')[0]}${on ? ' ✓' : ''}</span>
+        </button>`;
+    })
+    .join('');
+  const cols = Math.max(2, options.length);
+  return `<div class="gs-tourn-fieldbox gs-tourn-in gs-tourn-in3">
+      <div class="gs-tourn-fieldlabel">${label}</div>
+      <div class="gs-tourn-ppgrid" style="grid-template-columns:repeat(${cols},1fr);">${cards}</div>
     </div>`;
 }
 
@@ -243,9 +291,10 @@ export function storyTournamentScreen(): string {
   const isSinglesMatch = isSinglesMatchTournament(t); // Ch.3 — 1v1 singles matchplay vs the rival
   const rivalFirst = rival.name.split(' ')[0];
   // A singles-match / solo strokeplay major both show the friendly-rival field; the 2v2 shows the matchup
-  // box; a team-stroke major shows the partner picker.
+  // box PLUS the finale partner picker (GS-story-sigil5-npc — choose your loyal friend / Coil champion);
+  // a team-stroke major shows the team-Sigil partner picker.
   const fieldOrPicker = isTeamMatch
-    ? finaleMatchupBox(story)
+    ? `${finaleMatchupBox(story)}${finalePartnerPickerHTML(story)}`
     : team
     ? partnerPickerHTML(t, story)
     : `<div class="gs-tourn-fieldbox gs-tourn-in gs-tourn-in3">
@@ -546,3 +595,29 @@ const TOURN_STYLE = `
     @keyframes gs-tourn-rise{to{opacity:1;transform:translateY(0);}}
     @media(prefers-reduced-motion:reduce){.gs-tourn-in{animation:none;opacity:1;transform:none;}}
   </style>`;
+
+/**
+ * GS-story-aftermath: the post-result CONFRONTATION beat for a back-half Sigil (the Silent Sting
+ * withdrawing, the Green Key forging, the harvest). Reuses the shared `.gs-lore*` cinematic beat card
+ * (`loreBeatHTML`), so it reads identically to every other story beat and forks no CSS. Reads
+ * `state.pendingAftermath` (built by the reducer from the just-finished major + win/loss); the `{betrayer}`
+ * token resolves to the campaign's actual odd-one-out. Its single CTA dispatches `storyAftermathContinue`
+ * (→ the interlude on a Ch.4 win, else the clubhouse). Defensive fallback so a stale state can't blank it.
+ */
+export function storyTournamentAftermathScreen(): string {
+  const beat = state.pendingAftermath;
+  if (!beat) {
+    return `<div style="min-height:60vh;display:flex;align-items:center;justify-content:center;padding:24px;">${btn(
+      'Continue →',
+      { type: 'storyAftermathContinue' },
+      { variant: 'primary' },
+    )}</div>`;
+  }
+  const resolve = (t: string): string =>
+    t.replaceAll('{betrayer}', state.story ? betrayerName(state.story) : 'a friend');
+  return loreBeatHTML(
+    { accent: beat.accent, kicker: beat.kicker, title: beat.title, speaker: beat.speaker, portrait: beat.portrait, lines: beat.lines, cta: beat.cta },
+    resolve,
+    { type: 'storyAftermathContinue' },
+  );
+}

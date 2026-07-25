@@ -84,10 +84,12 @@ import { acceptQuest, completeQuest, activeQuest, questWorld, startableQuestForW
 import { isStoryShipId, buyStoryShip, equipStoryShip, worldIsShipVendor } from '../sim/rpg/storyShips';
 import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
 import { currentTournament, tournamentForChapter, tournamentRival, sigilMatchThrough, rivalTotalThrough, isTeamTournament, isTeamMatchTournament, teamPartnerOrDefault } from '../sim/rpg/storyTournaments';
-import { finaleMatchup } from '../sim/rpg/storyBetrayal';
+import { finaleMatchup, coilChampionOptions, wardenAllyOptions, type CoilChampionId } from '../sim/rpg/storyBetrayal';
 import { finaleUnlocked, finaleResult, winFinale } from '../sim/rpg/storyFinale';
 import { interludeSeen, applyInterlude } from '../sim/rpg/storyInterlude';
 import { midroundOmen, applyMidroundOmen } from '../sim/rpg/storyMidround';
+import { tournamentAftermath } from '../sim/rpg/storyAftermath';
+import { activeQualifierPlan, qualifierMatchThrough } from '../sim/rpg/storyQualifierFormats';
 import { questBeatFor, questBeatTurnIndex, questOfferBeatFor } from '../sim/rpg/storyQuestBeat';
 import type { GearSlot } from '../sim/rpg/story';
 import {
@@ -197,6 +199,20 @@ export function rerollCost(rerolls: number): number {
   return Math.round(REROLL_BASE_COST * Math.pow(1.6, Math.max(0, rerolls)));
 }
 
+/**
+ * GS-story-aftermath: the continuation AFTER a back-half Sigil recap (and its confrontation beat) — the
+ * Chapter-4 emotional INTERLUDE (win a friend back / sever one) on a fresh win, else the clubhouse. Shared
+ * by `storyTournamentContinue` (trunk / no-aftermath path) and `storyAftermathContinue` (after the beat),
+ * so both read the identical branch. Clears the transient tournament payloads.
+ */
+function continuePastTournament(state: UiState): UiState {
+  const r = state.lastStoryTournament;
+  if (r?.won && r.chapter === 4 && state.story?.alignment && !interludeSeen(state.story, state.story.alignment)) {
+    return { ...state, screen: 'storyInterlude', lastStoryTournament: undefined, pendingAftermath: undefined };
+  }
+  return { ...state, screen: 'story', lastStoryTournament: undefined, pendingAftermath: undefined };
+}
+
 export function reduce(state: UiState, action: Action): UiState {
   switch (action.type) {
     case 'start': {
@@ -230,7 +246,11 @@ export function reduce(state: UiState, action: Action): UiState {
       if (state.pendingStoryNew) {
         return {
           ...state,
-          story: defaultStoryState(action.characterId),
+          // GS-story-qualifier-formats: stamp the campaign's DRAW-SHEET seed off the boot run seed (the
+          // one sanctioned `Math.random` site, `freshRunSeed`), so every campaign draws its own qualifier
+          // formats/pairings/partners while each remains a pure keyed hash from then on. `defaultStoryState`
+          // stays rng-free (it's sim-pure); the seed is a side-effect-layer value threaded in here.
+          story: { ...defaultStoryState(action.characterId), campaignSeed: `c${state.run.seed}` },
           pendingStoryNew: false,
           storyInspectId: undefined,
           characterLoreId: undefined,
@@ -445,6 +465,17 @@ export function reduce(state: UiState, action: Action): UiState {
       // GS-story-gear: fold the campaign's equipped gear (glove/hat/shoes/ball) effects onto the loadout.
       // GS-story-caddies: then the active caddy (a friend on the bag folds a real effect + shows on course).
       const loadout = applyStoryClubEffects(applyStoryCaddy(applyStoryGear({ ...run0.loadout, bag }, state.story), state.story), state.story);
+      // GS-story-qualifier-formats: a chapter's QUALIFYING EVENTS are nine-hole cards drawn into one of five
+      // formats — and three of those five put a tour-mate beside you. Arming the plan here does three things
+      // at once: `currentCourse` serves nine holes, the paired formats arm the SAME co-op machinery the team
+      // Sigils use (`storyTeamFormat` + `storyTournamentPartner` → the per-shot scramble pick card / the
+      // per-hole best-ball reveal, and `scrambleOptsFor` so the auto path plays best-of-two identically), and
+      // the resolution scores the round in the format's own units. A venue/prologue/quest world draws no
+      // plan ⇒ the pinned 18, byte-for-byte.
+      // GS-story-qualifier-partner-pick: the partner is the player's CHOICE (the dossier's picker), not the
+      // draw's — the format and the pairing are the draw's to set, the company is yours. Validated inside
+      // the plan, so a skipped picker tees off with the drawn suggestion exactly as before.
+      const qplan = activeQualifierPlan(state.story, action.courseId, action.partnerId);
       const run = {
         ...run0,
         loadout,
@@ -453,6 +484,9 @@ export function reduce(state: UiState, action: Action): UiState {
         // harder, not just longer — scaled by the world's tier, calm at Ch.1 → the wildest sky by Ch.5.
         staticEffect: storyWorldEffect(action.courseId),
         storyRound: true,
+        ...(qplan ? { storyQualifier: qplan } : {}),
+        ...(qplan?.partnerId ? { storyTournamentPartner: qplan.partnerId } : {}),
+        ...(qplan?.pairing ? { storyTeamFormat: qplan.pairing } : {}),
       };
       return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', viewHole: 0, played: undefined, storyItemInspectId: undefined });
     }
@@ -895,6 +929,21 @@ export function reduce(state: UiState, action: Action): UiState {
       return { ...state, storyPartnerPick: action.characterId };
     }
 
+    case 'selectFinalePartner': {
+      // GS-story-sigil5-npc: pick your Ch.5 2v2 finale ally in the lobby — a loyal tour-mate (Warden) or a
+      // Coil champion (Herald: Voss/Venoma/Scorpius, minus your caddy). Reject anything not a valid option
+      // for the path so the pick can never desync the matchup.
+      if (state.screen !== 'storyTournament' || !state.story) return state;
+      const t = currentTournament(state.story);
+      if (!t || !isTeamMatchTournament(t)) return state;
+      const valid =
+        state.story.alignment === 'herald'
+          ? coilChampionOptions(state.story).includes(action.characterId as CoilChampionId)
+          : wardenAllyOptions(state.story).includes(action.characterId);
+      if (!valid) return state;
+      return { ...state, storyFinalePartner: action.characterId };
+    }
+
     case 'storyPlayTournament': {
       // GS-story-tournament: tee off the tournament round at the venue vs the rival. Builds a story round
       // (campaign bag + gear) MARKED as the chapter's tournament so it resolves vs the rival for the Sigil.
@@ -915,7 +964,8 @@ export function reduce(state: UiState, action: Action): UiState {
       const partner = isTeamTournament(t)
         ? teamPartnerOrDefault(state.story, state.storyPartnerPick)
         : teamMatch
-        ? finaleMatchup(state.story, state.story.activeCaddyId).allyId
+        ? // GS-story-sigil5-npc: carry the chosen finale ally (loyal friend / Coil champion) onto the run.
+          finaleMatchup(state.story, state.story.activeCaddyId, state.storyFinalePartner).allyId
         : undefined;
       // GS-story-sigil-play: a TEAM Sigil carries its co-op FORMAT so the round plays interactively — a
       // SCRAMBLE arms the per-shot pick card, a BEST-BALL the per-hole reveal (the 2v2 finale is a scramble).
@@ -988,12 +1038,22 @@ export function reduce(state: UiState, action: Action): UiState {
       if (r?.won && r.chapter === 3 && state.story && !state.story.alignment) {
         return { ...state, screen: 'storyChoice', lastStoryTournament: undefined };
       }
-      // GS-story-midchapter: winning the Chapter-4 route major reaches the emotional INTERLUDE (win a
-      // friend back / sever one) — divert to it once, before the clubhouse.
-      if (r?.won && r.chapter === 4 && state.story?.alignment && !interludeSeen(state.story, state.story.alignment)) {
-        return { ...state, screen: 'storyInterlude', lastStoryTournament: undefined };
+      // GS-story-aftermath: a back-half Sigil (Ch.4/5) lands a post-result CONFRONTATION beat — win OR loss
+      // — before the interlude / clubhouse (Scorpius withdrawing, the key forging, the harvest), so the
+      // result carries weight instead of cutting straight on. Trunk majors return undefined ⇒ unchanged.
+      if (r && state.story) {
+        const t = tournamentForChapter(r.chapter, state.story.alignment);
+        const beat = t ? tournamentAftermath(t, state.story, r.won) : undefined;
+        if (beat) return { ...state, screen: 'storyTournamentAftermath', pendingAftermath: beat };
       }
-      return { ...state, screen: 'story', lastStoryTournament: undefined };
+      return continuePastTournament(state);
+    }
+
+    case 'storyAftermathContinue': {
+      // GS-story-aftermath: dismiss the post-Sigil confrontation beat → the interlude (a Ch.4 win) or the
+      // clubhouse (everything else). Runs the SAME continuation the aftermath diverted from.
+      if (state.screen !== 'storyTournamentAftermath') return state;
+      return continuePastTournament({ ...state, pendingAftermath: undefined });
     }
 
     case 'storyInterludeContinue': {
@@ -1483,9 +1543,23 @@ export function reduce(state: UiState, action: Action): UiState {
           const pars = state.course.holes.map((h) => h.par);
           const m = sigilMatchThrough(t, state.story, stopPlayed.map((p) => p.record.strokes), String(state.run.seed), pars, {
             teamPlayed: state.run.storyTeamFormat === 'scramble',
+            chosenAllyId: state.run.storyTournamentPartner,
           });
           if (m?.res.state.decided) return resolveStoryTournament({ ...state, stopPlayed }, stopPlayed);
         }
+      }
+      // GS-story-qualifier-match-live: a `pair-match` QUALIFYING EVENT closes out the same way — once your
+      // side is up by more than the holes that remain, the match is over and walking in is the honest
+      // ending (the panel has already called it). Resolves through the SAME `resolveStoryRound` path, which
+      // scores the holes the match actually ran and skips the partial `worldBest` write.
+      if (state.run.storyQualifier?.format === 'pair-match' && nextIdx < total) {
+        const res = qualifierMatchThrough(
+          state.run.storyQualifier,
+          stopPlayed.map((p) => p.record.strokes),
+          state.course.holes.map((h) => h.par),
+          String(state.run.seed),
+        );
+        if (res?.state.decided) return resolveStoryRound({ ...state, stopPlayed }, stopPlayed);
       }
       if (state.run.storyTournament && total === 18 && nextIdx === 9) {
         const t = tournamentForChapter(state.run.storyTournament, state.story?.alignment);
@@ -1498,6 +1572,7 @@ export function reduce(state: UiState, action: Action): UiState {
           // resolver streams as the finish), never a stroke count the format doesn't score by.
           const m = sigilMatchThrough(t, state.story, stopPlayed.map((p) => p.record.strokes), String(state.run.seed), pars, {
             teamPlayed: state.run.storyTeamFormat === 'scramble',
+            chosenAllyId: state.run.storyTournamentPartner,
           });
           // GS-story-midround-omen: BEFORE the rival pop, at the Chapter-3 major's turn (both partner picks
           // locked, path unchosen), divert ONCE to the pre-Choice betrayal foreshadow — the future betrayer's

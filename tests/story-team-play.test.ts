@@ -10,7 +10,7 @@ import { defaultStoryState } from '../src/sim/rpg/story';
 import { initState, reduce } from '../src/ui/game';
 import { storyPartnerBestBallScore, resolveStoryTeamStroke, resolveStory2v2Match } from '../src/sim/rpg/storyTeams';
 import { TEAM_PARTNER_EDGE } from '../src/sim/rpg/storyTournaments';
-import { loyalAllyId, betrayerId } from '../src/sim/rpg/storyBetrayal';
+import { loyalAllyId, betrayerId, wardenAllyOptions, coilChampionOptions } from '../src/sim/rpg/storyBetrayal';
 
 /** A Chapter-1 (scramble) campaign with the Emerald major unlocked. */
 function scrambleReady() {
@@ -103,6 +103,19 @@ describe('GS-story-sigil5-play — the 2v2 scramble-matchplay finale plays as a 
     return { ...initState('sigil5-seed', {}, undefined, story), screen: 'story' as const };
   }
 
+  /** A Chapter-5 HERALD campaign with the Ghost Harvest (2v2 scramble matchplay) unlocked. */
+  function heraldFinaleReady() {
+    const hub = finaleReady();
+    const story = {
+      ...hub.story!,
+      alignment: 'herald' as const,
+      trophyIds: ['sigil-emerald', 'sigil-ember', 'sigil-storm', 'sigil-drowned'],
+      clearedWorldIds: ['standrews-18', 'swamp-18', 'cetus-18'],
+      qualifierResults: { 'swamp-18': { place: 1, field: 12 }, 'cetus-18': { place: 2, field: 12 } },
+    };
+    return { ...hub, story };
+  }
+
   /** Dismiss however many arrival beats fire (Ch.5 runs the Ragnarök omen thread). */
   function pastLore(s: ReturnType<typeof reduce>) {
     while (s.screen === 'lore') s = reduce(s, { type: 'dismissLore' });
@@ -122,21 +135,36 @@ describe('GS-story-sigil5-play — the 2v2 scramble-matchplay finale plays as a 
   });
 
   it('the HERALD finale arms the scramble with the Coil champion as the shared-ball partner', () => {
-    const hub = finaleReady();
-    const story = {
-      ...hub.story!,
-      alignment: 'herald' as const,
-      trophyIds: ['sigil-emerald', 'sigil-ember', 'sigil-storm', 'sigil-drowned'],
-      clearedWorldIds: ['standrews-18', 'swamp-18', 'cetus-18'],
-      qualifierResults: { 'swamp-18': { place: 1, field: 12 }, 'cetus-18': { place: 2, field: 12 } },
-    };
-    const heraldHub = { ...hub, story };
-    const armed = pastLore(reduce(reduce(heraldHub, { type: 'openStoryTournament' }), { type: 'storyPlayTournament' }));
+    const armed = pastLore(reduce(reduce(heraldFinaleReady(), { type: 'openStoryTournament' }), { type: 'storyPlayTournament' }));
     expect(armed.run.storyTeamFormat).toBe('scramble');
-    // The Herald side's partner is a Coil champion (Voss/Venoma) — not a playable character.
-    expect(['voss', 'venoma']).toContain(armed.run.storyTournamentPartner);
+    // The Herald side's partner is a Coil champion (Voss/Venoma/Scorpius) — not a playable character.
+    expect(['voss', 'venoma', 'scorpius']).toContain(armed.run.storyTournamentPartner);
     // A champion has no character mods, but the scramble still arms (partner plays a neutral swing).
     expect(scrambleOptsFor(armed.run)).toBeTruthy();
+  });
+
+  // GS-story-sigil5-npc: the finale partner is a player CHOICE, threaded lobby → run → resolution.
+  it('the WARDEN finale honours the CHOSEN loyal ally (not just the default), and rejects the betrayer', () => {
+    const lobby = reduce(finaleReady(), { type: 'openStoryTournament' });
+    const options = wardenAllyOptions(lobby.story!);
+    // pick the loyal option that ISN'T the default, to prove the choice takes effect
+    const nonDefault = options.find((id) => id !== loyalAllyId(lobby.story!)) ?? options[0]!;
+    const picked = reduce(lobby, { type: 'selectFinalePartner', characterId: nonDefault });
+    expect(picked.storyFinalePartner).toBe(nonDefault);
+    const armed = pastLore(reduce(picked, { type: 'storyPlayTournament' }));
+    expect(armed.run.storyTournamentPartner).toBe(nonDefault);
+    // the betrayer can never be your loyal ally — the pick is rejected
+    const rejected = reduce(lobby, { type: 'selectFinalePartner', characterId: betrayerId(lobby.story!) });
+    expect(rejected.storyFinalePartner).toBeUndefined();
+  });
+
+  it('the HERALD finale lets you pick Scorpius as your Coil champion', () => {
+    const lobby = reduce(heraldFinaleReady(), { type: 'openStoryTournament' });
+    expect(coilChampionOptions(lobby.story!)).toContain('scorpius');
+    const picked = reduce(lobby, { type: 'selectFinalePartner', characterId: 'scorpius' });
+    expect(picked.storyFinalePartner).toBe('scorpius');
+    const armed = pastLore(reduce(picked, { type: 'storyPlayTournament' }));
+    expect(armed.run.storyTournamentPartner).toBe('scorpius');
   });
 
   it('a full swing raises the pick-your-ball card, exactly like the Sigil-1 scramble', () => {

@@ -21,7 +21,9 @@ import type { ReputationByCharacter } from '../sim/rpg/factions';
 import type { SeenLore } from '../sim/rpg/lore';
 import type { StoryState } from '../sim/rpg/story';
 import type { MidroundOmen } from '../sim/rpg/storyMidround';
+import type { TournamentAftermath } from '../sim/rpg/storyAftermath';
 import type { QuestBeat } from '../sim/rpg/storyQuestBeat';
+import type { QualifierFormatId } from '../sim/rpg/storyQualifierFormats';
 import type { AimMode, HolePlay, ScrambleShot } from '../sim/rpg/play';
 import type { HoleDuel } from '../sim/rpg/match';
 import type { Rng } from '../sim/rng';
@@ -68,6 +70,9 @@ export type Screen =
   // GS-story-tournament: a chapter's Galaxy Tournament — the lobby (host/rival/Sigil) and the win/lose recap.
   | 'storyTournament'
   | 'storyTournamentResult'
+  // GS-story-aftermath: the post-result confrontation beat for a back-half Sigil (Scorpius withdraws, the
+  // key forges, …), win or loss, shown after the scorecard and before the interlude / clubhouse.
+  | 'storyTournamentAftermath'
   // GS-story-tournament-midpop: the halftime (after hole 9) rival brag/curse pop in an 18-hole major.
   | 'storyTournamentPop'
   // GS-story-midround-omen: the pre-Choice betrayal foreshadow at the Ch.3 major's turn (before the pop).
@@ -291,7 +296,25 @@ export interface UiState {
       qualified: boolean;
       qualifiedCount: number;
       neededCount: number;
-      leaderboard: { name: string; gross: number; kind: 'ghost' | 'player' }[];
+      /** The board, in finishing order. `points` is present on a STABLEFORD event (higher wins). Empty on a
+       *  matchplay event, which has a scoreline instead of a board. */
+      leaderboard: { name: string; gross: number; points?: number; kind: 'ghost' | 'player' }[];
+      /** GS-story-qualifier-formats: the shape this event was drawn as, for the recap headline. */
+      formatId: QualifierFormatId;
+      formatName: string;
+      /** The tour-mate you played it beside, on a paired format. */
+      partnerName?: string;
+      pairing?: 'scramble' | 'bestball';
+      /** Scored in points (higher wins), so the recap labels the column right. */
+      stableford?: boolean;
+      /** Your posted score in the format's units (strokes, or points). Absent on a matchplay event. */
+      playerScore?: number;
+      /** Your team's gross on a paired stroke/Stableford event. */
+      teamGross?: number;
+      /** How many holes your partner's ball beat yours (best-ball colour). */
+      partnerCountedHoles?: number;
+      /** A matchplay event's result — plus the pair you faced, since there's no board to read them off. */
+      match?: { scoreline: string; playerWon: boolean; halved: boolean; thru: number; holesUp: number; opponents: string };
     };
   };
   /** GS-story-tournament: the just-finished Galaxy Tournament recap (the `storyTournamentResult` screen). */
@@ -355,6 +378,10 @@ export interface UiState {
    *  `storyMidBeat` screen), BEFORE the halftime rival pop. Carries the assembled beat (the future
    *  betrayer + why + their voice lines); on continue it's marked seen and flows into the pop. Transient. */
   pendingMidBeat?: MidroundOmen;
+  /** GS-story-aftermath: the post-result confrontation beat for a back-half Sigil (the `storyTournamentAftermath`
+   *  screen), shown after the scorecard and before the interlude / clubhouse. Set on the divert, cleared on
+   *  continue. Transient; back-half (Ch.4/5) majors only, so a trunk major never carries it. */
+  pendingAftermath?: TournamentAftermath;
   /** GS-story-caddy-quest-dialogue: the caddy's mid-round beat shown at the turn of their quest round (the
    *  `storyQuestBeat` screen). Set on the divert, cleared on continue → the next hole tees up. Transient;
    *  quest-only, so it never appears in a tournament / main-story round. */
@@ -401,6 +428,11 @@ export interface UiState {
    *  before you tee off. Transient (carried onto the run at tee-off; the locked pick persists on StoryState).
    *  Absent ⇒ default to your first tour-mate. */
   storyPartnerPick?: string;
+  /** GS-story-sigil5-npc: the FINALE partner chosen in the Ch.5 2v2 lobby — a loyal tour-mate (Warden) or a
+   *  Coil champion (Herald: Voss/Venoma/Scorpius, minus the one on your bag). Transient (carried onto the run
+   *  at tee-off as `storyTournamentPartner`; validated on read, so a stale pick from a prior run is ignored).
+   *  Absent ⇒ the deterministic default (`loyalAllyId` / `coilChampionExcluding`). */
+  storyFinalePartner?: string;
   /** GS-story-allies: the recruited crew ally whose talk card is open on the clubhouse (undefined ⇒ none).
    *  Transient (never persisted). */
   storyAllyInspectId?: string;
@@ -451,7 +483,10 @@ export type Action =
   | { type: 'openStory' } // GS-story: enter Story Mode — continue the saved campaign, or pick a golfer for a new one
   | { type: 'storyNewCampaign' } // GS-story: begin a fresh campaign (pick a golfer) — overwrites the saved one on completion
   | { type: 'exitStory' } // GS-story: leave the Story Mode hub back to the title
-  | { type: 'storyPlayWorld'; courseId: string } // GS-story-prologue: tee off a Story world round from the hub
+  // GS-story-prologue: tee off a Story world round from the hub. `partnerId` (GS-story-qualifier-partner-pick)
+  // is the tour-mate the player chose on the star-map dossier for a PAIRED qualifying event — validated on
+  // read against the roster, so an absent/stale id falls back to the draw's suggestion.
+  | { type: 'storyPlayWorld'; courseId: string; partnerId?: string }
   | { type: 'storyRoundContinue' } // GS-story-prologue: dismiss the world-round recap back to the campaign hub
   | { type: 'storyInspectGolfer'; characterId: string } // GS-story-clubhouse: open a golfer's stats/abilities overlay
   | { type: 'storyCloseInspect' } // GS-story-clubhouse: close the golfer stats overlay
@@ -485,8 +520,10 @@ export type Action =
   | { type: 'exitStoryTournament' } // GS-story-tournament: back to the clubhouse from the lobby
   | { type: 'storyPlayTournament' } // GS-story-tournament: tee off the tournament round (vs the rival)
   | { type: 'selectStoryPartner'; characterId: string } // GS-story-partners: pick your team-Sigil partner in the lobby
+  | { type: 'selectFinalePartner'; characterId: string } // GS-story-sigil5-npc: pick your Ch.5 finale ally (loyal friend / Coil champion)
   | { type: 'tournamentPopContinue' } // GS-story-tournament-midpop: dismiss the halftime rival pop, play on
   | { type: 'storyMidBeatContinue' } // GS-story-midround-omen: dismiss the pre-Choice foreshadow → the pop
+  | { type: 'storyAftermathContinue' } // GS-story-aftermath: dismiss the post-Sigil confrontation beat → interlude/clubhouse
   | { type: 'storyQuestBeatContinue' } // GS-story-caddy-quest-dialogue: dismiss the caddy mid-round beat → play on
   | { type: 'storyQuestOfferContinue' } // GS-story-quest-offer-beat: dismiss the ally's pitch → fly out, tee up the quest round
   | { type: 'storyTournamentContinue' } // GS-story-tournament: dismiss the win/lose recap

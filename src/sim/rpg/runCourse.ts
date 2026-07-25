@@ -131,10 +131,16 @@ export function currentCourse(run: Run): Course {
     const effect = run.staticEffect ?? 'none';
     // GS-story-quest-9: an ally SIDE QUEST is a shorter NINE-hole round on their home world — and a DISTINCT
     // layout from the 18 you cleared to recruit them (a quest-salted seed + holes:9), never a replay of the
-    // same holes. A normal world round / Star-Tour round (no `storyQuest`) is byte-for-byte the pinned 18.
-    const spec = run.storyQuest ? staticCourseSpec(run.staticCourseId) : undefined;
+    // same holes.
+    // GS-story-qualifier-formats: a QUALIFYING EVENT is nine holes too, on its own salt — so the chapter's
+    // three events are a single sitting each and the format variety gets room to breathe, while the Sigil
+    // majors keep the full 18 that makes them majors. Deterministic per world (a replay is the same test,
+    // so improving your finishing place is a fair second attempt). A normal world round / Star-Tour round
+    // (neither flag set) is byte-for-byte the pinned 18.
+    const nineHoleSalt = run.storyQuest ? 'quest' : run.storyQualifier ? 'qualifier' : undefined;
+    const spec = nineHoleSalt ? staticCourseSpec(run.staticCourseId) : undefined;
     const course = spec
-      ? regenerateStaticCourse({ ...spec, seed: `${spec.seed}:quest`, opts: { ...spec.opts, holes: 9 } })
+      ? regenerateStaticCourse({ ...spec, seed: `${spec.seed}:${nineHoleSalt}`, opts: { ...spec.opts, holes: 9 } })
       : buildStaticCourse(run.staticCourseId);
     const withEffect = applyEffectPhysics(course, effect);
     return armTentHoles(

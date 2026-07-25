@@ -32,7 +32,10 @@ import {
   qualifyTop,
   qualifierFieldSize,
   QUALIFY_EVENTS_NEEDED,
+  QUALIFIER_HOLES,
 } from './storyQualifiers';
+import { qualifierPlan, qualifierFormatName, qualifierFormatBlurb } from './storyQualifierFormats';
+import { getCharacter } from './characters';
 import {
   isStoryQualifier,
   tournamentForChapter,
@@ -68,6 +71,17 @@ export interface StoryQualifierNav {
   qualified: boolean;
   /** The best finishing PLACE recorded here, if the player has played it. */
   place?: number;
+  /** GS-story-qualifier-formats: how many holes this event runs (nine). */
+  holes: number;
+  /** The FORMAT this event is drawn as, named for the dossier, plus how it's won. Shown BEFORE you fly, so
+   *  picking which two of the chapter's three events to play is a real choice — of golf, and of company. */
+  formatName: string;
+  formatBlurb: string;
+  /** The tour-mate you'd be drawn with, on a paired format (their short name + id). */
+  partnerId?: string;
+  partnerName?: string;
+  /** Matchplay events qualify on a WIN or a halve, not a placing — the dossier says so instead of "top N". */
+  matchplay: boolean;
 }
 
 /** A world that is a chapter's Sigil TOURNAMENT venue. */
@@ -116,17 +130,25 @@ function questNavForWorld(story: StoryState, courseId: string): StoryQuestNav | 
 
 /** GS-story-map-nav: the qualifier status for a world — only for the player's CURRENT chapter's qualifiers
  *  (the live objective), so the chart stays focused on what to do now. Undefined otherwise. */
-function qualifierNavForWorld(story: StoryState, courseId: string): StoryQualifierNav | undefined {
+function qualifierNavForWorld(story: StoryState, courseId: string, chosenPartnerId?: string): StoryQualifierNav | undefined {
   const w = storyWorldById(courseId);
   if (!w || w.unlockChapter !== story.chapter) return undefined;
   if (!isStoryQualifier(courseId, story.alignment)) return undefined;
   const res = story.qualifierResults[courseId];
+  const plan = qualifierPlan(story, courseId, chosenPartnerId);
+  const partnerName = plan?.partnerId ? getCharacter(plan.partnerId)?.shortName : undefined;
   return {
     chapter: w.unlockChapter,
     top: qualifyTop(w.unlockChapter),
     field: qualifierFieldSize(w.unlockChapter),
     qualified: eventQualified(story, courseId),
     place: res?.place,
+    holes: plan?.holes ?? QUALIFIER_HOLES,
+    formatName: plan ? qualifierFormatName(plan) : 'Singles stroke play',
+    formatBlurb: plan ? qualifierFormatBlurb(plan) : '',
+    ...(plan?.partnerId ? { partnerId: plan.partnerId } : {}),
+    ...(partnerName ? { partnerName } : {}),
+    matchplay: plan?.format === 'pair-match',
   };
 }
 
@@ -150,11 +172,13 @@ function venueNavForWorld(story: StoryState, courseId: string): StoryVenueNav | 
 }
 
 /** The whole star-map status for a world — quest + qualifier + venue, whichever apply. */
-export function storyWorldNav(story: StoryState, courseId: string): StoryWorldNav {
+export function storyWorldNav(story: StoryState, courseId: string, chosenPartnerId?: string): StoryWorldNav {
   return {
     courseId,
     quest: questNavForWorld(story, courseId),
-    qualifier: qualifierNavForWorld(story, courseId),
+    // GS-story-qualifier-partner-pick: the dossier passes the tour-mate the player has picked for this
+    // event so the preview names who you'd ACTUALLY be teeing off beside, not the draw's suggestion.
+    qualifier: qualifierNavForWorld(story, courseId, chosenPartnerId),
     venue: venueNavForWorld(story, courseId),
   };
 }

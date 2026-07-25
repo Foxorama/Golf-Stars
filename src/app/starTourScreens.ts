@@ -26,6 +26,7 @@ import { bestStrokeFor, bestStrokeRounds } from '../sim/rpg/strokePlay';
 import { STORY_WORLDS, storyWorldUnlocked, storyWorldEffect, STORY_CHAPTER_COUNT, worldCleared } from '../sim/rpg/story';
 import { storyWorldNav, storyWorldMarker, type StoryWorldNav } from '../sim/rpg/storyMapNav';
 import { qualifyTop } from '../sim/rpg/storyQualifiers';
+import { qualifierPartnerPool } from '../sim/rpg/storyQualifierFormats';
 import { tournamentRival } from '../sim/rpg/storyTournaments';
 import { storyWorldShoppable, worldHasShop } from '../sim/rpg/storyShop';
 import { worldIsShipVendor } from '../sim/rpg/storyShips';
@@ -81,6 +82,11 @@ export const starTourView = {
   selectedId: null as string | null,
   /** The weather sky chosen for the round (a CourseEffectId). */
   effect: 'none' as CourseEffectId,
+  /** GS-story-qualifier-partner-pick: the tour-mate the player picked to play a PAIRED qualifying event
+   *  beside, keyed by world id (so each event on the chart remembers its own pick). View-only, like
+   *  `effect` — carried onto the run in the tee-off action, never persisted; an absent entry means "the
+   *  draw's suggestion", which is what the plan falls back to. */
+  qualifierPartnerBy: {} as Record<string, string>,
   /** The course-record boards panel is open. */
   recordsOpen: false,
   /** The Yggdrasil realm-tree overlay is open (GS-star-tour-yggdrasil): opened by flying to the World
@@ -424,6 +430,29 @@ function weatherPicker(): string {
   return `<div class="gs-st-wxrow">${chips}</div>`;
 }
 
+/**
+ * GS-story-qualifier-partner-pick: the partner PICKER for a paired qualifying event — the three tour-mates
+ * as chips, the chosen one ringed, mirroring the team-Sigil lobby's picker. The draw sets the format and
+ * the pairing; WHO plays it beside you is your call, which is what makes the partner tally (and so the
+ * betrayal it feeds) a record of your choices rather than of the dice. Tapping a chip writes the view-only
+ * override and re-renders in place; the tee-off action carries it onto the run.
+ */
+function qualifierPartnerPickerHTML(worldId: string, selectedId: string): string {
+  const story = state.story;
+  if (!story) return '';
+  const chips = qualifierPartnerPool(story)
+    .map((p) => {
+      const on = p.id === selectedId;
+      return `<button class="gs-st-wx${on ? ' gs-st-wx--on' : ''}" data-startour-qpartner="${p.id}" data-startour-qworld="${worldId}"
+          aria-label="Play this event with ${p.name}">${on ? '✓ ' : ''}${p.name}</button>`;
+    })
+    .join('');
+  return `<div style="margin-top:8px;">
+      <div style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#8fd0e8;">🤝 Your partner — you choose</div>
+      <div class="gs-st-wxrow" style="margin-top:4px;">${chips}</div>
+    </div>`;
+}
+
 /** Ordinal suffix for a finishing place (1st, 2nd, 3rd, 11th…). */
 function ordinalPlace(n: number): string {
   const v = n % 100;
@@ -500,8 +529,15 @@ function storyNavSectionsHTML(w: StarTourWorld, nav: StoryWorldNav | undefined):
       : qu.place !== undefined
       ? `<span style="color:#ffb0b0;font-weight:700;">not yet</span> <span style="opacity:.75;">(best ${ordinalPlace(qu.place)} — replay to improve)</span>`
       : `<span style="opacity:.75;">not yet played</span>`;
+    // GS-story-qualifier-formats: the DRAW SHEET, shown before you fly — the shape and the length.
+    // GS-story-qualifier-partner-pick: and, on a paired event, a PICKER for who plays it beside you. The
+    // draw sets the format and the pairing; the company is your call, exactly as it is for a team Sigil.
+    const bar = qu.matchplay ? 'win or halve the match to qualify' : `finish top ${qu.top} of ${qu.field} to qualify`;
     out += `<div class="gs-st-rec" style="margin-top:10px;padding:9px 12px;background:#0c1a22;border:1px solid #234a5a;border-radius:10px;color:#bfe6f5;">
-      🏁 <b>Qualifying event</b> · finish top ${qu.top} of ${qu.field} to qualify — ${verdict}</div>`;
+      🏁 <b>Qualifying event</b> · ${bar} — ${verdict}
+      <div style="margin-top:6px;font-size:11.5px;color:#8fd0e8;">🎲 <b>${qu.formatName}</b> · ${qu.holes} holes</div>
+      ${qu.formatBlurb ? `<div style="margin-top:3px;font-size:11.5px;color:#9ab8c8;line-height:1.4;">${qu.formatBlurb}</div>` : ''}
+      ${qu.partnerId ? qualifierPartnerPickerHTML(w.id, qu.partnerId) : ''}</div>`;
   }
 
   return out;
@@ -529,10 +565,12 @@ function dossier(w: StarTourWorld): string {
   const shoppable = story && storyWorldShoppable(state.story!, w.id);
   // GS-story-map-nav: the campaign status for this world (quest / qualifier / Sigil venue), stamped as
   // actionable dossier sections so the three pulls are reachable straight from the chart.
-  const nav = story ? storyWorldNav(state.story!, w.id) : undefined;
+  const nav = story ? storyWorldNav(state.story!, w.id, starTourView.qualifierPartnerBy[w.id]) : undefined;
   const navSections = storyNavSectionsHTML(w, nav);
   const playAction = story
-    ? { type: 'storyPlayWorld', courseId: w.id }
+    ? // GS-story-qualifier-partner-pick: carry the chosen tour-mate onto the run (validated in the plan,
+      // so an unpicked event simply tees off with the draw's suggestion).
+      { type: 'storyPlayWorld', courseId: w.id, ...(starTourView.qualifierPartnerBy[w.id] ? { partnerId: starTourView.qualifierPartnerBy[w.id] } : {}) }
     : { type: 'pickStarTourCourse', courseId: w.id, effect: starTourView.effect };
   // The plain world round is a secondary "practice" at a Sigil venue (the tournament is the headline CTA
   // above); at a qualifying event it's the qualifying round itself, so it says so.

@@ -133,6 +133,7 @@ export function itemArtKind(id: string): ItemArtKind {
     if (slot === 'ball') return 'ball';
     if (slot === 'hat') return variant === 'range' ? 'rangefinder' : 'hat';
     if (slot === 'shaft') return 'shaft';
+    if (slot === 'wedge') return 'wedge'; // GS-story-wedge-slot: the short-game slot → a wedge head
     if (slot === 'bag') return 'coin'; // the economy slot → a credit-coin emblem
     if (slot === 'jacket') return 'jacket'; // GS-story-clothing: a tailored jacket
     if (slot === 'pants') return 'pants'; // GS-story-clothing: trousers

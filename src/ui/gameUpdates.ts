@@ -53,7 +53,8 @@ import { upgradeCreditMult, grantShipUpgrade } from '../sim/rpg/storyShipUpgrade
 import { storyGearCreditMult } from '../sim/rpg/storyGear';
 import { tournamentForChapter, tournamentRival, sigilMatchThrough, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS, isStoryQualifier, chapterQualifierEvents, isTeamTournament, isSinglesMatchTournament, isTeamMatchTournament, teamFieldPairs, teamPartnerOrDefault, TEAM_PARTNER_EDGE } from '../sim/rpg/storyTournaments';
 import { resolveStoryTeamStroke, opposingField } from '../sim/rpg/storyTeams';
-import { qualifierField, qualifierPlacement, recordQualifier, qualifiedCount, qualifyTop, QUALIFY_EVENTS_NEEDED } from '../sim/rpg/storyQualifiers';
+import { qualifierField, qualifierFieldSize, qualifierPlacement, recordQualifier, recordQualifierPartner, qualifiedCount, qualifyTop, QUALIFY_EVENTS_NEEDED } from '../sim/rpg/storyQualifiers';
+import { activeQualifierPlan, resolveQualifierRound, qualifierFormatName, qualifierMatchOpponents } from '../sim/rpg/storyQualifierFormats';
 import { betrayerId, betrayerOddness } from '../sim/rpg/storyBetrayal';
 import { getCharacter } from '../sim/rpg/characters';
 import type { HolePlay } from '../sim/rpg/play';
@@ -397,7 +398,9 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
     credits,
     // GS-story-quality (finding D): a quest round is 9 holes on the same world — don't overwrite the
     // world's 18-hole best (par 36 vs par 72 would corrupt the revisit chase + dossier).
-    !run.storyQuest,
+    // GS-story-qualifier-match-live: nor does a PARTIAL round — a `pair-match` qualifier that closed out
+    // early banked only the holes the match ran, so its card is measuring a shorter test than the record.
+    !run.storyQuest && played.length >= state.course.holes.length,
   );
   // GS-story-ships: a hole-in-one on any Story round earns the secret Comet Rider (the ace ship).
   const aces = played.filter((p) => p.record.strokes === 1).length;
@@ -414,17 +417,40 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
   let qualifier: NonNullable<UiState['lastStoryRound']>['qualifier'];
   if (!run.storyQuest && isStoryQualifier(courseId, base.alignment) && storyWorldChapter(courseId) <= base.chapter) {
     const chapter = storyWorldChapter(courseId);
-    const field = qualifierField(courseId, totals.totalPar, chapter);
-    const place = qualifierPlacement(field, totals.gross);
-    const fieldSize = field.length + 1;
-    const need = qualifyTop(chapter);
+    // GS-story-qualifier-formats: score the event in the FORMAT it was drawn as — a solo card, a points
+    // card, or a two-ball (scramble/best-ball) card, and matchplay on its own win-or-halve terms. The plan
+    // rides the run (armed at tee-off); it is re-derived defensively so a resumed/headless round still
+    // resolves. Every format lands on the same currency — a finishing place — so the top-N gate, the
+    // record and the recap stay one shape.
+    const plan = run.storyQualifier ?? activeQualifierPlan(base, courseId);
+    const pars = state.course.holes.map((h) => h.par);
+    const res = plan
+      ? resolveQualifierRound(plan, played.map((p) => p.record.strokes), pars, String(run.seed))
+      : undefined;
+    const place = res?.place ?? qualifierPlacement(qualifierField(courseId, totals.totalPar, chapter), totals.gross);
+    const fieldSize = res?.fieldSize ?? qualifierFieldSize(chapter);
+    const need = res?.need ?? qualifyTop(chapter);
     story = recordQualifier(story, courseId, place, fieldSize);
+    // The pairing you actually played feeds the betrayal arc's partner tally (one entry per event, so a
+    // replay can never stack it) — the friend you keep drawing, or keep leaving on the ship, is the one who
+    // ends up standing apart.
+    if (plan?.partnerId) story = recordQualifierPartner(story, courseId, plan.partnerId);
     const qualifiedNow = qualifiedCount(story, chapterQualifierEvents(chapter, base.alignment));
     const playerName = getCharacter(base.characterId)?.shortName ?? 'You';
+    const stableford = plan?.format === 'stableford' || plan?.format === 'pair-stableford';
+    const partnerLabel = plan?.partnerId ? getCharacter(plan.partnerId)?.shortName : undefined;
+    const playerRowName = partnerLabel ? `${playerName} & ${partnerLabel}` : playerName;
+    const playerGross = res?.teamGross ?? totals.gross;
+    const playerPoints = stableford ? res?.playerScore ?? totals.stableford : undefined;
+    const ghosts = res?.field ?? qualifierField(courseId, totals.totalPar, chapter);
     const board = [
-      ...field.map((g) => ({ name: g.name, gross: g.gross, kind: 'ghost' as const })),
-      { name: playerName, gross: totals.gross, kind: 'player' as const },
-    ].sort((a, b) => a.gross - b.gross || (a.kind === 'player' ? -1 : b.kind === 'player' ? 1 : 0));
+      ...ghosts.map((g) => ({ name: g.name, gross: g.gross, ...(g.points !== undefined ? { points: g.points } : {}), kind: 'ghost' as const })),
+      { name: playerRowName, gross: playerGross, ...(playerPoints !== undefined ? { points: playerPoints } : {}), kind: 'player' as const },
+    ].sort((a, b) =>
+      stableford
+        ? (b.points ?? 0) - (a.points ?? 0) || (a.kind === 'player' ? -1 : b.kind === 'player' ? 1 : 0)
+        : a.gross - b.gross || (a.kind === 'player' ? -1 : b.kind === 'player' ? 1 : 0),
+    );
     qualifier = {
       chapter,
       place,
@@ -433,7 +459,28 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
       qualified: place <= need,
       qualifiedCount: qualifiedNow,
       neededCount: QUALIFY_EVENTS_NEEDED,
-      leaderboard: board,
+      leaderboard: res?.match ? [] : board,
+      formatId: plan?.format ?? 'stroke',
+      formatName: plan ? qualifierFormatName(plan) : 'Singles stroke play',
+      ...(partnerLabel ? { partnerName: partnerLabel } : {}),
+      ...(plan?.pairing ? { pairing: plan.pairing } : {}),
+      ...(stableford ? { stableford: true } : {}),
+      ...(res?.playerScore !== undefined ? { playerScore: res.playerScore } : {}),
+      ...(res?.teamGross !== undefined ? { teamGross: res.teamGross } : {}),
+      ...(res?.partnerCountedHoles !== undefined ? { partnerCountedHoles: res.partnerCountedHoles } : {}),
+      ...(res?.match && plan
+        ? {
+            match: {
+              scoreline: res.match.scoreline,
+              playerWon: res.match.playerWon,
+              halved: res.match.halved,
+              thru: res.match.thru,
+              holesUp: res.match.holesUp,
+              // No board on a matchplay event, so the recap has to NAME the pair you faced.
+              opponents: qualifierMatchOpponents(plan, totals.totalPar),
+            },
+          }
+        : {}),
     };
   }
 
@@ -554,6 +601,7 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
     // strokes — tell the resolver so it doesn't ALSO fold an ally ghost on top.
     const match = sigilMatchThrough(t, base, played.map((p) => p.record.strokes), String(run.seed), pars, {
       teamPlayed: run.storyTeamFormat === 'scramble',
+      chosenAllyId: run.storyTournamentPartner,
     })!;
     const res = match.res;
     won = res.playerAdvances; // win OR halve advances (the campaign's matchplay convention)

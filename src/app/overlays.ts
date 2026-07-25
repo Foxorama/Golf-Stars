@@ -8,6 +8,7 @@
 import { state } from './ctx';
 import { teamDuel, teamPartnerChar } from './duelHud';
 import { getCharacter } from '../sim/rpg/characters';
+import { isCoilChampionId, coilChampionName } from '../sim/rpg/storyBetrayal';
 import {
   holeBiome,
   holeThemeId,
@@ -156,14 +157,12 @@ export function scrambleChoiceOverlay(): string {
     : state.run.storyTournamentPartner
     ? getCharacter(state.run.storyTournamentPartner)
     : undefined;
-  // GS-story-sigil5-play: on the Herald finale the scramble partner is a Coil CHAMPION (Voss/Venoma) —
-  // not a playable character — so name them for the card instead of a generic "your partner".
+  // GS-story-sigil5-play / GS-story-sigil5-npc: on the Herald finale the scramble partner is a Coil CHAMPION
+  // (Voss / Venoma / Scorpius) — not a playable character — so name them for the card.
   const partnerName =
     partner?.name ??
-    (state.run.storyTournamentPartner === 'voss'
-      ? 'Sable Voss'
-      : state.run.storyTournamentPartner === 'venoma'
-      ? 'Venoma'
+    (isCoilChampionId(state.run.storyTournamentPartner)
+      ? coilChampionName(state.run.storyTournamentPartner).replace(/\s*".*"\s*/, ' ').trim()
       : undefined);
   const hole = sc.base.hole;
   // Both balls from the SAME spot: the player's line solid, the partner's muted (ghost) beneath.

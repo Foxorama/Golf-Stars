@@ -450,10 +450,13 @@ export function venomaPortraitSVG(): string {
  * assassin the cult sends to the Abyssal Vigil (Chapter 4, Warden path) when the Viper has failed twice.
  * Where Venoma is saturated plum menace and Voss is grief, Scorpius is COLD armour: a chitin-black
  * carapace hood, a segmented face-VEIL that hides mouth and jaw (he never speaks aloud), and only two
- * narrow, pale acid-green eyes reading you from the dark. His identity motif is a segmented SCORPION TAIL
- * arcing over his shoulder to a raised stinger, a bead of venom trembling at its point (the mirror of
- * Venoma's little coiled snake and Voss's dripping driver). Obsidian carapace (#161020 / #2a1e3a) with the
- * Coil acid-green (#7fe0a0) as the only warmth — a hunter, not a zealot. Deliberately still and blade-like.
+ * narrow, pale acid-green eyes reading you from the dark. Predominantly COIL (venom-plum #2a1e3a/#3a2a52 +
+ * acid-green #7fe0a0), never brown — a hunter of the cult, not a beast. His identity motif is a SEGMENTED
+ * scorpion tail — a chain of chitin bulbs, NOT a smooth stick — rising from BEHIND the near shoulder, arcing
+ * over it to a bulbed stinger with a bead of venom trembling at its point (the mirror of Venoma's coiled
+ * snake and Voss's dripping driver). Behind him, the SCORPIO constellation hangs in the dark: a stylised
+ * fishhook of pale stars with red Antares as its heart, its stellar tail echoing his own (GS-story-scorpius:
+ * the starry-constellation identity the other Coil champions lacked). Deliberately still and blade-like.
  */
 export function scorpiusPortraitSVG(): string {
   return `<svg viewBox="0 0 320 340" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Scorpius the Silent Sting" style="display:block;aspect-ratio:320/340;overflow:visible;">
@@ -471,10 +474,17 @@ export function scorpiusPortraitSVG(): string {
       <stop offset="0%" stop-color="#3a2a52"/>
       <stop offset="100%" stop-color="#150e22"/>
     </linearGradient>
-    <linearGradient id="gs-lore-sco-tail" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#3a2c1e"/>
-      <stop offset="100%" stop-color="#7a5a2a"/>
-    </linearGradient>
+    <!-- the tail: Coil chitin, lit from the upper-left (plum highlight → deep plum core) -->
+    <radialGradient id="gs-lore-sco-seg" cx="38%" cy="30%" r="80%">
+      <stop offset="0%" stop-color="#5a4276"/>
+      <stop offset="55%" stop-color="#33234c"/>
+      <stop offset="100%" stop-color="#180f28"/>
+    </radialGradient>
+    <radialGradient id="gs-lore-sco-antares" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffd8b0"/>
+      <stop offset="40%" stop-color="#ff8a52"/>
+      <stop offset="100%" stop-color="#c93a2e" stop-opacity="0"/>
+    </radialGradient>
     <radialGradient id="gs-lore-sco-veil" cx="50%" cy="30%" r="70%">
       <stop offset="0%" stop-color="#241830" stop-opacity="1"/>
       <stop offset="100%" stop-color="#0a0610" stop-opacity="1"/>
@@ -484,7 +494,41 @@ export function scorpiusPortraitSVG(): string {
   <!-- soft spotlight halo -->
   <ellipse cx="160" cy="150" rx="150" ry="162" fill="url(#gs-lore-sco-spot)"/>
 
-  <!-- shoulders / segmented carapace mantle -->
+  <!-- ── the SCORPIO constellation, hanging in the dark behind him (starry-constellation identity) ── -->
+  <g opacity="0.9">
+    <!-- faint field of background stars (hand-placed; the deterministic render path takes no rng) -->
+    <g fill="#cfe6d8">
+      <circle cx="212" cy="44" r="1" opacity="0.5"/><circle cx="250" cy="70" r="0.8" opacity="0.4"/>
+      <circle cx="284" cy="110" r="1.1" opacity="0.55"/><circle cx="300" cy="176" r="0.9" opacity="0.4"/>
+      <circle cx="286" cy="292" r="1" opacity="0.45"/><circle cx="30" cy="70" r="1" opacity="0.5"/>
+      <circle cx="18" cy="150" r="0.9" opacity="0.4"/><circle cx="26" cy="238" r="1.1" opacity="0.5"/>
+      <circle cx="150" cy="30" r="0.9" opacity="0.45"/><circle cx="96" cy="30" r="0.8" opacity="0.4"/>
+      <circle cx="8" cy="200" r="0.8" opacity="0.35"/><circle cx="308" cy="230" r="0.8" opacity="0.35"/>
+    </g>
+    <!-- the fishhook asterism: head trio → body → Antares heart → hooking stellar tail (echoes his own) -->
+    <path d="M196 58 L166 50 L138 50 L112 60 L90 78 L72 104 L60 134 L52 166 L58 198 L78 222 L104 232 L126 220"
+          fill="none" stroke="#7fe0a0" stroke-width="1" opacity="0.32" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M126 220 L142 206" fill="none" stroke="#7fe0a0" stroke-width="1" opacity="0.28" stroke-linecap="round"/>
+    <g fill="#e8f6ec">
+      <circle cx="196" cy="58" r="1.5"/><circle cx="166" cy="50" r="1.7"/><circle cx="138" cy="50" r="1.5"/>
+      <circle cx="112" cy="60" r="1.4"/><circle cx="90" cy="78" r="1.6"/><circle cx="72" cy="104" r="1.5"/>
+      <circle cx="60" cy="134" r="1.4"/><circle cx="58" cy="198" r="1.6"/><circle cx="78" cy="222" r="1.8"/>
+      <circle cx="104" cy="232" r="1.5"/><circle cx="126" cy="220" r="2"/><circle cx="142" cy="206" r="1.4"/>
+    </g>
+    <!-- Antares: the scorpion's red heart -->
+    <circle cx="52" cy="166" r="10" fill="url(#gs-lore-sco-antares)"/>
+    <circle cx="52" cy="166" r="2.6" fill="#ff9a6e"/>
+  </g>
+
+  <!-- ── tail root: the lower segments RISING FROM BEHIND the right shoulder (drawn first, so the -->
+  <!--    shoulder mantle occludes the base — the tail reads as coming from behind, not the chest) ── -->
+  <g>
+    <ellipse cx="250" cy="306" rx="13" ry="11.5" fill="url(#gs-lore-sco-seg)"/>
+    <ellipse cx="272" cy="278" rx="12.5" ry="11.5" fill="url(#gs-lore-sco-seg)"/>
+    <ellipse cx="287" cy="246" rx="12" ry="11.5" fill="url(#gs-lore-sco-seg)"/>
+  </g>
+
+  <!-- shoulders / segmented carapace mantle (drawn OVER the tail root) -->
   <path d="M30 340 Q36 248 96 232 Q160 218 224 232 Q284 248 290 340 Z" fill="url(#gs-lore-sco-carapace)"/>
   <!-- overlapping plate seams on the shoulders -->
   <g fill="none" stroke="#4a3660" stroke-width="2.4" opacity="0.7" stroke-linecap="round">
@@ -497,32 +541,50 @@ export function scorpiusPortraitSVG(): string {
   <path d="M96 232 Q108 250 100 300 Q92 262 78 300 Q84 250 96 232 Z" fill="#4a3660" opacity="0.35"/>
   <path d="M224 232 Q212 250 220 300 Q228 262 242 300 Q236 250 224 232 Z" fill="#4a3660" opacity="0.35"/>
 
+  <!-- ── tail (front): the upper segments arcing OVER the shoulder to the raised stinger. A CHAIN of -->
+  <!--    chitin bulbs tapering to the telson — never a smooth stick. Each segment carries an acid-green -->
+  <!--    rim-light and a dark inter-segment seam so it reads as jointed armour. ── -->
+  <g>
+    ${(() => {
+      // segment centres from the shoulder-top up to the venom sac; radius tapers along the metasoma
+      const segs = [
+        [288, 232, 11.5], [283, 205, 10.8], [273, 180, 10], [259, 158, 9.2], [250, 136, 11.5],
+      ] as const;
+      const body = segs
+        .map(
+          ([x, y, r]) =>
+            `<ellipse cx="${x}" cy="${y}" rx="${r}" ry="${r + 0.5}" fill="url(#gs-lore-sco-seg)"/>` +
+            // upper-left rim-light + a thin acid-green Coil edge
+            `<path d="M${x - r * 0.7} ${y + r * 0.4} A ${r} ${r} 0 0 1 ${x + r * 0.2} ${y - r * 0.9}" fill="none" stroke="#7c5f9c" stroke-width="1.8" opacity="0.7" stroke-linecap="round"/>` +
+            `<path d="M${x - r * 0.5} ${y + r * 0.6} A ${r} ${r} 0 0 1 ${x - r * 0.9} ${y - r * 0.1}" fill="none" stroke="#7fe0a0" stroke-width="1.2" opacity="0.5" stroke-linecap="round"/>`,
+        )
+        .join('');
+      // dark seams between consecutive segments
+      const seams = segs
+        .slice(0, -1)
+        .map(([x, y], i) => {
+          const [nx, ny] = segs[i + 1]!;
+          const mx = (x + nx) / 2;
+          const my = (y + ny) / 2;
+          return `<line x1="${mx - 7}" y1="${my - 2}" x2="${mx + 7}" y2="${my + 2}" stroke="#140b22" stroke-width="2" opacity="0.7" stroke-linecap="round"/>`;
+        })
+        .join('');
+      return body + seams;
+    })()}
+    <!-- the bulbed stinger + curved barb striking forward, past his own shoulder -->
+    <path d="M247 126 Q236 110 242 96 Q248 84 252 94" fill="none" stroke="url(#gs-lore-sco-seg)" stroke-width="10" stroke-linecap="round"/>
+    <path d="M252 94 Q256 84 250 78" fill="none" stroke="#9be8b6" stroke-width="5" stroke-linecap="round"/>
+    <!-- a bead of venom trembling at the point -->
+    <circle cx="250" cy="77" r="4.5" fill="#7fe0a0"/>
+    <circle cx="250" cy="77" r="9" fill="#7fe0a0" opacity="0.25"/>
+    <path d="M250 81 q-1 8 0 14" stroke="#7fe0a0" stroke-width="2" stroke-linecap="round" opacity="0.55"/>
+  </g>
+
   <!-- collar clasp: a pair of small pincers meeting at the throat, acid-green edged -->
   <g transform="translate(160 250)">
     <path d="M-30 -6 Q-14 -2 -4 6 Q-16 4 -30 8 Z" fill="#1a1226" stroke="#7fe0a0" stroke-width="1.6"/>
     <path d="M30 -6 Q14 -2 4 6 Q16 4 30 8 Z" fill="#1a1226" stroke="#7fe0a0" stroke-width="1.6"/>
     <circle cx="0" cy="4" r="4.5" fill="#7fe0a0" opacity="0.9"/>
-  </g>
-
-  <!-- the scorpion tail arcing over the near shoulder, raised to strike (his identity motif) -->
-  <g>
-    <!-- segmented tail sweeping up from behind the right shoulder -->
-    <path d="M232 300 Q276 288 288 236 Q294 196 268 172 Q248 154 250 128"
-          fill="none" stroke="url(#gs-lore-sco-tail)" stroke-width="15" stroke-linecap="round"/>
-    <!-- segment ridges -->
-    <g fill="none" stroke="#1c140a" stroke-width="2" opacity="0.75">
-      <path d="M244 296 q10 -3 18 -8"/>
-      <path d="M270 268 q9 -6 13 -15"/>
-      <path d="M284 232 q4 -10 2 -22"/>
-      <path d="M266 190 q-6 -10 -14 -16"/>
-    </g>
-    <!-- the bulbed stinger + curved barb -->
-    <path d="M250 128 Q240 112 250 100 Q262 90 258 108" fill="none" stroke="url(#gs-lore-sco-tail)" stroke-width="12" stroke-linecap="round"/>
-    <path d="M258 108 Q266 98 262 88" fill="none" stroke="#c9a24a" stroke-width="6" stroke-linecap="round"/>
-    <!-- a bead of venom trembling at the point -->
-    <circle cx="262" cy="86" r="4.5" fill="#7fe0a0"/>
-    <circle cx="262" cy="86" r="9" fill="#7fe0a0" opacity="0.25"/>
-    <path d="M262 90 q-1 8 0 14" stroke="#7fe0a0" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
   </g>
 
   <!-- neck, in shadow beneath the veil -->

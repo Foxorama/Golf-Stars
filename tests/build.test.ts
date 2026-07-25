@@ -271,7 +271,10 @@ describe('build output (real browser)', () => {
     { screen: 'storypick', sel: '.gs-eclub-ov', text: 'STRENGTHS', label: 'the Story golfer stats/abilities overlay' },
     { screen: 'storymap', sel: '.gs-startour', text: 'CLUBHOUSE', label: 'the Story galaxy star-map navigator' },
     { screen: 'storyresult', sel: '.gs-storyres', text: 'Champion', label: 'the Story prologue world-round recap' },
-    { screen: 'storyqualresult', sel: '.gs-storyres', text: 'qualif', label: 'the Story qualifying-event recap (field + placement)' },
+    { screen: 'storyqualresult', sel: '.gs-storyres', text: 'Two-ball', label: 'the Story qualifying-event recap (two-ball board + placement)' },
+    { screen: 'storyqualmatch', sel: '.gs-storyres', text: 'matchplay', label: 'the Story qualifying-event recap (matchplay scoreline, no board)' },
+    { screen: 'storyqualmatchlive', sel: '.gs-hud', text: 'matchplay', label: 'the LIVE match chip + panel mid-round of a pair-match qualifier' },
+    { screen: 'storyqualpick', sel: '.gs-st-wxrow', text: 'Your partner', label: 'the qualifying-event dossier with its partner PICKER' },
     { screen: 'storyshop', sel: '.gs-sshop-grid', text: 'Pro Shop', label: 'the Story per-world Pro Shop' },
     { screen: 'storylocker', sel: '.gs-lock-grid', text: 'Your bag', label: 'the Story locker (bag builder + gear)' },
     { screen: 'storyshipyard', sel: '.gs-yard-usec', text: 'Weapons & upgrades', label: 'the Story shipyard (ships + weapons/upgrades)' },
@@ -285,6 +288,7 @@ describe('build output (real browser)', () => {
     { screen: 'storyfinaleresult', sel: '.gs-storyres', text: 'Universe', label: 'the Story finale victory recap' },
     { screen: 'storychoice', sel: '.gs-choice-grid', text: 'The Choice', label: 'the Story alignment fork (The Choice)' },
     { screen: 'storyinterlude', sel: '.gs-inter-dialogue', text: 'The Severing', label: 'the Story emotional interlude' },
+    { screen: 'storyaftermath', sel: '.gs-lore', text: 'The Sting Withdraws', label: 'the Story post-Sigil confrontation beat (Scorpius withdraws)' },
     { screen: 'storybar', sel: '.gs-pbar__scene', text: "The Parrot's Perch", label: "the Story Parrot Bar (the Parrot's Perch)" },
   ];
   for (const { screen, sel, text, label } of SCREENS) {
