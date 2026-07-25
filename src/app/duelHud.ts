@@ -11,6 +11,7 @@ import { livePosition, matchOpponentFor, runField } from '../sim/rpg/league';
 import { getArchetype, getGolfer } from '../sim/rpg/golfers';
 import { holeDuel, matchScoreline, matchState } from '../sim/rpg/match';
 import { getCharacter, type Character } from '../sim/rpg/characters';
+import { storyPartnerName } from '../sim/rpg/storyPartners';
 import { teamDuelSetupForRun, type TeamDuelSetup } from '../sim/rpg/run';
 import { opponentBadge, ordinal } from '../render/golferCards';
 import type { PlayedHole } from '../sim/round';
@@ -213,7 +214,7 @@ export function bestBallRevealHTML(raw: PlayedHole, partnerHole: PlayedHole, par
   return `<div style="max-width:460px;">
       <div style="display:flex;gap:10px;align-items:stretch;">
         ${card(`You · ${youChar?.name ?? 'Player'}`, raw, !partnerKept, youChar?.style.cap ?? '#5fd45a')}
-        ${card(partner?.name ?? 'Partner', partnerHole, partnerKept, partner?.style.cap ?? '#7aa2ff')}
+        ${card(partner?.name ?? (state.run.storyTournamentPartner ? storyPartnerName(state.run.storyTournamentPartner) : 'Partner'), partnerHole, partnerKept, partner?.style.cap ?? '#7aa2ff')}
       </div>
       <div style="font-size:11px;opacity:.65;margin-top:8px;text-align:center;">🤝 Best ball — the better score is the team's for the hole.</div>
     </div>`;

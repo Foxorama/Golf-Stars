@@ -315,6 +315,15 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     Choice, both picks locked — diverting `holeComplete` to the shared `.gs-lore*` beat card (`storyMidBeat`,
     `loreBeatHTML`) then on to the halftime pop. A new golfer = new `BETRAYAL_VOICE` rows; never an engine
     edit. Zero sim rng, no `STORY_VERSION` bump (rides `seenStoryBeats`).
+  - **The PATH decides who stands beside you, and who speaks** (`storyPartners.ts` is the ONE seam).
+    `storyPartnerIds(story)` = your three tour-mates on the Warden/undecided road, the four Coil agents once
+    you are the Herald (GS-story-coil-partners — the tour-mates deserted the bag; two of them come for you at
+    Ch.5). Same size ⇒ the qualifier draw sheet is byte-for-byte for a Warden campaign; a pure function of
+    `alignment` ⇒ the sheet never moves mid-campaign. `storyPartnerName(id)` names ANY partner — golfer, Coil
+    agent, Coil champion — so no surface resolves names itself. A Sigil-5 Coil partner must be a champion you
+    have actually MET (`metCoilChampions`, GS-story-champion-met — Scorpius is the Ch.4 WARDEN rival and was
+    walking into the Herald climax a stranger). A friend who comes as a PAIR speaks the `confrontPair` voice,
+    never the lone-champion `confront` lines (GS-story-pair-voice).
   - **Switched sides is SHOWN** (GS-story-defection-clubhouse / GS-story-coil-garb). The defector's Coil
     costume (`corruptedLookOpts`) KEEPS the golfer's own shirt colour + face + hair and layers an open
     serpent robe + raised cobra hood + serpent circlet OVER it (`golferPreviewSVG`'s `coilGarb` opt), so

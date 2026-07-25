@@ -35,7 +35,7 @@ import {
   QUALIFIER_HOLES,
 } from './storyQualifiers';
 import { qualifierPlan, qualifierFormatName, qualifierFormatBlurb } from './storyQualifierFormats';
-import { getCharacter } from './characters';
+import { storyPartnerName } from './storyPartners';
 import {
   isLiveStoryQualifier,
   tournamentForChapter,
@@ -139,7 +139,7 @@ function qualifierNavForWorld(story: StoryState, courseId: string, chosenPartner
   if (!isLiveStoryQualifier(story, courseId)) return undefined;
   const res = story.qualifierResults[courseId];
   const plan = qualifierPlan(story, courseId, chosenPartnerId);
-  const partnerName = plan?.partnerId ? getCharacter(plan.partnerId)?.shortName : undefined;
+  const partnerName = plan?.partnerId ? storyPartnerName(plan.partnerId) : undefined;
   return {
     chapter: w.unlockChapter,
     top: qualifyTop(w.unlockChapter),

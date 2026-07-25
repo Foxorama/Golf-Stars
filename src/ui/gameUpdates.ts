@@ -56,6 +56,7 @@ import { resolveStoryTeamStroke, opposingField } from '../sim/rpg/storyTeams';
 import { qualifierField, qualifierFieldSize, qualifierPlacement, recordQualifier, recordQualifierPartner, qualifiedCount, qualifyTop, QUALIFY_EVENTS_NEEDED } from '../sim/rpg/storyQualifiers';
 import { activeQualifierPlan, resolveQualifierRound, qualifierFormatName, qualifierMatchOpponents } from '../sim/rpg/storyQualifierFormats';
 import { betrayerId, betrayerOddness } from '../sim/rpg/storyBetrayal';
+import { storyPartnerName } from '../sim/rpg/storyPartners';
 import { getCharacter } from '../sim/rpg/characters';
 import type { HolePlay } from '../sim/rpg/play';
 import type { MatchUi, UiState } from './gameState';
@@ -438,7 +439,7 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
     const qualifiedNow = qualifiedCount(story, chapterQualifierEvents(chapter, base.alignment));
     const playerName = getCharacter(base.characterId)?.shortName ?? 'You';
     const stableford = plan?.format === 'stableford' || plan?.format === 'pair-stableford';
-    const partnerLabel = plan?.partnerId ? getCharacter(plan.partnerId)?.shortName : undefined;
+    const partnerLabel = plan?.partnerId ? storyPartnerName(plan.partnerId) : undefined;
     const playerRowName = partnerLabel ? `${playerName} & ${partnerLabel}` : playerName;
     const playerGross = res?.teamGross ?? totals.gross;
     const playerPoints = stableford ? res?.playerScore ?? totals.stableford : undefined;

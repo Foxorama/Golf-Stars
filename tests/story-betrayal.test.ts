@@ -11,6 +11,7 @@ import {
   coilChampionExcluding,
   coilChampionName,
   coilChampionOptions,
+  metCoilChampions,
   coilCaddyChampion,
   wardenAllyOptions,
   finaleMatchup,
@@ -131,7 +132,10 @@ describe('GS-story-sigil-rivals — the severed friend + dynamic tournament riva
     const herald = { ...s(A, B), alignment: 'herald' as const, chapter: 5 };
     const h = tournamentRival(tournamentForChapter(5, 'herald')!, herald);
     expect(heraldOpponentIds(herald)).toContain(h.golferId);
-    expect(h.voice).toBe('confront');
+    // GS-story-pair-voice: they come as a PAIR at the Ghost Harvest, so they speak with the pair voice —
+    // never the lone-champion `confront` lines written for the Ch.4 rite ("came alone anyway").
+    expect(h.voice).toBe('confrontPair');
+    expect(friendRivalTaunt(h.golferId!, 'confrontPair')).not.toContain('alone anyway');
   });
 
   it('trunk + Ch.4 Warden rivals stay the static NPCs; no story → the fallback row rival', () => {
@@ -165,10 +169,14 @@ describe('GS-story-sigil-rivals — the severed friend + dynamic tournament riva
   it('every golfer has a full betrayal voice: defection, farewell, confront + corrupt rival lines', () => {
     expect(everyGolferHasBetrayalVoice()).toBe(true);
     for (const c of CHARACTERS) {
-      for (const voice of ['confront', 'corrupt'] as const) {
+      for (const voice of ['confront', 'corrupt', 'confrontPair'] as const) {
         expect(friendRivalTaunt(c.id, voice).length).toBeGreaterThan(10);
         expect(friendRivalHalftime(c.id, voice, true)).not.toBe(friendRivalHalftime(c.id, voice, false));
       }
+      // GS-story-pair-voice: the pair voice is its own writing, not a copy of the lone-champion one, and it
+      // never claims they came alone — at the Ghost Harvest there are two of them sharing a ball.
+      expect(friendRivalTaunt(c.id, 'confrontPair')).not.toBe(friendRivalTaunt(c.id, 'confront'));
+      expect(friendRivalTaunt(c.id, 'confrontPair')).not.toMatch(/alone anyway|came alone/i);
     }
   });
 });
@@ -230,10 +238,15 @@ describe('GS-story-sigil5-npc — the Ch.5 finale partner is a player CHOICE', (
     expect(finaleMatchup(st, undefined, betrayerId(st)).allyId).toBe(loyalAllyId(st));
   });
 
-  it('HERALD: you may pick your Coil champion from Voss / Venoma / Scorpius', () => {
+  it('HERALD: you may pick your Coil champion from the ones you have actually MET (GS-story-champion-met)', () => {
     const st = herald();
-    expect(coilChampionOptions(st).sort()).toEqual(['scorpius', 'venoma', 'voss']);
-    for (const champ of ['voss', 'venoma', 'scorpius'] as const) {
+    // Scorpius is the Chapter-4 WARDEN rival — a Herald never plays the Abyssal Vigil and never meets him,
+    // so offering him as the Sigil-5 partner put a stranger in the climax (the player report).
+    expect(coilChampionOptions(st).sort()).toEqual(['venoma', 'voss']);
+    expect(metCoilChampions(st)).not.toContain('scorpius');
+    // A Warden who has reached the Vigil HAS met him.
+    expect(metCoilChampions({ ...warden(A, B), chapter: 4 })).toContain('scorpius');
+    for (const champ of ['voss', 'venoma'] as const) {
       const m = finaleMatchup(st, undefined, champ);
       expect(m.herald).toBe(true);
       expect(m.allyId).toBe(champ);
@@ -246,8 +259,9 @@ describe('GS-story-sigil5-npc — the Ch.5 finale partner is a player CHOICE', (
     expect(coilCaddyChampion('coil-voss')).toBe('voss');
     expect(coilCaddyChampion('coil-venoma')).toBe('venoma');
     expect(coilCaddyChampion('driver-dan')).toBeUndefined();
-    // Voss on the bag → only Venoma + Scorpius remain
-    expect(coilChampionOptions(herald({ activeCaddyId: 'coil-voss' })).sort()).toEqual(['scorpius', 'venoma']);
+    // Voss on the bag → only Venoma remains (a champion can't carry the bag AND play beside you; putting a
+    // different Keeper on the bag in the locker is how you free the one you want at your side).
+    expect(coilChampionOptions(herald({ activeCaddyId: 'coil-voss' }))).toEqual(['venoma']);
     // Venoma on the bag → the default partner is no longer Venoma
     const st = herald({ activeCaddyId: 'coil-venoma' });
     expect(coilChampionOptions(st)).not.toContain('venoma');

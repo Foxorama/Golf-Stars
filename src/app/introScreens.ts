@@ -23,9 +23,9 @@ import { ascensionCutBonus, canWarpStop, currentBoss, effectiveCut, endlessHoleN
 import { getFormat, isMatchplayBoss, isTeamDuelBoss, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
 import { endlessSetGateOverPar, endlessSetLabel, endlessSetToPar, formatToPar, toParColour } from '../sim/rpg/endless';
 import { bestStrokeFor, bestStrokeRounds } from '../sim/rpg/strokePlay';
-import { getCharacter } from '../sim/rpg/characters';
 import { qualifyTop, qualifierFieldSize } from '../sim/rpg/storyQualifiers';
 import { qualifierFormatName } from '../sim/rpg/storyQualifierFormats';
+import { storyPartnerName } from '../sim/rpg/storyPartners';
 import { staticCourseSpec } from '../sim/course/staticCourses';
 import type { EndlessCardData } from '../render/endlessCards';
 import { arcSurvivorTarget } from '../sim/rpg/competition';
@@ -178,7 +178,7 @@ function introShared(): {
           q.format === 'pair-match'
             ? 'win or halve the match to qualify'
             : `finish top ${qualifyTop(q.chapter)} of ${qualifierFieldSize(q.chapter)} to qualify`;
-        const mate = q.partnerId ? ` with <b>${getCharacter(q.partnerId)?.shortName ?? 'your partner'}</b>` : '';
+        const mate = q.partnerId ? ` with <b>${storyPartnerName(q.partnerId)}</b>` : '';
         return `🏁 <b>${qualifierFormatName(q)}</b>${mate} · ${q.holes} holes — ${bar}.`;
       }
       // Star Tour (GS-star-tour): a stroke-play round chasing a personal course record.
