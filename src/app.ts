@@ -114,6 +114,8 @@ import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SH
 import type { CourseEffectId } from './sim/rpg/effects';
 import { exitConfirmOverlay, priceNoticeOverlay, scrambleChoiceOverlay, settingsOverlay, settingsSheetInner, shotPopupOverlay } from './app/overlays';
 import { backIntent } from './ui/back';
+import { isNativeShell } from './native';
+import { primeHaptics } from './render/haptics';
 import { hazardLabel, mapTopInfo, puttAimLabel, puttAimRow } from './app/playHud';
 import { mountWeatherOverlay, playCaddyVoice, playTentBonk, syncMusic } from './app/playFx';
 import { metaFromSave, persist, persistStory } from './app/persist';
@@ -3549,20 +3551,6 @@ function shouldPlayIntro(): boolean {
 }
 
 /**
- * True when the app is running inside the Capacitor native shell (the Google Play build,
- * GS-android) rather than a browser. Capacitor injects this global into the WebView before any
- * app code runs; in a browser it is simply absent.
- */
-function isNativeShell(): boolean {
-  try {
-    const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
-    return typeof cap?.isNativePlatform === 'function' ? cap.isNativePlatform() : false;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Perform one BACK press (GS-android-back). The DECISION is pure and lives in `ui/back.ts`; this is
  * only the side-effect half — dispatching, or closing the settings sheet (which is module state
  * here, deliberately outside the reducer).
@@ -3651,6 +3639,9 @@ export function start(): void {
   boot();
   registerServiceWorker();
   wireBackButton();
+  // Load the native haptic engine now, not on the first swing — a lazy load would drop that buzz
+  // while the chunk resolved. No-op in a browser (GS-native-haptics).
+  primeHaptics();
   // Capture the install prompt so the title can offer an "Install app" button (instead of the
   // browser's own mini-infobar). Re-render so the button appears once it's available.
   try {

@@ -10,6 +10,40 @@ is the endless survival mode — the old `flat`/`ladder` roguelites are retired 
 under the new format). Avenue (1), a full top-down RPG shell, stays deferred until the loop is exhausted.
 
 ## Now / next
+
+**GS-hud-frame — ONE persistent play HUD across every view state** ⭐ *next session, player-chosen approach*
+From the 2026-07-25 Pixel 9a play-test: the play screen is laid out differently in each of its six states
+(shot / watching / chip / chip-watching / putt / putt-watching) — the map/zoom/settings column exists while
+aiming but VANISHES on putt and watch, the info panel changes shape and height, the canvas flight label
+lives somewhere unrelated to everything else, and the readouts are small and hard to parse. Player's call
+(asked explicitly): **one persistent frame** — a single HUD skeleton always present in the same places
+(fixed info bar · fixed control column · fixed action zone), with only the CONTENTS changing per state.
+Buttons must never move or disappear between states. Requirements:
+- **The caddy needs a permanent slot.** Not visible in the play-test screenshots, but it must have a space
+  in the frame that PERSISTS across all six states like everything else — today `.gs-caddybadge` is a
+  pass-through portrait floated wherever there's room.
+- Typography/sizing is in scope (the readouts are too small), but may be split into a follow-up polish pass.
+- Every state must reserve the system UI — see GS-play-safearea below; the frame inherits that discipline
+  rather than re-solving it per state.
+- New chrome gets its OWN class prefix (the `.gs-hud` play-screen namespace already exists — extend it, and
+  never reuse another screen's names; see the #353 map-blur regression).
+- ⚠️ Touches `app.ts` + `index.html`, the two hottest shared files. One focused session, per the constitution.
+
+**Deferred out of the 2026-07-25 quick-win batch** (both looked small, both are bigger than they read):
+- **GS-story-briefing-beat** — the first-visit Parrot briefing currently advertises itself with a gold ❗ on
+  the bar hotspot (`storySpaceport.ts`, gated on `chapter <= 1 && !seenStoryBeats['story-bar-briefing']`),
+  borrowing the QUEST-marker idiom for something that is not a quest. Player wants it to present as a LORE
+  BEAT instead. Not a one-liner: `withLoreGate` wraps stop-INTRO arrivals, so firing a beat on a CLUBHOUSE
+  arrival needs either a new gate surface or a `storyMidBeat`-style divert. Design call, then plumbing.
+- **GS-story-inspect-flicker** — swapping golfer at a qualifier, and choosing "another" in the clubhouse
+  inspect overlay, both flicker hard. Same root cause as GS-settings-flicker: the action falls through to a
+  full `render()`, which replaces `app.innerHTML` and replays every mount animation. Fix is the documented
+  surgical-refresh pattern (`refreshSettings` is the model — swap the overlay's innerHTML + re-wire), but it
+  means routing specific actions around the normal dispatch→render path, which wants care rather than a
+  rushed end-of-session patch.
+- **Putt-watching renders INSET** — black margins on three sides while every other state is full-bleed
+  (seen in the play-test screenshots, not yet reproduced). May share a cause with the chuggy watching view.
+  Confirm reproducibility first.
 Foundations are shipped; these are the live follow-ons.
 
 **GS-story — Story Mode (the big one; systems roadmap in `docs/decisions/story-mode.md`, narrative canon in

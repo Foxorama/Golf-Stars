@@ -49,6 +49,8 @@ interface LiveMatch {
   title: string;
   /** True when your side is a PAIR — the opponent's per-hole number is "their ball", not "X made". */
   team: boolean;
+  /** Your partner's short name, when your side is a pair — so the chip can say whose ball it is. */
+  mateShort?: string;
 }
 
 /** The Sigil tournament of the CURRENT run, if this round is one. */
@@ -79,6 +81,7 @@ function sigilLiveMatch(strokes: readonly number[]): LiveMatch | undefined {
     caption: team ? '2v2 scramble matchplay' : 'Singles matchplay',
     title: team ? `You & ${first(m.matchup?.allyName ?? 'ally')} vs ${oppShort}` : `vs ${m.rival.name}`,
     team,
+    ...(team && m.matchup ? { mateShort: first(m.matchup.allyName) } : {}),
   };
 }
 
@@ -102,6 +105,7 @@ function qualifierLiveMatch(strokes: readonly number[]): LiveMatch | undefined {
     caption: `Two-ball ${plan.pairing === 'scramble' ? 'scramble' : 'best-ball'} matchplay`,
     title: `You & ${mate} vs ${oppShort}`,
     team: true,
+    mateShort: mate,
   };
 }
 
@@ -110,12 +114,18 @@ function liveMatch(strokes: readonly number[]): LiveMatch | undefined {
   return sigilLiveMatch(strokes) ?? qualifierLiveMatch(strokes);
 }
 
-/** The opponent's (side's) score on ONE hole, read off the SAME resolver streams (a dummy player stroke
- *  is appended — the opponent's card doesn't depend on it). Real matchplay: you can see the other ball. */
-function opponentHoleScore(holeIndex: number): number | undefined {
+/** The opposing side's ball AND your partner's ball on ONE hole, read off the SAME resolver streams (a
+ *  dummy player stroke is appended — neither the opponents' nor the partner's ghost card depends on it).
+ *  Real matchplay: you can see the other balls.
+ *
+ *  GS-story-partner-ball: the chip used to show ONLY `their ball`, which in a two-ball best-ball is the
+ *  less useful half — you can already see your own card, but you had no idea what your partner made, so
+ *  you couldn't tell what your side's number even was. */
+function otherBallsOnHole(holeIndex: number): { opp?: number; mate?: number } {
   const played = (state.stopPlayed ?? []).map((p) => p.record.strokes);
   const probe = [...played.slice(0, holeIndex), 9]; // earlier holes + a dummy for the hole in play
-  return liveMatch(probe)?.res.duels[holeIndex]?.bossStrokes;
+  const duel = liveMatch(probe)?.res.duels[holeIndex];
+  return { opp: duel?.bossStrokes, mate: duel?.mateStrokes };
 }
 
 /** The live MATCH chip for the play HUD (any matchplay round — a Sigil or a `pair-match` qualifier) —
@@ -130,12 +140,21 @@ export function storySigilMatchChip(): string {
   const play = state.play;
   let target = '';
   if (play && !play.done) {
-    const opp = opponentHoleScore(play.holeIndex);
-    if (opp !== undefined) {
-      const rel = opp - play.hole.par;
-      const relTxt = rel === 0 ? 'par' : rel > 0 ? `+${rel}` : `${rel}`;
-      target = `<span style="font-size:10.5px;opacity:.85;">· ${m.team ? 'their ball:' : `${m.oppShort} made`} <b>${opp}</b> (${relTxt})</span>`;
+    const { opp, mate } = otherBallsOnHole(play.holeIndex);
+    const rel = (n: number): string => {
+      const d = n - play.hole.par;
+      return d === 0 ? 'par' : d > 0 ? `+${d}` : `${d}`;
+    };
+    const parts: string[] = [];
+    // Your partner's ball FIRST — in a pairs format it's the half you can't see for yourself, and it's
+    // what tells you whether you still need this hole (GS-story-partner-ball).
+    if (mate !== undefined) {
+      parts.push(`<span style="font-size:10.5px;opacity:.85;">· ${m.mateShort ?? 'partner'}: <b>${mate}</b> (${rel(mate)})</span>`);
     }
+    if (opp !== undefined) {
+      parts.push(`<span style="font-size:10.5px;opacity:.85;">· ${m.team ? 'their ball:' : `${m.oppShort} made`} <b>${opp}</b> (${rel(opp)})</span>`);
+    }
+    target = parts.join('');
   }
   return `<div style="display:flex;align-items:center;gap:8px;padding:4px 9px;border:1px solid ${col};border-radius:8px;background:#0d1016cc;flex-wrap:wrap;">
       <span style="font-size:11px;opacity:.7;">⚔ ${m.team ? 'Your side vs' : 'vs'} ${m.oppShort}</span>
