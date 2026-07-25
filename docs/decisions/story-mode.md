@@ -964,9 +964,10 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
     Sigils; at nine holes an event is one sitting and the majors keep the 18 that makes them majors. The bar
     scales with the round (`ghostToPar` takes `holes`, quoted over an 18-hole reference), so the golf asked
     PER HOLE is unchanged and the classic 18-hole call is byte-for-byte the original ladder.
-  - **Five formats, one currency.** `qualifierPlan(story, courseId)` is a pure keyed hash off a new
-    `StoryState.campaignSeed` + the world (zero sequential rng on any play stream), so the sheet is fixed for
-    the campaign's life, SHOWN on the star-map dossier before you fly, and different per campaign. Every
+  - **Five formats, one currency.** `qualifierPlan(story, courseId, chosenPartnerId?)` is a pure keyed hash
+    off a new `StoryState.campaignSeed` + the world (zero sequential rng on any play stream), so the sheet is
+    fixed for the campaign's life, SHOWN on the star-map dossier before you fly, and different per campaign.
+    The draw owns the FORMAT + PAIRING; the PARTNER is the player's (see GS-story-qualifier-partner-pick). Every
     format resolves to the same thing — a finishing place in the chapter's field — so the top-N gate, the
     `qualifierResults` record and the recap stay one shape. Matchplay has no board, so it earns a synthetic
     place off the campaign's win-or-halve convention (win → 1, halve → the bar, loss → one outside it).
@@ -992,6 +993,25 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
     measuring a different test, so the new form supersedes it rather than being judged against a to-par it
     can never fairly beat. Guarded by `tests/story-qualifier-formats.test.ts` +
     `tests/story-partner-tally.test.ts` + `?screen=storyqualresult|storyqualmatch` browser smokes.
+- **GS-story-qualifier-partner-pick** — ✅ *shipped* (`storyQualifierFormats.ts` + `storyMapNav.ts` +
+  `starTourScreens.ts`/`app.ts` + the `storyPlayWorld` action). Player call: *"the player needs to be able to
+  pick their playing partner for each qualifier like the Sigil tournaments to really sell the player agency"* —
+  and they were right. The partner was part of the DRAW, which meant the partner tally (and so the betrayal it
+  decides) was steered by dice as much as by the player: the arc read as something that happened TO you.
+  - `qualifierPlan` gained a `chosenPartnerId` parameter, honoured whenever it names one of your three
+    tour-mates and ignored otherwise, so a skipped picker (or a legacy caller, or the headless path) still
+    tees off with the drawn suggestion — byte-for-byte the previous behaviour. The draw keeps the format and
+    the pairing; only the company moved.
+  - The star-map dossier grew the picker (`qualifierPartnerPickerHTML`) — three tour-mate chips, the chosen
+    one ringed, the team-Sigil lobby's picker in the dossier's own chip idiom. It rides `starTourView.
+    qualifierPartnerBy` (view-only, keyed by world so each event remembers its own pick) via the established
+    `data-startour-*` listener → `render()` path, so tapping a chip never round-trips the reducer and the
+    chart's camera/zoom are untouched. Reset on chart entry, like the weather pick.
+  - The pick is carried into `{ type: 'storyPlayWorld', courseId, partnerId }` and validated inside the plan,
+    so the reducer stays pure and the run/tally/recap all read the friend you actually chose.
+  - Guarded in `tests/story-qualifier-formats.test.ts` (the override, the fallback for every invalid pick,
+    and an end-to-end assertion that a pick *other than* the draw's suggestion is what lands in
+    `qualifierPartners`) + a `?screen=storyqualpick` browser smoke on the dossier chrome.
 - **GS-story-qualifier-match-live** — ✅ *shipped* (`storyQualifierFormats.ts` + `app/storySigilHud.ts` +
   `playHud.ts`/`app.ts` + reducer). Closes the one gap GS-story-qualifier-formats shipped with: a `pair-match`
   qualifier played out BLIND — you learned the result on the recap — while the Sigils showed their match live

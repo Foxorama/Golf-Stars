@@ -7,6 +7,7 @@ import {
   activeQualifierPlan,
   qualifierFormatName,
   qualifierFormatBlurb,
+  qualifierPartnerPool,
   qualifierTeamHoleScores,
   qualifierMatchThrough,
   resolveQualifierRound,
@@ -19,6 +20,7 @@ import { QUALIFIER_HOLES, qualifierField, qualifyTop, qualifierFieldSize } from 
 import { storyPartnerBestBallScore } from '../src/sim/rpg/storyTeams';
 import { TEAM_PARTNER_EDGE, tournamentForChapter } from '../src/sim/rpg/storyTournaments';
 import { otherGolferIds } from '../src/sim/rpg/storyCast';
+import { getCharacter } from '../src/sim/rpg/characters';
 import { defaultStoryState, STORY_WORLDS, type StoryState } from '../src/sim/rpg/story';
 import { initState, reduce } from '../src/ui/game';
 import type { UiState } from '../src/ui/gameState';
@@ -411,3 +413,53 @@ describe('a pair-match qualifier plays as a LIVE match (GS-story-qualifier-match
   });
 });
 
+
+describe('YOU pick the partner (GS-story-qualifier-partner-pick)', () => {
+  it('a chosen tour-mate overrides the draw; the format + pairing stay the draw’s to set', () => {
+    const s = CAMPAIGN();
+    const world = STORY_WORLDS.find((w) => isPairedFormat(qualifierPlan(s, w.courseId)!.format))!.courseId;
+    const drawn = qualifierPlan(s, world)!;
+    const others = otherGolferIds(s);
+    for (const mate of others) {
+      const picked = qualifierPlan(s, world, mate)!;
+      expect(picked.partnerId).toBe(mate);
+      // the draw still owns everything except the company
+      expect(picked.format).toBe(drawn.format);
+      expect(picked.pairing).toBe(drawn.pairing);
+      expect(picked.holes).toBe(drawn.holes);
+    }
+    // every friend is offered, and only friends
+    expect(qualifierPartnerPool(s).map((p) => p.id)).toEqual(others);
+  });
+
+  it('an invalid pick falls back to the draw — a skipped picker still tees off cleanly', () => {
+    const s = CAMPAIGN();
+    const world = STORY_WORLDS.find((w) => isPairedFormat(qualifierPlan(s, w.courseId)!.format))!.courseId;
+    const drawn = qualifierPlan(s, world)!;
+    for (const bad of [undefined, '', 'not-a-golfer', s.characterId]) {
+      expect(qualifierPlan(s, world, bad)!.partnerId, `pick "${bad}"`).toBe(drawn.partnerId);
+    }
+  });
+
+  it('the pick reaches the ROUND and the betrayal tally — not the draw’s suggestion', () => {
+    const story = { ...CAMPAIGN(), unlockedWorldIds: STORY_WORLDS.map((w) => w.courseId) };
+    const map = { ...initState('run-seed', {}, undefined, story), screen: 'starTour' as const };
+    const venue = tournamentForChapter(1)!.venueId;
+    const world = STORY_WORLDS.filter((w) => w.unlockChapter === 1 && w.courseId !== venue).find((w) =>
+      isPairedFormat(activeQualifierPlan(map.story!, w.courseId)!.format),
+    )!.courseId;
+    const drawn = activeQualifierPlan(map.story!, world)!;
+    // Deliberately pick someone OTHER than the draw's suggestion.
+    const chosen = otherGolferIds(map.story!).find((id) => id !== drawn.partnerId)!;
+
+    let s: UiState = reduce(map, { type: 'storyPlayWorld', courseId: world, partnerId: chosen });
+    while (s.screen === 'lore') s = reduce(s, { type: 'dismissLore' });
+    expect(s.run.storyQualifier!.partnerId).toBe(chosen);
+    expect(s.run.storyTournamentPartner).toBe(chosen); // the co-op machinery gets the chosen friend
+
+    const done = reduce(s, { type: 'play' });
+    // The event is recorded against the friend you CHOSE, so the tally is a record of your decisions.
+    expect(done.story!.qualifierPartners[world]).toBe(chosen);
+    expect(done.lastStoryRound!.qualifier!.partnerName).toBe(getCharacter(chosen)!.shortName);
+  });
+});

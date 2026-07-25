@@ -472,7 +472,10 @@ export function reduce(state: UiState, action: Action): UiState {
       // per-hole best-ball reveal, and `scrambleOptsFor` so the auto path plays best-of-two identically), and
       // the resolution scores the round in the format's own units. A venue/prologue/quest world draws no
       // plan ⇒ the pinned 18, byte-for-byte.
-      const qplan = activeQualifierPlan(state.story, action.courseId);
+      // GS-story-qualifier-partner-pick: the partner is the player's CHOICE (the dossier's picker), not the
+      // draw's — the format and the pairing are the draw's to set, the company is yours. Validated inside
+      // the plan, so a skipped picker tees off with the drawn suggestion exactly as before.
+      const qplan = activeQualifierPlan(state.story, action.courseId, action.partnerId);
       const run = {
         ...run0,
         loadout,
