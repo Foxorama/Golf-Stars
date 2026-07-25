@@ -4,16 +4,26 @@ name: android
 # a Gradle/Android build takes minutes and depends on the runner's Android SDK, so gating every push
 # on it would slow the normal loop for no safety gain — `tests.yml` already guards the game itself.
 #
-# Triggers: on demand, on a version tag (the real release path), and on pushes that touch the native
-# shell, so a change to the wrapper can't silently break the build.
+# Triggers: on demand, and on any push that touches the native shell — so a change to the wrapper
+# can't silently break the build, and so this is runnable from a FEATURE BRANCH before it lands.
+#
+# That last part is why there is no `tags:` filter here. Two GitHub behaviours bite:
+#   - `workflow_dispatch` only shows a "Run workflow" button once the file is on the DEFAULT branch,
+#     so it is useless for testing the wrapper before merge — which is exactly when you need it.
+#   - a `push` block with `tags:` and no `branches:` fires ONLY on tag pushes, never on branch
+#     pushes, so the path filter below would never have matched a normal commit.
+# `branches: ['**']` + `paths` gives the one behaviour that actually works pre-merge: push a change
+# to the native shell on any branch and the build runs against that commit. A release-tag trigger can
+# be added once this is on main and proven.
 on:
   workflow_dispatch:
   push:
-    tags: ['v*']
+    branches: ['**']
     paths:
       - 'android/**'
       - 'capacitor.config.ts'
       - 'scripts/android-assets.mjs'
+      - 'package.json'
       - '.github/workflows/android.yml'
 
 concurrency:
