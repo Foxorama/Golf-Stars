@@ -52,11 +52,18 @@ The web build is unaffected and keeps its network-first worker.
 ## Commands
 
 ```bash
-npm run android:assets   # regenerate launcher/splash art from public/icon-512.png
-npm run android:sync     # npm run build + cap sync android
-npm run android:apk      # debug APK — this is what you sideload to play-test
-npm run android:aab      # release bundle for Play
+npm run android:assets       # regenerate launcher/splash art from public/icon-512.png
+npm run android:sync         # npm run build + cap sync android
+npm run android:apk          # debug APK — signed with YOUR ~/.android/debug.keystore
+npm run android:apk:release  # release APK — signed with the upload key; the sideload build
+npm run android:aab          # release bundle for Play
 ```
+
+⚠️ **These three produce three DIFFERENT signatures**, and Android will not update across them.
+A local debug APK, a CI debug APK and a release APK are mutually un-updatable — switching between
+them needs an uninstall (which wipes the save; see *Signing and the "app failed to update" trap*).
+Pick one channel per device and stay on it. For play-testing, that channel should be
+`android:apk:release` / the CI signed APK, because it is the one that matches Play.
 
 ## The back gesture (GS-android-back)
 
@@ -116,6 +123,72 @@ run is not working code.
    `paths`: push a change to the native shell on any branch and it builds that commit.
 
 Build shape once green: ~2.5 min total, `bundleRelease` ~86s, `assembleDebug` ~32s, artifact ~12 MB.
+
+## Signing and the "app failed to update" trap (2026-07-25)
+
+The first real play-test download failed at the phone with a bare *"app failed to update"*. Nothing
+in CI had gone red — the job was green and the artifact downloaded fine. Two independent faults, both
+in the workflow rather than the app:
+
+1. **The sideload APK was `assembleDebug`.** A debug APK is signed with the *runner's*
+   auto-generated `~/.android/debug.keystore`. GitHub runners are ephemeral, so that certificate
+   differs from run to run and matches nothing already on a phone. **Android refuses to update a
+   package whose signing certificate changed** — that refusal is the message.
+2. **The debug APK was always `versionCode 1`.** `ANDROID_VERSION_CODE` is a per-step `env:`, and
+   only the bundle step had it, so `build.gradle`'s `?: '1'` fallback won every time. Against
+   anything installed from the bundle that is a *downgrade*, blocked outright before the signature is
+   even considered.
+
+And a third thing made it expensive to diagnose: **the keyless path succeeded silently.** With no
+`ANDROID_KEYSTORE_BASE64` secret set, `Decode upload keystore` skipped, the `.aab` came out unsigned
+(Play would have rejected it), the debug APK came out randomly signed — and the artifact still had
+the same friendly name as a good build. Everything looked right until the phone said no.
+
+The fix, all three parts:
+
+- The sideload artifact is now **`assembleRelease`, signed with the upload key** — one stable
+  certificate for every build, the same one Play ships, so sideloaded builds update in place forever.
+- **Every** artifact step is stamped with `ANDROID_VERSION_CODE` (the run number) and
+  `ANDROID_VERSION_NAME` (`1.0.<run>`), so version codes always increase and a tester can read which
+  build is on their phone off the Android app-info screen.
+- **The keyless path is now loud.** It still builds (that was deliberate — a fork or a pre-key
+  checkout needs to be able to compile the wrapper), but it emits a `::warning::`, writes the reason
+  into the run summary, and — the part you cannot miss — names the artifact
+  `golf-stars-android-UNSIGNED-cannot-update-existing-install`. You have to read that to download it.
+
+### Setting the signing secrets (once)
+
+Generate the upload key **on your own machine** — never in CI, never in a chat transcript; a key that
+has been printed anywhere is burned. Then:
+
+```bash
+keytool -genkey -v -keystore upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+base64 -w0 upload.jks    # macOS: base64 -i upload.jks
+```
+
+Repo → Settings → Secrets and variables → Actions → four secrets:
+
+| Secret | Value |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | the base64 blob above |
+| `ANDROID_KEYSTORE_PASSWORD` | the store password you chose |
+| `ANDROID_KEY_ALIAS` | `upload` |
+| `ANDROID_KEY_PASSWORD` | the key password you chose |
+
+Back `upload.jks` up somewhere durable and offline. Losing it means you can never ship an update to
+that Play listing under the same key — Play keys the listing on `com.foxorama.golfstars`, which is
+permanent (see the top of this doc). `*.jks` / `*.keystore` / `keystore.properties` stay gitignored;
+the rule in `android/.gitignore` is not negotiable, which is why there is no zero-setup path here.
+
+### The first uninstall
+
+Because the certificate is changing, the build already on a test device cannot be updated to the
+signed one — that phone needs one uninstall, and **an uninstall wipes the app's `localStorage`, which
+is the whole save**. After that single reset, every later signed build updates in place.
+
+Note the Capacitor shell serves from `https://localhost`, so **the app's save is a separate store
+from the browser build's** — a save made on the web is not on the phone and vice versa. Moving one to
+the other is what the save export/import UI is for.
 
 ## What is NOT verified
 
