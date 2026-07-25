@@ -1,7 +1,8 @@
 # Android packaging — the Google Play shell (GS-android)
 
-**Status:** scaffolded, unbuilt. The native project exists and is configured; the AAB has never been
-compiled (see *What is NOT verified* below). Nothing about the game changed.
+**Status:** **building green in CI** as of run #6 (2026-07-25) — `bundleRelease` and `assembleDebug`
+both succeed and upload a ~12 MB artifact. The bundle is **UNSIGNED** (no upload key configured yet),
+so it is sideload/inspection-grade, not Play-uploadable. Nothing about the game changed.
 
 ## The decision: Capacitor, not a TWA
 
@@ -94,14 +95,34 @@ The confirm card reuses the shared `.gs-sheet` chrome the price notice already b
 bound per element with no `stopPropagation`, so a backdrop action would also fire on every click
 bubbling out of the card.
 
+## What the first real build cost (three bugs, none of them Gradle's fault)
+
+Recorded because all three were *invisible until executed* — the scaffolding typechecked, the YAML
+parsed, and the whole thing still could not produce a single artifact. Configuration that has never
+run is not working code.
+
+1. **`secrets` in a step-level `if:` kills the whole workflow.** `if: ${{ secrets.FOO != '' }}` is a
+   syntax error — the `secrets` context is not available to a step's `if:` (only `github`/`env`/
+   `job`/`runner`/`steps`/`needs` and friends are). GitHub rejects the file at STARTUP, which surfaces
+   as a red run with **zero jobs and no logs at all** — nothing like a build failure, and there is no
+   log to open. `list_workflow_jobs` returning `total_count: 0` is the tell. Fix: surface the secret
+   as **job-level `env`**, which a step `if:` *can* read.
+2. **`versionCode (expr).toInteger()` is a Groovy parse trap.** It parses as
+   `versionCode(expr).toInteger()` — the setter is called with a String, then `.toInteger()` runs on
+   its null return, and the build dies with a bare `> Value is null` pointing at a line that looks
+   fine. The space before the paren does the damage. Fix: compute into a local above `android {}`.
+3. **`workflow_dispatch` gives you no button until the workflow is on the DEFAULT branch** — useless
+   for testing a wrapper pre-merge, which is exactly when you need it. Hence `branches: ['**']` +
+   `paths`: push a change to the native shell on any branch and it builds that commit.
+
+Build shape once green: ~2.5 min total, `bundleRelease` ~86s, `assembleDebug` ~32s, artifact ~12 MB.
+
 ## What is NOT verified
 
 Stated plainly so nobody reads the scaffolding as a working build:
 
-- **The AAB has never been compiled.** The session that scaffolded this had no Android SDK and its
-  network policy blocked `dl.google.com` (403), which serves both the SDK and the Android Gradle
-  Plugin. Everything above is configuration; the first real Gradle run will be the first test of it.
-  Run `npm run android:apk` locally, or trigger the `android` workflow, to find out.
+- ~~The AAB has never been compiled.~~ **Now built** — see *What the first real build cost*, below.
+  It is unsigned until an upload key exists, so it cannot go to Play yet.
 - **Nothing has run on a device from the shell.** The game is play-tested on a Pixel 9a and an older
   Galaxy *in the browser*; the WebView is a different runtime (no browser chrome, different memory
   ceiling, different audio-focus behaviour on interruption).
