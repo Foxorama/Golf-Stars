@@ -35,7 +35,7 @@ import { stablefordPoints } from '../score';
 import { otherGolferIds } from './storyCast';
 import { getCharacter } from './characters';
 import { storyWorldById, type StoryState } from './story';
-import { resolveStory2v2Match, storyPartnerBestBallScore, type StoryTeamFormat } from './storyTeams';
+import { resolveStory2v2Match, storyPartnerBestBallScore, type StoryMatchResult, type StoryTeamFormat } from './storyTeams';
 import {
   QUALIFIER_HOLES,
   qualifierField,
@@ -277,6 +277,43 @@ export function qualifierTeamHoleScores(
 }
 
 /**
+ * The MATCH state of a `pair-match` qualifier through the holes played so far (GS-story-qualifier-match-live,
+ * pure). The single source the live HUD chip, the per-hole panel, the mid-round close-out AND the finished
+ * resolution all read — pass every hole played so far for the live state, or the whole round for the finish,
+ * and the two agree to the hole by construction (each hole's ghost cards are keyed by hole index, so a
+ * prefix of the strokes gives exactly the prefix of the duels).
+ *
+ * Your side's card is folded HERE, by the same helper the stroke formats use — a shared ball passes through
+ * (it was already played as the team), a best-ball takes the lower of your ball and the partner ghost off
+ * the `:partner` stream. That matters twice over: the per-hole reveal on the end-of-hole screen draws that
+ * exact ghost, so what you SEE is what scored; and the resolver is then handed a finished team card
+ * (`playerTeamPlayed`), so it never folds a SECOND ally ghost on a different stream — which is what made the
+ * match hinge on ghost noise instead of on your round.
+ *
+ * Returns undefined for any other format (they have a board, not a match).
+ */
+export function qualifierMatchThrough(
+  plan: QualifierPlan,
+  playerHoleStrokes: readonly number[],
+  pars: readonly number[],
+  seed: string,
+): StoryMatchResult | undefined {
+  if (plan.format !== 'pair-match') return undefined;
+  const { holes: teamHoles } = qualifierTeamHoleScores(playerHoleStrokes, pars, plan, seed);
+  return resolveStory2v2Match(
+    teamHoles,
+    plan.partnerId ?? '',
+    QUALIFIER_PARTNER_EDGE,
+    matchOpponentIds(plan.courseId),
+    qualifierOppEdge(plan.chapter) + QUALIFIER_MATCH_OPP_SHIFT[plan.pairing ?? 'bestball'],
+    seed,
+    pars,
+    plan.pairing ?? 'bestball',
+    true,
+  );
+}
+
+/**
  * Resolve a played qualifying event into a placement (pure, deterministic). Every format lands on the SAME
  * currency — a finishing place against the chapter's field — so the top-N gate, the recap and the
  * `qualifierResults` record are one shape no matter which road you took.
@@ -301,24 +338,7 @@ export function resolveQualifierRound(
   const barShift = paired && plan.pairing ? PAIRING_BAR_SHIFT[plan.pairing] : 0;
 
   if (plan.format === 'pair-match') {
-    // Your side's card is folded HERE, by the same helper the stroke formats use — a shared ball passes
-    // through (it was already played as the team), a best-ball takes the lower of your ball and the partner
-    // ghost off the `:partner` stream. That matters twice over: the per-hole reveal on the end-of-hole
-    // screen draws that exact ghost, so live ≡ final; and the resolver is then handed a finished team card
-    // (`playerTeamPlayed`), so it never folds a SECOND ally ghost on a different stream — which is what
-    // made the match hinge on ghost noise instead of on your round.
-    const { holes: teamHoles } = qualifierTeamHoleScores(playerHoleStrokes, pars, plan, seed);
-    const res = resolveStory2v2Match(
-      teamHoles,
-      plan.partnerId ?? '',
-      QUALIFIER_PARTNER_EDGE,
-      matchOpponentIds(plan.courseId),
-      qualifierOppEdge(plan.chapter) + QUALIFIER_MATCH_OPP_SHIFT[plan.pairing ?? 'bestball'],
-      seed,
-      pars,
-      plan.pairing ?? 'bestball',
-      true,
-    );
+    const res = qualifierMatchThrough(plan, playerHoleStrokes, pars, seed)!;
     const place = res.playerWon ? 1 : res.halved ? need : need + 1;
     return {
       plan,

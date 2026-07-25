@@ -208,7 +208,7 @@ export function mapTopInfo(v: ReturnType<typeof shotView>, opts: { shotNo: numbe
       <div class="gs-sub">${lieChip(v.lie)} ${windDescription(play.hole)}${lostRough}</div>
       ${scrambleLine}
       ${state.match ? `<div style="margin-top:5px;">${matchHud()}</div>` : ''}
-      ${!state.match && state.run.storyTournament ? (() => { const chip = storySigilMatchChip(); return chip ? `<div style="margin-top:5px;">${chip}</div>` : ''; })() : ''}
+      ${!state.match && (state.run.storyTournament || state.run.storyQualifier) ? (() => { const chip = storySigilMatchChip(); return chip ? `<div style="margin-top:5px;">${chip}</div>` : ''; })() : ''}
       ${holePips()}
     </div>`;
 }

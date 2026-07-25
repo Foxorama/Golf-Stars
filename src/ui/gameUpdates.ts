@@ -398,7 +398,9 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
     credits,
     // GS-story-quality (finding D): a quest round is 9 holes on the same world — don't overwrite the
     // world's 18-hole best (par 36 vs par 72 would corrupt the revisit chase + dossier).
-    !run.storyQuest,
+    // GS-story-qualifier-match-live: nor does a PARTIAL round — a `pair-match` qualifier that closed out
+    // early banked only the holes the match ran, so its card is measuring a shorter test than the record.
+    !run.storyQuest && played.length >= state.course.holes.length,
   );
   // GS-story-ships: a hole-in-one on any Story round earns the secret Comet Rider (the ace ship).
   const aces = played.filter((p) => p.record.strokes === 1).length;

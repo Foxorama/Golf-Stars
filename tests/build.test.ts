@@ -273,6 +273,7 @@ describe('build output (real browser)', () => {
     { screen: 'storyresult', sel: '.gs-storyres', text: 'Champion', label: 'the Story prologue world-round recap' },
     { screen: 'storyqualresult', sel: '.gs-storyres', text: 'Two-ball', label: 'the Story qualifying-event recap (two-ball board + placement)' },
     { screen: 'storyqualmatch', sel: '.gs-storyres', text: 'matchplay', label: 'the Story qualifying-event recap (matchplay scoreline, no board)' },
+    { screen: 'storyqualmatchlive', sel: '.gs-hud', text: 'matchplay', label: 'the LIVE match chip + panel mid-round of a pair-match qualifier' },
     { screen: 'storyshop', sel: '.gs-sshop-grid', text: 'Pro Shop', label: 'the Story per-world Pro Shop' },
     { screen: 'storylocker', sel: '.gs-lock-grid', text: 'Your bag', label: 'the Story locker (bag builder + gear)' },
     { screen: 'storyshipyard', sel: '.gs-yard-usec', text: 'Weapons & upgrades', label: 'the Story shipyard (ships + weapons/upgrades)' },
