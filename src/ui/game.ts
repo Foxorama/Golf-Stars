@@ -89,6 +89,7 @@ import { finaleUnlocked, finaleResult, winFinale } from '../sim/rpg/storyFinale'
 import { interludeSeen, applyInterlude } from '../sim/rpg/storyInterlude';
 import { midroundOmen, applyMidroundOmen } from '../sim/rpg/storyMidround';
 import { tournamentAftermath } from '../sim/rpg/storyAftermath';
+import { activeQualifierPlan } from '../sim/rpg/storyQualifierFormats';
 import { questBeatFor, questBeatTurnIndex, questOfferBeatFor } from '../sim/rpg/storyQuestBeat';
 import type { GearSlot } from '../sim/rpg/story';
 import {
@@ -245,7 +246,11 @@ export function reduce(state: UiState, action: Action): UiState {
       if (state.pendingStoryNew) {
         return {
           ...state,
-          story: defaultStoryState(action.characterId),
+          // GS-story-qualifier-formats: stamp the campaign's DRAW-SHEET seed off the boot run seed (the
+          // one sanctioned `Math.random` site, `freshRunSeed`), so every campaign draws its own qualifier
+          // formats/pairings/partners while each remains a pure keyed hash from then on. `defaultStoryState`
+          // stays rng-free (it's sim-pure); the seed is a side-effect-layer value threaded in here.
+          story: { ...defaultStoryState(action.characterId), campaignSeed: `c${state.run.seed}` },
           pendingStoryNew: false,
           storyInspectId: undefined,
           characterLoreId: undefined,
@@ -460,6 +465,14 @@ export function reduce(state: UiState, action: Action): UiState {
       // GS-story-gear: fold the campaign's equipped gear (glove/hat/shoes/ball) effects onto the loadout.
       // GS-story-caddies: then the active caddy (a friend on the bag folds a real effect + shows on course).
       const loadout = applyStoryClubEffects(applyStoryCaddy(applyStoryGear({ ...run0.loadout, bag }, state.story), state.story), state.story);
+      // GS-story-qualifier-formats: a chapter's QUALIFYING EVENTS are nine-hole cards drawn into one of five
+      // formats — and three of those five put a tour-mate beside you. Arming the plan here does three things
+      // at once: `currentCourse` serves nine holes, the paired formats arm the SAME co-op machinery the team
+      // Sigils use (`storyTeamFormat` + `storyTournamentPartner` → the per-shot scramble pick card / the
+      // per-hole best-ball reveal, and `scrambleOptsFor` so the auto path plays best-of-two identically), and
+      // the resolution scores the round in the format's own units. A venue/prologue/quest world draws no
+      // plan ⇒ the pinned 18, byte-for-byte.
+      const qplan = activeQualifierPlan(state.story, action.courseId);
       const run = {
         ...run0,
         loadout,
@@ -468,6 +481,9 @@ export function reduce(state: UiState, action: Action): UiState {
         // harder, not just longer — scaled by the world's tier, calm at Ch.1 → the wildest sky by Ch.5.
         staticEffect: storyWorldEffect(action.courseId),
         storyRound: true,
+        ...(qplan ? { storyQualifier: qplan } : {}),
+        ...(qplan?.partnerId ? { storyTournamentPartner: qplan.partnerId } : {}),
+        ...(qplan?.pairing ? { storyTeamFormat: qplan.pairing } : {}),
       };
       return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', viewHole: 0, played: undefined, storyItemInspectId: undefined });
     }

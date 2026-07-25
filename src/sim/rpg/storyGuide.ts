@@ -106,7 +106,10 @@ export function storyObjective(story: StoryState): StoryObjective {
       stage: 'clear-worlds',
       next:
         need > 0
-          ? `Finish top ${top} in ${need} more qualifying ${events} on the star chart to earn a start in ${t.name}.`
+          ? // GS-story-qualifier-formats: each event is a NINE-hole card in its own drawn format, and the
+            // chart's dossier names both that and the tour-mate you'd be drawn with — so say so here, and
+            // point at the chart to go read it.
+            `Finish top ${top} in ${need} more qualifying ${events} on the star chart — nine holes each, in the format the chart shows — to earn a start in ${t.name}.`
           : `Enter ${t.name} — it's ready on the star chart.`,
       actionLabel: '🗺 Set course',
       action: { type: 'openStoryMap' } as { type: string },

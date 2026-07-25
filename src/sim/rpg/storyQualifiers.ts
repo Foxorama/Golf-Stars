@@ -20,6 +20,16 @@ import { STORY_WORLDS, STORY_CHAPTER_COUNT, storyWorldById, type StoryState } fr
 /** How many qualifying events (top-N finishes) you need to unlock a chapter's Galaxy Tournament. */
 export const QUALIFY_EVENTS_NEEDED = 2;
 
+/** GS-story-qualifier-formats: a qualifying event is a NINE-hole card, not a full 18. Three events per
+ *  chapter × five chapters is a lot of golf to sit between you and each Sigil; at nine holes an event is a
+ *  single sitting, the format variety below actually gets to breathe, and the Sigil majors keep the full
+ *  18-hole weight that makes them majors. The bar/field maths scales off this (`ghostToPar`), so the
+ *  qualifying difficulty per hole is unchanged. */
+export const QUALIFIER_HOLES = 9;
+
+/** The reference round length the raw `QUALIFY_BAR`/`RANK_SPREAD` numbers are expressed over. */
+const BAR_REFERENCE_HOLES = 18;
+
 /** The finishing position you must beat to QUALIFY, by chapter (1..5): top 10 → 8 → 6 → 4 → 4. The bar
  *  tightens as the campaign — and the serpent — escalates. */
 export const QUALIFY_TOP: readonly number[] = [10, 8, 6, 4, 4];
@@ -60,10 +70,28 @@ export function qualifierEventsForChapter(chapter: number, venueId: string | und
   return STORY_WORLDS.filter((w) => w.unlockChapter === chapter && w.courseId !== venueId).map((w) => w.courseId);
 }
 
-/** A named ghost competitor in a qualifying field (deterministic gross over the venue's pars). */
+/** A named ghost competitor in a qualifying field (deterministic gross over the venue's pars). On a PAIRED
+ *  event (GS-story-qualifier-formats) the `name` is a two-golfer pair ("Chip Nakamura & Gale Ossuary") and
+ *  the gross is that pair's team card; on a STABLEFORD event `points` carries the same card scored as
+ *  points (higher wins) — the field is otherwise the identical deterministic ladder. */
 export interface QualifierGhost {
   name: string;
   gross: number;
+  points?: number;
+}
+
+/** Shape levers for a qualifying FIELD (GS-story-qualifier-formats). All optional and defaulting to the
+ *  classic 18-hole stroke event, so `qualifierField(id, par, chapter)` is byte-for-byte unchanged. */
+export interface QualifierFieldOpts {
+  /** How many holes the event is played over (scales the bar + the rank spread). Default 18. */
+  holes?: number;
+  /** Strokes added to EVERY ghost's to-par — negative sharpens the field. The paired formats use this to
+   *  price in the partner you're carrying, so a two-ball event is no easier to qualify in than a solo one. */
+  barShift?: number;
+  /** Score the field in STABLEFORD points (higher wins) as well as strokes, and sort points-first. */
+  stableford?: boolean;
+  /** Field entries are two-golfer PAIRS (name them as such). */
+  paired?: boolean;
 }
 
 /** A recorded qualifier finish (the BEST — lowest place — the player has posted at this event). */
@@ -83,10 +111,14 @@ const NAME_POOL: readonly string[] = [
 ];
 
 /** The to-par a ghost of the given RANK (0 = strongest) plays at this chapter. Rank N-1 sits exactly at the
- *  qualifying bar, so a player who beats the bar places inside the top N. */
-function ghostToPar(rank: number, chapter: number): number {
+ *  qualifying bar, so a player who beats the bar places inside the top N. The bar + the rank spread are
+ *  quoted over an 18-hole card and SCALE with the event's length (GS-story-qualifier-formats), so a nine-hole
+ *  event asks for exactly the same golf per hole; `barShift` prices in a format's scoring advantage (a
+ *  partner's ball) on top. `holes = 18, barShift = 0` reproduces the original draw exactly. */
+function ghostToPar(rank: number, chapter: number, holes = BAR_REFERENCE_HOLES, barShift = 0): number {
   const n = qualifyTop(chapter);
-  return QUALIFY_BAR[chIdx(chapter)]! + (rank - (n - 1)) * RANK_SPREAD;
+  const scale = holes / BAR_REFERENCE_HOLES;
+  return (QUALIFY_BAR[chIdx(chapter)]! + (rank - (n - 1)) * RANK_SPREAD) * scale + barShift;
 }
 
 /** Pick a stable, world-specific line-up of `count` competitor names. */
@@ -105,22 +137,50 @@ function pickNames(courseId: string, count: number): string[] {
 /**
  * The FIELD of a qualifying event: `fieldSize - 1` ghost competitors, each playing a fixed rank-based
  * to-par over the venue's total par, sorted low gross first. Deterministic (the only rng is the name
- * shuffle) so the qualifying bar is crisp and testable.
+ * shuffle) so the qualifying bar is crisp and testable. `opts` (GS-story-qualifier-formats) reshapes the
+ * field for the event's drawn FORMAT — length, the paired-format bar shift, Stableford points, pair names —
+ * and defaults to the classic 18-hole stroke field, byte-for-byte.
  */
-export function qualifierField(courseId: string, totalPar: number, chapter: number): QualifierGhost[] {
+export function qualifierField(
+  courseId: string,
+  totalPar: number,
+  chapter: number,
+  opts: QualifierFieldOpts = {},
+): QualifierGhost[] {
   const f = qualifierFieldSize(chapter);
+  const holes = opts.holes ?? BAR_REFERENCE_HOLES;
   const names = pickNames(courseId, f - 1);
+  // A PAIRED event fields two-golfer pairs: each entry takes its own name plus one from the far half of the
+  // same stable line-up, so the pairings are distinct, deterministic and read like a real draw sheet.
+  const offset = Math.max(1, Math.floor((f - 1) / 2));
   const ghosts: QualifierGhost[] = [];
   for (let rank = 0; rank < f - 1; rank++) {
-    ghosts.push({ name: names[rank] ?? `Competitor ${rank + 1}`, gross: Math.round(totalPar + ghostToPar(rank, chapter)) });
+    const solo = names[rank] ?? `Competitor ${rank + 1}`;
+    const mate = names[(rank + offset) % Math.max(1, names.length)] ?? `Competitor ${rank + 2}`;
+    const gross = Math.round(totalPar + ghostToPar(rank, chapter, holes, opts.barShift ?? 0));
+    ghosts.push({
+      name: opts.paired ? `${solo} & ${mate}` : solo,
+      gross,
+      // Stableford scores the SAME card as points: par is 2, every stroke over costs one (the arcade
+      // approximation the ghost model is expressed in — a ghost has a to-par, not a hole-by-hole card).
+      ...(opts.stableford ? { points: Math.max(0, Math.round(2 * holes - (gross - totalPar))) } : {}),
+    });
   }
-  return ghosts.sort((a, b) => a.gross - b.gross);
+  return opts.stableford
+    ? ghosts.sort((a, b) => (b.points ?? 0) - (a.points ?? 0))
+    : ghosts.sort((a, b) => a.gross - b.gross);
 }
 
 /** The player's finishing PLACE in a field (1 = winner). Ties break in the player's favour (a tied gross
  *  places the player ahead), matching the tournament convention. */
 export function qualifierPlacement(field: readonly QualifierGhost[], playerGross: number): number {
   return 1 + field.filter((g) => g.gross < playerGross).length;
+}
+
+/** The player's finishing PLACE in a STABLEFORD field (1 = winner; MORE points is better). Ties break in
+ *  the player's favour, exactly as the stroke placement does. */
+export function qualifierPlacementByPoints(field: readonly QualifierGhost[], playerPoints: number): number {
+  return 1 + field.filter((g) => (g.points ?? 0) > playerPoints).length;
 }
 
 /** Did the player's finishing place qualify them at a world of this chapter? */
@@ -134,6 +194,16 @@ export function recordQualifier(story: StoryState, courseId: string, place: numb
   const prev = story.qualifierResults[courseId];
   if (prev && prev.place <= place) return story;
   return { ...story, qualifierResults: { ...story.qualifierResults, [courseId]: { place, field } } };
+}
+
+/**
+ * GS-story-qualifier-formats: record WHO you played a paired qualifying event with (pure). One entry per
+ * EVENT — a replay of the same world can't stack the tally, so grinding one road never skews who ends up
+ * standing apart; only playing MORE of the chapter's roads does. Immutable; a no-op if already recorded.
+ */
+export function recordQualifierPartner(story: StoryState, courseId: string, partnerId: string): StoryState {
+  if (!partnerId || story.qualifierPartners[courseId] === partnerId) return story;
+  return { ...story, qualifierPartners: { ...story.qualifierPartners, [courseId]: partnerId } };
 }
 
 /** Has the player QUALIFIED at this specific event (their best finish clears the top-N bar)? `chapter` is

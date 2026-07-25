@@ -24,7 +24,7 @@ import { DEFAULT_CHARACTER_ID } from './characters';
 import { DEFAULT_SHIP_ID } from './ships';
 
 /** Current Story-Mode save version. Bump + add a `migrateStory` step when persisting a new field. */
-export const STORY_VERSION = 6;
+export const STORY_VERSION = 7;
 
 /** The player's PATH (GS-story-chapters) — chosen at The Choice after Chapter 3. `warden` re-consecrates
  *  and protects (redeem Venoma); `herald` desecrates and serves the Coil (crush your former allies). Absent
@@ -303,6 +303,20 @@ export interface StoryState {
    *  the event's world/course id. Qualifying (top-N) in two of a chapter's events unlocks its Galaxy
    *  Tournament. Empty = nothing qualified yet. */
   qualifierResults: Record<string, { place: number; field: number }>;
+
+  /** GS-story-qualifier-formats: this campaign's DRAW-SHEET seed. Every qualifying event's format, pairing
+   *  and drawn partner is a pure keyed hash off this + the world (`qualifierPlan`), so the sheet is fixed
+   *  for the campaign's life (the dossier shows it before you fly, a replay is the same test) while two
+   *  campaigns draw different sheets. Stamped when the campaign is created; absent on a pre-v7 save, which
+   *  falls back to the protagonist id — still stable, just shared across that golfer's campaigns. */
+  campaignSeed?: string;
+
+  /** GS-story-qualifier-formats: WHO you actually played each paired qualifying event with, keyed by the
+   *  event's world/course id. Recorded once per event when the round resolves. Together with the two team-
+   *  Sigil picks this is the PARTNER TALLY the betrayal arc reads (`storyBetrayal.partnerTally`): the friend
+   *  you keep drawing — or the one you keep leaving on the ship — is the one who ends up standing apart.
+   *  Empty = no paired event played yet. */
+  qualifierPartners: Record<string, string>;
 }
 
 /** A fresh campaign: the chosen golfer, the green bag, the station wagon, an empty purse, chapter 0. */
@@ -329,6 +343,7 @@ export function defaultStoryState(characterId: string = DEFAULT_CHARACTER_ID): S
     completedQuestIds: [],
     caddiedRoundIds: [],
     qualifierResults: {},
+    qualifierPartners: {},
   };
 }
 
@@ -370,6 +385,12 @@ export function migrateStory(raw: unknown): StoryState {
     completedQuestIds: strList(s.completedQuestIds),
     caddiedRoundIds: strList(s.caddiedRoundIds),
     qualifierResults: qualifierMap(s.qualifierResults),
+    // v6 → v7 (GS-story-qualifier-formats): the qualifier DRAW SHEET. Both fields default to a no-op — an
+    // absent `campaignSeed` falls back to the protagonist id (a stable sheet, just not campaign-unique) and
+    // an absent partner map is simply "no paired event played yet", which leaves the betrayal tally reading
+    // exactly the two team-Sigil picks it always did. So a v6 campaign upgrades with its arc unchanged.
+    ...(typeof s.campaignSeed === 'string' && s.campaignSeed ? { campaignSeed: s.campaignSeed } : {}),
+    qualifierPartners: strMap(s.qualifierPartners),
   };
 }
 
@@ -587,7 +608,14 @@ export function recordWorldClear(
     ? story.clearedWorldIds
     : [...story.clearedWorldIds, worldId];
   const prev = story.worldBest[worldId];
-  const better = recordBest && (!prev || result.toPar < prev.toPar || (result.toPar === prev.toPar && result.strokes < prev.strokes));
+  // GS-story-qualifier-formats: a world's best is only comparable against a round of the SAME shape. When a
+  // world changes length under the player — a qualifying event is nine holes now, where it used to be
+  // eighteen — the old record is measuring a different test, so the new form SUPERSEDES it rather than
+  // being judged against a to-par it can never fairly beat. Same par ⇒ the classic lower-is-better rule.
+  const comparable = !prev || prev.par === result.par;
+  const better =
+    recordBest &&
+    (!prev || !comparable || result.toPar < prev.toPar || (result.toPar === prev.toPar && result.strokes < prev.strokes));
   return {
     ...story,
     clearedWorldIds: cleared,
@@ -610,6 +638,16 @@ function strList(v: unknown): string[] {
 }
 function uniq(v: readonly string[]): string[] {
   return [...new Set(v)];
+}
+function strMap(v: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (v && typeof v === 'object') {
+    for (const k of Object.keys(v as object)) {
+      const val = (v as Record<string, unknown>)[k];
+      if (typeof val === 'string' && val) out[k] = val;
+    }
+  }
+  return out;
 }
 function boolMap(v: unknown): Record<string, true> {
   const out: Record<string, true> = {};

@@ -298,8 +298,71 @@ corrupted one; the former friends stay clean Warden.
   draws the Coil champions as full-body Coil figures (`championLookOpts`) so the 2v2 lineup is four consistent
   figures. Guarded by `tests/story-betrayal.test.ts` (options/exclusion/chosen-ally, Malachi-not-Venoma) +
   `tests/story-finale-match.test.ts`. Zero sim rng, no save/STORY_VERSION bump.
+- **GS-story-qualifier-formats** — ✅ (2026-07-25) the qualifying road becomes the betrayal's first act. See
+  *"The partner tally"* + *"The Chapter 1–3 thread"* below.
 - **GS-story-betrayal-polish** — balance re-tune (the finale + team-major edges), any dialogue-depth follow-up,
   constitution/roadmap docs.
+
+## The partner tally — who stands apart (GS-story-qualifier-formats)
+
+The odd-one-out rule above is unchanged in spirit and **generalised in mechanism**. It used to read exactly
+two data points (the Sigil-1 and Sigil-2 partner picks), which meant the whole betrayal turned on two clicks
+made hours apart, and the fifteen qualifying rounds between them said nothing about anybody. Now every tee
+you share counts.
+
+**The tally** (`storyBetrayal.partnerTally`): each of the three tour-mates scores `SIGIL_PARTNER_WEIGHT` (2)
+per team-Sigil pick — deliberate choices for a major, so they weigh double — plus `QUALIFIER_PARTNER_WEIGHT`
+(1) per paired QUALIFYING EVENT actually played beside them (`StoryState.qualifierPartners`, one entry per
+event, so replaying a road can never stack it).
+
+**The standing** (`partnerStanding`): rank the three, then compare the daylight at the TOP (`c[0]−c[1]`) with
+the daylight at the BOTTOM (`c[1]−c[2]`).
+- Bigger gap at the top → the friend you partner MOST is the odd one out, `lean:'most'` → oddness `tempted`.
+  Singled out, envied, and the one the Coil courts.
+- Bigger gap at the bottom → the friend you partner LEAST, `lean:'least'` → oddness `sidelined`. Benched, and
+  the one the Coil consoles.
+- Gaps EQUAL → `least`. Being left out is the plainer, more readable slight, and it keeps the classic
+  two-distinct-picks case reading exactly as it always did.
+- Dead level, or nothing on record → fall back to the original pick-only rule (`legacyOddOneOut`), so nothing
+  is ever undecided and a campaign with no picks still resolves to the deterministic first tour-mate.
+
+**Backward compatibility is the load-bearing property.** With no paired qualifier played, the tally *is* the
+old rule: two different picks tallies 2/2/0 (bottom gap wins → the lone unpicked friend, sidelined); the same
+partner twice tallies 4/0/0 (top gap wins → the friend you trusted most, tempted). A v6 campaign's arc is
+byte-for-byte what it was. `betrayerId` and `betrayerOddness` now both resolve from `partnerStanding`, so
+they can never disagree (machine-checked) — `betrayerOddness` keeps its "both Sigil picks locked" gate so the
+Ch.3 mid-round omen fires exactly when it always did, while the Ch.1–3 thread reads the LIVE standing.
+
+## The Chapter 1–3 thread — the betrayal's first act (GS-story-qualifier-formats)
+
+The arc used to start at Chapter 4. Everything before it was scenery. Now the friend standing apart in the
+live tally gets a scene after **each of the first two Sigils** — a `TournamentAftermath` beat
+(`partnerThreadAftermath`, rendered through the shared `.gs-lore*` card, WIN only, and a won Sigil can never
+be replayed so each stage lands exactly once):
+
+| Stage | Fires | `lean:'most'` → `enticed` | `lean:'least'` → `overlooked` |
+|---|---|---|---|
+| 0 | after Sigil 1 | someone has been watching them play, properly, for the first time — and it isn't you | the pairings sheet without their name on it, carried the way that character carries a slight |
+| 1 | after Sigil 2 | the courting has landed; they raise it with you themselves, testing whether you flinch | they've stopped asking, and someone in shed-scale has started sitting with them |
+
+Content is `BETRAYAL_VOICE.enticed[]` / `.overlooked[]` in `storyBetrayal.ts` — sixteen authored scenes (four
+golfers × two flavours × two stages), each around that golfer's own Coil relationship, so the thread runs
+unbroken into the mid-round omen, the Ch.4 doubt beats and the defection. **Huang-Woo ↔ Venoma** (the Viper
+is the only gallery that never goes home); **Feather / Larry / Bo ↔ the Apostate** (the windless line / the
+void-tide / the still green). A new golfer = new rows; `everyGolferHasBetrayalVoice` machine-checks coverage.
+
+**Why the aftermath and not the lore gate.** Arrival beats compete for a fixed number of world arrivals —
+adding two to Chapters 2–3 would have silently starved existing beats on a minimum path. The Sigil result is
+also simply the better moment: it is literally "after the Sigil-1 tournie", and it can't be missed.
+
+**Anti-spam, by construction.** At most two extra beats across the whole trunk, one per major, each once ever
+per (golfer, flavour, stage). The thread scales with how much of the campaign you actually play.
+
+**The agency this buys.** A chapter charts three qualifying events and asks you to qualify in two, and the
+star-map dossier shows each event's drawn format AND the tour-mate you'd be drawn with **before you fly**. So
+choosing which two roads to take is choosing who you spend the chapter beside — and the Sigil-1 beat is a
+warning you still have a whole chapter to act on. That is the point: the game tells you who is drifting, and
+gives you the wheel.
 
 ## The mid-round omen — pre-Choice foreshadow (GS-story-midround-omen)
 

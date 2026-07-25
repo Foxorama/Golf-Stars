@@ -260,9 +260,24 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     triggering beat to the `'lore'` screen. Mode-agnostic (derelict via biome, caddy via perks). The screen
     (`app/loreScreens.ts` + `render/loreArt.ts`) uses its OWN `.gs-lore*` prefix, never the play `.gs-hud`.
     Zero sim rng. Guards: `tests/lore.test.ts` + build smoke + save v27→v28.
+  - **Story-Tour QUALIFYING EVENTS are nine holes, drawn into one of five formats** (GS-story-qualifier-formats,
+    `storyQualifierFormats.ts`): single stroke / single Stableford / paired stroke / paired Stableford / paired
+    matchplay, a paired event played SCRAMBLE or BEST-BALL. `qualifierPlan` is a pure keyed hash off
+    `StoryState.campaignSeed` + the world (zero play-stream rng), so the sheet is FIXED for the campaign and
+    SHOWN on the dossier before you fly — picking two of a chapter's three roads is real agency. A paired event
+    arms the EXISTING team-Sigil machinery (`storyTeamFormat`/`storyTournamentPartner`) — never a new shot
+    mechanic. Every format resolves to ONE currency (a place in the chapter field) so the top-N gate + record
+    are one shape. Format balance is MEASURED (`scripts/qualifier-balance.ts`) and priced by `PAIRING_BAR_SHIFT`
+    so variety is never a difficulty dice-roll; a qualifier partner is deliberately WEAKER than a Sigil partner
+    (`QUALIFIER_PARTNER_EDGE`) or a best-ball card stops being about how YOU played.
   - **The Story-Tour betrayal is per-character + foreshadowed** (`docs/decisions/story-betrayal-arc.md`).
-    `betrayerId(story)` = the odd one out of your two team-Sigil partner picks; `betrayerOddness` says WHY
-    (`sidelined` = never picked / `tempted` = trusted twice). ALL of a friend's betrayal dialogue is ONE
+    `betrayerId(story)` = the friend standing apart in the PARTNER TALLY — team-Sigil picks (weight 2) plus
+    every paired qualifying event (weight 1); the bigger gap, top or bottom, names them and `betrayerOddness`
+    says WHY (`tempted` = partnered most, courted / `sidelined` = partnered least, benched). With no qualifiers
+    played the tally reproduces the original two-pick rule exactly, so a v6 arc is unchanged. The first two
+    Sigil WINS pay the live standing off as a scene (`storyAftermath partnerThreadAftermath`,
+    `BETRAYAL_VOICE.enticed/overlooked`, two stages × two flavours × every golfer) — capped at one beat per
+    major so the trunk is never spammed. ALL of a friend's betrayal dialogue is ONE
     indexed block, `BETRAYAL_VOICE` in `storyBetrayal.ts` (defection/farewell/confront/corrupt/doubt/distance
     + the pre-Choice `sidelined`/`tempted` + the Herald `heardTheWord` payoff), each around that golfer's Coil relationship (Voss
     or Venoma); `everyGolferHasBetrayalVoice` machine-checks full coverage. The **mid-round omen**

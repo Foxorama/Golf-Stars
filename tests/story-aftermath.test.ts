@@ -30,12 +30,36 @@ const s = (alignment: 'warden' | 'herald', p1 = A, p2 = B, chapter = 5): StorySt
 const shortName = (id: string) => getCharacter(id)?.shortName ?? id;
 
 describe('GS-story-aftermath — which majors get a confrontation beat', () => {
-  it('trunk majors (Ch.1–3) get NO aftermath, win or loss (unchanged flow)', () => {
-    for (const ch of [1, 2, 3]) {
-      const t = tournamentForChapter(ch)!;
-      expect(tournamentAftermath(t, s('warden'), true)).toBeUndefined();
-      expect(tournamentAftermath(t, s('warden'), false)).toBeUndefined();
+  it('the Storm (Ch.3) gets NO aftermath, and no trunk major does on a LOSS (GS-story-qualifier-formats)', () => {
+    // Ch.3 flows straight into The Choice; a LOST trunk Sigil is replayed, so its beat would repeat.
+    const t3 = tournamentForChapter(3)!;
+    expect(tournamentAftermath(t3, s('warden'), true)).toBeUndefined();
+    expect(tournamentAftermath(t3, s('warden'), false)).toBeUndefined();
+    for (const ch of [1, 2]) {
+      expect(tournamentAftermath(tournamentForChapter(ch)!, s('warden'), false)).toBeUndefined();
     }
+  });
+
+  it('Ch.1 & Ch.2 WINS land the PARTNER THREAD beat, on the friend standing apart', () => {
+    // Two DIFFERENT team-Sigil partners → the friend never picked stands apart at the BOTTOM (overlooked).
+    const sidelined = s('warden', A, B);
+    const left = getCharacter('longshot-larry') ? undefined : undefined; // (roster order resolves the third)
+    void left;
+    const w1 = tournamentAftermath(tournamentForChapter(1)!, sidelined, true)!;
+    expect(w1.id).toBe('aftermath-partner-least-0');
+    expect(w1.portrait).toMatch(/^golfer:/);
+    expect(w1.lines.length).toBeGreaterThanOrEqual(3);
+    const w2 = tournamentAftermath(tournamentForChapter(2)!, sidelined, true)!;
+    expect(w2.id).toBe('aftermath-partner-least-1');
+    expect(w2.portrait).toBe(w1.portrait); // the same friend, one chapter deeper
+    expect(w2.lines).not.toEqual(w1.lines);
+
+    // The SAME partner twice → they stand apart at the TOP: the Coil courts the friend you rely on.
+    const tempted = s('warden', A, A);
+    const t1 = tournamentAftermath(tournamentForChapter(1)!, tempted, true)!;
+    expect(t1.id).toBe('aftermath-partner-most-0');
+    expect(t1.portrait).toBe(`golfer:${A}`);
+    expect(t1.title).toContain(shortName(A));
   });
 
   it('Ch.4 WARDEN (Scorpius) lands a beat on WIN and LOSS — the Silent Sting, wordless', () => {

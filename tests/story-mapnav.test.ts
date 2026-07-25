@@ -103,8 +103,8 @@ describe('Story star-map navigation status (GS-story-map-nav)', () => {
 
   it('storyWorldMarker prioritises the Sigil venue over a quest over a qualifier', () => {
     const t = tournamentForChapter(1)!;
-    expect(storyWorldMarker({ courseId: 'x', venue: { tournament: t, current: true, ready: true, won: false, qualifiersMet: 2, needed: 2 }, quest: { questId: 'q', title: '', hook: '', giver: '', rewardName: '', state: 'offerable' }, qualifier: { chapter: 1, top: 10, field: 16, qualified: false } })).toBe('venue-ready');
-    expect(storyWorldMarker({ courseId: 'x', quest: { questId: 'q', title: '', hook: '', giver: '', rewardName: '', state: 'offerable' }, qualifier: { chapter: 1, top: 10, field: 16, qualified: false } })).toBe('quest');
-    expect(storyWorldMarker({ courseId: 'x', qualifier: { chapter: 1, top: 10, field: 16, qualified: true } })).toBe('qualified');
+    expect(storyWorldMarker({ courseId: 'x', venue: { tournament: t, current: true, ready: true, won: false, qualifiersMet: 2, needed: 2 }, quest: { questId: 'q', title: '', hook: '', giver: '', rewardName: '', state: 'offerable' }, qualifier: { chapter: 1, top: 10, field: 16, qualified: false, holes: 9, formatName: 'Singles stroke play', formatBlurb: '', matchplay: false } })).toBe('venue-ready');
+    expect(storyWorldMarker({ courseId: 'x', quest: { questId: 'q', title: '', hook: '', giver: '', rewardName: '', state: 'offerable' }, qualifier: { chapter: 1, top: 10, field: 16, qualified: false, holes: 9, formatName: 'Singles stroke play', formatBlurb: '', matchplay: false } })).toBe('quest');
+    expect(storyWorldMarker({ courseId: 'x', qualifier: { chapter: 1, top: 10, field: 16, qualified: true, holes: 9, formatName: 'Singles stroke play', formatBlurb: '', matchplay: false } })).toBe('qualified');
   });
 });

@@ -953,6 +953,51 @@ your golfer, your equipped kit, and the NPCs, and you TAP a place to go there.
   format); `storyQualifiers` imports only `story` (the alignment-aware wrappers live in `storyTournaments` →
   no cycle). Guarded by `tests/story-qualifiers.test.ts` + updated tournament/guide/state/flow tests + a
   `?screen=storyqualresult` recap smoke.
+- **GS-story-qualifier-formats** — ✅ *shipped* (`sim/rpg/storyQualifierFormats.ts` + `storyQualifiers.ts` +
+  `storyBetrayal.ts` + `storyAftermath.ts` + `storyMapNav.ts` + run/reducer/screens). Player ask: qualifying
+  rounds should be NINE holes and drawn at random into one of five formats — single stroke, single Stableford,
+  paired stroke, paired Stableford, paired matchplay — with a paired event played as a random scramble or
+  best-ball, and every pairing TRACKED to feed the odd-one-out betrayer.
+  - **Nine holes.** `QUALIFIER_HOLES` 9; `currentCourse` regenerates the world's static spec on a `:qualifier`
+    salt (the `:quest` mechanism, generalised), deterministic per world so a replay is the same test. Three
+    events a chapter × five chapters was fifteen full rounds of "shoot a number" standing between you and the
+    Sigils; at nine holes an event is one sitting and the majors keep the 18 that makes them majors. The bar
+    scales with the round (`ghostToPar` takes `holes`, quoted over an 18-hole reference), so the golf asked
+    PER HOLE is unchanged and the classic 18-hole call is byte-for-byte the original ladder.
+  - **Five formats, one currency.** `qualifierPlan(story, courseId)` is a pure keyed hash off a new
+    `StoryState.campaignSeed` + the world (zero sequential rng on any play stream), so the sheet is fixed for
+    the campaign's life, SHOWN on the star-map dossier before you fly, and different per campaign. Every
+    format resolves to the same thing — a finishing place in the chapter's field — so the top-N gate, the
+    `qualifierResults` record and the recap stay one shape. Matchplay has no board, so it earns a synthetic
+    place off the campaign's win-or-halve convention (win → 1, halve → the bar, loss → one outside it).
+  - **No new engine.** A paired event arms the SAME co-op machinery the team Sigils use — `storyTeamFormat` +
+    `storyTournamentPartner` on the run, so a scramble raises the per-shot pick card and `scrambleOptsFor`
+    plays best-of-two on the auto path (auto ≡ interactive), and a best-ball reveals the partner's ball per
+    hole off the same `storyPartnerBestBallScore` stream the resolution folds (live ≡ final).
+  - **Balance is MEASURED, not guessed** (`scripts/qualifier-balance.ts`, re-run after any retune). A shared
+    ball is worth ≈4.5 strokes over the real nine-hole layout (measured through `playCourse` with and without
+    the partner's shot mods); a best-ball partner ≈1–2. `PAIRING_BAR_SHIFT` sharpens the ghost ladder by that
+    much so a two-ball is VARIETY, never a discount. Landed: solo 36/44/57%, scramble 45/52/63%, best-ball
+    35/35/40%, matchplay 42–63% across Ch.1/3/5 — a 35–63% band with no walkover and no wall. The one real
+    design fix found by measuring: at Sigil partner strength (`TEAM_PARTNER_EDGE`) the ghost is as good as
+    you are, so a best-ball card becomes `min(you, someone-as-good-as-you)` and the qualifying rate stopped
+    responding to how the player actually played. `QUALIFIER_PARTNER_EDGE` is deliberately weaker — a
+    qualifier partner is company and a safety net, not a carry — and `app.ts` reads that same edge for the
+    reveal on a qualifier round, so the ball you see revealed is the ball that scored.
+  - **The pairing FEEDS the betrayal** (`StoryState.qualifierPartners`, STORY_VERSION 6→7 with
+    `campaignSeed`; both default to no-ops so a v6 arc is unchanged). See `story-betrayal-arc.md`
+    *"The partner tally"* + *"The Chapter 1–3 thread"* — the friend you keep drawing, or keep leaving on the
+    ship, is the one who ends up standing apart, and the first two Sigil wins now pay that off in scene.
+  - `recordWorldClear` became par-AWARE: when a world changes length under the player the old record is
+    measuring a different test, so the new form supersedes it rather than being judged against a to-par it
+    can never fairly beat. Guarded by `tests/story-qualifier-formats.test.ts` +
+    `tests/story-partner-tally.test.ts` + `?screen=storyqualresult|storyqualmatch` browser smokes.
+  - **Known gap / follow-up:** a `pair-match` qualifier has no LIVE match state on the play HUD — the round
+    plays out and the recap delivers the scoreline. The Sigil match chip + per-hole panel
+    (`storySigilMatchChip` / GS-story-sigil-live) are built around a `StoryTournament` row, so wiring them to
+    a qualifier plan is its own change; the format is complete and correct without it, just less legible
+    mid-round than the Sigils are. (The paired stroke/Stableford events DO show their per-shot scramble pick
+    card / per-hole best-ball reveal, since those ride the existing team machinery unchanged.)
 - **GS-story-gear-tiers** — ✅ *shipped* (`sim/rpg/storyGear.ts`). Player ask: gear should be ONE per slot
   (like clubs — you already can't stack two gloves in `equippedGear`/`applyStoryGear`), with the higher tier
   strong enough to make up for no stacking. Completed the ladder with a clean LEGENDARY apex per slot —

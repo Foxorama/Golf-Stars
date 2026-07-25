@@ -52,6 +52,8 @@ import { startingLoadoutFor, baseLoadoutForRun, ASCENSION_MAX, ascensionCutBonus
 import { currentCourse, currentTheme, routeTheme } from './runCourse';
 import { tankCapacity, routeFuelCost, travelRefuelCost, canTravel, strand } from './runFuel';
 import { buy } from './runShop';
+// Type-only (erased at compile) so the qualifier-format module never enters run.ts's runtime import graph.
+import type { QualifierPlan } from './storyQualifierFormats';
 
 export {
   startingLoadoutFor,
@@ -182,6 +184,13 @@ export interface Run {
    *  alongside `storyTournamentPartner` at tee-off; read by `scrambleOptsFor` (auto ≡ interactive) and the
    *  reducer. Absent for a solo major. Run-lifetime, not snapshotted. */
   storyTeamFormat?: 'scramble' | 'bestball';
+  /** GS-story-qualifier-formats: the drawn PLAN of the QUALIFYING EVENT this story round is being played as
+   *  — nine holes, one of five formats, and (on a paired format) the tour-mate you were drawn with and
+   *  whether you share a ball. Set alongside `storyRound` when the world is one of its chapter's qualifying
+   *  events; read by `currentCourse` (nine holes off a qualifier-salted seed) and by `resolveStoryRound`
+   *  (which scores the round in the format's own units). Absent on a prologue / quest / Sigil-venue /
+   *  Star-Tour round ⇒ the pinned 18, byte-for-byte. Run-lifetime, not snapshotted. */
+  storyQualifier?: QualifierPlan;
   /** GS-story-quests: this story round is an ally SIDE QUEST (the quest id), played at the ally's home
    *  world. Set alongside `storyRound`; the recap offers to complete the quest (grant the reward club).
    *  Run-lifetime, not snapshotted. */

@@ -23,6 +23,7 @@ import type { StoryState } from '../sim/rpg/story';
 import type { MidroundOmen } from '../sim/rpg/storyMidround';
 import type { TournamentAftermath } from '../sim/rpg/storyAftermath';
 import type { QuestBeat } from '../sim/rpg/storyQuestBeat';
+import type { QualifierFormatId } from '../sim/rpg/storyQualifierFormats';
 import type { AimMode, HolePlay, ScrambleShot } from '../sim/rpg/play';
 import type { HoleDuel } from '../sim/rpg/match';
 import type { Rng } from '../sim/rng';
@@ -295,7 +296,25 @@ export interface UiState {
       qualified: boolean;
       qualifiedCount: number;
       neededCount: number;
-      leaderboard: { name: string; gross: number; kind: 'ghost' | 'player' }[];
+      /** The board, in finishing order. `points` is present on a STABLEFORD event (higher wins). Empty on a
+       *  matchplay event, which has a scoreline instead of a board. */
+      leaderboard: { name: string; gross: number; points?: number; kind: 'ghost' | 'player' }[];
+      /** GS-story-qualifier-formats: the shape this event was drawn as, for the recap headline. */
+      formatId: QualifierFormatId;
+      formatName: string;
+      /** The tour-mate you played it beside, on a paired format. */
+      partnerName?: string;
+      pairing?: 'scramble' | 'bestball';
+      /** Scored in points (higher wins), so the recap labels the column right. */
+      stableford?: boolean;
+      /** Your posted score in the format's units (strokes, or points). Absent on a matchplay event. */
+      playerScore?: number;
+      /** Your team's gross on a paired stroke/Stableford event. */
+      teamGross?: number;
+      /** How many holes your partner's ball beat yours (best-ball colour). */
+      partnerCountedHoles?: number;
+      /** A matchplay event's result — plus the pair you faced, since there's no board to read them off. */
+      match?: { scoreline: string; playerWon: boolean; halved: boolean; thru: number; holesUp: number; opponents: string };
     };
   };
   /** GS-story-tournament: the just-finished Galaxy Tournament recap (the `storyTournamentResult` screen). */
