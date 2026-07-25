@@ -107,6 +107,15 @@ corrupted one; the former friends stay clean Warden.
 > a small floating portrait bust jammed next to full bodies. The distinctive portrait busts still front the
 > hero card + halftime pop, where they stand alone.
 
+> **GS-story-coil-garb (2026-07-25)** — supersedes the ROBE half of the note above, and only that half. The
+> defector no longer takes a Coil-violet shirt at all: `corruptedLookOpts` keeps the golfer's own **shirt
+> colour**, face and hair, and the Coil is layered OVER the top (`coilGarb`: open serpent robe + cobra hood +
+> serpent circlet). Same goal as GS-story-sigil5-look — a defector who reads as *familiar and wrong* rather
+> than as a generic Coil silhouette — carried further, since identity now survives below the neck too.
+> `COIL_SHIRT` stays exported but is no longer part of the costume. The `championLookOpts` half of
+> GS-story-sigil5-look is **unchanged**: the Coil CHAMPIONS are still drawn as full-body figures with their
+> own hardcoded palettes, so the Ch.5 matchup box is still four consistent figures.
+
 ## Build order — SHIPPED (see `IDEAS.md` for the live one-liners)
 
 - **GS-story-cast** — ✅ (#508) the 3 golfers aboard ship + clubhouse, tappable, per-character talk adapting
@@ -300,6 +309,31 @@ corrupted one; the former friends stay clean Warden.
   `tests/story-finale-match.test.ts`. Zero sim rng, no save/STORY_VERSION bump.
 - **GS-story-qualifier-formats** — ✅ (2026-07-25) the qualifying road becomes the betrayal's first act. See
   *"The partner tally"* + *"The Chapter 1–3 thread"* below.
+- **GS-story-coil-garb / GS-story-defection-clubhouse** — ✅ (2026-07-23) the switched-sides motif is now
+  properly SOLD on both surfaces (player ask):
+  - **The costume keeps the person.** `corruptedLookOpts` no longer repaints the whole figure Coil-violet
+    (the old flat reskin + `COIL_FIGURE_TINT` hue-shift made a defector a generic Coil silhouette). It now
+    KEEPS the golfer's own **shirt colour** (their signature identity hue), face and hair, and layers the
+    Coil OVER the top via a new `golferPreviewSVG` opt `coilGarb: {robe, hood, accent}`: an OPEN serpent
+    robe (two violet panels down the outer sides + a raised shawl-collar mantle with a coil-sigil clasp,
+    leaving the shirt visible down the centre — the "robe that doesn't obscure the shirt colour"), a raised
+    **cobra hood** flaring behind the head (drawn behind the head so the face + hair still read), and a
+    spiky **serpent circlet** on the brow (the "spiffy Coil hat", replacing the signature cap). Palette:
+    `COIL_ROBE`/`COIL_HOOD`/`COIL_ACCENT` in `storyBetrayal.ts`; the robe panels draw BEFORE the arms so
+    the golfer's arms hang naturally in front of the open robe. Used identically by the Ch.4 Defection
+    interlude portrait, the Ch.5 friend-rival card, and the Sigil-5 finale matchup box (the three old
+    `COIL_FIGURE_TINT` call sites, now un-tinted so the true shirt colour shows). Re-shoot with
+    `node scripts/coil-garb-preview.mjs`.
+  - **The defector leaves.** `betrayerHasDefected(story)` (= `seenStoryBeats['interlude-warden']`) gates
+    the Warden-path removal: once **The Defection** plays (after the Ch.4 major), the odd-one-out is gone
+    from the clubhouse deck (`storySpaceport.ts`, replaced by their `abandonedHatHTML` cap lying on the
+    floor at their old spot — non-interactive, wistful title) AND the ship lounge (`shipInteriorScreens.ts`
+    filters them from `otherGolfers`). You can no longer talk to them anywhere; the two loyal friends
+    remain. Before the interlude, all three still stand (they're drifting, not gone — the doubt thread).
+  - Pure render + a persisted-flag predicate; zero sim rng, no `STORY_VERSION`/save bump. Guarded by
+    `tests/story-betrayal.test.ts` (`betrayerHasDefected`, the costume keeps the shirt) +
+    `tests/story-cast.test.ts` (before/after The Defection: 3 standees → 2 + a left-behind hat).
+
 - **GS-story-betrayal-polish** — balance re-tune (the finale + team-major edges), any dialogue-depth follow-up,
   constitution/roadmap docs.
 

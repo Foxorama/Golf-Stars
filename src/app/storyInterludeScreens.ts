@@ -31,9 +31,9 @@ export function storyInterludeScreen(): string {
   const scene = interludeScene(story);
   const friend = interludeFriend(story);
   const you = 'You';
-  // GS-story-betrayal-warden: on the Warden defection the betrayer's portrait is drawn in corrupted Coil
-  // garb (the coil-violet robe + acid accent baked into the look, GS-story-sigil5-look — no muddying outer
-  // tint); on the Herald severing the friend stays a clean Warden.
+  // GS-story-betrayal-warden / GS-story-coil-garb: on the Warden defection the betrayer's portrait is drawn
+  // in corrupted Coil garb (their own shirt kept, an open serpent robe + cobra hood + circlet over it, so
+  // they still read as themselves — switched sides); on the Herald severing the friend stays a clean Warden.
   const look = scene.corrupt
     ? { ...corruptedLookOpts(friend), uid: `inter${friend.id.replace(/[^a-z0-9]/gi, '')}`, w: 120, h: 210 }
     : { skin: friend.style.skin, shirtBase: friend.style.shirt, capColor: friend.style.cap, hair: friend.style.hair, uid: `inter${friend.id.replace(/[^a-z0-9]/gi, '')}`, w: 120, h: 210 };
