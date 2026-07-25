@@ -169,7 +169,7 @@ function boot(): void {
  *     come fast on the wide ribbon and the Bifröst trigger fires authentically when you make one).
  *   • `?asgard=1`  — jump STRAIGHT into the Bifröst interlude (the Himinbjörg map → cross → the nine-hole
  *     tournament → win/lose → return), from a real suspended run so "Return to your journey" works.
- *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storymidbeat|storyquestbeat|storyquestoffer|storyshop|storylocker|storyshipyard|shipinterior|storytournament|storyfinale|storychoice|storyinterlude|storyaftermath|storyqualresult|storyqualmatch|storyqualmatchlive|storybar` (GS-screen-deeplink) — mount a between-stop
+ *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storymidbeat|storyquestbeat|storyquestoffer|storyshop|storylocker|storyshipyard|shipinterior|storytournament|storyfinale|storychoice|storyinterlude|storyaftermath|storyqualresult|storyqualmatch|storyqualmatchlive|storyqualpick|storybar` (GS-screen-deeplink) — mount a between-stop
  *     screen directly, so the browser LAYOUT smoke tests (tests/build.test.ts) can reach the travel /
  *     shop / market / clubhouse / lore surfaces WITHOUT playing a full stop (shot animations + watch screens
  *     are flaky to script). The report's highest-risk uncovered surface — the journey map was
@@ -310,6 +310,19 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const club = reduce(result, { type: 'storyRoundContinue' });
       starTourView.storyMode = true; // dispatch normally sets this; the deep-link builds state directly
       return reduce(club, { type: 'openStoryMap' });
+    }
+    case 'storyqualpick': {
+      // GS-story-qualifier-partner-pick: open the chart with a PAIRED qualifying event's dossier showing,
+      // so the browser smoke sees the partner picker chips (new dossier chrome). Built the honest way —
+      // prologue → Chapter 1 → open the star map → select the world (the seed is pinned so the draw is
+      // always a paired format).
+      const hub0 = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      const hub = hub0.story ? { ...hub0, story: { ...hub0.story, campaignSeed: 'q6' } } : hub0;
+      const ch1 = reduce(reduce(reduce(hub, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' }), { type: 'storyRoundContinue' });
+      starTourView.storyMode = true; // dispatch normally sets this; the deep-link builds state directly
+      const map = reduce(ch1, { type: 'openStoryMap' });
+      starTourView.selectedId = 'verdant2-18';
+      return map;
     }
     case 'storyshop': {
       // GS-story-econ: mount a world's Pro Shop the honest way — play the prologue to Chapter 1, then
@@ -605,6 +618,9 @@ function dispatch(action: Action): void {
       starTourView.storyMode = action.type === 'openStoryMap';
       starTourView.selectedId = null;
       starTourView.effect = 'none';
+      // GS-story-qualifier-partner-pick: partner picks are per-chart-session view state, like the weather —
+      // a fresh entry starts from each event's drawn suggestion again.
+      starTourView.qualifierPartnerBy = {};
       starTourView.recordsOpen = false;
       starTourView.yggdrasilOpen = false;
       starTourView.centred = false;
@@ -2916,6 +2932,18 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-startour-weather]').forEach((el) => {
     el.addEventListener('click', () => {
       starTourView.effect = (el.getAttribute('data-startour-weather') ?? 'none') as CourseEffectId;
+      sfx.click();
+      render();
+    });
+  });
+  // GS-story-qualifier-partner-pick: tapping a partner chip on a qualifying event's dossier records the
+  // pick for THAT world and re-renders in place (the `data-startour-weather` idiom — view state + render,
+  // never a reducer round-trip, so the chart's camera/zoom are untouched).
+  app.querySelectorAll<HTMLElement>('[data-startour-qpartner]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const worldId = el.getAttribute('data-startour-qworld');
+      const partnerId = el.getAttribute('data-startour-qpartner');
+      if (worldId && partnerId) starTourView.qualifierPartnerBy[worldId] = partnerId;
       sfx.click();
       render();
     });

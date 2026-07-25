@@ -130,12 +130,12 @@ function questNavForWorld(story: StoryState, courseId: string): StoryQuestNav | 
 
 /** GS-story-map-nav: the qualifier status for a world — only for the player's CURRENT chapter's qualifiers
  *  (the live objective), so the chart stays focused on what to do now. Undefined otherwise. */
-function qualifierNavForWorld(story: StoryState, courseId: string): StoryQualifierNav | undefined {
+function qualifierNavForWorld(story: StoryState, courseId: string, chosenPartnerId?: string): StoryQualifierNav | undefined {
   const w = storyWorldById(courseId);
   if (!w || w.unlockChapter !== story.chapter) return undefined;
   if (!isStoryQualifier(courseId, story.alignment)) return undefined;
   const res = story.qualifierResults[courseId];
-  const plan = qualifierPlan(story, courseId);
+  const plan = qualifierPlan(story, courseId, chosenPartnerId);
   const partnerName = plan?.partnerId ? getCharacter(plan.partnerId)?.shortName : undefined;
   return {
     chapter: w.unlockChapter,
@@ -172,11 +172,13 @@ function venueNavForWorld(story: StoryState, courseId: string): StoryVenueNav | 
 }
 
 /** The whole star-map status for a world — quest + qualifier + venue, whichever apply. */
-export function storyWorldNav(story: StoryState, courseId: string): StoryWorldNav {
+export function storyWorldNav(story: StoryState, courseId: string, chosenPartnerId?: string): StoryWorldNav {
   return {
     courseId,
     quest: questNavForWorld(story, courseId),
-    qualifier: qualifierNavForWorld(story, courseId),
+    // GS-story-qualifier-partner-pick: the dossier passes the tour-mate the player has picked for this
+    // event so the preview names who you'd ACTUALLY be teeing off beside, not the draw's suggestion.
+    qualifier: qualifierNavForWorld(story, courseId, chosenPartnerId),
     venue: venueNavForWorld(story, courseId),
   };
 }

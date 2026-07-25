@@ -19,11 +19,16 @@
  * new shot mechanic, so auto ≡ interactive holds by construction.
  *
  * **The draw is a PLAN, not a surprise.** `qualifierPlan` is a pure keyed hash off the campaign seed + the
- * event's world, so the format, the pairing and WHO you are drawn with are fixed the moment the campaign
- * starts and are shown on the star-map dossier before you fly. A chapter charts three events and asks you
- * to qualify in two — so the draw sheet is a real choice of road, and choosing it is choosing who you spend
- * the chapter beside. That choice is exactly what `storyBetrayal`'s partner tally reads: the friend you keep
- * drawing (or keep avoiding) is the friend who ends up standing apart.
+ * event's world, so the format and the pairing are fixed the moment the campaign starts and are shown on the
+ * star-map dossier before you fly. A chapter charts three events and asks you to qualify in two, so which
+ * roads you take is a real choice of golf.
+ *
+ * **WHO plays it beside you is YOURS** (GS-story-qualifier-partner-pick). The draw suggests a tour-mate; the
+ * dossier offers the same three-friend picker a team Sigil does, and `chosenPartnerId` overrides the
+ * suggestion (validated against the roster, so a skipped picker still tees off). That matters because the
+ * pairing is exactly what `storyBetrayal`'s partner tally reads: the friend you keep choosing — or keep
+ * leaving on the ship — is the friend who ends up standing apart. Leaving that to the dice would have made
+ * the betrayal something that happened TO you; picking it makes it something you did.
  *
  * PURE + DOM-free. Zero sim rng: the plan is a keyed hash (no sequential draws off any play stream), the
  * field is the deterministic `storyQualifiers` ladder, and the paired resolutions reuse the seeded ghost
@@ -146,14 +151,25 @@ export function campaignDrawSeed(story: StoryState): string {
  * show it before you fly, a replay is the same test, and two campaigns draw different sheets. Returns
  * undefined for anything that isn't a charted story world.
  */
-export function qualifierPlan(story: StoryState, courseId: string): QualifierPlan | undefined {
+export function qualifierPlan(
+  story: StoryState,
+  courseId: string,
+  /** GS-story-qualifier-partner-pick: the tour-mate the player CHOSE to play this event beside, from the
+   *  star-map dossier's picker. Honoured whenever it's one of your three friends; anything else (absent, a
+   *  stale id, the protagonist) falls back to the drawn suggestion — so a skipped picker still tees off
+   *  cleanly and every existing caller is byte-for-byte unchanged. WHO you play with is the one part of the
+   *  draw sheet that is yours: the format and the pairing are the draw's to set, the company is yours,
+   *  which is what makes the partner tally a record of your choices rather than of the dice. */
+  chosenPartnerId?: string,
+): QualifierPlan | undefined {
   const w = storyWorldById(courseId);
   if (!w) return undefined;
   const rng = new Rng(`qualplan:${campaignDrawSeed(story)}:${courseId}`);
   const format = QUALIFIER_FORMATS[Math.min(QUALIFIER_FORMATS.length - 1, Math.floor(rng.float() * QUALIFIER_FORMATS.length))]!;
   const pairing: QualifierPairing = rng.float() < 0.5 ? 'scramble' : 'bestball';
   const others = otherGolferIds(story);
-  const partnerId = others[Math.min(others.length - 1, Math.floor(rng.float() * Math.max(1, others.length)))];
+  const drawn = others[Math.min(others.length - 1, Math.floor(rng.float() * Math.max(1, others.length)))];
+  const partnerId = chosenPartnerId && others.includes(chosenPartnerId) ? chosenPartnerId : drawn;
   const paired = isPairedFormat(format);
   return {
     courseId,
@@ -164,13 +180,19 @@ export function qualifierPlan(story: StoryState, courseId: string): QualifierPla
   };
 }
 
+/** The tour-mates you may pick to play a qualifying event beside — your three friends (id + short name),
+ *  the same pool the team Sigils offer. Empty-safe. */
+export function qualifierPartnerPool(story: StoryState): { id: string; name: string }[] {
+  return otherGolferIds(story).map((id) => ({ id, name: getCharacter(id)?.shortName ?? id }));
+}
+
 /**
  * The plan for a world that IS a qualifying event on the player's path right now (pure) — the gate every
  * caller wants, so the Sigil venue, the Earth prologue and an off-chart course never draw a plan. Undefined
  * when the world isn't a qualifying event.
  */
-export function activeQualifierPlan(story: StoryState, courseId: string): QualifierPlan | undefined {
-  return isStoryQualifier(courseId, story.alignment) ? qualifierPlan(story, courseId) : undefined;
+export function activeQualifierPlan(story: StoryState, courseId: string, chosenPartnerId?: string): QualifierPlan | undefined {
+  return isStoryQualifier(courseId, story.alignment) ? qualifierPlan(story, courseId, chosenPartnerId) : undefined;
 }
 
 /** The player-facing name of a format ("Two-ball best-ball"). */

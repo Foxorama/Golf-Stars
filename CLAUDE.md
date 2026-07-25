@@ -264,7 +264,9 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     `storyQualifierFormats.ts`): single stroke / single Stableford / paired stroke / paired Stableford / paired
     matchplay, a paired event played SCRAMBLE or BEST-BALL. `qualifierPlan` is a pure keyed hash off
     `StoryState.campaignSeed` + the world (zero play-stream rng), so the sheet is FIXED for the campaign and
-    SHOWN on the dossier before you fly — picking two of a chapter's three roads is real agency. A paired event
+    SHOWN on the dossier before you fly. The draw sets the FORMAT + PAIRING; the PARTNER is the player's pick
+    on the dossier (GS-story-qualifier-partner-pick, the team-Sigil picker's twin, validated in the plan so a
+    skipped pick falls back to the drawn suggestion) — so the partner tally records your choices, not dice. A paired event
     arms the EXISTING team-Sigil machinery (`storyTeamFormat`/`storyTournamentPartner`) — never a new shot
     mechanic. Every format resolves to ONE currency (a place in the chapter field) so the top-N gate + record
     are one shape. Format balance is MEASURED (`scripts/qualifier-balance.ts`) and priced by `PAIRING_BAR_SHIFT`

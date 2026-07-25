@@ -483,7 +483,10 @@ export type Action =
   | { type: 'openStory' } // GS-story: enter Story Mode — continue the saved campaign, or pick a golfer for a new one
   | { type: 'storyNewCampaign' } // GS-story: begin a fresh campaign (pick a golfer) — overwrites the saved one on completion
   | { type: 'exitStory' } // GS-story: leave the Story Mode hub back to the title
-  | { type: 'storyPlayWorld'; courseId: string } // GS-story-prologue: tee off a Story world round from the hub
+  // GS-story-prologue: tee off a Story world round from the hub. `partnerId` (GS-story-qualifier-partner-pick)
+  // is the tour-mate the player chose on the star-map dossier for a PAIRED qualifying event — validated on
+  // read against the roster, so an absent/stale id falls back to the draw's suggestion.
+  | { type: 'storyPlayWorld'; courseId: string; partnerId?: string }
   | { type: 'storyRoundContinue' } // GS-story-prologue: dismiss the world-round recap back to the campaign hub
   | { type: 'storyInspectGolfer'; characterId: string } // GS-story-clubhouse: open a golfer's stats/abilities overlay
   | { type: 'storyCloseInspect' } // GS-story-clubhouse: close the golfer stats overlay
