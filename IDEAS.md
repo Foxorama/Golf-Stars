@@ -266,6 +266,20 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
   uphill-magnet). The "until perks exist" caveat in the slope code is the hook.
 - **GS-split-fairways** — risky-short vs safe-long alternate fairways (the dogleg-grove machinery is the
   start); centreline-bunker pinch + opposite greenside bunker (open-the-angle).
+  **A full implementation already exists but is UNMERGEABLE — recover the patch, don't rewrite blind.**
+  PR #377 (closed 2026-07-25) built it: an alternate mown lane diverging through the driving zone off a
+  dedicated `:split:` side stream, split from the primary corridor by a non-penalty waste median, opt-in
+  per world (`Biome.splitFairway`), auto-AI untouched (it still plays the primary centreline, so
+  auto ≡ interactive holds). It cannot be merged: `claude/biome-hole-layout-variety-idvtpv` shares **no
+  common ancestor** with `main` (history was rewritten after 2026-07-13 — `git merge` says "refusing to
+  merge unrelated histories"), so the base `0aca690` is on a dead lineage. The patch still extracts with
+  `git diff 0aca690 claude/biome-hole-layout-variety-idvtpv` — 359 insertions / 7 files; `contract.ts`
+  applies cleanly to today's `main`, `generate.ts` + `biomes.ts` + the two docs conflict. **The trap:**
+  every claim in it (zero fixture re-pins, the fairness argument, death-spiral neutrality on verdant/
+  tempest) was measured at `GENERATOR_VERSION` **25**; we are on **43**, having gained GS-green-flare,
+  GS-green-clear and biome profiles — all of which move exactly the corridor/green geometry a split
+  fairway interacts with. Re-landing = re-apply + bump 43→44 + **re-measure all three bars from scratch**
+  + the eyes-on play-test that PR asked for and never got.
 - **GS-fairway-width-2b (follow-on)** — GS-fairway-width-2 shipped the LAY-UP half (the auto AI reads
   the corridor width and lays up off a genuinely tight driving-zone pinch — position over power). Still
   open: teach the reach-AI to read width for CLUB SELECTION in a chute/thin ribbon (a shorter club's
