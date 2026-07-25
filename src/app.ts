@@ -112,7 +112,8 @@ import { loreScreen } from './app/loreScreens';
 import { storyMidBeatScreen, storyQuestBeatScreen, storyQuestOfferScreen } from './app/storyMidroundScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
-import { priceNoticeOverlay, scrambleChoiceOverlay, settingsOverlay, settingsSheetInner, shotPopupOverlay } from './app/overlays';
+import { exitConfirmOverlay, priceNoticeOverlay, scrambleChoiceOverlay, settingsOverlay, settingsSheetInner, shotPopupOverlay } from './app/overlays';
+import { backIntent } from './ui/back';
 import { hazardLabel, mapTopInfo, puttAimLabel, puttAimRow } from './app/playHud';
 import { mountWeatherOverlay, playCaddyVoice, playTentBonk, syncMusic } from './app/playFx';
 import { metaFromSave, persist, persistStory } from './app/persist';
@@ -2647,7 +2648,10 @@ function render(): void {
   // The one-off Trade Market price-cut / refund notice (GS-trade-rebalance) rides over every screen
   // until the player closes it — it's stamped by the save migration and shown on the boot title.
   const priceNotice = state.priceRefund != null ? priceNoticeOverlay() : '';
-  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}${fit ? ' gs-main--fit' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${introTraits}${introField}${priceNotice}`;
+  // The leave-the-round confirm (GS-android-back) rides over every screen like the settings sheet;
+  // only a back press inside a run can raise it.
+  const exitConfirm = state.pendingExit ? exitConfirmOverlay() : '';
+  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}${fit ? ' gs-main--fit' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${introTraits}${introField}${priceNotice}${exitConfirm}`;
   app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
 
   // Star Tour star map (GS-star-tour): on first mount, centre the pannable chart on the worlds'
@@ -3559,6 +3563,62 @@ function isNativeShell(): boolean {
 }
 
 /**
+ * Perform one BACK press (GS-android-back). The DECISION is pure and lives in `ui/back.ts`; this is
+ * only the side-effect half — dispatching, or closing the settings sheet (which is module state
+ * here, deliberately outside the reducer).
+ *
+ * Returns `false` ONLY when back should close the app, which `backIntent` allows from the title and
+ * nowhere else. Every other screen returns `true`, so a stray press can never drop a player out of
+ * a run.
+ */
+function handleBack(): boolean {
+  const intent = backIntent(state, { settingsOpen });
+  switch (intent.kind) {
+    case 'closeSettings':
+      settingsOpen = false;
+      render();
+      return true;
+    case 'swallow':
+      return true;
+    case 'exitApp':
+      return false;
+    default:
+      dispatch(intent.action);
+      return true;
+  }
+}
+
+/**
+ * Wire every source of a back press to the one handler: the Android hardware button in the native
+ * shell, and Escape in a browser (same policy, so the behaviour can be exercised on desktop and in
+ * the headless layout tests without a device).
+ *
+ * The Capacitor plugin is imported LAZILY and only in the shell — the browser build never needs it,
+ * and a failure to load it must not take the app down with it, so the whole thing is swallowed.
+ */
+function wireBackButton(): void {
+  try {
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (handleBack()) e.preventDefault();
+    });
+  } catch {
+    /* ignore — Escape is a desktop convenience */
+  }
+  if (!isNativeShell()) return;
+  import('@capacitor/app')
+    .then(({ App }) => {
+      void App.addListener('backButton', () => {
+        // `handleBack()` false means we're on the title: this is the one sanctioned way out.
+        if (!handleBack()) void App.exitApp();
+      });
+    })
+    .catch(() => {
+      /* no plugin ⇒ Android's default (close the activity); nothing else in the app depends on it */
+    });
+}
+
+/**
  * Register the offline service worker (PWA). Guarded to http/https so it never fires under
  * the `file://` smoke test (where registration would reject), and fully swallowed so a SW
  * failure can never strand the boot — the app works identically with no worker. The worker
@@ -3590,6 +3650,7 @@ function registerServiceWorker(): void {
 export function start(): void {
   boot();
   registerServiceWorker();
+  wireBackButton();
   // Capture the install prompt so the title can offer an "Install app" button (instead of the
   // browser's own mini-infobar). Re-render so the button appears once it's available.
   try {

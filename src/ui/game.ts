@@ -2165,8 +2165,23 @@ export function reduce(state: UiState, action: Action): UiState {
         scrambleChoice: undefined,
         bossReward: undefined,
         manageCharacterId: undefined,
+        // The back-button confirm (GS-android-back) is what usually dispatches this; clear it so the
+        // card can never survive onto the title screen.
+        pendingExit: undefined,
         viewHole: 0,
       };
+    }
+
+    case 'requestExit': {
+      // GS-android-back: raise the "leave this round?" confirm. Only meaningful in a run — every other
+      // screen resolves back to a plain navigation, so nothing else should ever reach this.
+      if (state.screen !== 'playing' && state.screen !== 'intro') return state;
+      return { ...state, pendingExit: true };
+    }
+
+    case 'cancelExit': {
+      if (!state.pendingExit) return state;
+      return { ...state, pendingExit: undefined };
     }
 
     case 'restart': {

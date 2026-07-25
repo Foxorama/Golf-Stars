@@ -486,6 +486,15 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
   hard-refresh to escape it. `npm run android:apk` to sideload, `android:aab` for Play; the `android`
   workflow is NOT a required check. Launcher art has ONE source (`public/icon-512.png` →
   `scripts/android-assets.mjs`).
+- **BACK is ONE pure decision** (GS-android-back, `ui/back.ts backIntent`) — the Android hardware
+  button AND desktop Escape route through it, never a fork. Four tiers: dismiss the topmost overlay →
+  navigate to the parent *using the screen's own back action* → **swallow** on forward-only beats
+  (skipping one would let a player dodge a reward pick / desync `seenStoryBeats`) → confirm, but ONLY
+  in a run. **`title` is the only screen that may close the app.** `screenIntent` ends in a `never`
+  guard, so a new `Screen` fails to COMPILE until back is decided for it. The confirm is NOT a
+  data-loss warning — `toTitle` already parks the run as `resumable`; `exitPrompt` says the true
+  thing instead (strokeplay resumes on the hole, other formats replay the stop) and a test forbids
+  the word "lose". Reuses `.gs-sheet` chrome ⇒ zero new global CSS.
 
 ## Do NOT carry from golf-finder
 GPS/geolocation, OSM/Overpass, weather APIs, real astronomy/star catalogs, the day course-finder,

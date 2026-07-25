@@ -57,6 +57,43 @@ npm run android:apk      # debug APK — this is what you sideload to play-test
 npm run android:aab      # release bundle for Play
 ```
 
+## The back gesture (GS-android-back)
+
+On Android an unhandled back button **closes the app**, from any screen, mid-round included — it reads
+as a crash, and it is the single most likely thing to sink a store review. `src/ui/back.ts` is the ONE
+pure decision (`backIntent(state, ctx)`); the Capacitor hardware button and the desktop Escape key both
+route through it, so the behaviour can be exercised without a device and can never fork.
+
+Four tiers, in precedence order:
+
+0. **Dismiss the topmost layer** — the exit confirm, then the settings sheet, then any inspect/lore
+   overlay. Never prompts. This is most of the value.
+1. **Navigate to the parent**, reusing the EXACT action the screen's own back button dispatches, so
+   back can't land somewhere the UI itself wouldn't send you (`clubhouse` → the hall, not the title;
+   `starTour` → the campaign when `state.story` is set, else the title).
+2. **Swallow** on forward-only beats (lore, boss reward, results, The Choice). Deliberate: treating
+   back as "continue" would let a player skip a reward pick and desync `seenStoryBeats`. One dead
+   press beats a corrupted campaign.
+3. **Confirm, then leave** — only `playing`, and `intro` past the first tee (at the first tee back
+   mirrors the screen's own "‹ Change golfer", since nothing has been played).
+
+`title` is the ONLY screen that may close the app.
+
+Two details worth keeping:
+
+- **The confirm is not a data-loss warning, because there is no data loss.** `toTitle` already parks
+  an active run as `resumable`. The copy (`exitPrompt`) says the thing that IS true and differs by
+  format: a strokeplay round resumes on its current hole (GS-star-tour-resume), a Voyage/Unending stop
+  restarts from its first. A test asserts the wording never says "lose".
+- **`screenIntent` ends in a `never` guard**, so adding a member to the `Screen` union fails to
+  COMPILE until someone decides what back does there. Verified by actually adding a screen and
+  watching `tsc` fail in `back.ts` — not assumed.
+
+The confirm card reuses the shared `.gs-sheet` chrome the price notice already borrows, so it adds
+**zero new global CSS**. It has no tap-to-dismiss backdrop on purpose: `[data-action]` handlers are
+bound per element with no `stopPropagation`, so a backdrop action would also fire on every click
+bubbling out of the card.
+
 ## What is NOT verified
 
 Stated plainly so nobody reads the scaffolding as a working build:
@@ -68,10 +105,10 @@ Stated plainly so nobody reads the scaffolding as a working build:
 - **Nothing has run on a device from the shell.** The game is play-tested on a Pixel 9a and an older
   Galaxy *in the browser*; the WebView is a different runtime (no browser chrome, different memory
   ceiling, different audio-focus behaviour on interruption).
-- **The Android hardware BACK button is unhandled.** The game is a single-page reducer that never
-  pushes history entries, so back will close the app from any screen. This needs mapping onto the
-  reducer's own back semantics (`@capacitor/app`'s `backButton` listener) and is a design call, not a
-  mechanical one — it is the top follow-up before any public track.
+- **The hardware BACK button has never been pressed on a device.** The policy is implemented and
+  exhaustively unit-tested (`src/ui/back.ts`, `tests/back.test.ts` — see below), and Escape exercises
+  the identical path in a browser, but the Capacitor `backButton` event itself is unverified until
+  the app runs on real hardware.
 - **Saves are still `localStorage`.** Durable enough in a Capacitor WebView to not be a launch
   blocker, but moving `src/save/storage.ts` behind `@capacitor/preferences` (keeping the existing
   `migrate()` chain and JSON export on top) is the belt-and-braces version.
