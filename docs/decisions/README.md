@@ -28,3 +28,5 @@ domain. The root `CLAUDE.md` carries the load-bearing invariants and points here
 | `render.md` | Projector, `buildScene`, blend/family draws, per-zone palettes, stellar sky, weather, wind, map nav, spray cone, power gesture, full-bleed play screen |
 | `ui-intro.md` | The pure UI reducer, play-loop UX, and the loading-intro cinematic |
 | `process-and-deploy.md` | Testing, the test/demo hub, art pipeline, GitHub Pages deploy gotcha, PWA service worker, change/versioning flow |
+| `save-transfer.md` | Save export/import (GS-save-transfer): the bundle format across all three blobs, why import THROWS instead of defaulting, the two-step confirm, and the per-origin split between the website and the Android shell |
+| `android-packaging.md` | The Capacitor shell (GS-android): app id, the disabled service worker, back-button policy, signing + the "app failed to update" trap |

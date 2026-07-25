@@ -23,6 +23,64 @@ import { shotCardHTML } from '../render/cards';
 import { pinOf } from '../sim/round';
 import { dist } from '../sim/course/contract';
 import { getSettings, type Settings } from '../settings';
+import { describeBackup, type Backup } from '../save/backup';
+
+/**
+ * Save-transfer view state (GS-save-transfer) — an exported mutable view object, the documented
+ * pattern for per-screen UI state (see `docs/decisions/ui-intro.md` → GS-app-split): app.ts's
+ * handlers mutate the FIELDS and call `refreshSettings()`, because cross-module `let` reassignment
+ * is illegal in ESM and a full `render()` would replay the sheet's slide-up as a flicker.
+ *
+ * `stage` drives the Save data section:
+ *  - `idle`    — the two buttons
+ *  - `confirm` — a file has been read and PARSED; its contents are summarised and the player has to
+ *                say yes before anything is overwritten. This step is the safety: import replaces
+ *                everything, so it must never happen on a single tap of a file picker.
+ *  - `note`    — a transient result line (exported / copied / imported / refused), `message` set.
+ */
+export const saveView: { stage: 'idle' | 'confirm' | 'note'; pending: Backup | null; message: string; bad: boolean } = {
+  stage: 'idle',
+  pending: null,
+  message: '',
+  bad: false,
+};
+
+/** The Save data section of the settings sheet. `localStorage` is the only copy of a save AND it is
+ *  per-origin, so the website and the Android shell cannot see each other's progress — moving
+ *  between them, or off a device before an uninstall, is what this is for. */
+function saveDataSection(): string {
+  if (saveView.stage === 'confirm' && saveView.pending) {
+    const b = saveView.pending;
+    const when = b.exportedAt ? new Date(b.exportedAt).toLocaleString() : 'unknown date';
+    return `
+        <div class="gs-setsec">💾 Save data</div>
+        <div class="gs-savebox">
+          <div class="gs-savebox-h">Replace your save with this file?</div>
+          <div class="gs-setnote" style="margin:0 0 6px;">Saved ${when}</div>
+          <ul class="gs-savelist">${describeBackup(b).map((l) => `<li>${l}</li>`).join('')}</ul>
+          <div class="gs-savewarn">⚠ This overwrites everything on this device — shards, unlocks, and any Story Tour campaign. It cannot be undone.</div>
+          <div class="gs-saverow">
+            <button class="gs-btn gs-btn--ghost" data-save-transfer="cancel">Cancel</button>
+            <button class="gs-btn gs-btn--primary" data-save-transfer="apply">Replace my save</button>
+          </div>
+        </div>`;
+  }
+  const note = saveView.stage === 'note' && saveView.message
+    ? `<div class="gs-savenote${saveView.bad ? ' gs-savenote--bad' : ''}">${saveView.message}</div>`
+    : '';
+  return `
+        <div class="gs-setsec">💾 Save data</div>
+        <div class="gs-setnote">Your progress lives only on this device, and the website and the app store it separately. Export to move a save between them — or to keep a backup.</div>
+        <div class="gs-saverow">
+          <button class="gs-btn gs-btn--ghost" data-save-transfer="export">⬇ Export save</button>
+          <button class="gs-btn gs-btn--ghost" data-save-transfer="import">⬆ Import save</button>
+        </div>
+        <div class="gs-saverow">
+          <button class="gs-btn gs-btn--ghost" data-save-transfer="copy" style="flex:1;">📋 Copy save to clipboard</button>
+        </div>
+        ${note}
+        <input type="file" id="gs-save-file" accept="application/json,.json" hidden>`;
+}
 
 /** The three default-aim modes, as a SEGMENTED radio control (GS-default-aim): big real-button tap
  *  targets, so there's no fiddly native `<select>` to mis-tap (the old dropdown only opened on its
@@ -99,6 +157,8 @@ export function settingsSheetInner(): string {
         <div class="gs-setnote">How every shot is pre-aimed. Change it mid-round with the ◎ button too.</div>
         <div class="gs-segctl" role="radiogroup" aria-label="Default aim mode">${aimBtns}</div>
         <div class="gs-seghint">${activeAim.desc}</div>
+
+        ${saveDataSection()}
 
         ${homeFoot}
         <div class="gs-setdone">

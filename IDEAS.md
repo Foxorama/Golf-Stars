@@ -393,6 +393,20 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-save-transfer** — save export/import, finally wired to a button. `CLAUDE.md` has claimed
+  "export/import from day one" since v1; the save LAYER had it (`downloadSave`/`importAndStore`) and
+  nothing in the UI ever called them. A backup is a BUNDLE of all three blobs (`gs_save` + `gs_story` +
+  `gs_settings`) — exporting the save alone would have silently dropped a whole Story Tour campaign.
+  `parseBackup` THROWS on anything untrustworthy rather than `importSave`'s swallow-and-return-
+  `defaultSave()` (right for boot, catastrophic for import — it would report success while wiping a real
+  save); import is two steps, the pick parsing + summarising and a second tap writing. Export offers a
+  file AND a clipboard copy because blob downloads aren't reliable in the Capacitor WebView. Needed
+  because localStorage is per-ORIGIN — the website and the shell (`https://localhost`) never shared a
+  save — and because the Android signing fix costs one uninstall. `docs/decisions/save-transfer.md`.
+- **GS-android signing** — the sideload APK is a RELEASE build signed with the upload key, not
+  `assembleDebug` (whose runner-generated certificate changes every run, so Android refused the update);
+  every artifact step stamps version code + name; the keyless path stays buildable but goes loud, ending
+  in an artifact named `…-UNSIGNED-cannot-update-existing-install`. `docs/decisions/android-packaging.md`.
 - **GS-hud-frame** — ONE persistent play HUD across all six play states (`app/playFrame.ts`): five fixed
   regions (info bar · nav column · caddy slot · controls panel · action column), contents change, nothing is
   removed — a dead control greys in place. Panel bottom-anchored with the COMMIT row last, so commit · caddy ·

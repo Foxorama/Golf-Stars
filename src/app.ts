@@ -112,7 +112,15 @@ import { loreScreen } from './app/loreScreens';
 import { storyMidBeatScreen, storyQuestBeatScreen, storyQuestOfferScreen } from './app/storyMidroundScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
-import { exitConfirmOverlay, priceNoticeOverlay, scrambleChoiceOverlay, settingsOverlay, settingsSheetInner, shotPopupOverlay } from './app/overlays';
+import { exitConfirmOverlay, priceNoticeOverlay, saveView, scrambleChoiceOverlay, settingsOverlay, settingsSheetInner, shotPopupOverlay } from './app/overlays';
+import {
+  BackupError,
+  applyBackup,
+  copyBackupToClipboard,
+  currentBackupJSON,
+  downloadBackup,
+  parseBackup,
+} from './app/saveTransfer';
 import { backIntent } from './ui/back';
 import { isNativeShell } from './native';
 import { primeHaptics } from './render/haptics';
@@ -2461,6 +2469,105 @@ function wireSettingsSheet(root: ParentNode): void {
       dispatch({ type: 'toTitle' });
     });
   });
+  wireSaveTransfer(root);
+}
+
+/**
+ * Save export / import (GS-save-transfer). `localStorage` is the only copy of a save AND it is
+ * scoped to an ORIGIN — the website and the Capacitor shell (`https://localhost`) are different
+ * origins, so their saves are invisible to each other. This is the bridge, and the only way to move
+ * a save off a device before an uninstall wipes it.
+ *
+ * Import is DESTRUCTIVE, so it is two steps by construction: picking a file only PARSES it and shows
+ * what's inside; nothing is written until the player confirms against that summary. A file that
+ * can't be trusted raises `BackupError` and is refused with its message — never a silent fallback to
+ * an empty save, which is what `importSave` would have done (correct for boot, catastrophic here).
+ */
+function wireSaveTransfer(root: ParentNode): void {
+  const fileInput = root.querySelector<HTMLInputElement>('#gs-save-file');
+  const note = (message: string, bad = false): void => {
+    saveView.stage = 'note';
+    saveView.message = message;
+    saveView.bad = bad;
+    refreshSettings();
+  };
+  // Flush the live state to localStorage before reading it back — `persist` runs after every action,
+  // but an export taken mid-run should carry the run as it stands right now, not as of the last one.
+  const freshJSON = (): string => {
+    persist();
+    persistStory();
+    return currentBackupJSON();
+  };
+  root.querySelectorAll<HTMLElement>('[data-save-transfer]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sfx.click();
+      const what = el.dataset.saveTransfer;
+      if (what === 'export') {
+        // A blob download is reliable in a browser and NOT in the Capacitor WebView (no download
+        // manager wired up), so we never claim success we can't observe — a failure points at the
+        // clipboard button, which does work there.
+        const ok = downloadBackup(freshJSON());
+        note(
+          ok
+            ? '✅ Saved to your downloads. Keep the file somewhere safe.'
+            : "⚠ Couldn't save a file here — use “Copy save to clipboard” instead.",
+          !ok,
+        );
+        return;
+      }
+      if (what === 'copy') {
+        const json = freshJSON();
+        void copyBackupToClipboard(json).then((ok) =>
+          note(
+            ok
+              ? '✅ Copied. Paste it somewhere safe — it’s long, so check the whole thing arrived.'
+              : '⚠ The clipboard was blocked. Try “Export save” instead.',
+            !ok,
+          ),
+        );
+        return;
+      }
+      if (what === 'import') {
+        fileInput?.click();
+        return;
+      }
+      if (what === 'cancel') {
+        saveView.stage = 'idle';
+        saveView.pending = null;
+        refreshSettings();
+        return;
+      }
+      if (what === 'apply' && saveView.pending) {
+        applyBackup(saveView.pending);
+        saveView.stage = 'idle';
+        saveView.pending = null;
+        // Reload rather than patching the live state: boot already rebuilds everything from the
+        // blobs (save + story + settings), and half-applying an import into a running reducer is
+        // exactly the kind of surgery that leaves a run pointing at a course the save no longer has.
+        location.reload();
+      }
+    });
+  });
+  fileInput?.addEventListener('click', (e) => e.stopPropagation());
+  fileInput?.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    file
+      .text()
+      .then((text) => {
+        saveView.pending = parseBackup(text); // throws BackupError on anything untrustworthy
+        saveView.stage = 'confirm';
+        refreshSettings();
+      })
+      .catch((err: unknown) => {
+        note(`⚠ ${err instanceof BackupError ? err.message : "That file couldn't be read."}`, true);
+      })
+      .finally(() => {
+        // Clear the picker so choosing the SAME file twice still fires `change`.
+        fileInput.value = '';
+      });
+  });
 }
 
 /**
@@ -3197,6 +3304,11 @@ function render(): void {
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       settingsOpen = true;
+      // Open clean: a half-finished import confirmation or a stale result line from the last time
+      // the sheet was open must never greet the next one (GS-save-transfer).
+      saveView.stage = 'idle';
+      saveView.pending = null;
+      saveView.message = '';
       render();
     });
   });
