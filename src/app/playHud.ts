@@ -16,32 +16,59 @@ import { endlessSetGateOverPar, endlessSetLabel, endlessSetToPar, formatToPar, t
 import { isTeamDuelBoss, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
 import { shotView } from '../sim/rpg/play';
 
-/** The aim readout inside the break-read row — split out so an aim nudge can update JUST this span
- *  in place (the ◄/► buttons keep their listeners; see puttAimRefresh). */
-export function puttAimLabel(breakYd: number, aim: number, dbl = false): string {
-  const fmt = (y: number) => `${Math.abs(y).toFixed(1)}yd ${y >= 0 ? 'right' : 'left'}`;
-  // GS-green-contour: a double-breaker is called out — its NET break can be tiny while the line
-  // still S-curves, so "breaks —" alone would read as a flat putt and lie about the picture.
-  const brkTxt = dbl
-    ? `double-breaks${Math.abs(breakYd) < 0.2 ? '' : ` · nets ${fmt(breakYd)}`}`
-    : Math.abs(breakYd) < 0.2 ? '—' : `breaks ${fmt(breakYd)}`;
-  return `Aim <b>${Math.abs(aim) < 0.2 ? 'straight' : fmt(aim)}</b><br><span style="opacity:.6;">slope ${brkTxt}</span>`;
+/** Signed yardage as plain words (+ = right of the line). */
+const yds = (y: number): string => `${Math.abs(y).toFixed(1)}yd ${y >= 0 ? 'right' : 'left'}`;
+
+/** How the slope reads in one phrase. GS-green-contour: a double-breaker is called out — its NET
+ *  break can be tiny while the line still S-curves, so "breaks —" alone would read as a flat putt
+ *  and lie about the picture. */
+function breakText(breakYd: number, dbl: boolean): string {
+  if (dbl) return `double-breaks${Math.abs(breakYd) < 0.2 ? '' : ` · nets ${yds(breakYd)}`}`;
+  return Math.abs(breakYd) < 0.2 ? 'flat' : `breaks ${yds(breakYd)}`;
 }
 
-/** The break-read row on the putt screen (GS-greens-3): the slope's break + ◄/► aim controls (or the
- *  caddy's read). `breakYd`/`aim` are signed (+ = right of the line); the player aims to cancel break. */
-export function puttAimRow(breakYd: number, aim: number, reads: boolean, dbl = false): string {
-  const fmt = (y: number) => `${Math.abs(y).toFixed(1)}yd ${y >= 0 ? 'right' : 'left'}`;
-  const brkTxt = dbl
-    ? `double-breaks${Math.abs(breakYd) < 0.2 ? '' : ` · nets ${fmt(breakYd)}`}`
-    : Math.abs(breakYd) < 0.2 ? '—' : `breaks ${fmt(breakYd)}`;
+/** The aim readout inside the adjuster row — split out so an aim nudge can update JUST this span
+ *  in place (the ◄/► buttons keep their listeners; see puttAimRefresh). It sits in the slot the club
+ *  name occupies while aiming (GS-hud-frame), so it must fit one line between the ◄/► buttons: it
+ *  carries the AIM alone and the slope read moved to the row below (which is static — the break
+ *  doesn't change when you re-aim, only your line through it does). */
+export function puttAimLabel(breakYd: number, aim: number, dbl = false): string {
+  void breakYd;
+  void dbl;
+  return `Aim <b>${Math.abs(aim) < 0.2 ? 'straight' : yds(aim)}</b>`;
+}
+
+/** The slope's read, for the putt panel's read row. Static for the putt — the break is the green's,
+ *  not the player's line — so it never needs the surgical aim refresh. */
+export function puttBreakLine(breakYd: number, dbl = false): string {
+  return `Slope <b>${breakText(breakYd, dbl)}</b>`;
+}
+
+/**
+ * The putt screen's ADJUSTER row (GS-greens-3 · GS-hud-frame): the slope's break + ◄/► aim controls
+ * (or the caddy's read), built in the SAME `.gs-clubrow` shape the club cycler uses while aiming — so
+ * the two most-tapped buttons on the play screen stay in the same place all the way round the hole.
+ * `breakYd`/`aim` are signed (+ = right of the line); the player aims to cancel the break.
+ * A green-reading caddy (Mystic Mole) has already found the line, so its buttons render disabled
+ * rather than disappearing.
+ */
+export function puttAimRow(breakYd: number, aim: number, reads: boolean, dbl = false, fringe = false): string {
+  const toggle = fringe
+    ? `<button class="gs-btn gs-mini" data-putt-toggle="0" title="Chip instead of putting">🏌</button>`
+    : '';
   if (reads) {
-    return `<div style="font-size:11.5px;opacity:.85;text-align:center;margin:1px 0;">🐀 <b>Mole reads:</b> aim ${Math.abs(aim) < 0.2 ? 'straight' : fmt(aim)} · <span style="opacity:.7;">${brkTxt}</span></div>`;
+    return `<div class="gs-clubrow">
+        <button class="gs-btn" disabled aria-hidden="true">◄</button>
+        <span class="gs-clubname gs-clubname--read" id="puttaimlabel">🐀 Mole reads <b>${Math.abs(aim) < 0.2 ? 'straight' : yds(aim)}</b></span>
+        <button class="gs-btn" disabled aria-hidden="true">►</button>
+        ${toggle}
+      </div>`;
   }
-  return `<div style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:11.5px;margin:1px 0;">
-      <button class="gs-btn gs-mini" data-putt-aim="-1" title="Aim left">◄</button>
-      <span id="puttaimlabel" style="min-width:120px;text-align:center;">${puttAimLabel(breakYd, aim)}</span>
-      <button class="gs-btn gs-mini" data-putt-aim="1" title="Aim right">►</button>
+  return `<div class="gs-clubrow">
+      <button class="gs-btn" data-putt-aim="-1" title="Aim left">◄</button>
+      <span class="gs-clubname gs-clubname--read" id="puttaimlabel">${puttAimLabel(breakYd, aim, dbl)}</span>
+      <button class="gs-btn" data-putt-aim="1" title="Aim right">►</button>
+      ${toggle}
     </div>`;
 }
 
@@ -169,8 +196,18 @@ function widthLabel(widthId?: string): string {
 /** The floating top-left info chip for the full-bleed hole screen (GS-fullmap): hole #/total, par +
  *  length, the live distance, the running zone score on line 1; a thin lie · wind sub-line + the
  *  momentum pips below. Conditions are pared to what matters (an armed lost-rough warning + scramble);
- *  the verbose biome string moved off the play HUD. Translucent, non-intrusive, pass-through. */
-export function mapTopInfo(v: ReturnType<typeof shotView>, opts: { shotNo: number; distLabel: string }): string {
+ *  the verbose biome string moved off the play HUD. Translucent, non-intrusive, pass-through.
+ *
+ *  GS-hud-frame: the distance slot is min-width'd in CSS so the stats row wraps IDENTICALLY between
+ *  the aim and watch states — the bar used to visibly reflow the instant a shot was struck, because
+ *  "…watching…" is far wider than "347y". `opts.lie` overrides the live lie for the same reason plus
+ *  one better: while the ball is in the air `play.lie` is ALREADY the lie it will finish in, so the
+ *  bar was quietly spoiling the result before the ball landed. The watch state passes the lie the
+ *  shot was played FROM. */
+export function mapTopInfo(
+  v: ReturnType<typeof shotView>,
+  opts: { shotNo: number; distLabel: string; lie?: string },
+): string {
   const play = state.play!;
   const len = Math.round(dist(play.hole.tee, play.hole.green));
   // Only the decision-relevant warning survives onto the play HUD (the full conditions list lives on
@@ -201,11 +238,13 @@ export function mapTopInfo(v: ReturnType<typeof shotView>, opts: { shotNo: numbe
         <span>Par <b>${play.hole.par}</b>·${len}y</span>
         ${shapeLabel(play.hole.shapeId) ? `<span style="color:var(--gs-info);">${shapeLabel(play.hole.shapeId)}</span>` : ''}
         ${widthLabel(play.hole.widthId) ? `<span style="color:var(--gs-info);">${widthLabel(play.hole.widthId)}</span>` : ''}
-        <span>${opts.distLabel}</span>
+        <span class="gs-hud-dist">${opts.distLabel}</span>
+      </div>
+      <div class="gs-stats gs-stats--score">
         ${zoneScoreChip()}
         ${liveLeaderChip()}
       </div>
-      <div class="gs-sub">${lieChip(v.lie)} ${windDescription(play.hole)}${lostRough}</div>
+      <div class="gs-sub">${lieChip(opts.lie ?? v.lie)} ${windDescription(play.hole)}${lostRough}</div>
       ${scrambleLine}
       ${state.match ? `<div style="margin-top:5px;">${matchHud()}</div>` : ''}
       ${!state.match && (state.run.storyTournament || state.run.storyQualifier) ? (() => { const chip = storySigilMatchChip(); return chip ? `<div style="margin-top:5px;">${chip}</div>` : ''; })() : ''}

@@ -384,6 +384,16 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     `app.ts` keeps boot/dispatch/render + the play screen (still the hottest file, ~2,200 lines — extend a
     `src/app/*` module, don't grow it); every other screen is a `src/app/*` module reading `state` from
     `ctx.ts`, never dispatching or importing app.ts. **A new screen = a new module.**
+  - **ONE play HUD frame** (GS-hud-frame, `app/playFrame.ts`) — the play screen's six view states (aim/chip/
+    putt × decide/watch) mount the SAME five regions in the SAME places: info bar · nav column · caddy slot ·
+    controls panel · action column. Only the CONTENTS change. Two rules: **nothing is removed, only
+    `disabled`** (a dead control greys in place — the nav column always ships its five buttons), and the panel
+    is **bottom-anchored with the COMMIT row last**, so commit · caddy · `»` land at the same y in every state
+    while the rows above differ in height. A new play state = new row contents, never a new skeleton
+    (`tests/play-hud-frame.test.ts` forbids a second `class="gs-shot gs-shot--full"`). The caddy's slot is
+    PERMANENT (hired ⇒ badge · no read here ⇒ dimmed · none ⇒ reserved placeholder), so the badge — not a
+    canvas corner figure — is the caddy everywhere; `playView` takes a measured `caddyAnchor` (`{muzzle,head}`)
+    and skips its own figure, absent ⇒ the classic corner figure (replay screen, unchanged).
   - **CSS classes / DOM ids are GLOBAL and screens can't see each other's names** — new screen chrome gets
     its OWN prefix (bridge HUD `.gs-bhud`, resume `.gs-resume`, lore `.gs-lore`, star-tour content
     `.gs-sthud` — NEVER the play screen's `.gs-hud`, which the #353 map-blur regression proved). Grep the

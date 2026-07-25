@@ -114,7 +114,20 @@ export function caddyId(): string | undefined {
   if (named) return named;
   const active = state.story?.activeCaddyId;
   if (state.run.storyRound && active && isHeraldAgent(active)) return active;
-  return undefined;
+  // DEMO hook (`_gsFeel.forceRedirect`, GS-caddy): the forced guard interception has to have a guard
+  // to come FROM. Since GS-hud-frame the caddy lives in the HUD's badge slot rather than as a figure
+  // painted in the canvas corner, so the demo has to fill that slot to be watchable — otherwise the
+  // fabricated throw launches from a corner figure drawn behind the controls panel. Render-only, like
+  // the flag itself: nothing here touches the loadout, the perks or a single rng draw.
+  return forcedDemoCaddy();
+}
+
+/** The guard implied by the `_gsFeel.forceRedirect` demo flag, read through the usual `typeof window`
+ *  guard so this module stays importable outside a browser. '' / unset ⇒ undefined. */
+function forcedDemoCaddy(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const kind = (window as unknown as { _gsFeel?: { forceRedirect?: string } })._gsFeel?.forceRedirect;
+  return kind === 'boomerang' ? 'convict-sheep' : kind === 'laser' ? 'space-ducks' : undefined;
 }
 
 /** The caddy to show on the PUTTING screen — only a putting specialist (Penelope, Mystic Mole). A

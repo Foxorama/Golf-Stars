@@ -63,9 +63,9 @@ import { HAPTICS, haptic } from './render/haptics';
 import { showAceCelebration, showBirdCelebration, showEndlessMilestone, showSectorScan, showVoyageVictory } from './render/celebrations';
 import { characterScreen, ordinal, leaderboardHTML } from './render/golferCards';
 import { state, setState, btn, header, seedFromUrl, freshRunSeed } from './app/ctx';
+import { playFrameHTML } from './app/playFrame';
 import {
   burst,
-  caddyBadgeHTML,
   caddyId,
   currentEffect,
   golferLook,
@@ -116,7 +116,7 @@ import { exitConfirmOverlay, priceNoticeOverlay, scrambleChoiceOverlay, settings
 import { backIntent } from './ui/back';
 import { isNativeShell } from './native';
 import { primeHaptics } from './render/haptics';
-import { hazardLabel, mapTopInfo, puttAimLabel, puttAimRow } from './app/playHud';
+import { hazardLabel, mapTopInfo, puttAimLabel, puttAimRow, puttBreakLine } from './app/playHud';
 import { mountWeatherOverlay, playCaddyVoice, playTentBonk, syncMusic } from './app/playFx';
 import { metaFromSave, persist, persistStory } from './app/persist';
 
@@ -849,6 +849,29 @@ let popupTimer = 0;
 // screen, torn down on any dispatch.
 let puttMeter: PuttMeterHandle | null = null;
 
+/** Where the HUD's permanent caddy badge sits, in the play canvas's own CSS-pixel space
+ *  (GS-hud-frame) — the muzzle a guard caddy's laser/boomerang fires from during the watch state,
+ *  now that the badge replaces the play view's corner figure. Null when no badge is on screen (no
+ *  caddy hired), which leaves the view drawing its classic corner figure. */
+function caddyBadgeAnchor(mapEl: HTMLElement): { muzzle: [number, number]; head: [number, number] } | undefined {
+  const badge = document.querySelector<HTMLElement>('.gs-hud-caddy .gs-caddybadge');
+  if (!badge) return undefined;
+  const b = badge.getBoundingClientRect();
+  const m = mapEl.getBoundingClientRect();
+  if (b.width === 0 || b.height === 0) return undefined;
+  const x = b.left + b.width / 2 - m.left;
+  // The BUBBLE has to clear the whole bottom bar, not just the badge — the badge sits inside the
+  // panel row, so a bubble hung above the portrait would be drawn behind the controls glass.
+  const bar = document.querySelector<HTMLElement>('.gs-hud-bottom')?.getBoundingClientRect();
+  const barTop = bar && bar.height > 0 ? bar.top - m.top : b.top - m.top;
+  return {
+    // Mid-figure, a touch above centre — the badge's portrait torso, so the throw reads as coming
+    // from the caddy rather than from the frame's corner.
+    muzzle: [x, b.top + b.height * 0.45 - m.top],
+    head: [x, barTop - 8],
+  };
+}
+
 function pendingAnimation(play: NonNullable<UiState['play']>): { shots: typeof play.shots; putts: typeof play.puttLogs } | null {
   const newShots = play.shots.slice(animatedShots);
   const newPutts = play.puttLogs.slice(animatedPutts);
@@ -1137,24 +1160,62 @@ function synthGhostHole(strokes: number, par: number): PlayedHole {
   return { record: { par, strokes }, stat: {}, shots: [], putts: [], holed: true, pickedUp: false } as unknown as PlayedHole;
 }
 
-function playingBody(animating: boolean): string {
+function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
   const play = state.play!;
   const v = shotView(play, state.run.loadout);
   const bag = state.run.loadout.bag;
   const par = play.hole.par;
 
-  if (animating) {
-    // Full-bleed: the live shot canvas IS the screen. The play view draws the active caddy ITSELF in
-    // the bottom-LEFT corner during flight — a guard caddy persistently (so its laser/boomerang
-    // redirect originates from the figure), and any other hired caddy transiently while its effect
-    // calls out. We do NOT also float the framed gold portrait badge here: the corner figure already
-    // shows the caddy, so a badge just rendered the SAME caddy twice (the "caddy shows twice on the
-    // shot-watching screen" bug). The portrait still rides the aim-and-charge + putting screens.
-    return `
-      <div class="gs-shot gs-shot--full">
-        <div class="gs-bigmap" id="play"></div>
-        ${mapTopInfo(v, { shotNo: play.strokes, distLabel: '…watching…' })}
-      </div>`;
+  if (anim) {
+    // WATCHING (GS-hud-frame). This used to be the odd one out: a bare canvas with the top chip and
+    // NOTHING else — no nav column, no controls panel, no caddy — so every control the player had
+    // just been using vanished the instant they released the shot, then reappeared somewhere after
+    // the ball settled. Now the watch state mounts the SAME frame, with its contents frozen and its
+    // controls disabled: you can see what you hit and where every button still lives.
+    //
+    // The caddy rides the permanent slot here too. That's why the play view no longer draws its own
+    // bottom-left corner figure while the badge is on screen (it would be the SAME caddy twice — the
+    // old "caddy shows twice on the shot-watching screen" bug); instead app.ts hands the view the
+    // badge's screen box as the projectile anchor, so a guard's laser/boomerang fires from the
+    // framed portrait the player has been looking at all along.
+    const struck = anim.shots[anim.shots.length - 1];
+    const rolling = !struck; // putts-only batch — the ball is rolling on the green
+    const clubName = struck ? struck.club.name : 'Putter';
+    // The gauge slot holds the shot's CARRY against the club's full carry — the same bar shape the
+    // power meter occupies while aiming, showing what the swing actually produced.
+    const carry = struck ? Math.round(struck.result.carry) : 0;
+    const carryFrac = struck && struck.club.carry > 0 ? Math.min(1, struck.result.carry / struck.club.carry) : 0;
+    const totalRun = struck ? Math.round(Math.hypot(struck.rest[0] - struck.from[0], struck.rest[1] - struck.from[1])) : 0;
+    const watchGauge = rolling
+      ? `<div class="gs-powerbar"><span class="gs-powerfill" style="width:100%;background:#9fd8e6;"></span></div>
+         <div class="gs-powerlabel"><b>⛳ Putt away</b> · <span style="opacity:.7;">watching it run</span></div>`
+      : `<div class="gs-powerbar"><span class="gs-powerfill" style="width:${(carryFrac * 100).toFixed(0)}%;background:#5fd45a;"></span></div>
+         <div class="gs-powerlabel"><b>Carry ${carry}y</b> · <span style="opacity:.7;">${totalRun}y from the strike</span></div>`;
+    return playFrameHTML({
+      mode: 'watch',
+      map: `<div class="gs-bigmap" id="play"></div>`,
+      // The lie shown is the one this shot was played FROM (`lieFrom`) — `play.lie` is already the
+      // lie the ball will FINISH in, so the bar was spoiling the result mid-flight.
+      top: mapTopInfo(v, {
+        shotNo: play.strokes,
+        distLabel: rolling ? '…rolling…' : '…in flight',
+        lie: struck ? struck.lieFrom : v.lie,
+      }),
+      rows: [
+        `<div class="gs-clubrow">
+          <button class="gs-btn" disabled aria-hidden="true">◄</button>
+          <span class="gs-clubname">${clubName}</span>
+          <button class="gs-btn" disabled aria-hidden="true">►</button>
+        </div>`,
+        watchGauge,
+        `<div class="gs-legend-line" style="opacity:.75;">${rolling ? 'The putt is rolling — reading the break as it goes.' : 'Ball in the air — hold on.'}</div>`,
+      ],
+      commit: `<button class="gs-btn gs-btn--primary" disabled>${rolling ? '⛳ Rolling…' : '🏌 In flight…'}</button>`,
+      caddyId: caddyId(),
+      nav: { whole: mapView === 'whole', moved: mapViewMoved(), viewDisabled: true, settingsDisabled: true },
+      autoFinishDisabled: true,
+      lefty: lefty(),
+    });
   }
 
   if (play.done) {
@@ -1410,21 +1471,29 @@ function playingBody(animating: boolean): string {
     // Manual putt = a pace meter: stop the sweeping marker in the green MAKE band to sink it.
     // Tapping the meter OR the Putt button captures the pace. Full-bleed: the map fills the screen,
     // the meter + Putt float in a bottom panel.
-    return `
-      <div class="gs-shot gs-shot--full">
-        <div class="gs-bigmap" data-weather="putt">${puttSvg}</div>
-        ${mapTopInfo(v, { shotNo: play.strokes + play.putts + 1, distLabel: `<b>${v.distToPin}</b>y · putt <b>${play.putts + 1}</b>` })}
-        <div class="gs-hud gs-hud-bottom">
-          ${caddyBadgeHTML(puttCaddyId())}
-          <div class="gs-hud-controls gs-glass">
-            <p style="font-size:11px;opacity:.7;margin:0;line-height:1.35;">${fringePutt ? 'Putting from the fringe — ' : ''}Read the <b>break</b>, aim, then tap the meter in the green <b>MAKE</b> band.${puttReadFrac < 0.999 ? ` <span style="opacity:.85;">Your read line <b>ends at ${Math.round(puttReadRange)}y</b> — past it you're guessing; a better putter reads further.</span>` : ''}</p>
-            ${puttAimRow(breakYd, puttAim, reads, doubleBreak)}
-            <div id="puttmeter"></div>
-            <button class="gs-btn gs-btn--primary" data-putt-commit="1" style="margin:0;padding:11px;">⛳ Putt</button>
-            ${fringePutt ? `<button class="gs-btn gs-btn--ghost" data-putt-toggle="0" style="margin:6px 0 0;padding:9px;">⛳→🏌 Chip instead</button>` : ''}
-          </div>
-        </div>
-      </div>`;
+    // The putt state mounts the SAME frame as the aim state (GS-hud-frame). Row 1 is the adjuster
+    // row the club cycler occupies while aiming — here its ◄/► nudge the AIM instead of the club, so
+    // the two most-tapped buttons on the screen never move between states. Row 2 is the gauge slot
+    // (the pace meter takes the power bar's place), row 3 the read, and the commit button is last, so
+    // it lands at the same y as ⛳/🏌 in every other state.
+    return playFrameHTML({
+      mode: 'putt',
+      map: `<div class="gs-bigmap" data-weather="putt">${puttSvg}</div>`,
+      top: mapTopInfo(v, { shotNo: play.strokes + play.putts + 1, distLabel: `<b>${v.distToPin}</b>y · putt <b>${play.putts + 1}</b>` }),
+      rows: [
+        puttAimRow(breakYd, puttAim, reads, doubleBreak, fringePutt),
+        `<div id="puttmeter"></div>`,
+        `<div class="gs-legend-line">${puttBreakLine(breakYd, doubleBreak)} <span style="opacity:.7;">· ${fringePutt ? 'from the fringe · ' : ''}aim it off, then tap the meter in the green <b>MAKE</b> band.${puttReadFrac < 0.999 ? ` Your read <b>ends at ${Math.round(puttReadRange)}y</b>.` : ''}</span></div>`,
+      ],
+      commit: `<button class="gs-btn gs-btn--primary" data-putt-commit="1">⛳ Putt</button>`,
+      // The caddy keeps its slot on the green even when they have no read here (a distance/guard
+      // caddy) — the badge dims instead of vanishing, so the bar's left edge never jumps.
+      caddyId: caddyId(),
+      caddyOffDuty: !puttCaddyId(),
+      nav: { whole: mapView === 'whole', moved: mapViewMoved(), viewDisabled: true, settingsDisabled: false },
+      autoFinishDisabled: false,
+      lefty: lefty(),
+    });
   }
 
   // Decision screen: map with shots so far + ball marker, the aiming spray cone, and controls.
@@ -1545,17 +1614,6 @@ function playingBody(animating: boolean): string {
     sprayGeom,
     ...mapOpts,
   });
-  // Map-nav overlay (floats ON the map so it needs no scrolling): overview/follow toggle, zoom
-  // in/out, and a recenter that snaps back to the default follow-cam. Solves "can't see the green
-  // / full hole on a long hole" (overview) and "move the map around" (zoom + drag-to-pan).
-  const mapCtrls = `
-    <div class="gs-mapctrl">
-      <button class="gs-mapbtn${mapView === 'whole' ? ' gs-mapbtn--on' : ''}" data-mapview="toggle" title="${mapView === 'whole' ? 'Follow the ball' : 'See the whole hole'}">${mapView === 'whole' ? '🎯' : '🗺'}</button>
-      <button class="gs-mapbtn" data-mapzoom="in" title="Zoom in"${mapView === 'whole' ? ' disabled' : ''}>＋</button>
-      <button class="gs-mapbtn" data-mapzoom="out" title="Zoom out"${mapView === 'whole' ? ' disabled' : ''}>－</button>
-      ${mapViewMoved() ? `<button class="gs-mapbtn" data-mapview="reset" title="Recenter on the ball">⌖</button>` : ''}
-      <button class="gs-mapbtn" data-open-settings="1" title="Settings">⚙</button>
-    </div>`;
   const cbtn = (label: string, dir: number) =>
     `<button class="gs-btn" data-cycle="${dir}" aria-label="cycle club ${dir > 0 ? 'up' : 'down'}">${label}</button>`;
   // Aim-mode toggle (GS-default-aim): cycle the default aim between the smart auto assist, always-attack
@@ -1590,7 +1648,7 @@ function playingBody(animating: boolean): string {
           ? 'aim: pin'
           : aimModeMeta(selAim).note;
     return `<div class="gs-powerbar"><span class="gs-powerfill" style="width:${Math.min(100, (selPower / maxPower) * 100).toFixed(0)}%;background:${powerCol};"></span>${maxPower > 1 ? `<span class="gs-power100" style="left:${(100 / maxPower).toFixed(0)}%;"></span>` : ''}</div>
-      <div class="gs-powerlabel"><b style="color:${powerCol};">${over ? '⚡ ' : ''}Power ${powerPct}%</b> · ${aimNote} · <span style="opacity:.7;">${charging ? 'release to hit · pull back to cancel' : 'pull DOWN on the map'}</span></div>`;
+      <div class="gs-powerlabel"><b style="color:${powerCol};">${over ? '⚡ ' : ''}Power ${powerPct}%</b> · ${aimNote} · <span style="opacity:.7;">${charging ? 'release to hit' : 'pull DOWN to power'}</span></div>`;
   };
   const powerHud = `<div class="gs-power" id="gs-powerhud">${powerHudInner()}</div>`;
   // Condensed spray odds + carry range (the cone on the map carries the detail). Sam (if hired) adds a
@@ -1656,27 +1714,25 @@ function playingBody(animating: boolean): string {
           const leg = document.getElementById('gs-shotlegend');
           if (leg) leg.innerHTML = legendInner(sprayNow);
         };
-  // The hired caddy, framed in the bottom-left so it stands out (GS-fullmap). The figure is drawn to
-  // the canvas in the render wiring. Absent when no caddy is hired.
-  const caddyBadge = caddyBadgeHTML(caddyId());
-  const autoFinish = `<button class="gs-roundbtn gs-glass" data-action='${JSON.stringify({ type: 'autoShotHole' })}' title="Auto-finish this hole">»</button>`;
-  return `
-    <div class="gs-shot gs-shot--full${lefty() ? ' gs-shot--lefty' : ''}">
-      <div class="gs-bigmap" data-map="1" data-weather="decision">${svg}</div>
-      ${mapCtrls}
-      ${mapTopInfo(v, { shotNo: play.strokes + 1, distLabel: `<b>${v.distToPin}</b>y` })}
-      <div class="gs-hud gs-hud-bottom">
-        ${caddyBadge}
-        <div class="gs-hud-controls gs-glass">
-          ${clubRow}
-          ${powerHud}
-          ${legend}
-          ${samRead}
-        </div>
-        ${autoFinish}
-      </div>
-    </div>
-    ${state.scrambleChoice ? scrambleChoiceOverlay() : awaitingShotPopup ? shotPopupOverlay() : ''}`;
+  // The commit row (GS-hud-frame): the pull-to-power gesture is still the expressive way to swing,
+  // but the frame's action row must be occupied in EVERY state — and a tap-to-swing button is the
+  // honest occupant here. It fires the exact shot the cone is previewing (the same club/aim/target
+  // and the resting `selPower`, which is already seeded to reach the pin), through the identical
+  // dispatch the gesture release uses — so it's one path, not a second shot mechanic. It also makes
+  // the screen playable one-handed, and without a drag at all.
+  const swingBtn = `<button class="gs-btn gs-btn--primary" data-swing="1" title="Swing at the previewed power — or pull down on the map to set it yourself">🏌 Swing</button>`;
+  return playFrameHTML({
+    mode: 'aim',
+    map: `<div class="gs-bigmap" data-map="1" data-weather="decision">${svg}</div>`,
+    top: mapTopInfo(v, { shotNo: play.strokes + 1, distLabel: `<b>${v.distToPin}</b>y` }),
+    rows: [clubRow, powerHud, legend, samRead],
+    commit: swingBtn,
+    caddyId: caddyId(),
+    nav: { whole: mapView === 'whole', moved: mapViewMoved(), viewDisabled: false, settingsDisabled: false },
+    autoFinishDisabled: false,
+    lefty: lefty(),
+    after: state.scrambleChoice ? scrambleChoiceOverlay() : awaitingShotPopup ? shotPopupOverlay() : '',
+  });
 }
 
 // Settings sheet — a view overlay (not reducer state), toggled like the shot popup.
@@ -2554,7 +2610,7 @@ function render(): void {
       : state.screen === 'intro'
       ? introScreen()
       : state.screen === 'playing'
-      ? playingBody(animatingPlay !== null)
+      ? playingBody(animatingPlay)
       : state.screen === 'result'
       ? resultScreen()
       : state.screen === 'bossReward'
@@ -3184,6 +3240,18 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-putt-commit]').forEach((el) => {
     el.addEventListener('click', () => puttMeter?.commit());
   });
+  // The "🏌 Swing" button (GS-hud-frame) — the aim state's occupant of the frame's fixed commit row.
+  // It fires the shot the cone is ALREADY previewing: the same club/aim/free-target and the resting
+  // `selPower` (seeded per shot to reach the pin), through the identical dispatch the pull-gesture
+  // release uses. So it is not a second shot mechanic — it's the same one, without the drag, which
+  // also makes the play screen usable one-handed.
+  app.querySelectorAll<HTMLElement>('[data-swing]').forEach((el) => {
+    el.addEventListener('click', () => {
+      if (!state.play || !selClubId) return;
+      haptic(HAPTICS.swing);
+      dispatch({ type: 'shot', clubId: selClubId, aim: selAim, target: selFreeTarget ?? undefined, power: selPower });
+    });
+  });
   // ◄/► nudge the manual-putt AIM (GS-greens-3) to read the break. A tap steps once; PRESS-AND-HOLD
   // auto-repeats (doubling after a second) so a big borrow on a long steep putt doesn't take dozens
   // of taps. Step/clamp are per-putt (puttAimStep/puttAimMax, scaled to the read). Updates are
@@ -3382,6 +3450,13 @@ function render(): void {
         groundPatch: patchActive(),
         golferLook: golferLook(),
         caddyId: caddyId(),
+        // GS-hud-frame: the caddy now rides a PERMANENT badge slot that stays put through the watch
+        // state too, so the play view must not also draw its corner figure (that's the same caddy
+        // twice). Hand it the badge's live screen box instead — a guard's laser/boomerang then fires
+        // from the framed portrait. Measured, not assumed: the badge is CSS-positioned against the
+        // safe area, and there's no badge at all when no caddy is hired (⇒ undefined ⇒ the classic
+        // corner figure, which is what the force-redirect demo still needs).
+        caddyAnchor: caddyBadgeAnchor(playEl),
         lefty: lefty(),
         onCaddyEffect: playCaddyVoice,
         onTentHit: playTentBonk,
