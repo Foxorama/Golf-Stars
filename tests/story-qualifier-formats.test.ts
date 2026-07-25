@@ -117,6 +117,17 @@ describe('the qualifier DRAW SHEET (GS-story-qualifier-formats)', () => {
     expect(activeQualifierPlan(s, event.courseId)).toBeTruthy();
   });
 
+  it('GS-story-qualifier-chapter-gate: a world charted AHEAD of its chapter is not an event yet', () => {
+    // The Ghost Wreck is a Chapter-5 world charted at Ch.4 (GS-story-gather-early) so you can fly out and
+    // recruit its friend in time. Flying there early is exploration — arming a qualifying plan there played
+    // a nine-hole event that could never be recorded, and then the world came round AGAIN as a real
+    // qualifier for its own chapter's Sigil.
+    const early: StoryState = { ...CAMPAIGN(), chapter: 4, alignment: 'warden' };
+    expect(activeQualifierPlan(early, 'derelict-18')).toBeUndefined();
+    // Once you actually reach Chapter 5, it is the qualifying event it always meant to be.
+    expect(activeQualifierPlan({ ...early, chapter: 5 }, 'derelict-18')).toBeTruthy();
+  });
+
   it('every format has a readable name + a "how this is won" blurb naming the partner', () => {
     for (const format of QUALIFIER_FORMATS) {
       const p = plan(format);

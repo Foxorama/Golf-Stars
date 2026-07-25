@@ -51,7 +51,7 @@ import { shipCreditMult, grantStoryAceShip, grantStoryShip } from '../sim/rpg/st
 import { recordCaddyRound } from '../sim/rpg/storyCaddies';
 import { upgradeCreditMult, grantShipUpgrade } from '../sim/rpg/storyShipUpgrades';
 import { storyGearCreditMult } from '../sim/rpg/storyGear';
-import { tournamentForChapter, tournamentRival, sigilMatchThrough, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS, isStoryQualifier, chapterQualifierEvents, isTeamTournament, isSinglesMatchTournament, isTeamMatchTournament, teamFieldPairs, teamPartnerOrDefault, TEAM_PARTNER_EDGE } from '../sim/rpg/storyTournaments';
+import { tournamentForChapter, tournamentRival, sigilMatchThrough, rivalTotal, tournamentField, tournamentLeaderboard, winTournament, SIGIL_WIN_BONUS, isLiveStoryQualifier, chapterQualifierEvents, isTeamTournament, isSinglesMatchTournament, isTeamMatchTournament, teamFieldPairs, teamPartnerOrDefault, TEAM_PARTNER_EDGE } from '../sim/rpg/storyTournaments';
 import { resolveStoryTeamStroke, opposingField } from '../sim/rpg/storyTeams';
 import { qualifierField, qualifierFieldSize, qualifierPlacement, recordQualifier, recordQualifierPartner, qualifiedCount, qualifyTop, QUALIFY_EVENTS_NEEDED } from '../sim/rpg/storyQualifiers';
 import { activeQualifierPlan, resolveQualifierRound, qualifierFormatName, qualifierMatchOpponents } from '../sim/rpg/storyQualifierFormats';
@@ -412,10 +412,10 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
   // the chapter's Galaxy Tournament. Records the best finish; the recap shows the board + progress.
   // GS-story-gather-early: a caddy-home world can be CHARTED before its tournament chapter (fly out to
   // recruit + quest the friend in time). Visiting it early is a plain exploration clear — only resolve the
-  // formal QUALIFYING EVENT once you've actually reached its chapter (`storyWorldChapter <= your chapter`).
-  // Byte-identical for all ordinary play, where a world is never reachable above the current chapter.
+  // formal QUALIFYING EVENT once you've actually reached its chapter (`isLiveStoryQualifier`, the SAME
+  // predicate that arms the plan at tee-off, so what you played is what gets scored).
   let qualifier: NonNullable<UiState['lastStoryRound']>['qualifier'];
-  if (!run.storyQuest && isStoryQualifier(courseId, base.alignment) && storyWorldChapter(courseId) <= base.chapter) {
+  if (!run.storyQuest && isLiveStoryQualifier(base, courseId)) {
     const chapter = storyWorldChapter(courseId);
     // GS-story-qualifier-formats: score the event in the FORMAT it was drawn as — a solo card, a points
     // card, or a two-ball (scramble/best-ball) card, and matchplay on its own win-or-halve terms. The plan

@@ -172,6 +172,47 @@ DATA-driven is that a new story arc costs zero engine. Three additions:
 The one-off is recorded in the main-save `seenLore` like every other beat (no new save field). Pure DATA
 + render — zero sim rng, no `_gs*`/URL hook. Full campaign story: `docs/decisions/story-mode.md`.
 
+## GS-story-beat-venue — a beat says which ROOM it happens in (2026-07-25)
+**The player report:** *"the Sigil story beats now fire in the qualifying rounds."*
+
+When the story beats were written, a chapter's non-venue worlds were plain world-clears you flew out to
+between majors, so an ungated `storyChapter === N` beat landed somewhere quiet. GS-story-qualifiers turned
+every one of those worlds into a COMPETITIVE nine-hole qualifying event with its own field, format and
+dossier — and the beats did not move. The result: the Apostate stepped onto the tee of a qualifier and
+announced he was here for the major; the Viper waited "at the shrine" three worlds before the shrine; the
+Ragnarök omen said *"play this one like the whole galaxy is watching"* over a Tuesday qualifier.
+
+**The rule:** a beat now declares its venue.
+- `!c.storyTournament` — **on the road** (a qualifying event, a quest round, a practice lap): the galleries,
+  the Coilkeepers, the Parrot's lessons, the crew fraying between events. These are the beats whose copy
+  works anywhere a ball is teed.
+- `c.storyTournament === true` — **at the Sigil**: the rivals who genuinely stand across THAT tee (Venoma's
+  debut at the Forge, Scorpius at the Vigil, the Apostate at the Storm, the Viper back at the shrine) and
+  the Ragnarök omens, which count Sigils and therefore speak at one.
+
+**Beats CHAIN at a major, and only at a major.** Gating the rival + the omen to the same single arrival
+would otherwise strand one of them forever (a chapter has ONE Sigil tee-off), so `dismissLore` re-runs the
+gate when `run.storyTournament` is set and plays the next pending beat. Everywhere else the classic pacing
+holds — one beat per arrival — because chaining on the road would collapse a chapter's whole thread into
+the first qualifier you flew to. Still zero sim rng; the chain terminates because the dismissed beat is
+already recorded in `seenLore`.
+
+## GS-story-qualifier-chapter-gate / GS-story-quest-soon-marker — the chart tells the truth (2026-07-25)
+Two star-map reports from the same session, both about a marker promising something that wasn't there:
+- **"a world can be a qualifier for two different Sigil events."** A Ch.5 world charted at Ch.4
+  (`chartChapter`, GS-story-gather-early) armed a qualifier PLAN at tee-off — it played as a nine-hole
+  event with a format and a field — but `resolveStoryRound` refused to RECORD a finish for a chapter you
+  hadn't reached, and the same world came round again as a real qualifier for its own Sigil. Two gates, two
+  answers. Now `isLiveStoryQualifier(story, courseId)` is the ONE predicate: it arms the plan, records the
+  finish, and fills the dossier. An early visit is exploration; the event is a brand-new event when its
+  chapter arrives. The dossier's "Replay this qualifying event" also keys off a recorded FINISH rather than
+  a cleared world, so it never claims a replay of something you never played.
+- **"the caddy quest SOON icon appears as soon as you hire a caddy, and it hides the qualifier banner."**
+  Both halves were true. `questBeatPendingReason` now splits the held beat into `'caddy'` (you have never
+  had them on the bag — a crew-card hint, nothing on the chart) and `'elsewhere'` (fly on once and they'll
+  open up — worth a pill), and `storyWorldMarker` ranks an actionable quest above the qualifier flag but a
+  pending hint BELOW it: a marker is a call to action, and the live objective always wins the glyph.
+
 ### Guards
 - `tests/lore.test.ts` — the parrot beat's trigger (fires only for derelict + parrot, once), its
   `effects`, the portrait, and the reducer flow (dismiss grants the Firebird + arms foresight; the boon

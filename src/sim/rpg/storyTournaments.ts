@@ -408,6 +408,24 @@ export function isStoryQualifier(courseId: string, alignment?: StoryAlignment): 
   return courseId !== tournamentForChapter(w.unlockChapter, alignment)?.venueId;
 }
 
+/**
+ * Is this world a LIVE qualifying event for the player right now (GS-story-qualifier-chapter-gate)? — a
+ * qualifier for their path (above) whose own chapter they have actually REACHED.
+ *
+ * The chapter half matters because a couple of Ch.5 worlds chart at Ch.4 (`chartChapter`, GS-story-gather-
+ * early) so you can fly out and recruit their friend in time. Visiting one early is EXPLORATION: the round
+ * banks a clear, and `resolveStoryRound` has always refused to record a qualifying finish for a chapter you
+ * haven't reached. Arming the qualifier PLAN had no such gate, so an early visit played as a nine-hole
+ * qualifying event that could never count — and then the same world came round AGAIN as a real qualifier for
+ * its own chapter's Sigil, reading as "you already played this event, play it again". One predicate now
+ * decides both, so a world is a qualifying event for exactly ONE Sigil, once you're in its chapter.
+ */
+export function isLiveStoryQualifier(story: StoryState, courseId: string): boolean {
+  const w = storyWorldById(courseId);
+  if (!w || w.unlockChapter > story.chapter) return false;
+  return isStoryQualifier(courseId, story.alignment);
+}
+
 /** Has this tournament already been won (its Sigil banked)? */
 export function tournamentWon(story: StoryState, t: StoryTournament): boolean {
   return story.trophyIds.includes(t.sigilId);

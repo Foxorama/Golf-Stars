@@ -1170,7 +1170,13 @@ export function reduce(state: UiState, action: Action): UiState {
           : state.ownedShips;
       // Arm the Prognostic Parrot's 100% foresight for THIS stop (self-expiring off `stopIndex`).
       const run = fx?.parrotForesight ? { ...state.run, parrotForesightStop: state.run.stopIndex } : state.run;
-      return { ...state, screen: 'intro', pendingLoreId: undefined, seenLore, ownedShips, run };
+      const next = { ...state, screen: 'intro' as const, pendingLoreId: undefined, seenLore, ownedShips, run };
+      // GS-story-beat-venue: at a SIGIL tee-off, beats CHAIN. The chapter's Sigil-flavoured beats (the rival
+      // who actually waits at this tee + the Ragnarök omen that counts the Sigils) all land on the ONE major
+      // arrival, so the gate runs again here and plays the next one instead of stranding it. Everywhere else
+      // the classic pacing holds — one beat per arrival — so a qualifying round is never a wall of dialogue.
+      // The just-seen beat is already recorded, so the chain always terminates.
+      return next.run.storyTournament != null ? withLoreGate(next) : next;
     }
 
     case 'play': {

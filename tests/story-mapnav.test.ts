@@ -81,10 +81,19 @@ describe('Story star-map navigation status (GS-story-map-nav)', () => {
       activeCaddyId: 'sandy-sandsaver',
       clearedWorldIds: ['standrews-18', 'verdant-18'],
     };
-    // Pending: recruited + chapter-ready but not yet carried a round with them.
-    const pend = storyWorldNav(ch1({ ...base, caddiedRoundIds: [] }), 'desert-18');
+    // GS-story-quest-soon-marker: merely RECRUITING a friend puts nothing on the chart — you have never had
+    // them on the bag, so they have nothing to show you yet.
+    const hired = storyWorldNav(ch1({ ...base, caddiedRoundIds: [], clearedWorldIds: ['standrews-18'] }), 'desert-18');
+    expect(hired.quest).toBeUndefined();
+    expect(storyWorldMarker(hired)).toBeUndefined();
+
+    // Pending: carried a round together, but they want you to fly on elsewhere before they open up.
+    const pend = storyWorldNav(ch1({ ...base, caddiedRoundIds: ['sandy-sandsaver'], clearedWorldIds: ['desert-18'] }), 'desert-18');
     expect(pend.quest!.state).toBe('pending');
     expect(storyWorldMarker(pend)).toBe('quest-pending');
+
+    // …and a pending hint NEVER covers a live qualifying event's own banner.
+    expect(storyWorldMarker({ ...pend, qualifier: { chapter: 1, top: 10, field: 16, qualified: false, holes: 9, formatName: 'Singles stroke play', formatBlurb: '', matchplay: false } })).toBe('qualifier');
 
     // Active: the quest has been accepted.
     const act = storyWorldNav(ch1({ ...base, caddiedRoundIds: ['sandy-sandsaver'], activeQuestId: 'quest-sandy' }), 'desert-18');

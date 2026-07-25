@@ -817,11 +817,15 @@ describe('The Choice + alignment fork (GS-story-chapters)', () => {
       equippedBagIds: defaultStoryState().equippedBagIds.map((id) => (id === 'D' ? 'club:solar:D' : id)),
     };
     const hub = { ...initState('seed', {}, undefined, story), screen: 'story' as const };
-    // The Ch.4 major arrival fires a Warden DOUBT-thread beat (GS-story-doubt — here the betrayer's
-    // eve-of-the-vigil drift, since the vigil tee-off is the first arrival) — dismiss it, then play.
+    // GS-story-beat-venue: the vigil tee-off fires the beats that belong to THIS tee — the Silent Sting up
+    // close, then (chained on dismiss) the chapter's Ragnarök omen. The doubt thread's eve-of-the-vigil
+    // drift belongs to the road, so it never turns up at the major.
     let round = reduce(reduce(hub, { type: 'openStoryTournament' }), { type: 'storyPlayTournament' });
     expect(round.screen).toBe('lore');
-    expect(round.pendingLoreId).toMatch(/^story-distance-/);
+    expect(round.pendingLoreId).toBe('story-scorpius-warden');
+    const chained = reduce(round, { type: 'dismissLore' });
+    expect(chained.screen).toBe('lore'); // the omen chains onto the same arrival rather than being stranded
+    expect(chained.pendingLoreId).toBe('story-omen-abyss-warden');
     round = pastLore(round);
     const done = reduce(round, { type: 'play' });
     expect(done.screen).toBe('storyTournamentResult');

@@ -21,7 +21,7 @@ import {
   questWorld,
   activeQuest,
   questOfferable,
-  questBeatPending,
+  questBeatPendingReason,
   questGiverName,
   questRewardEffectLabel,
   STORY_QUESTS,
@@ -37,7 +37,7 @@ import {
 import { qualifierPlan, qualifierFormatName, qualifierFormatBlurb } from './storyQualifierFormats';
 import { getCharacter } from './characters';
 import {
-  isStoryQualifier,
+  isLiveStoryQualifier,
   tournamentForChapter,
   tournamentWon,
   currentTournament,
@@ -123,7 +123,10 @@ function questNavForWorld(story: StoryState, courseId: string): StoryQuestNav | 
   for (const q of STORY_QUESTS) {
     if (questWorld(q) !== courseId) continue;
     if (questOfferable(story, q.caddyId)) return build(q, 'offerable');
-    if (questBeatPending(story, q.caddyId)) return build(q, 'pending');
+    // GS-story-quest-soon-marker: only the LAST beat ("fly on elsewhere and they'll open up") reaches the
+    // chart. A friend you've merely hired — never had on the bag — has nothing to show you yet, so their
+    // home world stays a plain destination instead of lighting up 🎒 SOON the moment you recruit them.
+    if (questBeatPendingReason(story, q.caddyId) === 'elsewhere') return build(q, 'pending');
   }
   return undefined;
 }
@@ -133,7 +136,7 @@ function questNavForWorld(story: StoryState, courseId: string): StoryQuestNav | 
 function qualifierNavForWorld(story: StoryState, courseId: string, chosenPartnerId?: string): StoryQualifierNav | undefined {
   const w = storyWorldById(courseId);
   if (!w || w.unlockChapter !== story.chapter) return undefined;
-  if (!isStoryQualifier(courseId, story.alignment)) return undefined;
+  if (!isLiveStoryQualifier(story, courseId)) return undefined;
   const res = story.qualifierResults[courseId];
   const plan = qualifierPlan(story, courseId, chosenPartnerId);
   const partnerName = plan?.partnerId ? getCharacter(plan.partnerId)?.shortName : undefined;
@@ -197,7 +200,11 @@ export type StoryWorldMarker =
 
 export function storyWorldMarker(nav: StoryWorldNav): StoryWorldMarker | undefined {
   if (nav.venue) return nav.venue.won ? 'venue-won' : nav.venue.ready ? 'venue-ready' : 'venue-locked';
-  if (nav.quest) return nav.quest.state === 'active' ? 'quest-active' : nav.quest.state === 'pending' ? 'quest-pending' : 'quest';
+  // An ACTIONABLE quest (accept now / go play) outranks the qualifier flag; a PENDING one is only a hint,
+  // so it never covers the live objective (GS-story-quest-soon-marker — the 🎒 SOON pill was hiding the
+  // 🏁 QUALIFIER banner on a world you actually have to go and qualify at).
+  if (nav.quest && nav.quest.state !== 'pending') return nav.quest.state === 'active' ? 'quest-active' : 'quest';
   if (nav.qualifier) return nav.qualifier.qualified ? 'qualified' : 'qualifier';
+  if (nav.quest) return 'quest-pending';
   return undefined;
 }
