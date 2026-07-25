@@ -2,7 +2,7 @@
  * The STORY MODE recruitment cinematic (GS-story-intro) — Canvas2D, render-only (NOT the sim), played as a
  * full-screen overlay after you win the Earth World Tour final and "answer the call", before you arrive at
  * the spaceport clubhouse. The beats (per the story bible):
- *   1. VICTORY  — dusk over the 18th at St Andrews; the champion lifts the trophy, the gallery cheering.
+ *   1. VICTORY  — dusk over the 18th at St Annette’s; the champion lifts the trophy, the gallery cheering.
  *   2. SHADOW   — the sky darkens; a vast shadow sweeps the green as the Mothership descends.
  *   3. LAND     — the Mothership hovers on a beam of light; the Prognostic Parrot flies down.
  *   4. THE CALL — the Parrot's recruitment line, typed in: "the Universe needs you… follow me!"
@@ -201,7 +201,7 @@ export function mountStoryIntro(opts: { onDone?: () => void } = {}): StoryIntroH
     ctx.globalAlpha = 1;
   }
 
-  /** The 18th at St Andrews: layered links, the Swilcan-ish burn, a red pin, the stone clubhouse and the
+  /** The 18th at St Annette’s: layered links, the Annette-ish burn, a red pin, the stone clubhouse and the
    *  gallery crowd. `alpha` fades the whole ground away as we lift off. */
   function drawLinks(alpha: number): void {
     if (!ctx || alpha <= 0) return;

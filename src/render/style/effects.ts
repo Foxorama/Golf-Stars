@@ -364,8 +364,8 @@ export function rainbowSky(W: number, H: number, accents: number, rng: () => num
 }
 
 /**
- * Earth's atmospheric DAYLIGHT sky (GS-story-earth-sky): the one real-world course — the Old Course at
- * St Andrews — sits on planet Earth, not out in space, so its out-of-bounds backdrop is a bright coastal
+ * Earth's atmospheric DAYLIGHT sky (GS-story-earth-sky): the one real-world course — St Annette’s at
+ * St Annette’s — sits on planet Earth, not out in space, so its out-of-bounds backdrop is a bright coastal
  * SKY, not the deep-space base + starfield every space world draws. A vertical blue gradient (deep zenith
  * easing to a pale sea-haze), a warm low sun with a soft halo, and a scatter of drifting clouds. Replaces
  * buildScene §1+§2 for the `earth` archetype ONLY, so every other world is byte-for-byte unchanged.

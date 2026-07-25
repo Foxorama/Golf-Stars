@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      GS-android-systembars. The app background — the gs-bg design token in index.html. The status
+      bar and navigation bar are painted this colour so they read as part of the game instead of as
+      foreign chrome; see styles.xml for why that only mattered on one of the two test phones.
+      Prefixed "gs" so it can never collide with the colour resources @capacitor/android's library
+      supplies (colorPrimary, colorPrimaryDark, colorAccent).
+
+      Note: no double hyphen anywhere in this comment. XML forbids it inside a comment, and AAPT
+      fails the whole Android build on it — which is an easy trap when quoting a CSS custom property.
+    -->
+    <color name="gsSystemBar">#0b0d12</color>
+</resources>

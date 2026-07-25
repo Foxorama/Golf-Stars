@@ -20,7 +20,7 @@ describe('story objective guide (GS-story-objective)', () => {
   it('a fresh campaign points at the World Tour final (prologue)', () => {
     const o = storyObjective(defaultStoryState());
     expect(o.stage).toBe('prologue');
-    expect(o.next).toMatch(/St Andrews|World Tour/);
+    expect(o.next).toMatch(/St Annette’s|World Tour/);
     expect(o.action).toEqual({ type: 'storyPlayWorld', courseId: 'standrews-18' });
   });
 

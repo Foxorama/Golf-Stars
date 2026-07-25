@@ -23,6 +23,7 @@ import { holeProjector } from './project';
 import { buildScene, drawScenePrims, landPolysCourseFor, type Prim } from './style';
 import { artFeel } from './style/shared';
 import { createWeather, type WeatherHandle } from './weather';
+import { safeAreaInsets } from './safeArea';
 import { createCetusFlow } from './cetusFlow';
 import { createShipDrift } from './shipDrift';
 import {
@@ -557,12 +558,22 @@ export function mountPlayView(
   }
 
   function drawHUD(text: string): void {
+    // Keep the flight / putt label clear of the system status bar (GS-play-safearea). The play
+    // canvas is FULL-BLEED (`.gs-shot--full .gs-bigmap` is `inset: 0`), so a label at canvas y=8
+    // is painted underneath the clock and battery on any device that overlays the status bar —
+    // which is what put "5-Iron · 114 yds" on top of the time. CSS `env()` can't help here: to CSS
+    // a canvas is one opaque box, so the inset has to be measured and applied in canvas space.
+    // `ctx` is already `scale(dpr, dpr)`d, so its user units ARE CSS pixels and the insets apply
+    // directly with no DPR multiply.
+    const sa = safeAreaInsets();
+    const x = 8 + sa.left;
+    const y = 8 + sa.top;
     ctx.font = '600 13px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
     const w = ctx.measureText(text).width + 16;
-    ctx.fillRect(8, 8, w, 24);
+    ctx.fillRect(x, y, w, 24);
     ctx.fillStyle = '#fff';
-    ctx.fillText(text, 16, 24);
+    ctx.fillText(text, x + 8, y + 16);
   }
 
   // Animated atmosphere — the always-on space ambience (twinkling stars + the odd shooting star),

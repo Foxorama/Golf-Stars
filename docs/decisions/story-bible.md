@@ -113,7 +113,7 @@ The friends who fought beside you become the champions you must *break* if you t
 you becomes your mentor. That reversal is the whole point of the choice.
 
 ```
-PROLOGUE  Earth · World Tour final (St Andrews) → win → Mothership lands → Parrot recruits → intro → Clubhouse
+PROLOGUE  Earth · World Tour final (St Annette’s) → win → Mothership lands → Parrot recruits → intro → Clubhouse
 
 ── SHARED TRUNK ──────────────────────────────────────────────────────────────────────────────
 CH.1  The Emerald Invitational   (Lyra Meadows, verdant)   — rookie major; the Game is real     [Sigil 1]

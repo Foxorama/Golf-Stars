@@ -231,6 +231,12 @@ export interface UiState {
    *  while one is already on the bag, so the shop shows a "they won't be happy to be fired" warning
    *  before the hire goes through. Transient (never persisted); cleared on confirm/cancel. */
   pendingFireCaddy?: { newId: string; oldId: string };
+  /** A pending LEAVE-THE-ROUND confirmation (GS-android-back): the player pressed the Android back
+   *  button (or Escape) while in a run, so the app shows a confirm card before parking the run and
+   *  returning to the title. Transient (never persisted); cleared on confirm/cancel and by `toTitle`.
+   *  See `ui/back.ts` — the confirm exists because leaving mid-stop replays that stop, not because
+   *  anything is lost (`toTitle` keeps the run resumable). */
+  pendingExit?: boolean;
   /** The suspended real run (GS-asgard): when an eagle-or-better on Rainbow Road opens the Bifröst, the
    *  current run is snapshotted here while the Asgard tournament plays in `run`. Restored (perks edited)
    *  on the tournament's end. The Asgard run is never persisted, so a mid-tournament quit resumes THIS. */
@@ -575,6 +581,8 @@ export type Action =
   | { type: 'dismissPriceNotice' } // close the one-off Trade Market price-cut / refund notice (GS-trade-rebalance)
   | { type: 'buyBagTier'; tier: BagTier } // buy a permanent default-bag upgrade with shards (GS-bag-tiers)
   | { type: 'setCharacterBagTier'; tier: BagTier } // pick the managed golfer's Unending-Universe starting bag tier (GS-wardrobe-bagtier)
+  | { type: 'requestExit' } // GS-android-back: raise the "leave this round?" confirm (back pressed in a run)
+  | { type: 'cancelExit' } // GS-android-back: dismiss that confirm and stay in the round
   | { type: 'toTitle' } // back to the title from anywhere (GS-settings-nav) — an underway run stays resumable
   | { type: 'restart'; seed?: number | string };
 

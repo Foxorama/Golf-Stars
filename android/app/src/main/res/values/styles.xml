@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Base application theme. -->
+    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+        <!-- Customize your theme here. -->
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+    </style>
+
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:background">@null</item>
+        <!--
+          GS-android-systembars: PAINT THE SYSTEM BARS.
+
+          Capacitor's stock theme sets neither statusBarColor nor navigationBarColor, so both fall
+          back to the platform default — an OPAQUE LIGHT bar. Against this game's dark UI that reads
+          as a white strip pinned to the bottom of the screen, which play-testing reported as a
+          leftover "browser bar". It is the Android navigation bar; there is no browser in the shell.
+
+          Why it only showed on ONE device: with targetSdk 36, Android 15+ ENFORCES edge-to-edge, so
+          on a Pixel 9a the bars go transparent and the app draws behind them (which is what
+          GS-play-safearea exists to handle). An older Android — the Galaxy S20 FE tops out well
+          before 15 — does no such thing and simply honours the theme, defaults included. Same APK,
+          two completely different results, and only the older one looked broken.
+
+          Matching them to the app background makes the bars disappear into the game on the older
+          devices, and changes nothing on the edge-to-edge ones (transparent wins there). The light*
+          flags force LIGHT icons, since dark-on-dark would be unreadable; both are ignored on the
+          API levels that predate them, which is why they are safe to declare with minSdk 24.
+        -->
+        <item name="android:statusBarColor">@color/gsSystemBar</item>
+        <item name="android:navigationBarColor">@color/gsSystemBar</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <item name="android:background">@drawable/splash</item>
+        <!-- Same treatment on the launch screen, so the bars don't flash light before the game paints. -->
+        <item name="android:statusBarColor">@color/gsSystemBar</item>
+        <item name="android:navigationBarColor">@color/gsSystemBar</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

@@ -2191,7 +2191,7 @@ interface WidthProfile {
  * (Augusta's 18th), an approach that necks down into the green (Royal Lytham), a fairway pinched
  * exactly at driving distance so you lay up short or thread it (Oakmont, links driving zones), a
  * links ribbon that wanders wide-narrow-wide, a uniformly tight US-Open strip, and the huge shared
- * meadows of St Andrews. The old generator gave every hole ONE recipe (full body + landing bulges +
+ * meadows of St Annette’s. The old generator gave every hole ONE recipe (full body + landing bulges +
  * a soft pinch), so width never distinguished holes. Like the shape grammar, the width grammar is
  * VARIETY, not difficulty: profiles appear at every wildness (the overall `widthScale` early→late
  * lever still carries difficulty), and each profile's params are drawn seeded so no two chutes are
@@ -2255,7 +2255,7 @@ export function chooseWidthProfile(
     return { id: 'thin', at: (u) => tw * (1 + w(u)), floorFrac: 0.4, asymScale: 0.6 };
   };
   const broad = (): WidthProfile => {
-    // A generous meadow — the St Andrews shared-fairway feel.
+    // A generous meadow — the St Annette’s shared-fairway feel.
     const bw = rng.range(1.24, 1.5);
     const w = wave(rng.range(0.04, 0.09));
     return { id: 'broad', at: (u) => bw * (1 + w(u)), floorFrac: 0.62, asymScale: 1 };

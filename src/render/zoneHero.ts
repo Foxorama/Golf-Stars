@@ -365,8 +365,8 @@ export function zoneHeroSVG(archetype: BiomeArchetype, opts: HeroOpts = {}): str
   }
 
   if (archetype === 'earth') {
-    // HOME (GS-earth) — the Old Course at dusk: a low sun over the North Sea, rolling golden dune
-    // ridges, a Swilcan-style stone bridge, and a flag on a huge green under a real seaside sky.
+    // HOME (GS-earth) — St Annette’s at dusk: a low sun over the North Sea, rolling golden dune
+    // ridges, a Annette-style stone bridge, and a flag on a huge green under a real seaside sky.
     let inner = body(W * 0.74, H * 0.34, 15, '#ffe6a8', { glow: 'rgba(255,214,140,0.28)', shade: false });
     inner += `<rect x="0" y="${n1(H * 0.5)}" width="${W}" height="${n1(H * 0.14)}" fill="rgba(90,140,180,0.4)"/>`;
     for (let i = 0; i < 4; i++) {

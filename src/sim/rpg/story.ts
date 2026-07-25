@@ -34,7 +34,7 @@ export type StoryAlignment = 'warden' | 'herald';
 /** The five Galaxy Tournaments — collecting all five trophies forges the key to the other realm. */
 export const STORY_CHAPTER_COUNT = 5;
 
-/** The Earth opening: the final round of the World Tour (the Old Course at St Andrews). Clearing it is the
+/** The Earth opening: the final round of the World Tour (St Annette’s Links). Clearing it is the
  *  prologue — it recruits you into the campaign and advances chapter 0 → 1. See the story bible. */
 export const PROLOGUE_COURSE_ID = 'standrews-18';
 

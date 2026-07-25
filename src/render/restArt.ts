@@ -80,21 +80,106 @@ function fairwayScene(): string {
   );
 }
 
-function roughScene(opts: RestArtOpts): string {
+/** Rough. `deep` darkens the turf and raises the growth so DEEP rough / fescue reads as a hack-out
+ *  rather than as ordinary first cut — the ball sits lower and is half-swallowed (GS-restart-coverage). */
+function roughScene(opts: RestArtOpts, deep = false): string {
   const tufts = [
     [40, 96], [62, 104], [150, 98], [172, 106], [88, 110], [128, 112], [30, 112], [184, 96],
   ]
-    .map(([x, y]) => grassTuft(x!, y!, '#2f7a35'))
+    .map(([x, y]) => grassTuft(x!, y!, deep ? '#1f5a26' : '#2f7a35'))
     .join('');
+  // Deep: a second, taller rank of growth in FRONT of the ball, so it reads as buried.
+  const front = deep
+    ? [[74, 100], [96, 102], [116, 101], [138, 103], [58, 98], [156, 99]]
+        .map(([x, y]) => grassTuft(x!, y! + 4, '#2b6f30'))
+        .join('') +
+      [[84, 104], [106, 106], [128, 105]].map(([x, y]) => grassTuft(x!, y! + 7, '#37853c')).join('')
+    : '';
   return frame(
     skyBand('#0e2233', '#1d4a63') +
-      turf(60, '#56a94a', '#357c33', '#244f22') +
-      ball(104, 86, 11) +
+      (deep ? turf(56, '#3f8a3a', '#276227', '#173d18') : turf(60, '#56a94a', '#357c33', '#244f22')) +
+      ball(104, deep ? 92 : 86, deep ? 10 : 11) +
       // tufts hugging the ball so it reads "nestled down"
-      grassTuft(92, 92, '#3c8f3f') +
-      grassTuft(118, 93, '#3c8f3f') +
-      tufts,
+      grassTuft(92, deep ? 98 : 92, deep ? '#2b6f30' : '#3c8f3f') +
+      grassTuft(118, deep ? 99 : 93, deep ? '#2b6f30' : '#3c8f3f') +
+      tufts +
+      front,
     opts,
+  );
+}
+
+/**
+ * A POT bunker — steep revetted walls, ball at the bottom (GS-restart-coverage). Deliberately NOT
+ * `bunkerScene`: that is a shallow raked bunker you can swing a wedge in, whereas a pot is a
+ * sideways hack-out. Drawing them the same is a lie about the shot you're about to face, and pot
+ * bunkers are a SIGNATURE lie on the links world (`potBunkers` 1.9), so this is the one the player
+ * meets most.
+ */
+function potScene(): string {
+  const revet = Array.from({ length: 7 }, (_, i) => {
+    const y = 58 + i * 6;
+    return `<rect x="0" y="${y}" width="${W}" height="5" fill="${i % 2 ? '#6f5a34' : '#7d663c'}"/>`;
+  }).join('');
+  return frame(
+    skyBand('#0b1a26', '#1b3f55') +
+      // The far wall of stacked turf revetments, rising above the ball.
+      `<rect x="0" y="52" width="${W}" height="46" fill="#6b5631"/>` +
+      revet +
+      // Sand floor, deep in shadow at the base of the wall.
+      `<path d="M 0 98 Q 100 90 200 98 L 200 132 L 0 132 Z" fill="#d9c48c"/>` +
+      `<path d="M 0 98 Q 100 90 200 98 L 200 108 Q 100 100 0 108 Z" fill="rgba(60,44,16,0.30)"/>` +
+      // A lip of grass along the top of the revetment.
+      [24, 70, 118, 168].map((x) => grassTuft(x, 56, '#2f7a35')).join('') +
+      ball(104, 112, 10),
+  );
+}
+
+/**
+ * Bare STEEL — the derelict's off-deck grating and loose junk (GS-restart-coverage). Sand-coloured
+ * `wasteScene` would read as a beach, which the inside of a wrecked hull is not.
+ */
+function metalScene(): string {
+  const rivets = Array.from({ length: 16 }, (_, i) => {
+    const x = 14 + (i * 43) % 176;
+    const y = 86 + ((i * 29) % 38);
+    return `<circle cx="${x}" cy="${y}" r="1.5" fill="#7d8794"/>`;
+  }).join('');
+  const grate = Array.from({ length: 5 }, (_, i) => {
+    const y = 82 + i * 11;
+    return `<path d="M 0 ${y} L ${W} ${y - 4}" stroke="#2b3340" stroke-width="2" fill="none"/>`;
+  }).join('');
+  return frame(
+    skyBand('#080a12', '#161d2b') +
+      `<rect x="0" y="74" width="${W}" height="${H - 74}" fill="#4a5462"/>` +
+      `<rect x="0" y="74" width="${W}" height="18" fill="#5d6875" opacity="0.8"/>` +
+      grate +
+      rivets +
+      // A torn plate edge, so it reads wrecked rather than merely industrial.
+      `<path d="M 132 74 l 10 9 l -6 8 l 14 6" stroke="#2b3340" stroke-width="2" fill="none"/>` +
+      ball(100, 90, 11),
+  );
+}
+
+/**
+ * CHARRED ground — a meteor scorch crust, and the closest truthful read for tar (GS-restart-coverage).
+ * Blackened crust with embers still glowing in the cracks.
+ */
+function scorchScene(): string {
+  const embers = Array.from({ length: 14 }, (_, i) => {
+    const x = 16 + (i * 47) % 172;
+    const y = 88 + ((i * 37) % 36);
+    return `<circle cx="${x}" cy="${y}" r="${1 + (i % 3) * 0.5}" fill="${i % 3 ? '#c4531f' : '#f0873a'}" opacity="0.85"/>`;
+  }).join('');
+  return frame(
+    skyBand('#140b08', '#3a1c10') +
+      `<rect x="0" y="74" width="${W}" height="${H - 74}" fill="#241d1a"/>` +
+      `<rect x="0" y="74" width="${W}" height="16" fill="#352924" opacity="0.85"/>` +
+      // Cracks in the crust, lit from beneath.
+      [30, 78, 126, 172]
+        .map((x) => `<path d="M ${x} 132 L ${x + 8} 104 L ${x + 2} 86" stroke="#8a3b16" stroke-width="1.6" fill="none"/>`)
+        .join('') +
+      embers +
+      ball(104, 90, 11),
   );
 }
 
@@ -360,6 +445,33 @@ export function restArtSVG(lie: string, opts: RestArtOpts = {}): string {
     case 'void':
       return voidScene();
     case 'cetusdeep':
+      return starOceanScene();
+    // ── GS-restart-coverage ────────────────────────────────────────────────────────────────────
+    // These ten used to fall through to `fairwayScene()` below. Play-test report: "it shows all
+    // hazards as fairway and then the shot flies into a bunker" — a ball in a POT bunker, deep
+    // rough, fescue, a barranca or a wrecked hull was illustrated as lush mown fairway, and the
+    // scramble ball-choice card is exactly where that lie costs you a stroke: you pick the ball
+    // that looks safe. `FeatureKind` is `(string & {})` by design (content-as-data), so there is no
+    // union for the compiler to check exhaustively — which is why this rotted silently as lies were
+    // added. `tests/rest-art.test.ts` now machine-checks coverage against LIE_INFO + PATCH_SPECS.
+    case 'pot':
+      return potScene(); // steep + revetted, NOT the shallow raked bunker
+    case 'deeprough':
+    case 'fescue':
+      return roughScene(opts, true);
+    case 'barranca':
+      return wasteScene(); // a dry rocky gully — the sand/gravel family reads true
+    case 'shiprough':
+    case 'junk':
+      return metalScene();
+    case 'breach':
+      return voidScene(); // a hull breach opens onto space
+    case 'scorch':
+    case 'tar':
+      return scorchScene();
+    case 'acid':
+      return lavaScene(); // caustic pool — the molten-liquid read is the honest one here
+    case 'stardust':
       return starOceanScene();
     default:
       return fairwayScene();

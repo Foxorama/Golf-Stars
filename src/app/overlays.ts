@@ -6,6 +6,7 @@
  */
 
 import { state } from './ctx';
+import { exitPrompt } from '../ui/back';
 import { teamDuel, teamPartnerChar } from './duelHud';
 import { getCharacter } from '../sim/rpg/characters';
 import { isCoilChampionId, coilChampionName } from '../sim/rpg/storyBetrayal';
@@ -137,6 +138,38 @@ export function priceNoticeOverlay(): string {
         </div>
         <div style="opacity:.7;font-size:13px;margin-bottom:14px;">added to your balance</div>
         <button class="gs-btn gs-btn--primary" data-action='${JSON.stringify({ type: 'dismissPriceNotice' })}' style="padding:11px 30px;">Got it</button>
+      </div>
+    </div>`;
+}
+
+/**
+ * The LEAVE-THE-ROUND confirm (GS-android-back) — raised when back (Android hardware button, or
+ * Escape) is pressed inside a run. Reuses the shared `.gs-sheet` chrome the price notice already
+ * borrows rather than minting new screen classes, so there is no new global CSS to collide with.
+ *
+ * Copy comes from `exitPrompt` (ui/back.ts), not from here, so the wording is derived from the same
+ * state as the decision and stays honest: leaving does NOT lose the run, it replays the stop.
+ * "Keep playing" is the primary action — the safe choice should be the fat one under a thumb, since
+ * back is easy to press by accident.
+ *
+ * NO tap-to-dismiss backdrop, deliberately: `[data-action]` handlers are bound per element with no
+ * `stopPropagation`, so an action on the backdrop would ALSO fire on every click that bubbles out of
+ * the card. Back/Escape and "Keep playing" are the dismiss paths.
+ */
+export function exitConfirmOverlay(): string {
+  const { title, body, confirmLabel } = exitPrompt(state);
+  return `
+    <div class="gs-sheet-backdrop" style="align-items:center;">
+      <div class="gs-sheet gs-exit" style="max-width:360px;text-align:center;">
+        <div style="font-size:30px;margin:2px 0 6px;">⛳</div>
+        <b style="font-size:18px;">${title}</b>
+        <p style="margin:10px 0 16px;line-height:1.5;color:var(--gs-dim);">${body}</p>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button class="gs-btn gs-btn--primary" data-action='${JSON.stringify({ type: 'cancelExit' })}'
+            style="padding:11px 24px;">Keep playing</button>
+          <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'toTitle' })}'
+            style="padding:10px 24px;">${confirmLabel}</button>
+        </div>
       </div>
     </div>`;
 }

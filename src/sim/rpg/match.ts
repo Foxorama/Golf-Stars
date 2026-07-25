@@ -227,8 +227,16 @@ export function playSideHole(
 export interface HoleDuel {
   holeIndex: number;
   par: number;
+  /** YOUR SIDE's score for the hole. In a pairs format this is already the TEAM number (the better
+   *  ball), not your solo card — see `mateStrokes` for what your partner actually made. */
   playerStrokes: number;
   bossStrokes: number;
+  /** Your PARTNER's ball on this hole (GS-story-partner-ball). Present only in a paired format where
+   *  the partner is a ghost the sim rolls — so the live HUD can show what your side's other ball did
+   *  instead of leaving you to guess which one counted. Absent for singles, and absent when the round
+   *  was PLAYED as the team (`playerTeamPlayed`), where there is no separate partner card to show.
+   *  Optional so every existing caller and seeded fixture is untouched. */
+  mateStrokes?: number;
   /** Who won the hole (fewer strokes). */
   winner: 'player' | 'boss' | 'halved';
 }

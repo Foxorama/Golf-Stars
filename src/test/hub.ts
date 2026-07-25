@@ -202,7 +202,7 @@ function demoGroup(): HTMLElement {
       h('button', { class: 'ghost', onclick: () => loadGame({ screen: 'trademarket', intro: '0' }) }, '🚀 Trade Market'),
       h('button', { class: 'ghost', onclick: () => loadGame({ screen: 'clubhouse', intro: '0' }) }, '🏛 Clubhouse')),
     h('p', { class: 'note' }, 'Screen (GS-screen-deeplink): jump STRAIGHT to a between-stop screen (travel map, Pro Shop, StarMart, Trade Market, Clubhouse) without playing a full stop — the hook the browser layout smoke tests use so the highest-risk uncovered surfaces are reachable headlessly. TEST-ONLY URL param; the live game never sets it.'),
-    h('p', { class: 'note' }, 'Asgard (GS-asgard): “Open the Bifröst” jumps STRAIGHT to the Himinbjörg map → the nine-hole tournament on The Warrior’s Tee → win/lose → return. “Arm Rainbow Ball” starts a run on Rainbow Road so you can score an eagle and trigger the Bifröst yourself. These two are TEST-ONLY URL params — the live game never sets them.'),
+    h('p', { class: 'note' }, 'Asgard (GS-asgard): “Open the Bifröst” jumps STRAIGHT to the Himinbjörg map → the nine-hole tournament on The Warrior’s Tee → win/lose → return. “Arm Rainbow Ball” starts a run with the Rainbow Ball armed so you can score an eagle and trigger the Bifröst yourself. These two are TEST-ONLY URL params — the live game never sets them.'),
     h('p', { class: 'note' }, 'Guard throw forces the caddy interception (boomerang/laser) on EVERY shot so you can watch it — start a run and take a shot. Live _gsFeel / _gsIntro / _gsSpray / _gsArt flags apply on the next render/shot; seed & intro reload the frame.'),
   ]);
 }

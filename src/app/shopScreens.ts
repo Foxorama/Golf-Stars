@@ -311,7 +311,7 @@ function upgradeLines(): UpLine[] {
   else if ((l.spinReadBonus ?? 0) > 0) out.push({ icon: '🎯', label: `Backspin-line read +${l.spinReadBonus} yd` });
   // Hazard skips / novelty
   if (l.hazardImmune?.length) out.push({ icon: '🛡', label: `Skips ${[...new Set(l.hazardImmune)].join(' / ')}` });
-  if (l.rainbowRoad) out.push({ icon: '🌈', label: 'Rainbow Road ball' });
+  if (l.rainbowRoad) out.push({ icon: '🌈', label: 'Rainbow Ball' });
   // Ship / fuel
   if ((l.fuelEfficiency ?? 0) > 0) out.push({ icon: '🌀', label: `Ion thrusters — −${l.fuelEfficiency} ⛽ / jump` });
   if ((l.tankBonus ?? 0) > 0) out.push({ icon: '🛢', label: `Reserve tank — +${l.tankBonus} capacity` });

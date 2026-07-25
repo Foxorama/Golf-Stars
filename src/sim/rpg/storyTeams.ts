@@ -283,9 +283,12 @@ export function resolveStory2v2Match(
     // Your team: your real strokes + the ally ghost (+ a scramble "assist" bite off the ally) — or, when
     // the round was PLAYED as the team (playerTeamPlayed), the real strokes alone. The opposing team: the
     // two opponent ghosts (+ a scramble assist off the first). teamHoleScore = the best of them.
-    const playerCards = playerTeamPlayed
-      ? [playerHoleStrokes[i]!]
-      : [playerHoleStrokes[i]!, ghostCard(allyId, `${seed}:ally`, i, par, allyEdge, allyForm)];
+    // Hoisted out of the array literal ONLY so the partner's ball can be surfaced on the duel
+    // (GS-story-partner-ball). The call order is unchanged — ally first, then the two opponents —
+    // and it is still not called at all when the team was played for real, so the rng stream is
+    // byte-identical either way.
+    const allyCard = playerTeamPlayed ? undefined : ghostCard(allyId, `${seed}:ally`, i, par, allyEdge, allyForm);
+    const playerCards = allyCard === undefined ? [playerHoleStrokes[i]!] : [playerHoleStrokes[i]!, allyCard];
     const oppCards = [
       ghostCard(oppIds[0], `${seed}:opp`, i, par, oppEdge, oppForm0),
       ghostCard(oppIds[1], `${seed}:opp`, i, par, oppEdge, oppForm1),
@@ -296,7 +299,14 @@ export function resolveStory2v2Match(
     }
     const playerTeam = teamHoleScore(playerCards);
     const oppTeam = teamHoleScore(oppCards);
-    duels.push({ holeIndex: i, par, playerStrokes: playerTeam, bossStrokes: oppTeam, winner: duelWinner(playerTeam, oppTeam) });
+    duels.push({
+      holeIndex: i,
+      par,
+      playerStrokes: playerTeam,
+      bossStrokes: oppTeam,
+      ...(allyCard === undefined ? {} : { mateStrokes: allyCard }),
+      winner: duelWinner(playerTeam, oppTeam),
+    });
     if (matchState(duels, pars.length).decided) break;
   }
   const state = matchState(duels, pars.length);

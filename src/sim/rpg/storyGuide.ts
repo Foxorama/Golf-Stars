@@ -69,7 +69,7 @@ export function storyObjective(story: StoryState): StoryObjective {
     return {
       ...base,
       stage: 'prologue',
-      next: 'Win the final round of the World Tour at St Andrews to prove yourself Earth’s champion.',
+      next: 'Win the final round of the World Tour at St Annette’s to prove yourself Earth’s champion.',
       actionLabel: '⛳ To the first tee',
       action: { type: 'storyPlayWorld', courseId: PROLOGUE_COURSE_ID } as { type: string },
     };

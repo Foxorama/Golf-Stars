@@ -244,21 +244,21 @@ describe('Yggdrasil — the hidden World Tree (GS-star-tour-yggdrasil)', () => {
   });
 });
 
-describe('Earth — the Old Course at St Andrews (GS-earth)', () => {
+describe('Earth — St Annette’s Links (GS-earth)', () => {
   it('the catalogue carries a home Earth course with the real par-72 routing', () => {
     const spec = STATIC_COURSES.find((c) => c.id === 'standrews-18')!;
     expect(spec).toBeTruthy();
     expect(spec.themeId).toBe('earth');
     expect(spec.archetype).toBe('earth');
     expect(spec.opts.biome).toBe('earth-links');
-    // The pinned real Old-Course par sequence: par 72, out 36 / in 36.
+    // The pinned real St Annette’s par sequence: par 72, out 36 / in 36.
     const c = buildStaticCourse('standrews-18');
     const pars = c.holes.map((h) => h.par);
     expect(pars).toEqual([4, 4, 4, 4, 5, 4, 4, 3, 4, 4, 3, 4, 4, 5, 4, 4, 4, 4]);
     expect(pars.reduce((a, b) => a + b, 0)).toBe(72);
     expect(pars.slice(0, 9).reduce((a, b) => a + b, 0)).toBe(36);
     expect(c.biome).toBe('earth-links');
-    expect(c.meta.name).toBe('The Old Course, St Andrews');
+    expect(c.meta.name).toBe('St Annette’s Links');
   });
 
   it('is playable as a full Star Tour stroke-play round, banked as a course record', () => {
@@ -270,14 +270,14 @@ describe('Earth — the Old Course at St Andrews (GS-earth)', () => {
     expect(s.strokePlayBest['standrews-18']).toEqual(s.lastStrokeRecord);
   });
 
-  it('sits on the home Earth landmark and is the tappable Old Course target (not a constellation)', () => {
-    const earth: StarTourWorld = { id: 'standrews-18', name: 'The Old Course, St Andrews', archetype: 'earth', tier: 'testing', themeId: 'earth', hasRecord: false };
+  it('sits on the home Earth landmark and is the tappable St Annette’s Links target (not a constellation)', () => {
+    const earth: StarTourWorld = { id: 'standrews-18', name: 'St Annette’s Links', archetype: 'earth', tier: 'testing', themeId: 'earth', hasRecord: false };
     // Its map position IS the Earth blue-marble landmark, not the RA/Dec projection.
     expect(worldPos(earth)).toEqual(EARTH_POS);
     // Rendered onto the chart, the Earth glyph carries the single tappable course target + its label.
     const svg = starTourMapSVG({ seed: 'earth-map', worlds: [earth], selectedId: 'standrews-18' });
     expect((svg.match(/data-startour-course="standrews-18"/g) ?? []).length).toBe(1);
-    expect(svg).toContain('THE OLD COURSE');
+    expect(svg).toContain('ST ANNETTE’S LINKS');
     // It is NOT drawn as a generic constellation planet (that class is only the constellation worlds).
     expect((svg.match(/class="gs-st-world"/g) ?? []).length).toBe(0);
   });

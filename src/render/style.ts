@@ -261,7 +261,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   let cetusFaces: { top: Vec[]; height: number }[] = [];
 
   // --- 1+2. The backdrop: EARTH gets a daylight sky, every space world gets the void ---------
-  // The one real-world course (the Old Course at St Andrews, `earth` archetype) is on planet Earth, so
+  // The one real-world course (St Annette’s Links, `earth` archetype) is on planet Earth, so
   // its out-of-bounds backdrop is a bright coastal SKY — a blue gradient, a warm sun, drifting clouds —
   // NOT the deep-space base + starfield (GS-story-earth-sky). Gated to `earth` (and never rainbow), so
   // every other world's §1/§2 is byte-for-byte unchanged; the animated play view likewise drops the
