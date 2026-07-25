@@ -579,7 +579,10 @@ function dossier(w: StarTourWorld): string {
     : nav?.venue?.ready
     ? 'Practice round — no Sigil'
     : nav?.qualifier
-    ? cleared
+    ? // "Replay" means you have actually POSTED a finish at THIS event — not merely cleared the world
+      // (GS-story-qualifier-chapter-gate: a world you explored before its chapter is a brand-new event when
+      // its Sigil comes round, and calling that a replay read as "you already qualified here").
+      nav.qualifier.place !== undefined
       ? 'Replay this qualifying event'
       : 'Fly here &amp; tee off — qualifying event'
     : cleared

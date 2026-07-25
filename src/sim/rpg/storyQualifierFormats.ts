@@ -51,7 +51,7 @@ import {
   placeQualifies,
   type QualifierGhost,
 } from './storyQualifiers';
-import { isStoryQualifier } from './storyTournaments';
+import { isLiveStoryQualifier } from './storyTournaments';
 
 /** The five shapes a qualifying event can be drawn as. */
 export type QualifierFormatId = 'stroke' | 'stableford' | 'pair-stroke' | 'pair-stableford' | 'pair-match';
@@ -192,7 +192,10 @@ export function qualifierPartnerPool(story: StoryState): { id: string; name: str
  * when the world isn't a qualifying event.
  */
 export function activeQualifierPlan(story: StoryState, courseId: string, chosenPartnerId?: string): QualifierPlan | undefined {
-  return isStoryQualifier(courseId, story.alignment) ? qualifierPlan(story, courseId, chosenPartnerId) : undefined;
+  // GS-story-qualifier-chapter-gate: a world charted AHEAD of its chapter (a caddy-home world you fly out to
+  // early) is not a qualifying event yet — `isLiveStoryQualifier` is the one predicate the plan and the
+  // resolution share, so an event you play is always an event that counts.
+  return isLiveStoryQualifier(story, courseId) ? qualifierPlan(story, courseId, chosenPartnerId) : undefined;
 }
 
 /** The player-facing name of a format ("Two-ball best-ball"). */

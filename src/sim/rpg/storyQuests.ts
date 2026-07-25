@@ -507,13 +507,26 @@ function clearedElsewhere(story: StoryState, world: string): boolean {
  * thing (put them on the bag for a round, then fly on).
  */
 export function questBeatPending(story: StoryState, caddyId: string): boolean {
+  return !!questBeatPendingReason(story, caddyId);
+}
+
+/**
+ * WHICH beat the ally's quest is holding, or undefined if it isn't holding one (GS-story-quest-soon-marker):
+ *   • `'caddy'`     — recruited + chapter-ready, but you have never had them on the bag. Nothing has happened
+ *                     between you yet, so this is a CREW-CARD hint ("carry their bag a round"), never a
+ *                     call-out on the star chart — the player report was a 🎒 SOON pill lighting up a world
+ *                     the instant a friend was hired, before a single round together.
+ *   • `'elsewhere'` — you've caddied with them and the quest is one flight away (clear another world first).
+ * The clubhouse crew card shows both; the star map only surfaces `'elsewhere'`.
+ */
+export function questBeatPendingReason(story: StoryState, caddyId: string): 'caddy' | 'elsewhere' | undefined {
   const q = questForCaddy(caddyId);
-  if (!q || !questMatchesPath(q, story) || !storyCaddyHired(story, caddyId) || questDone(story, q.id)) return false;
-  if (story.activeQuestId) return false;
-  if (story.chapter < q.minChapter) return false;
-  if (!caddiedWith(story, caddyId)) return true; // recruited + ready, but not yet carried a round together
+  if (!q || !questMatchesPath(q, story) || !storyCaddyHired(story, caddyId) || questDone(story, q.id)) return undefined;
+  if (story.activeQuestId) return undefined;
+  if (story.chapter < q.minChapter) return undefined;
+  if (!caddiedWith(story, caddyId)) return 'caddy'; // recruited + ready, but not yet carried a round together
   const world = questWorld(q);
-  return !!world && !clearedElsewhere(story, world);
+  return world && !clearedElsewhere(story, world) ? 'elsewhere' : undefined;
 }
 
 /** Accept a quest (pure): make it the active quest. No-op if not offerable. */

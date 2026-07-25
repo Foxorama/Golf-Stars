@@ -203,6 +203,15 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
   // (Ch.3) → the Apostate shows himself (Ch.3) → after The Choice the Warden path runs the DOUBT thread (the
   // vow → the betrayer's strange question → their drifting — GS-story-doubt) while Venoma's confrontation
   // branches by path. Each fires ONCE, on a story-round arrival; order in this table IS the sequence.
+  //
+  // GS-story-beat-venue (the player report — "the Sigil story beats fire in the qualifying rounds"): every
+  // non-venue world of a chapter is now a competitive QUALIFYING EVENT, so an ungated beat always landed on
+  // one — including the beats that speak ABOUT the major you have not teed off yet ("Win your Sigil here",
+  // the Viper waiting at the shrine, the Apostate stepping onto the tee he plays). Each beat now says which
+  // ROOM it happens in: `!c.storyTournament` = on the road (a qualifying event — galleries, omens, the crew
+  // fraying between events), `c.storyTournament === true` = at the Sigil itself (the rivals who actually
+  // stand across that tee, and the Ragnarök omens that count the Sigils). When more than one Sigil beat is
+  // pending, they CHAIN at the major's tee-off (`dismissLore` re-runs the gate), so nothing is stranded.
   {
     id: 'story-true-line',
     trigger: (c) => c.storyRound === true && c.storyChapter === 1 && !c.storyTournament,
@@ -274,7 +283,7 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
   },
   {
     id: 'story-coilkeepers',
-    trigger: (c) => c.storyRound === true && c.storyChapter === 3,
+    trigger: (c) => c.storyRound === true && c.storyChapter === 3 && !c.storyTournament,
     speaker: 'A Coilkeeper',
     portrait: 'coilkeeper',
     kicker: 'They came to watch',
@@ -295,7 +304,7 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
   // fires on the first Ch.3 arrival and the Apostate on a later one (both once, so they never collide).
   {
     id: 'story-apostate',
-    trigger: (c) => c.storyRound === true && c.storyChapter === 3,
+    trigger: (c) => c.storyRound === true && c.storyChapter === 3 && c.storyTournament === true,
     speaker: 'Malachai "Sable" Voss',
     portrait: 'voss',
     kicker: 'The champion who fell',
@@ -349,7 +358,8 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
   ...CHARACTERS.map(
     (ch): LoreEvent => ({
       id: `story-distance-${ch.id}`,
-      trigger: (c) => c.storyRound === true && c.storyChapter === 4 && c.storyAlignment === 'warden' && c.storyBetrayerId === ch.id,
+      trigger: (c) =>
+        c.storyRound === true && c.storyChapter === 4 && c.storyAlignment === 'warden' && c.storyBetrayerId === ch.id && !c.storyTournament,
       speaker: ch.shortName,
       portrait: `golfer:${ch.id}`,
       kicker: 'The eve of the vigil',
@@ -390,7 +400,7 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
   // for the shrine: the whisper has already found its door, and {betrayer} is standing in it.
   {
     id: 'story-venoma-warden',
-    trigger: (c) => c.storyRound === true && (c.storyChapter ?? 0) >= 5 && c.storyAlignment === 'warden',
+    trigger: (c) => c.storyRound === true && (c.storyChapter ?? 0) >= 5 && c.storyAlignment === 'warden' && c.storyTournament === true,
     speaker: 'Venoma "the Viper" Krait',
     portrait: 'venoma',
     kicker: 'The Viper returns',
@@ -470,7 +480,7 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
   },
   {
     id: 'story-omen-abyss-warden',
-    trigger: (c) => c.storyRound === true && c.storyChapter === 4 && c.storyAlignment === 'warden',
+    trigger: (c) => c.storyRound === true && c.storyChapter === 4 && c.storyAlignment === 'warden' && c.storyTournament === true,
     speaker: 'The Prognostic Parrot',
     portrait: 'prognostic-parrot',
     kicker: 'Three Sigils set',
@@ -487,7 +497,7 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
   },
   {
     id: 'story-omen-abyss-herald',
-    trigger: (c) => c.storyRound === true && c.storyChapter === 4 && c.storyAlignment === 'herald',
+    trigger: (c) => c.storyRound === true && c.storyChapter === 4 && c.storyAlignment === 'herald' && c.storyTournament === true,
     speaker: 'The Carrion Prophet',
     portrait: 'crow',
     kicker: 'Three Sigils set',
@@ -504,7 +514,7 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
   },
   {
     id: 'story-ragnarok-warden',
-    trigger: (c) => c.storyRound === true && c.storyChapter === 5 && c.storyAlignment === 'warden',
+    trigger: (c) => c.storyRound === true && c.storyChapter === 5 && c.storyAlignment === 'warden' && c.storyTournament === true,
     speaker: 'The Prognostic Parrot',
     portrait: 'prognostic-parrot',
     kicker: 'The seal is failing',
@@ -520,7 +530,7 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
   },
   {
     id: 'story-ragnarok-herald',
-    trigger: (c) => c.storyRound === true && c.storyChapter === 5 && c.storyAlignment === 'herald',
+    trigger: (c) => c.storyRound === true && c.storyChapter === 5 && c.storyAlignment === 'herald' && c.storyTournament === true,
     speaker: 'The Carrion Prophet',
     portrait: 'crow',
     kicker: 'The Long Rest is near',

@@ -272,6 +272,12 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     triggering beat to the `'lore'` screen. Mode-agnostic (derelict via biome, caddy via perks). The screen
     (`app/loreScreens.ts` + `render/loreArt.ts`) uses its OWN `.gs-lore*` prefix, never the play `.gs-hud`.
     Zero sim rng. Guards: `tests/lore.test.ts` + build smoke + save v27→v28.
+  - **A story beat declares WHICH ROOM it happens in** (GS-story-beat-venue): every non-venue chapter world is
+    a competitive QUALIFYING EVENT, so a beat about the major (the rival waiting at that tee, the Ragnarök
+    omens counting Sigils) must gate `storyTournament === true`; road beats (galleries, omens, the crew
+    fraying) gate `!storyTournament`. Beats CHAIN only at a Sigil tee-off (`dismissLore` re-runs the gate when
+    `run.storyTournament` is set), so the major's pile-up plays out and every other arrival keeps its one-beat
+    pacing.
   - **Story-Tour QUALIFYING EVENTS are nine holes, drawn into one of five formats** (GS-story-qualifier-formats,
     `storyQualifierFormats.ts`): single stroke / single Stableford / paired stroke / paired Stableford / paired
     matchplay, a paired event played SCRAMBLE or BEST-BALL. `qualifierPlan` is a pure keyed hash off
@@ -287,7 +293,13 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     drives the SAME live surfaces as a matchplay Sigil (chip, per-hole panel, mid-round close-out) off ONE
     pure source, `qualifierMatchThrough` — which `resolveQualifierRound` also calls, so live ≡ final by
     construction; the two sources build one shared `LiveMatch` view so there is one renderer, never a fork
-    (GS-story-qualifier-match-live).
+    (GS-story-qualifier-match-live). **A world is a qualifying event for exactly ONE Sigil, once you have
+    REACHED its chapter** — `isLiveStoryQualifier` is the single predicate that arms the plan at tee-off AND
+    records the finish, so a world charted early (`chartChapter`, GS-story-gather-early) plays as plain
+    exploration and comes round later as a brand-new event (GS-story-qualifier-chapter-gate). A **map marker
+    is a call to action**: an actionable quest outranks the qualifier flag, a "soon" hint never does, and a
+    quest holds NO marker until you have carried that friend's bag (GS-story-quest-soon-marker,
+    `questBeatPendingReason`).
   - **The Story-Tour betrayal is per-character + foreshadowed** (`docs/decisions/story-betrayal-arc.md`).
     `betrayerId(story)` = the friend standing apart in the PARTNER TALLY — team-Sigil picks (weight 2) plus
     every paired qualifying event (weight 1); the bigger gap, top or bottom, names them and `betrayerOddness`

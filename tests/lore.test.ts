@@ -151,11 +151,13 @@ describe('GS-story-beats — story-round dialogue beats gate on the campaign', (
     expect(pickLoreEvent({ ...STORY, storyChapter: 3, storyRound: false }, {})).toBeUndefined();
   });
 
-  it('the Apostate appears in Chapter 3 after the Coilkeepers beat (GS-story-apostate)', () => {
-    // The gallery-dread beat leads on the first Ch.3 arrival; once seen, the Apostate himself appears.
-    expect(pickLoreEvent({ ...STORY, storyChapter: 3 }, { 'story-coilkeepers': true })?.id).toBe('story-apostate');
+  it('the Apostate appears at the Chapter-3 SIGIL — the tee he actually plays (GS-story-beat-venue)', () => {
+    // GS-story-beat-venue: the gallery-dread beat rides the qualifying events; the Apostate himself steps
+    // onto the tee of the Storm Championship — the major he plays — never a qualifying round.
+    expect(pickLoreEvent({ ...STORY, storyChapter: 3, storyTournament: true }, { 'story-coilkeepers': true })?.id).toBe('story-apostate');
+    expect(pickLoreEvent({ ...STORY, storyChapter: 3 }, { 'story-coilkeepers': true })).toBeUndefined();
     // Never on a non-story round, and never off Chapter 3.
-    expect(pickLoreEvent({ ...STORY, storyChapter: 3, storyRound: false }, { 'story-coilkeepers': true })).toBeUndefined();
+    expect(pickLoreEvent({ ...STORY, storyChapter: 3, storyTournament: true, storyRound: false }, { 'story-coilkeepers': true })).toBeUndefined();
     expect(pickLoreEvent({ ...STORY, storyChapter: 4 }, { 'story-coilkeepers': true, 'story-apostate': true })).toBeUndefined();
   });
 
@@ -170,14 +172,15 @@ describe('GS-story-beats — story-round dialogue beats gate on the campaign', (
     // A different betrayer → a different friend speaks.
     const other = CHARACTERS[2]!.id;
     expect(pickLoreEvent({ ...W, storyBetrayerId: other }, seenVow)?.id).toBe(`story-doubt-${other}`);
-    // Arrival 3 (any, incl. the vigil tee-off): the betrayer drifting.
+    // Arrival 3: the betrayer drifting — the EVE of the vigil, so a qualifying round, never the major
+    // itself (GS-story-beat-venue: the vigil tee-off belongs to the Sting).
     const seenDoubt = { ...seenVow, [`story-doubt-${betrayer}`]: true };
     expect(pickLoreEvent(W, seenDoubt)?.id).toBe(`story-distance-${betrayer}`);
-    expect(pickLoreEvent({ ...W, storyTournament: true }, seenDoubt)?.id).toBe(`story-distance-${betrayer}`);
+    expect(pickLoreEvent({ ...W, storyTournament: true }, seenDoubt)?.id).toBe('story-scorpius-warden');
     // The doubt thread is Warden-only, Chapter-4-only, and never fires without the betrayer id.
     expect(pickLoreEvent({ ...W, storyAlignment: 'herald' }, {})?.id).toBe('story-venoma-herald');
     // GS-story-scorpius: the Viper is now the Ch.5 shrine return (not Ch.4); Ch.4's rival-up-close is the Sting.
-    expect(pickLoreEvent({ ...W, storyChapter: 5 }, seenDoubt)?.id).toBe(`story-venoma-warden`);
+    expect(pickLoreEvent({ ...W, storyChapter: 5, storyTournament: true }, seenDoubt)?.id).toBe(`story-venoma-warden`);
     // The Sting is gated to the vigil tee-off (storyTournament), so it's your FIRST sighting on the tee.
     expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden', storyTournament: true }, seenVow)?.id).toBe('story-scorpius-warden');
   });
@@ -191,8 +194,10 @@ describe('GS-story-beats — story-round dialogue beats gate on the campaign', (
     // the tee — your first sighting of him. He never leaks into an ordinary practice-world arrival.
     expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden', storyTournament: true }, doubtSeen)?.id).toBe('story-scorpius-warden');
     expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden' }, doubtSeen)?.id).not.toBe('story-scorpius-warden');
-    // Venoma no longer fires at Ch.4 (the "second Venoma" replay is gone) — she returns at the Ch.5 shrine.
-    expect(pickLoreEvent({ ...STORY, storyChapter: 5, storyAlignment: 'warden' }, {})?.id).toBe('story-venoma-warden');
+    // Venoma no longer fires at Ch.4 (the "second Venoma" replay is gone) — she returns AT the Ch.5 shrine,
+    // which is the Sigil venue itself (GS-story-beat-venue), never on the road to it.
+    expect(pickLoreEvent({ ...STORY, storyChapter: 5, storyAlignment: 'warden', storyTournament: true }, {})?.id).toBe('story-venoma-warden');
+    expect(pickLoreEvent({ ...STORY, storyChapter: 5, storyAlignment: 'warden' }, {})).toBeUndefined();
     // Herald keeps the Viper's welcome from Ch.4 (the Warden Sting is a Warden-path beat only).
     expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'herald' }, {})?.id).toBe('story-venoma-herald');
     expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden' }, {})?.id).not.toBe('story-venoma-warden');
@@ -255,21 +260,27 @@ describe('GS-story-ragnarok — the impending-Ragnarök escalation beats (one pe
       'story-scorpius-warden': true,
       ...Object.fromEntries(CHARACTERS.flatMap((c) => [[`story-doubt-${c.id}`, true], [`story-distance-${c.id}`, true]])),
     };
-    expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden' }, seenWarden)?.id).toBe('story-omen-abyss-warden');
-    expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'herald' }, { 'story-venoma-herald': true })?.id).toBe('story-omen-abyss-herald');
+    // GS-story-beat-venue: the Sigil omens count Sigils, so they speak AT the Sigil (they chain behind the
+    // rival beat on the same tee-off) — never in a qualifying round.
+    expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden', storyTournament: true }, seenWarden)?.id).toBe('story-omen-abyss-warden');
+    expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'warden' }, seenWarden)).toBeUndefined();
+    expect(pickLoreEvent({ ...STORY, storyChapter: 4, storyAlignment: 'herald', storyTournament: true }, { 'story-venoma-herald': true })?.id).toBe('story-omen-abyss-herald');
     // The Ch.4 omen is Ch.4-only — at Ch.5 the Ragnarök beat takes over instead of it leaking forward.
-    expect(pickLoreEvent({ ...STORY, storyChapter: 5, storyAlignment: 'warden' }, { 'story-venoma-warden': true, 'story-omen-abyss-warden': true })?.id).toBe('story-ragnarok-warden');
+    expect(pickLoreEvent({ ...STORY, storyChapter: 5, storyAlignment: 'warden', storyTournament: true }, { 'story-venoma-warden': true, 'story-omen-abyss-warden': true })?.id).toBe('story-ragnarok-warden');
   });
 
   it('Chapter 5 brings Ragnarök to the door — four Sigils set, the finale looms (fills Sigil 5)', () => {
     const seen = { 'story-venoma-warden': true, 'story-venoma-herald': true };
-    expect(pickLoreEvent({ ...STORY, storyChapter: 5, storyAlignment: 'warden' }, seen)?.id).toBe('story-ragnarok-warden');
-    expect(pickLoreEvent({ ...STORY, storyChapter: 5, storyAlignment: 'herald' }, seen)?.id).toBe('story-ragnarok-herald');
+    const T = { storyTournament: true } as const;
+    expect(pickLoreEvent({ ...STORY, ...T, storyChapter: 5, storyAlignment: 'warden' }, seen)?.id).toBe('story-ragnarok-warden');
+    expect(pickLoreEvent({ ...STORY, ...T, storyChapter: 5, storyAlignment: 'herald' }, seen)?.id).toBe('story-ragnarok-herald');
+    // GS-story-beat-venue: a qualifying round on the way to the fifth Sigil stays clean.
+    expect(pickLoreEvent({ ...STORY, storyChapter: 5, storyAlignment: 'warden' }, seen)).toBeUndefined();
     // Warden hears the Parrot; Herald hears the Crow — the portraits differ by path.
     expect(loreEventById('story-ragnarok-warden')!.portrait).toBe('prognostic-parrot');
     expect(loreEventById('story-ragnarok-herald')!.portrait).toBe('crow');
     // Never off a story round.
-    expect(pickLoreEvent({ ...BASE, storyChapter: 5, storyAlignment: 'warden' }, seen)).toBeUndefined();
+    expect(pickLoreEvent({ ...BASE, ...T, storyChapter: 5, storyAlignment: 'warden' }, seen)).toBeUndefined();
   });
 
   it('paints the Carrion Crow portrait for the Herald escalation beats', () => {

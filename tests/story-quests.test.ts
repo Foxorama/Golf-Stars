@@ -5,6 +5,7 @@ import {
   questWorld,
   questOfferable,
   questBeatPending,
+  questBeatPendingReason,
   acceptQuest,
   completeQuest,
   activeQuest,
@@ -211,5 +212,18 @@ describe('Story ally side quests (GS-story-quests)', () => {
     const movedOn = { ...justRecruited, clearedWorldIds: [world, 'standrews-18'] };
     expect(questOfferable(movedOn, 'driver-dan')).toBe(true);
     expect(questBeatPending(movedOn, 'driver-dan')).toBe(false);
+  });
+
+  it('GS-story-quest-soon-marker: the two held beats are told apart (bag round vs fly on)', () => {
+    const world = questWorld(questForCaddy('driver-dan')!)!; // derelict-18
+    // Just recruited — never on the bag. A crew-card hint only; the star map shows nothing (a friend you
+    // have not played a round with has nothing to show you yet).
+    expect(questBeatPendingReason(withCaddy('driver-dan', { chapter: 3, caddiedRoundIds: [] }), 'driver-dan')).toBe('caddy');
+    // Carried the bag, but the only world cleared is their own home world → one flight away.
+    expect(
+      questBeatPendingReason(withCaddy('driver-dan', { chapter: 3, clearedWorldIds: [world] }), 'driver-dan'),
+    ).toBe('elsewhere');
+    // Ready to offer → no beat held at all.
+    expect(questBeatPendingReason(withCaddy('driver-dan', { chapter: 3 }), 'driver-dan')).toBeUndefined();
   });
 });
