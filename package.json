@@ -12,14 +12,25 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "gen:courses": "node scripts/gen-static-courses.mjs",
-    "check": "npm run typecheck && npm test && npm run build"
+    "check": "npm run typecheck && npm test && npm run build",
+    "android:sync": "npm run build && cap sync android",
+    "android:assets": "node scripts/android-assets.mjs && capacitor-assets generate --android",
+    "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug",
+    "android:aab": "npm run android:sync && cd android && ./gradlew bundleRelease",
+    "android:open": "cap open android"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.4.2",
     "@types/node": "^22.20.0",
     "playwright-core": "^1.61.1",
     "typescript": "^5.5.4",
     "vite": "^5.4.2",
     "vite-plugin-singlefile": "^2.3.3",
     "vitest": "^2.0.5"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/core": "^8.4.2"
   }
 }

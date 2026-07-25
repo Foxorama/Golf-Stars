@@ -1,0 +1,78 @@
+name: android
+
+# Builds the Google Play artifact (GS-android). Deliberately NOT part of the required `test` check:
+# a Gradle/Android build takes minutes and depends on the runner's Android SDK, so gating every push
+# on it would slow the normal loop for no safety gain — `tests.yml` already guards the game itself.
+#
+# Triggers: on demand, on a version tag (the real release path), and on pushes that touch the native
+# shell, so a change to the wrapper can't silently break the build.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+    paths:
+      - 'android/**'
+      - 'capacitor.config.ts'
+      - 'scripts/android-assets.mjs'
+      - '.github/workflows/android.yml'
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # ubuntu-latest ships a JDK and the Android SDK/build-tools preinstalled; Capacitor 8 needs 21.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+
+      - run: npm ci
+
+      # The AAB is only ever as good as the web bundle inside it — build the real production bundle,
+      # then let Capacitor copy it into the native project.
+      - run: npm run build
+      - run: npx cap sync android
+
+      # Decode the upload keystore from a repository secret, if one is configured. Without the
+      # secrets the release build still runs and produces an UNSIGNED bundle — useful for checking
+      # the build compiles on a fork or before the key exists, but NOT uploadable to Play.
+      - name: Decode upload keystore
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+
+      - name: Build release bundle (.aab)
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && format('{0}/upload.jks', runner.temp) || '' }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          # Play requires a strictly increasing versionCode per upload; the run number gives us one
+          # for free and never repeats.
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+        run: ./gradlew --no-daemon bundleRelease
+
+      # A debug APK is what you actually sideload onto a phone to play-test the wrapper.
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: golf-stars-android
+          path: |
+            android/app/build/outputs/bundle/release/*.aab
+            android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error

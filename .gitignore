@@ -7,3 +7,8 @@ dist-ssr
 
 # Art: keep regenerable prompt logs, ignore the heavy generated source images.
 art/generated/
+
+# Android launcher/splash SOURCE art — derived from public/icon-512.png by
+# `npm run android:assets`. The DOWNSCALED per-density output under android/app/src/main/res/
+# IS committed (CI packages it without regenerating); these oversized intermediates are not.
+assets/
