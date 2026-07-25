@@ -16,6 +16,7 @@
     "android:sync": "npm run build && cap sync android",
     "android:assets": "node scripts/android-assets.mjs && capacitor-assets generate --android",
     "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug",
+    "android:apk:release": "npm run android:sync && cd android && ./gradlew assembleRelease",
     "android:aab": "npm run android:sync && cd android && ./gradlew bundleRelease",
     "android:open": "cap open android"
   },

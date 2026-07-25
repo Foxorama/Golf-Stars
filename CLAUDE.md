@@ -505,6 +505,14 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
   hard-refresh to escape it. `npm run android:apk` to sideload, `android:aab` for Play; the `android`
   workflow is NOT a required check. Launcher art has ONE source (`public/icon-512.png` →
   `scripts/android-assets.mjs`).
+  **The sideload build is a RELEASE APK signed with the upload key, never `assembleDebug`** — a debug
+  APK carries the *runner's* throwaway certificate, and Android refuses to update a package whose
+  signature changed ("app failed to update"). Every artifact step stamps `ANDROID_VERSION_CODE` /
+  `_NAME`; a step that forgets ships `versionCode 1` and is a downgrade. Local debug / CI debug /
+  release are three DIFFERENT signatures — pick one channel per device. With no keystore secret the
+  job still builds (forks need that) but must stay LOUD: warning + run summary + an artifact NAMED
+  `…-UNSIGNED-cannot-update-existing-install`, because the silent-green keyless build is what cost a
+  play-test session.
 - **BACK is ONE pure decision** (GS-android-back, `ui/back.ts backIntent`) — the Android hardware
   button AND desktop Escape route through it, never a fork. Four tiers: dismiss the topmost overlay →
   navigate to the parent *using the screen's own back action* → **swallow** on forward-only beats

@@ -79,18 +79,89 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           # Play requires a strictly increasing versionCode per upload; the run number gives us one
-          # for free and never repeats.
+          # for free and never repeats. The NAME is stamped too so a tester can read which build is
+          # on their phone straight off the Android app-info screen.
           ANDROID_VERSION_CODE: ${{ github.run_number }}
+          ANDROID_VERSION_NAME: 1.0.${{ github.run_number }}
         run: ./gradlew --no-daemon bundleRelease
 
-      # A debug APK is what you actually sideload onto a phone to play-test the wrapper.
-      - name: Build debug APK
+      # THE SIDELOAD ARTIFACT — a RELEASE APK signed with the same upload key as the bundle.
+      #
+      # This used to be `assembleDebug`, and that is why a downloaded build could not update an
+      # installed one. A debug APK is signed with the RUNNER's auto-generated ~/.android/debug.keystore
+      # — GitHub runners are ephemeral, so that certificate differs from run to run and matches
+      # nothing already on the phone. Android refuses to update a package whose signing certificate
+      # changed, which surfaces to the player as a bare "app failed to update". The debug step also
+      # got no ANDROID_VERSION_CODE (it is set per-step, and only the bundle step had it), so every
+      # debug APK claimed versionCode 1 — a downgrade against anything installed from the bundle,
+      # blocked outright even before the signature was considered.
+      #
+      # Signing the sideload APK with the upload key fixes both: one stable certificate for every
+      # build, and the same increasing version code the bundle gets. Sideloaded play-test builds now
+      # update in place, and they carry the same signature as the Play release.
+      - name: Build release APK (.apk — the sideload build)
+        if: env.KEYSTORE_B64 != ''
         working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+          ANDROID_VERSION_NAME: 1.0.${{ github.run_number }}
+        run: ./gradlew --no-daemon assembleRelease
+
+      # Fallback ONLY when no signing key is configured: an unsigned release APK cannot be installed
+      # at all, so a keyless checkout still needs a debug APK to have produced anything runnable. It
+      # carries the run's version code, but its signature is still the runner's throwaway debug key —
+      # so it installs fresh and can NEVER update an earlier install. The artifact name below says so.
+      - name: Build debug APK (unsigned-key fallback)
+        if: env.KEYSTORE_B64 == ''
+        working-directory: android
+        env:
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+          ANDROID_VERSION_NAME: 1.0.${{ github.run_number }}-debug
         run: ./gradlew --no-daemon assembleDebug
 
-      - uses: actions/upload-artifact@v4
+      # The failure this guards is a SILENT one: with no keystore secret the job went green, uploaded
+      # an artifact with the normal name, and handed over an unsigned .aab (which Play rejects) plus a
+      # randomly-signed debug APK (which cannot update). Everything looked fine right up to the phone.
+      # So the signing state is written into the run summary AND into the artifact's NAME — the one
+      # place you cannot miss it, because you have to read it to download the thing.
+      - name: Report signing state
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "### ✅ Signed with the upload key" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "- \`.aab\` → uploadable to Play" >> "$GITHUB_STEP_SUMMARY"
+            echo "- \`.apk\` (release) → sideload this; it updates an existing install in place" >> "$GITHUB_STEP_SUMMARY"
+            echo "- versionCode \`${{ github.run_number }}\`, versionName \`1.0.${{ github.run_number }}\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning title=No signing key::ANDROID_KEYSTORE_BASE64 is not set — this build is NOT uploadable and NOT updatable."
+            echo "### ⚠️ UNSIGNED — not uploadable, not updatable" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`ANDROID_KEYSTORE_BASE64\` is not configured, so:" >> "$GITHUB_STEP_SUMMARY"
+            echo "- the \`.aab\` is **unsigned** — Play will reject it" >> "$GITHUB_STEP_SUMMARY"
+            echo "- the \`.apk\` is a **debug** build signed with this runner's throwaway key — it can only be installed fresh (uninstall first), and the next build will not update it either" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Fix: set the four \`ANDROID_*\` repository secrets — see \`docs/decisions/android-packaging.md\`." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload signed artifacts
+        if: env.KEYSTORE_B64 != ''
+        uses: actions/upload-artifact@v4
         with:
-          name: golf-stars-android
+          name: golf-stars-android-signed
+          path: |
+            android/app/build/outputs/bundle/release/*.aab
+            android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+      - name: Upload UNSIGNED artifacts
+        if: env.KEYSTORE_B64 == ''
+        uses: actions/upload-artifact@v4
+        with:
+          # The name is the warning. You have to read it to download it.
+          name: golf-stars-android-UNSIGNED-cannot-update-existing-install
           path: |
             android/app/build/outputs/bundle/release/*.aab
             android/app/build/outputs/apk/debug/*.apk
