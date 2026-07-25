@@ -33,6 +33,13 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # The `secrets` context is NOT available in a step-level `if:` — using it there is a workflow
+      # SYNTAX error, which GitHub rejects at startup (a "failure" run with zero jobs and no logs,
+      # which looks nothing like a build error). Surfacing the secret as job-level env is the
+      # supported way to branch on "is a signing key configured?", because `env` IS available in
+      # a step `if`.
+      KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -57,15 +64,17 @@ jobs:
       # secrets the release build still runs and produces an UNSIGNED bundle — useful for checking
       # the build compiles on a fork or before the key exists, but NOT uploadable to Play.
       - name: Decode upload keystore
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+        if: env.KEYSTORE_B64 != ''
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          # Export the path for the build step. When no key is configured this stays UNSET, so
+          # build.gradle's `System.getenv('ANDROID_KEYSTORE_PATH')` is null, `hasSigningKey` is
+          # false, and the release build still succeeds — just unsigned.
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
 
       - name: Build release bundle (.aab)
         working-directory: android
         env:
-          ANDROID_KEYSTORE_PATH: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && format('{0}/upload.jks', runner.temp) || '' }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
