@@ -11,23 +11,15 @@ under the new format). Avenue (1), a full top-down RPG shell, stays deferred unt
 
 ## Now / next
 
-**GS-hud-frame — ONE persistent play HUD across every view state** ⭐ *next session, player-chosen approach*
-From the 2026-07-25 Pixel 9a play-test: the play screen is laid out differently in each of its six states
-(shot / watching / chip / chip-watching / putt / putt-watching) — the map/zoom/settings column exists while
-aiming but VANISHES on putt and watch, the info panel changes shape and height, the canvas flight label
-lives somewhere unrelated to everything else, and the readouts are small and hard to parse. Player's call
-(asked explicitly): **one persistent frame** — a single HUD skeleton always present in the same places
-(fixed info bar · fixed control column · fixed action zone), with only the CONTENTS changing per state.
-Buttons must never move or disappear between states. Requirements:
-- **The caddy needs a permanent slot.** Not visible in the play-test screenshots, but it must have a space
-  in the frame that PERSISTS across all six states like everything else — today `.gs-caddybadge` is a
-  pass-through portrait floated wherever there's room.
-- Typography/sizing is in scope (the readouts are too small), but may be split into a follow-up polish pass.
-- Every state must reserve the system UI — see GS-play-safearea below; the frame inherits that discipline
-  rather than re-solving it per state.
-- New chrome gets its OWN class prefix (the `.gs-hud` play-screen namespace already exists — extend it, and
-  never reuse another screen's names; see the #353 map-blur regression).
-- ⚠️ Touches `app.ts` + `index.html`, the two hottest shared files. One focused session, per the constitution.
+**GS-hud-frame-2 — the frame's remaining polish** *(follow-on from the shipped frame, small)*
+The persistent frame landed (see Done). Left on the table, all cosmetic and none blocking:
+- The controls panel's TOP edge still rises on the putt state (a pace meter is genuinely taller than a
+  power bar). The floor is fixed, which is what keeps the buttons still — but a designed empty gauge slot
+  on the aim states would make the panel one height everywhere, at the cost of map. Wants eyes-on play
+  before deciding it's worth the pixels.
+- The top info bar is four lines on a par-4 with a shape + width tag. Now that it no longer reflows, the
+  next question is whether it should be two dense lines instead.
+- Landscape / tablet has had no pass: the frame is phone-portrait tuned.
 
 **Deferred out of the 2026-07-25 quick-win batch** (both looked small, both are bigger than they read):
 - **GS-story-briefing-beat** — the first-visit Parrot briefing currently advertises itself with a gold ❗ on
@@ -401,6 +393,17 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-hud-frame** — ONE persistent play HUD across all six play states (`app/playFrame.ts`): five fixed
+  regions (info bar · nav column · caddy slot · controls panel · action column), contents change, nothing is
+  removed — a dead control greys in place. Panel bottom-anchored with the COMMIT row last, so commit · caddy ·
+  `»` sit at the same y in every state. The caddy's slot is permanent (dimmed when off duty, a reserved
+  placeholder when none is hired) and the BADGE is now the caddy everywhere — `playView` takes a measured
+  `caddyAnchor` and drops its corner figure, so a guard's laser fires off the portrait. Two things the frame
+  forced, both wins: **tap-to-swing** (the aim state's commit button, firing the previewed shot through the
+  gesture's own dispatch — one-handed play) and the info bar no longer reflowing (min-width'd distance slot +
+  score chips on their own row), which surfaced a real bug: the bar was showing the ball's FINAL lie mid-flight,
+  spoiling the result. Readouts bumped a step throughout. Guarded by `tests/play-hud-frame.test.ts` (pure +
+  real-browser layout, 2px tolerance across the aim→watch transition). `docs/decisions/ui-intro.md`.
 - **GS-weather-affinity** — soft thematic weather↔biome bias: a weathered lane (blizzard/dust storm/…)
   now leans toward a fitting world (`EFFECT_BIOME_AFFINITY` + a `pickThemeFrom` weight boost on
   `routeTheme`'s own stream — same draw count, `:routes:` byte-identical, affinity-less skies unchanged).

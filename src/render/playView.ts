@@ -264,6 +264,15 @@ export interface PlayViewOptions {
    *  any other hired caddy only appears transiently for its signature effect (e.g. Dr Chipinski on a
    *  chip-in). Absent → no caddy figure. */
   caddyId?: string;
+  /** Screen-space (CSS px, canvas-relative) anchors for a caddy the HUD is already drawing in its
+   *  permanent badge slot (GS-hud-frame). When given, the corner FIGURE is not drawn — the badge is
+   *  showing that caddy, and drawing the figure too rendered the same caddy twice — and these become
+   *  the effect's anchors: `muzzle` is where a guard's laser/boomerang launches from (so the throw
+   *  visibly comes off the framed portrait), `head` is where its speech bubble points. `head` is
+   *  passed separately rather than derived, because the badge sits INSIDE the frame's bottom bar: a
+   *  bubble hung just above the portrait would be drawn behind the controls panel. Absent (the
+   *  result-screen replay, the no-caddy force-redirect demo) ⇒ the classic corner figure, unchanged. */
+  caddyAnchor?: { muzzle: Vec; head: Vec };
   /** Fired once when a caddy's signature effect triggers visually (a guard redirect or a Dr
    *  Chipinski chip-in) — the cue for app.ts to speak the caddy's voice line + haptic. The arg is
    *  the caddy id whose line to play. Pure feel hook; never affects the sim. */
@@ -685,7 +694,13 @@ export function mountPlayView(
     const calloutActive = caddyCallout && now < caddyCallout.until ? caddyCallout : null;
     const figureCaddyId =
       cornerCaddyId ?? (calloutActive && hasCaddyArt(calloutActive.id) ? calloutActive.id : undefined);
-    if (hasCaddyArt(figureCaddyId)) {
+    // GS-hud-frame: when the HUD is showing this caddy in its permanent badge slot, the badge IS the
+    // figure — anchor the projectile + bubble on it and draw nothing here (drawing both put the same
+    // caddy on screen twice). Only ever set for the caddy the badge is actually showing.
+    if (opts.caddyAnchor && hasCaddyArt(figureCaddyId)) {
+      caddyAnchor = opts.caddyAnchor.muzzle;
+      caddyHead = opts.caddyAnchor.head;
+    } else if (hasCaddyArt(figureCaddyId)) {
       const ch = Math.max(40, Math.min(56, height * 0.085));
       const cx = ch * 0.7 + 6;
       const cy = height - 14;

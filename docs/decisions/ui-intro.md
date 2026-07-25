@@ -384,6 +384,131 @@ exported view object so dispatch can reset it without owning it.
 
 ---
 
+## GS-hud-frame: ONE persistent play HUD across every view state (2026-07-25)
+
+### The report that started it
+
+A Pixel 9a play-test: *"the play screen is laid out differently in each of its six states."* Reading
+the screenshots back, that was exactly right. The play screen has three code branches — aim, putt,
+watch — and each built its own layout from scratch:
+
+| | aim / chip | putt | watch |
+|---|---|---|---|
+| top info bar | yes | yes | yes, but reflowed |
+| map/zoom/⚙ column | yes | **gone** | **gone** |
+| controls panel | club · power · odds | hint · aim · meter · Putt | **gone** |
+| caddy | framed badge, bottom-left | badge, **putting caddies only** | a figure painted in the canvas corner |
+| primary action | a pull gesture on the map | a full-width button | — |
+| auto-finish `»` | yes | **gone** | **gone** |
+
+Nothing threw. Every test was green. It was just miserable to play: you learned where a button was,
+took a shot, and every control you had been using vanished; the caddy came and went; the ⚙ was
+unreachable from the green. The player's call, asked explicitly, was **one persistent frame** — a
+single skeleton always present in the same places, with only the CONTENTS changing per state.
+
+### The frame
+
+`src/app/playFrame.ts` is now the ONE builder of the play screen's outer element. Five fixed regions:
+
+```
+┌──────────────────────────────────────────┐
+│ [info bar ······················] [nav]  │
+│                 (map)                    │
+│ [caddy] [ tool row              ] [ » ]  │
+│         [ gauge row             ]        │
+│         [ read row              ]        │
+│         [ COMMIT                ]        │
+└──────────────────────────────────────────┘
+```
+
+Two rules make it hold, and they are the load-bearing part:
+
+1. **Nothing is removed, only disabled.** A control that can't act in this state renders in its usual
+   place, `[disabled]`. The nav column always ships the same five buttons (a unit test counts them);
+   `»` greys mid-flight instead of disappearing; the recenter `⌖` is always there rather than
+   appearing once the map has been panned.
+2. **The panel is bottom-anchored and the commit row is LAST.** The rows above it genuinely differ in
+   height between states — a pace meter is taller than a power bar, and pretending otherwise would
+   mean reserving a putt-sized panel on every screen and eating the map. Anchoring at the floor puts
+   the thumb-critical line (commit · caddy · `»`) at the same y in all six states regardless. A
+   `min-height` on the panel makes aim / chip / watch pixel-identical to each other; the action
+   column's `»` is a fixed 46px box bottom-aligned, not stretched to the panel (a stretched button
+   rode up and down with the content — the first thing the layout test caught).
+
+### What each state puts in the frame
+
+- **aim / chip** — `◄ Club ►` + mode minis · power bar · spray odds · **🏌 Swing**.
+- **putt** — `◄ Aim: 1.2yd right ►` + the fringe 🏌 toggle · the pace meter · the slope read ·
+  **⛳ Putt**. The ◄/► buttons are physically the same two buttons as the club cycler, adjusting the
+  state's version of "the thing you adjust". The break read moved OUT of the adjuster label (it
+  ellipsised at `Aim straight · brea…`) and down to the read row, where it belongs anyway: the break
+  is the green's, and it doesn't change when you re-aim.
+- **watch** — the struck club, frozen and greyed · a carry bar in the power bar's slot · flight
+  status · a disabled **🏌 In flight…**.
+
+### Two things the frame forced, both improvements
+
+**Tap-to-swing.** The action row must be occupied in every state, and a disabled button on the aim
+screen would be a lie. So the aim state's commit button fires the shot the cone is *already*
+previewing — the same club/aim/free-target and the resting `selPower` (already seeded per shot to
+reach the pin), through the identical `dispatch({type:'shot'})` the pull-gesture release uses. It is
+not a second shot mechanic; it's the same one without the drag, and it makes the play screen usable
+one-handed.
+
+**The caddy's permanent slot, and the badge as the FX origin.** The badge used to ride the aim screen
+only (and, on the green, only a putting specialist), while the watch state painted its own caddy
+figure into the canvas corner — a guard persistently, because that figure was the muzzle its
+laser/boomerang launched from. Putting the badge in the watch state too would have drawn the same
+caddy twice (the old "caddy shows twice on the shot-watching screen" bug). So the direction was
+reversed: the **badge is the caddy**, in all six states, and `playView` takes a `caddyAnchor`
+(`{muzzle, head}`, canvas-relative CSS px, measured from the badge's real box in app.ts) and skips
+its corner figure entirely. A guard's laser now fires off the framed portrait the player has been
+looking at all hole, which reads better than a figure that only existed during flight.
+`head` is passed rather than derived because the badge sits INSIDE the bottom bar — a bubble hung
+just above the portrait draws behind the controls glass, so app.ts anchors it above the whole bar.
+Absent (`undefined`) ⇒ the classic corner figure, unchanged: that's the result-screen replay, and it
+was also the `_gsFeel.forceRedirect` demo until `caddyId()` learned to fill the slot with the demo's
+guard so the throw stays watchable (render-only, like the flag itself).
+
+Slot states: hired ⇒ the gold badge · hired but with no read here (a distance/guard caddy on the
+green) ⇒ the badge **dims**, it does not vanish · none hired ⇒ a quiet dashed placeholder holding the
+same box, so the bar's left edge never moves and the empty slot advertises the hire.
+
+### Typography
+
+The play-test's other verdict was that the readouts were too small to parse mid-round. Bumped a step
+across the frame: stats 13 → 14.5px, sub-line 11.5 → 12.5px, spray legend 11.5 → 12.5px, club name
+15 → 16.5px, power label + lie chip + score chip each up a notch.
+
+### The info bar stopped reflowing
+
+Two fixes, both structural rather than cosmetic. The distance slot has a `min-width` so the stats row
+wraps identically whether it reads `347y` or `…in flight`; and the score/placing chips moved to their
+OWN row instead of trailing the stats and wrapping whenever the line above them grew. Aim and watch
+are now line-for-line identical.
+
+While measuring that, a real bug fell out: during the animation `play.lie` is **already** the lie the
+ball will finish in, so the bar was quietly spoiling the result before the ball landed. The watch
+state now passes the lie the shot was played FROM (`shot.lieFrom`).
+
+### Guards
+
+`tests/play-hud-frame.test.ts`. Pure half: all five regions in all three shapes, the nav column's
+button count, the caddy slot's three cases. Browser half (against the BUILT artifact, so it also
+proves the CSS survives the single-file inline): mount the play screen, tap Swing, and assert every
+region is still there *and within 2px of where it was* while the ball is in the air, that the
+controls that can't act are `disabled` rather than gone, and that no chrome blankets the map. Plus a
+source check that no branch hand-rolls `class="gs-shot gs-shot--full"` any more — that's exactly how
+the six layouts drifted apart in the first place.
+
+### Not done here
+
+Deliberately left: the play screen's remaining reported issues (`GS-story-inspect-flicker`, the
+briefing-beat idiom, the putt-watch inset report) are separate entries in `IDEAS.md` and separate
+sessions.
+
+---
+
 ## Migrated from CLAUDE.md — System-index bullets (2026-07-23 refactor)
 
 > These are the verbatim terse System-index bullets moved out of `CLAUDE.md` when it was
