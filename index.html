@@ -1371,6 +1371,33 @@
       .gs-setrow--nav { border-top: none; }
       .gs-setdone { text-align: center; margin-top: 14px; }
 
+      /* ── Save export / import (GS-save-transfer) ───────────────────────────────────────
+         Lives inside the settings sheet, so it borrows `.gs-setsec`/`.gs-setnote`/`.gs-btn`
+         and adds only what it genuinely needs. Own `gs-save*` names — not the play HUD's
+         `.gs-hud`, per the global-class rule. */
+      .gs-saverow { display: flex; gap: 8px; margin-top: 8px; }
+      .gs-saverow .gs-btn { flex: 1; margin: 0; padding: 11px 8px; font-size: 13.5px; }
+      /* The import CONFIRM card — deliberately heavier than the rest of the sheet: it is the last
+         thing between a tap and an irreversible overwrite, so it should read as a stop, not a step. */
+      .gs-savebox {
+        margin-top: 8px; padding: 11px 12px 12px;
+        border: 1px solid var(--gs-line); border-radius: var(--gs-r);
+        background: #12151d;
+      }
+      .gs-savebox-h { font-weight: 800; font-size: 14.5px; margin-bottom: 4px; }
+      .gs-savelist { list-style: none; margin: 8px 0; padding: 0; font-size: 13px; line-height: 1.6; }
+      .gs-savelist li { opacity: .9; }
+      .gs-savewarn {
+        margin: 10px 0 2px; padding: 8px 10px; border-radius: 9px;
+        font-size: 12px; line-height: 1.45;
+        color: #ffd0c4; background: rgba(179, 64, 47, .18);
+        border: 1px solid rgba(255, 107, 107, .35);
+      }
+      .gs-savenote {
+        margin: 9px 2px 0; font-size: 12.5px; line-height: 1.45; color: #bfe9bd;
+      }
+      .gs-savenote--bad { color: #ffc4b8; }
+
       /* ── Celebration sparkle burst (assetless, one-shot) ───────────────────────────── */
       .gs-burst { position: absolute; left: 50%; top: 28%; width: 0; height: 0; pointer-events: none; z-index: 4; }
       .gs-spark {

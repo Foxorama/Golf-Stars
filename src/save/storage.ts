@@ -4,7 +4,7 @@
  * `localStorage` is unavailable (Node/tests, private mode) — the sim never depends on it.
  */
 
-import { defaultSave, exportSave, importSave, migrate, type Save } from './schema';
+import { defaultSave, migrate, type Save } from './schema';
 
 export const SAVE_KEY = 'gs_save';
 
@@ -42,21 +42,12 @@ export function writeSave(save: Save): boolean {
   }
 }
 
-/** Download the save as a JSON file (browser only). */
-export function downloadSave(save: Save, filename = 'golf-stars-save.json'): void {
-  if (typeof document === 'undefined') return;
-  const blob = new Blob([exportSave(save)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-/** Import a save from JSON text and persist it. Returns the loaded save. */
-export function importAndStore(json: string): Save {
-  const save = importSave(json);
-  writeSave(save);
-  return save;
-}
+// Save export/import lives in `save/backup.ts` + `app/saveTransfer.ts` (GS-save-transfer), NOT here.
+//
+// This file used to carry a `downloadSave` / `importAndStore` pair. They were never wired to any UI,
+// and both were wrong for the job by the time one was needed: `downloadSave` wrote the MAIN SAVE
+// only, which would have silently dropped a player's whole Story Tour campaign (`gs_story` is a
+// separate blob), and `importAndStore` went through `importSave`, which swallows its errors and
+// returns `defaultSave()` — so a wrong file would have reported success while wiping a real save.
+// Removed rather than left lying around: a plausible-looking helper that quietly loses data is worse
+// than no helper. See `docs/decisions/save-transfer.md`.

@@ -71,6 +71,15 @@ This game lives or dies on three axes — put every change through all three bef
   (localStorage is the only copy). Current schema is **v30**; bump + add a migration when you
   persist a new field. Loadouts are rebuilt from perk *ids* (`loadoutFromPerks`), so most
   run-state changes need NO save bump.
+  **A backup is a BUNDLE, not a save** (GS-save-transfer, `save/backup.ts` pure · `app/saveTransfer.ts`
+  the localStorage/DOM half). Progress lives in THREE blobs (`gs_save` + `gs_story` + `gs_settings`) and
+  localStorage is per-ORIGIN, so the website and the Capacitor shell (`https://localhost`) cannot see
+  each other's saves — export/import is the only bridge, and the only way off a device before an
+  uninstall. **A new persisted blob must join the bundle or it is silently lost.** `parseBackup`
+  **THROWS** (`BackupError`) on anything untrustworthy — never `importSave`'s swallow-and-return-
+  `defaultSave()`, which is right for boot and catastrophic for an import (it would report success
+  while wiping a real save). Import is two steps by construction: the pick PARSES + summarises, a
+  second tap writes. Guarded by `tests/save-backup.test.ts` + `tests/save-transfer-browser.test.ts`.
 - **Content as data, not code:** clubs, lies, biomes, items, economy, formats, characters, golfers,
   caddies, ships are tables the sim reads. **New world / item / golfer = a new row, not an engine edit.**
   Cutting/re-spreading the club taxonomy (`src/sim/clubs.ts CLUBS`) looks like a one-line edit but
