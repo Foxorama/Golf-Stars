@@ -9,6 +9,14 @@
  *     to fly there (engine-scaled speed) — dodging is real navigation, not a parry prompt.
  *   • THE SERPENT IS THE TEASER SERPENT. `paintSerpent` (the sigil-ceremony art) IS the boss — the same
  *     horns, fanged maw and slit-pupil eye the ceremonies tease, glaring wide-eyed (GS-story-serpent-eye).
+ *   • THE HERALD FIGHTS THE WARDEN ARK, NOT THE SERPENT (GS-story-warden-ark). On the Coil road you are the
+ *     serpent's liberator — what stands between you and the root is the Wardens' CAPITAL SHIP, your old
+ *     friends at its helm. It used to be the serpent's head spitting venom at you, which made no sense on
+ *     either count (the player report). The Ark is `paintWardenArk`, and it fights like a warship: FLAK
+ *     bursts, spinal LANCE lock-ons, seeker TORPEDOES — the same three attack shapes on the same timings
+ *     and the same dodgeable arcs, so the fight's balance and fairness are untouched and only the WEAPON
+ *     changed. Both bosses return the same `BossAnchors`, so targeting, the muzzle and the golf finisher
+ *     (the Ark's exposed reactor core / the serpent's bared eye) are one piece of code.
  *   • EVERY WEAPON IS ITS OWN TRIGGER. The bottom HUD seats one button per owned weapon upgrade
  *     (`FinaleLoadout.weapons` — scatter / railgun / nova / lance / wyrmfang), each with its own damage,
  *     cooldown ring and projectile style, so a stocked arsenal plays like an arsenal.
@@ -27,6 +35,7 @@
  */
 
 import { paintSerpent, type SerpentAnchors } from './sigilCeremony';
+import { paintWardenArk, arkBatteryPos } from './wardenArk';
 import { shipSVG } from './shipArt';
 import {
   FINALE_SERPENT_HP,
@@ -211,6 +220,11 @@ export function mountStoryBattle(opts: {
   // the boss now rears out of its own coils instead of a lone head poking in from the wing.
   const SERPENT_CX = 950;
   const SERPENT_CY = 200;
+  // GS-story-warden-ark: the HERALD's boss is not the serpent — it is the Wardens' capital ship, come to
+  // hold the seal you mean to break. It sits a shade further in-field than the serpent's head so the whole
+  // hull (and the reactor core amidships, the finisher's target) stays on canvas.
+  const ARK_CX = 760;
+  const ARK_CY = 250;
   const POSE_T = 1.5; // held pose for the aim reveal (keeps the head framed + targetable)
 
   let raf = 0;
@@ -376,14 +390,18 @@ export function mountStoryBattle(opts: {
   });
   window.addEventListener('keydown', onKey);
 
-  // ── serpent attack patterns ──────────────────────────────────────────────────
-  const mawPos = (): { x: number; y: number } => ({
-    x: anchors.browX + anchors.headH * 0.7,
-    y: anchors.browY + anchors.headH * 1.6,
-  });
+  // ── boss attack patterns ─────────────────────────────────────────────────────
+  /** Where the volleys come FROM: the serpent's maw, or the Ark's lance batteries (GS-story-warden-ark).
+   *  One seam, so every attack spawner is boss-agnostic. */
+  const muzzlePos = (): { x: number; y: number } =>
+    herald
+      ? arkBatteryPos(anchors)
+      : { x: anchors.browX + anchors.headH * 0.7, y: anchors.browY + anchors.headH * 1.6 };
 
+  /** A fan of the boss's bread-and-butter shot: the serpent SPITS acid, the Ark walks FLAK across the
+   *  field. Same slow, dodgeable arcs (the fairness the fight is built on) — a different weapon. */
   function spawnAcidFan(count: number, aimed: boolean): void {
-    const m = mawPos();
+    const m = muzzlePos();
     const baseA = Math.atan2(ship.y - m.y, ship.x - m.x);
     for (let k = 0; k < count; k++) {
       const a = baseA + (k - (count - 1) / 2) * (aimed ? 0.16 : 0.26) + (rng() - 0.5) * 0.06;
@@ -401,23 +419,31 @@ export function mountStoryBattle(opts: {
     }
   }
 
+  /** The telegraphed line: the serpent CALLS LIGHTNING, the Ark's spinal LANCE locks on. Both draw a
+   *  warning across the field first — leave the line before it fires. */
   function spawnBolt(targetY?: number): void {
-    // a full-width lightning line telegraphed through the ship's CURRENT height — dodge by leaving it
     const y = targetY ?? ship.y + (rng() - 0.5) * 40;
+    // The serpent CALLS the bolt down across the field (it arrives from the dark); the Ark's spinal lance
+    // is FIRED — so on the Herald path the line starts at the battery that fires it and runs out past you.
+    const m = muzzlePos();
+    const from = herald ? { x: m.x, y: m.y } : { x: -30, y: y + (rng() - 0.5) * 30 };
+    const to = herald ? { x: -30, y: y + (rng() - 0.5) * 30 } : { x: anchors.browX, y };
     enemyShots.push({
       kind: 'bolt',
-      x1: -30,
-      y1: y + (rng() - 0.5) * 30,
-      x2: anchors.browX,
-      y2: y,
+      x1: from.x,
+      y1: from.y,
+      x2: to.x,
+      y2: to.y,
       fireAt: now0 + BOLT_TELEGRAPH_MS,
       doneAt: now0 + BOLT_TELEGRAPH_MS + BOLT_ACTIVE_MS,
       hit: false,
     });
   }
 
+  /** The heavy round: a collapsing VOID orb from the serpent, a seeker TORPEDO from the Ark. Both fly a
+   *  fuse and then detonate into an expanding ring. */
   function spawnVoid(): void {
-    const e = { x: anchors.eyeX, y: anchors.eyeY };
+    const e = herald ? muzzlePos() : { x: anchors.eyeX, y: anchors.eyeY };
     const a = Math.atan2(ship.y - e.y, ship.x - e.x) + (rng() - 0.5) * 0.2;
     const sp = ACID_SPEED * 1.15;
     enemyShots.push({
@@ -449,12 +475,13 @@ export function mountStoryBattle(opts: {
 
   function phaseLabel(i: number): [string, string] {
     if (herald) {
+      // GS-story-warden-ark: a WARDEN warship's escalation — flak, then the spinal lances, then torpedoes.
       return (
         [
-          ['THE WARDS STRAIN', 'acid wells up between the bindings — fly clear of the globes'],
-          ['IT BEGINS TO WAKE', 'the acid spray thickens as the serpent stirs'],
-          ['THE BLOCKADE OPENS FIRE', 'warden lances sweep the field — leave the line before they land'],
-          ['THE LAST WARD CRACKS', 'void-rifts tear open — keep flying, keep firing'],
+          ['THE ARK COMES ABOUT', 'tap the field to fly · tap a weapon to fire'],
+          ['⚠ FLAK CURTAIN', 'the batteries find their range — fly around the bursts'],
+          ['⚠ LANCE BATTERIES', 'a lance locks on — leave the marked line before it fires'],
+          ['⚠ TORPEDO SALVO', 'seeker warheads detonate into shock rings — keep your distance'],
         ][i] ?? ['', '']
       ) as [string, string];
     }
@@ -493,7 +520,7 @@ export function mountStoryBattle(opts: {
       overwhelmHitsDealt = 0;
       enemyShots.length = 0; // the field clears for the set-piece
       shake = 12;
-      phaseCaption = herald ? 'THE LAST WARD SHATTERS' : 'THE WORLD-EATER UNCOILS';
+      phaseCaption = herald ? 'THE ARK FIRES EVERYTHING' : 'THE WORLD-EATER UNCOILS';
       phaseCaptionSub = 'an overwhelming barrage — your shields must hold';
       phaseCaptionUntil = now0 + 3000;
       opts.onPhase?.();
@@ -607,8 +634,8 @@ export function mountStoryBattle(opts: {
         enemyShots.length = 0;
         phase = 'aim';
         aimStart = now0;
-        phaseCaption = herald ? 'THE SEAL LIES BARE' : 'ITS EYE IS BARED';
-        phaseCaptionSub = herald ? 'strike the seal and let it rise' : 'strike the ball home';
+        phaseCaption = herald ? 'THE REACTOR LIES BARE' : 'ITS EYE IS BARED';
+        phaseCaptionSub = herald ? 'strike the core and break the blockade' : 'strike the ball home';
         phaseCaptionUntil = now0 + 2400;
       }
     } else if (phase === 'aim' && !interactive && now0 - aimStart > 1400) {
@@ -732,9 +759,11 @@ export function mountStoryBattle(opts: {
     ctx.ellipse(0, 0, 52, 15, 0, 0.3, Math.PI - 0.3);
     ctx.stroke();
     ctx.restore();
-    // the corruption haze bleeding in from the serpent's side
-    const haze = ctx.createRadialGradient(860, 260, 60, 860, 260, 560);
-    haze.addColorStop(0, `rgba(60,200,140,${0.1 + roar * 0.08})`);
+    // the light bleeding in from the boss's side — the serpent's corruption green, or the Ark's cold halo
+    const haze = herald
+      ? ctx.createRadialGradient(ARK_CX, ARK_CY, 60, ARK_CX, ARK_CY, 560)
+      : ctx.createRadialGradient(860, 260, 60, 860, 260, 560);
+    haze.addColorStop(0, herald ? `rgba(150,190,255,${0.1 + roar * 0.08})` : `rgba(60,200,140,${0.1 + roar * 0.08})`);
     haze.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = haze;
     ctx.fillRect(0, 0, DW, DH);
@@ -744,59 +773,65 @@ export function mountStoryBattle(opts: {
     }
   }
 
-  /** The serpent's waking level: the Warden fights it wide awake; the Herald watches it WAKE as the
-   *  wards (its health) wear down. */
-  const wakeLevel = (): number => (herald ? 0.3 + 0.7 * (1 - hp / hpMax) : 1);
+  /** How far the boss has been worn down, 0 → 1 — the serpent's waking level and the Ark's battle damage
+   *  are the same number read two ways (the Warden fights a serpent already wide awake). */
+  const worn = (): number => 1 - hp / hpMax;
 
-  function drawSerpent(t: number, focus: number, dim: number): void {
+  /** Paint the boss for this path: the world-serpent (Warden) or the Warden Ark (Herald). ONE anchors
+   *  seam, so everything downstream — targeting, the muzzle, the finisher — is boss-agnostic. */
+  function drawBoss(t: number, focus: number, dim: number): void {
     if (!ctx) return;
     if (dim > 0) ctx.globalAlpha = 1 - dim;
     const tPose = focus > 0 ? lerp(t, POSE_T + 0.06 * Math.sin(t * 0.9), Math.min(1, focus / 0.6)) : t;
-    // the maw gapes around each volley (GS-story-serpent-2): opens as the attack winds up, spits, closes
+    // the maw gapes / the batteries flare around each volley: winds up as the attack builds, fires, settles
     const fighting = phase === 'assault' || phase === 'overwhelm';
     const windUp = clamp01(1 - (nextAttackAt - now0) / 380);
     const spit = clamp01(1 - (now0 - lastVolleyAt) / 520);
     const rage = fighting ? Math.max(windUp * 0.85, spit) : 0;
-    anchors = paintSerpent(ctx, SERPENT_CX, SERPENT_CY, tPose, wakeLevel(), focus + roar * 0.12, { rage });
+    anchors = herald
+      ? paintWardenArk(ctx, ARK_CX, ARK_CY, tPose, worn(), focus + roar * 0.08, { rage })
+      : paintSerpent(ctx, SERPENT_CX, SERPENT_CY, tPose, 1, focus + roar * 0.12, { rage });
     ctx.globalAlpha = 1;
   }
 
-  /** The Herald's final SEAL sits on the serpent's drawn brow. */
-  const sealPos = (): { x: number; y: number; r: number } => ({
-    x: anchors.browX - anchors.headH * 0.1,
-    y: anchors.browY + anchors.headH * 0.15,
-    r: anchors.headH * 0.55,
+  /** The FINISHER's target: the Ark's exposed reactor core, or the serpent's bared eye. Both ride the same
+   *  anchor, so the aim phase, the reticle and the ball flight are one piece of code. */
+  const coreTarget = (): { x: number; y: number; r: number } => ({
+    x: anchors.eyeX,
+    y: anchors.eyeY,
+    r: herald ? anchors.eyeR * 1.6 : anchors.headH * 0.55,
   });
-  const aimTarget = (): { x: number; y: number } => (herald ? sealPos() : { x: anchors.eyeX, y: anchors.eyeY });
+  const aimTarget = (): { x: number; y: number } => ({ x: anchors.eyeX, y: anchors.eyeY });
   const reticleX = (t: number, cx: number): number => cx + Math.sin(t * SWEEP_SPEED) * SWEEP_AMP;
 
-  function drawSeal(t: number, lash: boolean): void {
+  /** GS-story-warden-ark: the exposed REACTOR CORE, laid bare when the Ark's hull finally fails — the
+   *  Herald finisher's target (the serpent's bared eye needs no ring; the Ark's core does). */
+  function drawCoreTarget(t: number, lash: boolean): void {
     if (!ctx) return;
-    const s = sealPos();
+    const s = coreTarget();
     const pulse = 0.7 + 0.3 * Math.sin(t * 2.6);
     const glow = ctx.createRadialGradient(s.x, s.y, 2, s.x, s.y, s.r * 1.8);
-    glow.addColorStop(0, `rgba(255,224,130,${0.4 * pulse})`);
+    glow.addColorStop(0, `rgba(190,235,255,${0.45 * pulse})`);
     glow.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = glow;
     ctx.beginPath();
     ctx.arc(s.x, s.y, s.r * 1.8, 0, 6.283);
     ctx.fill();
-    ctx.strokeStyle = lash ? 'rgba(255,120,80,0.95)' : `rgba(255,224,130,${0.85 * pulse})`;
+    ctx.strokeStyle = lash ? 'rgba(255,120,80,0.95)' : `rgba(255,224,138,${0.9 * pulse})`;
     ctx.lineWidth = 5;
     ctx.beginPath();
     ctx.arc(s.x, s.y, s.r, 0, 6.283);
     ctx.stroke();
-    // the ouroboros — a serpent ring biting its tail
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, s.r * 0.62, 0.5, 6.0);
-    ctx.stroke();
-    ctx.beginPath();
-    const ha = 0.35;
-    ctx.moveTo(s.x + Math.cos(ha) * s.r * 0.62, s.y + Math.sin(ha) * s.r * 0.62);
-    ctx.lineTo(s.x + Math.cos(ha - 0.35) * s.r * 0.82, s.y + Math.sin(ha - 0.35) * s.r * 0.82);
-    ctx.lineTo(s.x + Math.cos(ha - 0.5) * s.r * 0.5, s.y + Math.sin(ha - 0.5) * s.r * 0.5);
-    ctx.stroke();
+    // containment vanes venting light — a reactor coming apart, not a rune
+    ctx.strokeStyle = `rgba(255,255,255,${0.7 * pulse})`;
+    ctx.lineWidth = 2.4;
+    for (let k = 0; k < 6; k++) {
+      const a = k * 1.047 + t * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(s.x + Math.cos(a) * s.r * 0.45, s.y + Math.sin(a) * s.r * 0.45);
+      ctx.lineTo(s.x + Math.cos(a) * s.r * 0.95, s.y + Math.sin(a) * s.r * 0.95);
+      ctx.stroke();
+    }
   }
 
   function drawShip(t: number): void {
@@ -961,9 +996,53 @@ export function mountStoryBattle(opts: {
   function drawEnemyShots(t: number): void {
     if (!ctx) return;
     for (const s of enemyShots) {
-      if (s.kind === 'acid') {
+      if (s.kind === 'acid' && herald) {
+        // GS-story-warden-ark: the Ark fires FLAK, not venom — a hard shell in a burst of gold sparks,
+        // travelling the same slow, readable arc the acid globe did (the fight's fairness is unchanged).
         const wob = Math.sin(t * 5 + s.wob) * 2;
-        const acid = herald ? '176,224,79' : '110,230,120';
+        const y = s.y + wob;
+        const ta = Math.atan2(s.vy, s.vx);
+        const g = ctx.createRadialGradient(s.x, y, 1, s.x, y, s.r * 2.2);
+        g.addColorStop(0, 'rgba(255,236,190,0.55)');
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(s.x, y, s.r * 2.2, 0, 6.283);
+        ctx.fill();
+        // the smoke-and-spark trail
+        ctx.strokeStyle = 'rgba(210,222,240,0.28)';
+        ctx.lineWidth = s.r * 0.8;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(s.x - Math.cos(ta) * s.r * 3.2, y - Math.sin(ta) * s.r * 3.2);
+        ctx.lineTo(s.x, y);
+        ctx.stroke();
+        ctx.lineCap = 'butt';
+        // the shell itself — a bright slug with a gold burst around it
+        ctx.save();
+        ctx.translate(s.x, y);
+        ctx.rotate(ta);
+        ctx.fillStyle = '#ffe08a';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, s.r * 0.95, s.r * 0.62, 0, 0, 6.283);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.ellipse(s.r * 0.25, 0, s.r * 0.42, s.r * 0.3, 0, 0, 6.283);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(255,246,214,${0.5 + 0.35 * Math.sin(t * 12 + s.wob)})`;
+        ctx.lineWidth = 1.6;
+        for (let k = 0; k < 4; k++) {
+          const a = k * 1.57 + t * 2;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a) * s.r * 0.9, Math.sin(a) * s.r * 0.9);
+          ctx.lineTo(Math.cos(a) * s.r * 1.7, Math.sin(a) * s.r * 1.7);
+          ctx.stroke();
+        }
+        ctx.restore();
+      } else if (s.kind === 'acid') {
+        const wob = Math.sin(t * 5 + s.wob) * 2;
+        const acid = '110,230,120';
         const g = ctx.createRadialGradient(s.x, s.y + wob, 1, s.x, s.y + wob, s.r * 2);
         g.addColorStop(0, `rgba(${acid},0.5)`);
         g.addColorStop(1, 'rgba(0,0,0,0)');
@@ -1005,7 +1084,8 @@ export function mountStoryBattle(opts: {
           ctx.fillStyle = `rgba(${col},${0.5 + p * 0.5})`;
           ctx.font = '700 15px system-ui, sans-serif';
           ctx.textAlign = 'left';
-          ctx.fillText(herald ? '⚔' : '⚡', 8, s.y1 - 8);
+          // the warning glyph sits at the screen edge — whichever end of the line runs off it
+          ctx.fillText(herald ? '⚔' : '⚡', 8, (s.x1 < s.x2 ? s.y1 : s.y2) - 8);
         } else {
           // the zap: a jagged bolt along the line
           const a = clamp01((s.doneAt - now0) / BOLT_ACTIVE_MS);
@@ -1030,26 +1110,61 @@ export function mountStoryBattle(opts: {
         }
       } else {
         const sinceDet = now0 - s.detonateAt;
+        // GS-story-warden-ark: the Ark's heavy round is a seeker TORPEDO — a lit warhead running a fuse,
+        // then a white shock ring. The serpent's is a void orb collapsing into a violet rift. Same flight,
+        // same fuse, same ring radius: only the weapon changed.
+        const col = herald ? '190,235,255' : '170,120,255';
         if (sinceDet < 0) {
-          // the falling void orb — a dark core eating the light around it
-          const g = ctx.createRadialGradient(s.x, s.y, 1, s.x, s.y, 26);
-          g.addColorStop(0, 'rgba(20,8,40,0.95)');
-          g.addColorStop(0.55, 'rgba(90,50,160,0.5)');
-          g.addColorStop(1, 'rgba(0,0,0,0)');
-          ctx.fillStyle = g;
-          ctx.beginPath();
-          ctx.arc(s.x, s.y, 26, 0, 6.283);
-          ctx.fill();
-          ctx.strokeStyle = `rgba(190,140,255,${0.5 + 0.4 * Math.sin(t * 10)})`;
-          ctx.lineWidth = 1.6;
-          ctx.beginPath();
-          ctx.arc(s.x, s.y, 12 + Math.sin(t * 8) * 2, 0, 6.283);
-          ctx.stroke();
+          if (herald) {
+            const ta = Math.atan2(s.vy, s.vx);
+            const g = ctx.createRadialGradient(s.x, s.y, 1, s.x, s.y, 24);
+            g.addColorStop(0, 'rgba(190,235,255,0.5)');
+            g.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, 24, 0, 6.283);
+            ctx.fill();
+            ctx.save();
+            ctx.translate(s.x, s.y);
+            ctx.rotate(ta);
+            // the drive plume behind the warhead
+            ctx.fillStyle = `rgba(143,230,255,${0.5 + 0.4 * Math.sin(t * 18)})`;
+            ctx.beginPath();
+            ctx.moveTo(-9, -3.4);
+            ctx.lineTo(-26 - Math.sin(t * 20) * 5, 0);
+            ctx.lineTo(-9, 3.4);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = '#eaf2ff';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 12, 4.6, 0, 0, 6.283);
+            ctx.fill();
+            ctx.fillStyle = '#ffe08a';
+            ctx.beginPath();
+            ctx.ellipse(8, 0, 4.4, 3, 0, 0, 6.283);
+            ctx.fill();
+            ctx.restore();
+          } else {
+            // the falling void orb — a dark core eating the light around it
+            const g = ctx.createRadialGradient(s.x, s.y, 1, s.x, s.y, 26);
+            g.addColorStop(0, 'rgba(20,8,40,0.95)');
+            g.addColorStop(0.55, 'rgba(90,50,160,0.5)');
+            g.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, 26, 0, 6.283);
+            ctx.fill();
+            ctx.strokeStyle = `rgba(190,140,255,${0.5 + 0.4 * Math.sin(t * 10)})`;
+            ctx.lineWidth = 1.6;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, 12 + Math.sin(t * 8) * 2, 0, 6.283);
+            ctx.stroke();
+          }
         } else {
           // the detonation ring
           const p = clamp01(sinceDet / VOID_RING_MS);
           const ringR = p * VOID_RING_MAX;
-          ctx.strokeStyle = `rgba(170,120,255,${(1 - p) * 0.85})`;
+          ctx.strokeStyle = `rgba(${col},${(1 - p) * 0.85})`;
           ctx.lineWidth = 7 * (1 - p) + 2;
           ctx.beginPath();
           ctx.arc(s.x, s.y, ringR, 0, 6.283);
@@ -1101,12 +1216,12 @@ export function mountStoryBattle(opts: {
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.font = '800 13px system-ui, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(herald ? 'THE BOUND WORLD-EATER' : 'JÖRMUNGANDR', x, y - 7);
+    ctx.fillText(herald ? 'THE WARDEN ARK' : 'JÖRMUNGANDR', x, y - 7);
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
     ctx.fillRect(x, y, w, 13);
     const bg = ctx.createLinearGradient(x, 0, x + w, 0);
-    bg.addColorStop(0, herald ? '#ffd66e' : '#8fe0a0');
-    bg.addColorStop(1, herald ? '#e0a94f' : '#4fb87a');
+    bg.addColorStop(0, herald ? '#eaf2ff' : '#8fe0a0');
+    bg.addColorStop(1, herald ? '#ffe08a' : '#4fb87a');
     ctx.fillStyle = bg;
     ctx.fillRect(x, y, w * clamp01(frac), 13);
     // phase notches — the escalation is READABLE on the bar
@@ -1127,7 +1242,7 @@ export function mountStoryBattle(opts: {
       ctx.fillStyle = '#ff9a6a';
       ctx.font = '700 12.5px system-ui, sans-serif';
       ctx.textAlign = 'right';
-      ctx.fillText(herald ? 'the last ward HOLDS — not enough gun' : 'its hide HOLDS — not enough gun', x + w, y + 32);
+      ctx.fillText(herald ? 'the Ark\u2019s armour HOLDS — not enough gun' : 'its hide HOLDS — not enough gun', x + w, y + 32);
     }
   }
 
@@ -1351,7 +1466,7 @@ export function mountStoryBattle(opts: {
 
     if (phase === 'assault' || phase === 'overwhelm') {
       drawSpace(t, hitFlash * 0.55 + (phase === 'overwhelm' ? 0.12 : 0));
-      drawSerpent(t, phase === 'overwhelm' ? clamp01((now0 - overwhelmStart) / 1600) * 0.4 : 0, 0);
+      drawBoss(t, phase === 'overwhelm' ? clamp01((now0 - overwhelmStart) / 1600) * 0.4 : 0, 0);
       drawEnemyShots(t);
       drawPlayerShots(t);
       drawBursts();
@@ -1367,9 +1482,9 @@ export function mountStoryBattle(opts: {
       drawSpace(t, 0);
       // the REVEAL: the camera pushes to the head exactly like the fifth-Sigil teaser
       const focus = clamp01((now0 - aimStart) / 1400) * 0.95;
-      drawSerpent(t, focus, 0);
+      drawBoss(t, focus, 0);
       const lash = now0 < lashUntil;
-      if (herald) drawSeal(t, lash);
+      if (herald) drawCoreTarget(t, lash);
       const target = aimTarget();
       const rx = reticleX(now0 / 1000, target.x);
       const ry = target.y;
@@ -1385,7 +1500,7 @@ export function mountStoryBattle(opts: {
       drawShip(t);
       drawShieldPips();
       if (interactive) {
-        prompt(lash ? 'it lashes — steady…' : herald ? '🎯 TAP TO STRIKE THE SEAL' : '🎯 TAP TO STRIKE THE EYE', '#ffe6a0', t * 1.25);
+        prompt(lash ? (herald ? 'the batteries swing round — steady…' : 'it lashes — steady…') : herald ? '🎯 TAP TO STRIKE THE CORE' : '🎯 TAP TO STRIKE THE EYE', '#ffe6a0', t * 1.25);
       }
     } else if (phase === 'climax-win') {
       const e = nowMs - climaxStart;
@@ -1393,11 +1508,12 @@ export function mountStoryBattle(opts: {
       const p = clamp01((e - 380) / 1600);
       drawSpace(t, 0);
       if (herald) {
-        // the seal breaks — the serpent RISES, and the stars begin to go out
-        drawSerpent(t, 0.95, 0);
-        const s = sealPos();
+        // GS-story-warden-ark: the core takes the ball, the Ark comes apart — and behind the wreck the
+        // root the blockade was holding shut lies open, the serpent's green rising through it.
+        drawBoss(t, 0.95, ballT < 1 ? 0 : Math.min(0.85, p));
+        const s = coreTarget();
         if (ballT < 1) {
-          drawSeal(t, false);
+          drawCoreTarget(t, false);
           const bx = lerp(ship.x + 30, s.x, ballT);
           const by = lerp(ship.y, s.y, ballT) - Math.sin(ballT * Math.PI) * 90;
           ctx.fillStyle = '#ffffff';
@@ -1405,34 +1521,51 @@ export function mountStoryBattle(opts: {
           ctx.arc(bx, by, 7, 0, 6.283);
           ctx.fill();
         } else {
-          ctx.strokeStyle = `rgba(255,224,130,${(1 - p) * 0.9})`;
+          // the reactor lets go: gold shock-rings, then hull debris thrown across the field
+          ctx.strokeStyle = `rgba(255,240,190,${(1 - p) * 0.95})`;
           ctx.lineWidth = 3;
-          for (let k = 0; k < 10; k++) {
-            const a = k * 0.63;
-            const rr = 20 + p * 260;
+          for (let k = 0; k < 12; k++) {
+            const a = k * 0.52;
+            const rr = 20 + p * 300;
             ctx.beginPath();
             ctx.moveTo(s.x + Math.cos(a) * rr * 0.5, s.y + Math.sin(a) * rr * 0.5);
             ctx.lineTo(s.x + Math.cos(a) * rr, s.y + Math.sin(a) * rr);
             ctx.stroke();
           }
-          ctx.strokeStyle = `rgba(120,255,180,${(1 - p) * 0.7})`;
+          ctx.fillStyle = `rgba(201,214,234,${(1 - p) * 0.9})`;
+          for (let k = 0; k < 16; k++) {
+            const a = k * 0.98 + 0.3;
+            const rr = p * (160 + (k % 4) * 90);
+            ctx.save();
+            ctx.translate(s.x + Math.cos(a) * rr, s.y + Math.sin(a) * rr * 0.7);
+            ctx.rotate(a + p * 3);
+            ctx.fillRect(-7, -2.5, 14, 5);
+            ctx.restore();
+          }
+          ctx.strokeStyle = `rgba(255,224,138,${(1 - p) * 0.8})`;
           ctx.lineWidth = 6;
           ctx.beginPath();
           ctx.arc(s.x, s.y, 30 + p * 700, 0, 6.283);
           ctx.stroke();
+          // the root, unbarred: a green light welling up from below as the last of the fleet burns
+          const rg = ctx.createRadialGradient(DW / 2, DH + 60, 40, DW / 2, DH + 60, 620);
+          rg.addColorStop(0, `rgba(120,255,180,${p * 0.5})`);
+          rg.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = rg;
+          ctx.fillRect(0, 0, DW, DH);
           const vg = ctx.createRadialGradient(DW / 2, DH / 2, 200, DW / 2, DH / 2, 640);
           vg.addColorStop(0, 'rgba(0,0,0,0)');
           vg.addColorStop(1, `rgba(0,4,2,${p * 0.9})`);
           ctx.fillStyle = vg;
           ctx.fillRect(0, 0, DW, DH);
           caption(
-            strike === 'clean' ? 'The seal breaks clean.' : 'A clipping blow — enough.',
-            'The last ward falls — the serpent uncoils, and the galaxy goes still.',
+            strike === 'clean' ? 'The Ark breaks clean.' : 'A clipping blow — enough.',
+            'The blockade is gone — the root lies open, and something vast begins to stir.',
             p,
           );
         }
       } else {
-        drawSerpent(t, 0.95, ballT < 1 ? 0 : p);
+        drawBoss(t, 0.95, ballT < 1 ? 0 : p);
         if (ballT < 1) {
           const bx = lerp(ship.x + 30, anchors.eyeX, ballT);
           const by = lerp(ship.y, anchors.eyeY, ballT) - Math.sin(ballT * Math.PI) * 90;
@@ -1467,7 +1600,7 @@ export function mountStoryBattle(opts: {
       const e = nowMs - climaxStart;
       const p = clamp01(e / 1600);
       drawSpace(t, (1 - p) * 0.6);
-      drawSerpent(t, 0, 0);
+      drawBoss(t, 0, 0);
       drawShip(t);
       const repelled = won; // an armed ship that lost the fight was merely repelled
       caption(

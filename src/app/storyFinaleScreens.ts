@@ -46,40 +46,42 @@ export function storyFinaleScreen(): string {
   }
   const who = getCharacter(story.characterId)?.name ?? 'Champion';
   const ready = r.won;
-  // GS-story-quality: the finale is re-themed by the path chosen at The Choice. The WARDEN comes to KILL
-  // the serpent and save the worlds (the Parrot at your side); the HERALD comes to UNSEAL it — first
-  // breaking the Warden blockade that arrives to stop you, then presenting the serpent its final release
-  // (the Crow, the Coil's true prophet, in the Parrot's place). The mechanics are identical; the framing,
-  // the speaker, and the meaning invert. (Jörmungandr is a genderless eldritch enormity — "it", never "she".)
+  // GS-story-quality / GS-story-warden-ark: the finale is re-themed by the path chosen at The Choice, and
+  // the two paths now fight DIFFERENT THINGS. The WARDEN comes to put the serpent back to sleep (the Parrot
+  // at your side). The HERALD comes to unseal it — and what stands in the way is the WARDEN ARK, the Order's
+  // capital ship with your old friends at its helm. The gates, the phases and the finisher are identical;
+  // the enemy, its weapons, the speaker and the meaning invert. (Jörmungandr is a genderless eldritch
+  // enormity — "it", never "she".)
   const herald = story.alignment === 'herald';
   const lore = herald
     ? `The five Sigils burn together into the Green Key, and the root of the World-Tree splits open. Coiled
-        in the dark below waits the World-Eater, bound in the Wardens' old wards — and the Ark has come after
-        you, your friends at its helm, too late to close the root. Break the last wards that cage it, and
-        there is nothing left between the galaxy and its rest.`
+        in the dark below waits the World-Eater — and between you and it hangs the <b>Warden Ark</b>, the
+        Order's capital ship, run out of the deep sky with your old friends at its helm. They will not move.
+        Break the Ark, and there is nothing left between the galaxy and its rest.`
     : `The five Sigils burn together into a single key, and the root of the World-Tree splits open. Coiled
         in the dark below sleeps the world-serpent — and something worse wears it now, a corruption from
         beyond the stars. It is waking. Only your ship stands between it and every world you crossed to get here.`;
   const guide = herald
-    ? `<p class="gs-fin-lore" style="color:#b0e04f;">🐦‍⬛ "Fly sharp, Herald. Wear the wards down and it
-        will thrash harder with every one that gives — venom, lances, the void itself. Keep shields for the
-        moment the last ward cracks; nothing dodges that. Then the seal lies bare — strike it, and let the
-        serpent rise."</p>`
+    ? `<p class="gs-fin-lore" style="color:#b0e04f;">🐦‍⬛ "Fly sharp, Herald. A warship fights in order —
+        flak first, then those long spinal lances, then torpedoes when it starts to panic. Keep shields for
+        the moment it fires everything at once; nothing dodges that. Then its reactor lies bare amidships —
+        strike it, and the road to the root is yours."</p>`
     : `<p class="gs-fin-lore" style="color:#7fe0a0;">🦜 "This is it, ${who}. It gets MEANER as it bleeds —
         acid, then lightning, then the void itself. Fly around what you can, save the shields for what you
         can't, and when it finally uncoils and bares that eye… you take the shot. Don’t miss."</p>`;
   // GS-story-battle-3: the R-Type sequence fight — fly your ship, fire each weapon from its own trigger,
   // dodge the phase attacks, and hold shields for the near-undodgeable overwhelm at the end.
   const plan = herald
-    ? `<p class="gs-fin-battleplan">🚀 <b>Fly your ship</b> — tap anywhere on the field to move; the serpent's
-        venom drifts slow enough to fly around.<br>
+    ? `<p class="gs-fin-battleplan">🚀 <b>Fly your ship</b> — tap anywhere on the field to move; the Ark's
+        flak bursts travel slow enough to fly around.<br>
         ⚔ <b>Fire your arsenal</b> — every weapon you own is its own trigger on the battle HUD, each with its
         own punch and recharge.<br>
-        🐍 <b>It wakes in stages.</b> As the wards wear down it sprays ACID, the Warden blockade sweeps the
-        field with telegraphed LANCES, and void-rifts tear open — and when the last ward cracks, one
-        <b>overwhelming barrage</b> lands that no pilot dodges: your shields must absorb
-        ${FINALE_OVERWHELM_HITS} strikes, so keep cells in hand.<br>
-        🎯 <b>The Final Strike.</b> When the seal lies bare on its brow, strike the ball home and break it.<br>
+        🛰 <b>The Ark fights in stages.</b> Its batteries walk a FLAK CURTAIN across the field, then the
+        spinal LANCES lock on down a telegraphed line, then seeker TORPEDOES detonate into shock rings — and
+        with its hull failing it fires <b>everything at once</b>, a barrage no pilot dodges: your shields
+        must absorb ${FINALE_OVERWHELM_HITS} strikes, so keep cells in hand.<br>
+        🎯 <b>The Final Strike.</b> When the reactor lies bare amidships, strike the ball home and break
+        it.<br>
         <span style="color:#8fb8ff;">Lose the fight and you are only driven off — re-engage at no cost.</span></p>`
     : `<p class="gs-fin-battleplan">🚀 <b>Fly your ship</b> — tap anywhere on the field to move; the serpent's
         acid drifts slow enough to fly around.<br>
@@ -107,9 +109,9 @@ export function storyFinaleScreen(): string {
       ${weaponRows}
       <span>⚔ Assault</span><b>${
         r.breachOk
-          ? `${herald ? 'wears the wards down' : 'brings it to bay'} in ~${Math.round(assaultS)}s of fire`
+          ? `${herald ? 'guts the Ark' : 'brings it to bay'} in ~${Math.round(assaultS)}s of fire`
           : herald
-            ? 'cannot break the last ward'
+            ? 'cannot punch through the Ark’s armour'
             : 'cannot break its hide'
       }</b>
       <span>🛡 Shields</span><b>${lo.shieldCells} ${lo.shieldCells === 1 ? 'cell' : 'cells'} (the overwhelm costs ${FINALE_OVERWHELM_HITS})</b>
@@ -121,13 +123,13 @@ export function storyFinaleScreen(): string {
   // GS-story-quality (finding C): weapons + engines outfit aboard your ship; SHIELDS are stocked at ship-vendor
   // worlds you fly to — so the guidance names where the gap is actually filled, not the equip-only Hangar.
   const breachHint = herald
-    ? 'Buy heavier WEAPONS — aboard your ship or at a ship-vendor world — your guns can’t break its wards yet.'
+    ? 'Buy heavier WEAPONS — aboard your ship or at a ship-vendor world — your guns can’t punch through the Ark’s armour yet.'
     : 'Buy heavier WEAPONS — aboard your ship or at a ship-vendor world — your guns can’t crack its scales yet.';
   const surviveHint = 'Buy ENGINES aboard your ship and SHIELDS at a ship-vendor world — you can’t weather the assault yet.';
   return `
     <header class="gs-hero gs-storyhub">
-      <h1 class="gs-hero-title">🐍 Jörmungandr</h1>
-      <p class="gs-hero-tag">The Dark Root of Yggdrasil · ${herald ? 'the final rite' : 'the final battle'}</p>
+      <h1 class="gs-hero-title">${herald ? '🛰 The Warden Ark' : '🐍 Jörmungandr'}</h1>
+      <p class="gs-hero-tag">The Dark Root of Yggdrasil · ${herald ? 'break the blockade' : 'the final battle'}</p>
     </header>
     <section style="max-width:520px;margin:6px auto 0;">
       <p class="gs-fin-lore">${lore}</p>
@@ -137,7 +139,7 @@ export function storyFinaleScreen(): string {
       ${readout}
 
       <h2 class="gs-fin-sec">Battle readiness</h2>
-      ${gateRow(herald ? 'Firepower — shatter the wards' : 'Firepower — breach the hide', r.weaponRating, FINALE_BREACH_NEED, breachHint)}
+      ${gateRow(herald ? 'Firepower — break the Ark' : 'Firepower — breach the hide', r.weaponRating, FINALE_BREACH_NEED, breachHint)}
       ${gateRow('Defence — survive the assault', r.defenceRating, FINALE_SURVIVE_NEED, surviveHint)}
       <div class="gs-fin-verdict" style="color:${ready ? '#7fe0a0' : '#ff9a6a'};">
         ${ready ? '🚀 Your ship is ready. Engage when you are.' : '🛠 Your ship isn’t ready — arm up, then return.'}
@@ -146,7 +148,7 @@ export function storyFinaleScreen(): string {
         lose, and you return to the clubhouse with everything intact to arm up and try again. The root will wait.</p>
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:420px;margin:16px auto 0;">
-      <button class="gs-btn" data-story-finale-engage="1" style="${ready ? '' : 'opacity:0.9;'}">⚔ Engage Jörmungandr</button>
+      <button class="gs-btn" data-story-finale-engage="1" style="${ready ? '' : 'opacity:0.9;'}">⚔ Engage ${herald ? 'the Warden Ark' : 'Jörmungandr'}</button>
       <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStoryFinale' })}'>‹ Not yet — arm up first (progress saved)</button>
     </div>
     ${FIN_STYLE}`;
@@ -173,8 +175,8 @@ export function storyFinaleResultScreen(): string {
     const fled = state.story ? betrayerName(state.story) : 'your lost friend';
     const strikeLine = herald
       ? graze
-        ? `<p style="color:#ffd08a;">🎯 Your finisher <b>clipped</b> the seal — not the clean release you meant, but enough. The last ward cracks all the same, and you'll always know how close it was.</p>`
-        : `<p style="color:#c8e88a;">🎯 A <b>dead-centre</b> strike — the ball vanished into the seal like it was always meant to, and the cage sprang open clean.</p>`
+        ? `<p style="color:#ffd08a;">🎯 Your finisher <b>clipped</b> the Ark's reactor — not the clean shot you meant, but enough. The great hull folds all the same, and you'll always know how close it was.</p>`
+        : `<p style="color:#c8e88a;">🎯 A <b>dead-centre</b> strike — the ball vanished into the reactor core like it was always meant to, and the Ark came apart around it.</p>`
       : graze
         ? `<p style="color:#ffd08a;">🎯 Your finisher <b>clipped</b> the eye — not the pure note you meant to strike, but enough. The great eye wavered, dimmed… and slid shut all the same.</p>`
         : `<p style="color:#9dffce;">🎯 A <b>dead-centre</b> strike — the ball vanished into the serpent's eye like it was always meant to, and the eye… closed. Not a kill. A lullaby.</p>`;
@@ -183,9 +185,11 @@ export function storyFinaleResultScreen(): string {
       ? 'The serpent uncoils around the galaxy. The lights go out, one by one, into a final green silence.'
       : 'Jörmungandr sleeps. The seal takes, the root goes quiet, and dawn breaks across every world you crossed.';
     const body = herald
-      ? `<p>Your finisher struck true, but not to kill — to <em>release</em>. The World-Eater unwinds across
-          the sky, and the lights go out one by one, into a serene and perfect stillness. The Coil hails you
-          as its Herald as the last star gutters. The Universe is devoured. You tell yourself it was mercy.</p>
+      ? `<p>The Ark breaks apart above the root — the Order's last ship, and the last of the people who
+          would have stopped you, scattered burning across the dark. Then the way is open, and your finisher
+          strikes the seal below not to kill but to <em>release</em>. The World-Eater unwinds across the sky,
+          and the lights go out one by one, into a serene and perfect stillness. The Coil hails you as its
+          Herald as the last star gutters. The Universe is devoured. You tell yourself it was mercy.</p>
          <p style="color:#b0e04f;">🐍 "It is done, Herald. The old Game is over. What comes next is rest — endless, perfect, still."</p>`
       : `<p>Your finisher found the serpent’s eye — and the World-Eater did not break. It <em>exhaled</em>.
           The coils loosened, the seal took hold, and Jörmungandr sank back beneath the root into a sleep
@@ -223,12 +227,12 @@ export function storyFinaleResultScreen(): string {
   if (r.failReason === 'repelled') {
     const rTitle = herald ? '🛡 Driven Off the Root' : '🐍 Driven Back';
     const rTag = herald
-      ? 'The blockade holds you off — this once. The wards you cracked already tremble.'
+      ? 'The Ark holds you off — this once. Its hull is already burning in a dozen places.'
       : 'The coils sweep you back into the dark — but your ship holds together.';
     const rBody = herald
       ? `<p>Your ship limps clear of the lances, shields spent — but the root remains open, and your arsenal is
-          every bit equal to the rite. Fire between their volleys, <b>veer when a lance locks on</b>, and the
-          last ward will fall.</p>
+          every bit equal to the Ark. Fire between their volleys, <b>veer the moment a lance locks on</b>, and
+          that hull will fail.</p>
          <p style="color:#b0e04f;">🐦‍⬛ "The ship was ready, Herald. Next time, so are you. Go again — the
           serpent keeps no calendar."</p>`
       : `<p>The serpent's coils battered your shields down before your guns could finish the work — but your
@@ -251,12 +255,13 @@ export function storyFinaleResultScreen(): string {
   }
   const title = herald ? '🦜 The Wardens Prevail' : '🐦‍⬛ The World-Eater is Free';
   const tag = herald
-    ? 'The Parrot, Driver Dan and Penelope hold the root. Engines busted, you flee toward the dark zones.'
+    ? 'The Ark holds the root, the Parrot on its bridge. Engines busted, you flee toward the dark zones.'
     : 'The Crow let you win all along — you were to be the key. The maw opens on the unbroken hide.';
   const body = herald
-    ? `<p>Dan plants his feet where your bag once hung. Penelope reads the line that stops you cold. The Parrot
-        bars the root, and your busted ship falls away into the unmapped dark. But a Herald is patient — arm
-        heavier at a ship-vendor world, and come back for what you were promised.</p>
+    ? `<p>The Ark's batteries find you at last and the sky turns white. Somewhere behind that hull Dan is
+        standing where your bag once hung, and the Parrot is barring the root, and your busted ship falls away
+        into the unmapped dark. But a Herald is patient — arm heavier at a ship-vendor world, and come back
+        for what you were promised.</p>
        <p style="color:#b0e04f;">🐦‍⬛ "Patience, Herald. A blockade is only a delay, and the cage was always
         meant to open. Arm heavier. Return. The serpent keeps no calendar — and neither do we."</p>`
     : `<p>The great black Crow spreads its wings and <em>laughs</em> — it never fought you; it let you win, every
