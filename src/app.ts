@@ -3545,13 +3545,34 @@ function shouldPlayIntro(): boolean {
 }
 
 /**
+ * True when the app is running inside the Capacitor native shell (the Google Play build,
+ * GS-android) rather than a browser. Capacitor injects this global into the WebView before any
+ * app code runs; in a browser it is simply absent.
+ */
+function isNativeShell(): boolean {
+  try {
+    const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+    return typeof cap?.isNativePlatform === 'function' ? cap.isNativePlatform() : false;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Register the offline service worker (PWA). Guarded to http/https so it never fires under
  * the `file://` smoke test (where registration would reject), and fully swallowed so a SW
  * failure can never strand the boot — the app works identically with no worker. The worker
  * is network-first (see public/sw.js), so it adds offline play without risking a stale page.
+ *
+ * SKIPPED ENTIRELY in the native shell (GS-android). Capacitor serves the bundle from
+ * `https://localhost` — which passes the protocol check below — but every asset is already local
+ * inside the APK, so a worker caches nothing useful and instead reintroduces the stale-serve
+ * failure the web deploy was designed around: after a Play update the worker could keep answering
+ * from the PREVIOUS build's cache. Native offline support comes from the package itself.
  */
 function registerServiceWorker(): void {
   try {
+    if (isNativeShell()) return;
     if (!('serviceWorker' in navigator)) return;
     if (location.protocol !== 'https:' && location.protocol !== 'http:') return;
     // Relative URL → the worker scopes to our own subpath, never a sibling app on the origin.

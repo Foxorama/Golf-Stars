@@ -242,7 +242,7 @@ export function createWeather(o: WeatherOpts): WeatherHandle {
   const effect = o.effect || 'none';
   const windCol = WIND_RGBA[o.archetype] ?? WIND_RGBA.verdant;
   const spaceOn = o.spaceFX !== false;
-  // GS-story-earth-sky: the one real-world course (Old Course, St Andrews — `earth`) plays under a daylight
+  // GS-story-earth-sky: the one real-world course (St Annette’s Links, St Annette’s — `earth`) plays under a daylight
   // SKY, not the star void (the static backdrop draws blue sky + sun + clouds), so the animated twinkle
   // starfield + shooting stars are suppressed for earth. Everything else that rides `spaceOn` (the pale
   // seaside spindrift `AMBIENT.earth`, the weather tint) stays on — only the stars go.

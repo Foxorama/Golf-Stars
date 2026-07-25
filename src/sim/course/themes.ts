@@ -60,12 +60,12 @@ export type BiomeArchetype =
   // world (opulent gilded emerald fields under a royal twilight). NOT a normal route destination:
   // reached only via a later tournament trigger, so no theme maps to it (weight 0 in `BIOMES`).
   | 'asgard' // the Golden Realm — grand, fair, celestial: wide fairways, a gentle divine tailwind
-  // GS-earth: HOME. The one real-world course — the Old Course at St Andrews, the birthplace of golf.
+  // GS-earth: HOME. The one real-world course — St Annette’s Links, the birthplace of golf.
   // A true Scottish LINKS: earth gravity, seaside wind, treeless firm turf, deep revetted pot bunkers,
-  // gorse/fescue rough, huge shared double greens, the Swilcan Burn. NOT a normal route destination —
+  // gorse/fescue rough, huge shared double greens, the Annette Burn. NOT a normal route destination —
   // reached only by flying to Earth on the Star Tour star map (weight 0 in `BIOMES`, no pickable theme),
   // exactly like the tournament-only Asgard.
-  | 'earth'; // the home world — the Old Course links: firm, windswept, pot-bunkered, huge double greens
+  | 'earth'; // the home world — St Annette’s links: firm, windswept, pot-bunkered, huge double greens
 
 /**
  * Per-theme biome flavour (GS-17b) — bounded MULTIPLIERS on the archetype baseline that give a

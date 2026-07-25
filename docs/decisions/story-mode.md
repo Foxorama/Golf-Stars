@@ -34,7 +34,7 @@
 ## The pitch (what the player experiences)
 
 You are the reigning **World Tour** champion. Story Mode opens on the final round of the World Tour
-at **Earth** (the Old Course at St Andrews — the one real course). Win it, and a victory scene plays;
+at **Earth** (St Annette’s Links — the one real course). Win it, and a victory scene plays;
 then **the Mothership descends** and lands, and the **Prognostic Parrot** walks up to you:
 
 > *"Golfer, you have proven yourself the best on planet Earth — and now the Universe needs you. I have

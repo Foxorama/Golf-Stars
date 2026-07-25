@@ -100,7 +100,7 @@ describe('course composition planner (GS-compose)', () => {
   });
 
   it('a pinned parSequence dictates the exact par of every hole (GS-hole-plan)', () => {
-    // The real Old Course at St Andrews par-72 rhythm: 4·8 / 5 / 4·2 / 3 / 4 | 4·3 / 5 / 4·5.
+    // The real St Annette’s Links par-72 rhythm: 4·8 / 5 / 4·2 / 3 / 4 | 4·3 / 5 / 4·5.
     const STA: (3 | 4 | 5)[] = [4, 4, 4, 4, 5, 4, 4, 3, 4, 4, 3, 4, 4, 5, 4, 4, 4, 4];
     const plans = planCourse('st-andrews', 18, 0.5, { parSequence: STA });
     expect(plans.map((p) => p.par)).toEqual(STA);

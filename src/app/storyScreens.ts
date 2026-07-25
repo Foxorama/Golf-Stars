@@ -1,7 +1,7 @@
 /**
  * Story Mode screens (GS-story). The campaign HUB is the clubhouse you return to between worlds — and it
  * changes with the story (GS-story-prologue): during the PROLOGUE it's an EARTH clubhouse (the four golfers
- * prepping for the World Tour final at St Andrews — grounded, no spaceship, no Parrot, since you haven't been
+ * prepping for the World Tour final at St Annette’s — grounded, no spaceship, no Parrot, since you haven't been
  * recruited yet); AFTER you win Earth + are recruited it "opens up" to the SPACEPORT clubhouse (your ship
  * parked, the Parrot in the bar, the star chart ahead). That arc — Earth → win → the Universe calls → space —
  * reads far better than starting in a spaceport before you've ever left the ground.
@@ -106,7 +106,7 @@ function premiseCardHTML(): string {
     <section class="gs-premise" aria-label="The World Tour — the final round">
       <div class="gs-premise-kicker">✦ THE WORLD TOUR · FINAL ROUND</div>
       <p class="gs-premise-lede">You are <b>Earth's greatest golfer</b>, and one round stands between you and
-        the sport's highest honour: eighteen holes on the <b>Old Course at St Andrews</b>, the oldest and
+        the sport's highest honour: eighteen holes on the <b>St Annette’s Links</b>, the oldest and
         sternest test in the game. Win here and the whole planet knows your name — <b>World Champion</b>.</p>
       <div class="gs-premise-road">
         <span class="gs-premise-step">⛳ 18 holes</span><span class="gs-premise-arr">·</span>
@@ -150,7 +150,7 @@ export function storyGolferPickerHTML(): string {
   return `
     <header class="gs-hero gs-storyhub">
       <h1 class="gs-hero-title">🌍 World Tour</h1>
-      <p class="gs-hero-tag">The Final Round · The Old Course, St Andrews · Earth</p>
+      <p class="gs-hero-tag">The Final Round · St Annette’s Links · Earth</p>
     </header>
     ${premiseCardHTML()}
     <section style="max-width:620px;margin:2px auto 0;">
@@ -170,11 +170,11 @@ export function storyGolferPickerHTML(): string {
  * The PROLOGUE clubhouse (GS-story-prologue / GS-story-clubhouse): the graphic Earth clubhouse on the eve of
  * the World Tour final, your chosen golfer highlighted. Tap any golfer to view their stats (yours, or switch
  * to another before you tee off). No spaceship, no Parrot yet — you're still just the best golfer on one small
- * planet. The forward button heads to the first tee at St Andrews.
+ * planet. The forward button heads to the first tee at St Annette’s.
  */
 function earthClubhouseHTML(story: StoryState): string {
   const spec = staticCourseSpec(PROLOGUE_COURSE_ID);
-  const courseName = spec?.name ?? 'The Old Course, St Andrews';
+  const courseName = spec?.name ?? 'St Annette’s Links';
   const inspectId = state.storyInspectId;
   const overlay = inspectId
     ? golferInspectOverlayHTML(
@@ -199,7 +199,7 @@ function earthClubhouseHTML(story: StoryState): string {
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:14px auto 0;">
       <button class="gs-btn" data-action='${JSON.stringify({ type: 'storyPlayWorld', courseId: PROLOGUE_COURSE_ID })}'>
-        ⛳ Head to the first tee — St Andrews
+        ⛳ Head to the first tee — St Annette’s
       </button>
       ${hubFooterHTML()}
     </div>

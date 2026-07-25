@@ -253,7 +253,7 @@ export function projectSky(ra: number, dec: number): { x: number; y: number } {
 /** The projected chart position of a world (falls back to the chart centre if the theme has no sky
  *  anchor — never happens for a real Star Tour course, but keeps the projection total). */
 export function worldPos(w: StarTourWorld): { x: number; y: number } {
-  // HOME (GS-earth): the Old Course lives ON Earth, the home landmark beside the port — not out on a
+  // HOME (GS-earth): St Annette’s lives ON Earth, the home landmark beside the port — not out on a
   // constellation. It has no sky anchor (Earth is the observer), so it's pinned to the blue-marble
   // glyph's fixed position instead of the RA/Dec projection.
   if (w.themeId === 'earth') return EARTH_POS;
@@ -1321,10 +1321,10 @@ function worldGlyph(w: StarTourWorld, selected: boolean): string {
  *  disc, green continents, white cloud swirls, a cyan atmosphere rim + day/night terminator, and a
  *  small grey Moon. Seeded for the continents but always reads as Earth.
  *
- *  GS-earth: Earth is now ALSO the destination for the Old Course at St Andrews — the home planet's
+ *  GS-earth: Earth is now ALSO the destination for St Annette’s Links — the home planet's
  *  course. When a `world` is passed (the `earth`-themed catalogue row) the blue marble becomes a
  *  TAPPABLE course target (`data-startour-course`), with the selection ring + record star + best-to-par
- *  the constellation worlds carry; flying home to it opens the Old Course dossier. With no world it stays
+ *  the constellation worlds carry; flying home to it opens St Annette’s dossier. With no world it stays
  *  the decorative "HOME" landmark (backward-safe). */
 function earthGlyph(world?: StarTourWorld, selected = false): string {
   const { x, y } = EARTH_POS;
@@ -1367,9 +1367,9 @@ function earthGlyph(world?: StarTourWorld, selected = false): string {
       ? `<text x="0" y="${rr(r + 30)}" font-size="12" text-anchor="middle" fill="${world.bestToPar < 0 ? '#5fd45a' : world.bestToPar === 0 ? '#cdd3df' : '#ffce54'}" font-weight="700">${toParLabel(world.bestToPar)}</text>`
       : '';
   const wrapOpen = world
-    ? `<g class="gs-st-world gs-st-earth" data-startour-course="${world.id}" role="button" tabindex="0" aria-label="Earth — The Old Course, St Andrews" transform="translate(${x},${y})" style="cursor:pointer;">`
+    ? `<g class="gs-st-world gs-st-earth" data-startour-course="${world.id}" role="button" tabindex="0" aria-label="Earth — St Annette’s Links" transform="translate(${x},${y})" style="cursor:pointer;">`
     : `<g transform="translate(${x},${y})" aria-hidden="true">`;
-  const sublabel = world ? 'THE OLD COURSE' : 'HOME';
+  const sublabel = world ? 'ST ANNETTE’S LINKS' : 'HOME';
   return `
     ${wrapOpen}
       ${ring}
@@ -1774,7 +1774,7 @@ export function starTourMapSVG(opts: StarTourMapOpts): string {
     const y = ((gy / ghN) * CHART_H).toFixed(1);
     grid += `<line x1="0" y1="${y}" x2="${CHART_W}" y2="${y}" stroke="#2a3350" stroke-width="1" opacity="0.28"/>`;
   }
-  // The home Old Course rides the bespoke Earth blue-marble glyph (drawn with the port), not a generic
+  // The home St Annette’s Links rides the bespoke Earth blue-marble glyph (drawn with the port), not a generic
   // constellation planet — so it's split out of the world loop and handed to `earthGlyph` below.
   const earthWorld = opts.worlds.find((w) => w.themeId === 'earth');
   const worlds = opts.worlds

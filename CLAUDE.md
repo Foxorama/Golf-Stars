@@ -175,9 +175,12 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     varied routing in its par band, not a pinned number. The catalogue is a ROW.
   - **Star Tour** (GS-star-tour, format `strokeplay`) — one 18-hole stroke-play round on a player-chosen
     static course, ranked into per-course record boards (`StrokePlayBest` map, save v27). Threaded through
-    both drivers (contract 2). **Earth** (GS-earth) is the one real-world course (Old Course at St Andrews,
-    `earth`/`earth-links`, real gravity, weight 0, pinned par-72 `parSequence`); a new archetype = a row in
-    every archetype-keyed table (compile- and test-forced), never an engine fork.
+    both drivers (contract 2). **Earth** (GS-earth) is the one EARTH-set course — **St Annette’s Links**, a
+    FICTIONAL Scottish links (`earth`/`earth-links`, real gravity, weight 0, pinned par-72 `parSequence`);
+    a new archetype = a row in every archetype-keyed table (compile- and test-forced), never an engine fork.
+    **Name no real venue, trophy or trademark in shipped STRINGS** — the world may be recognisably Scottish
+    links golf, but the course, its features and its landmarks are ours. (Comments are stripped by the
+    minifier and don't ship, but a name in a comment is a name that creeps back into a string.)
   - All new generator draws gate on their feature being armed (contract 1).
 
 - **RPG meta-loop** — `docs/decisions/rpg-meta-loop.md`
@@ -474,6 +477,15 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
   always wins online. Bump `VERSION` per deploy. The foreign-SW/cache cleanup in `index.html` is
   narrowed to kill only NON-`golf-stars-*` workers/caches so golf-finder coexistence holds. Full
   rationale: `docs/decisions/process-and-deploy.md`.
+- **Google Play ships the SAME web build wrapped in Capacitor** (GS-android, full story:
+  `docs/decisions/android-packaging.md`). `webDir` is `dist/` — the native shell adds NO game code and
+  the browser build is unaffected. Two rules: the app id `com.foxorama.golfstars` is **permanent** (Play
+  keys the listing on it), and the **service worker MUST stay disabled in the shell**
+  (`isNativeShell()` in `app.ts`) — Capacitor serves from `https://localhost`, which passes the protocol
+  guard, so an un-gated worker would cache already-local assets and resurrect the stale-serve bug with no
+  hard-refresh to escape it. `npm run android:apk` to sideload, `android:aab` for Play; the `android`
+  workflow is NOT a required check. Launcher art has ONE source (`public/icon-512.png` →
+  `scripts/android-assets.mjs`).
 
 ## Do NOT carry from golf-finder
 GPS/geolocation, OSM/Overpass, weather APIs, real astronomy/star catalogs, the day course-finder,

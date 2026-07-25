@@ -1,6 +1,6 @@
 /**
  * The graphic EARTH clubhouse for Story Mode's prologue (GS-story-clubhouse): an illustrated golf
- * clubhouse interior — warm wood, a trophy cabinet, and a big window onto the Old Course + the North Sea —
+ * clubhouse interior — warm wood, a trophy cabinet, and a big window onto St Annette’s + the North Sea —
  * where the four golfers stand around before the World Tour final. Tapping a golfer opens a stats/abilities
  * overlay (their bars, strengths, watch-fors, signature) with the "play as / switch" action.
  *
@@ -97,7 +97,7 @@ function eclubStyle(): string {
 
 /**
  * The illustrated clubhouse room (SVG backdrop): a wood-panelled interior with a trophy cabinet, a chalk
- * leaderboard, warm lamps, and a big picture window onto the Old Course links and the North Sea. viewBox
+ * leaderboard, warm lamps, and a big picture window onto St Annette’s links and the North Sea. viewBox
  * 0 0 400 300 (4:3). Hand-placed, byte-stable.
  */
 function earthClubhouseArt(): string {
@@ -135,7 +135,7 @@ function earthClubhouseArt(): string {
     <path d="M182,16 L218,16 L212,30 L188,30 Z" fill="#2a1c0e"/>
     <ellipse cx="200" cy="30" rx="15" ry="3.4" fill="#ffcf7a"/>
 
-    <!-- the big picture window onto the Old Course -->
+    <!-- the big picture window onto St Annette’s -->
     <g>
       <rect x="118" y="34" width="164" height="104" rx="4" fill="#0d0a06"/>
       <rect x="123" y="39" width="154" height="94" fill="url(#ec-sky)"/>
@@ -153,7 +153,7 @@ function earthClubhouseArt(): string {
       <ellipse cx="212" cy="123" rx="24" ry="7" fill="#7ec25e"/>
       <line x1="212" y1="123" x2="212" y2="110" stroke="#e8e8ea" stroke-width="1.2"/>
       <path d="M212,110 L221,113 L212,116 Z" fill="#ff5a5a"/>
-      <!-- the Swilcan Bridge, a little stone hump over the burn -->
+      <!-- the Annette Bridge, a little stone hump over the burn -->
       <path d="M150,128 Q160,120 170,128" fill="none" stroke="#8a8172" stroke-width="3.4"/>
       <!-- window mullions -->
       <line x1="200" y1="39" x2="200" y2="133" stroke="#0d0a06" stroke-width="4"/>

@@ -99,7 +99,7 @@ export const OB_LOOK: Record<BiomeArchetype, ObLook> = {
   // a dead red warning light adrift where the hull ends. Cold steel post for the calm-stop hull edges.
   derelict: { post: '#6a7a86', cap: '#ff5a4a', line: 'rgba(150,175,200,0.16)', beacon: 'rgba(255,90,74,0.42)' },
   asgard: { post: '#e8d48a', cap: '#ffcf4a', line: 'rgba(232,212,138,0.18)', glow: 'rgba(255,210,110,0.34)' }, // gilded rune-pillars with a Bifröst-banner cap glow
-  earth: { post: '#f4f4f4', cap: '#d64545', line: 'rgba(244,244,244,0.16)' }, // the classic white boundary stakes of a real course (St Andrews' out-of-bounds)
+  earth: { post: '#f4f4f4', cap: '#d64545', line: 'rgba(244,244,244,0.16)' }, // the classic white boundary stakes of a real course (St Annette’s' out-of-bounds)
 };
 
 /**

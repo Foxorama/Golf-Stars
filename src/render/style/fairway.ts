@@ -27,7 +27,7 @@ const RAINBOW_BANDS = ['#ff3b5c', '#ff9a3d', '#ffe23d', '#49e06b', '#3bd1ff', '#
 /**
  * A rainbow-road ribbon (GS-rainbow): fill a play surface (fairway/green/tee) with bright rainbow
  * bands clipped to its polygon — perpendicular-to-play after the projector rotates tee→green up, so
- * the bands read like a Mario-Kart Rainbow Road track — then cap it with a glowing white rail. Pure
+ * the bands read like a prismatic sky-track — then cap it with a glowing white rail. Pure
  * geometry (no rng); `phaseY`/`bandH` let several fairway pieces share one continuous band grid.
  *
  * GS-rainbow-polish: the flat poster bands used to read "pretty rough" — so each band is now GROOVED

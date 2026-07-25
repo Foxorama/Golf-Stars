@@ -561,35 +561,35 @@ export const BIOMES: readonly Biome[] = [
     roughBreaks: 0.7, // GS-variety-2 broken-fairway frequency
   },
   {
-    // GS-earth: HOME — the Old Course at St Andrews, the one real-world course, reached only by flying
+    // GS-earth: HOME — St Annette’s Links, the one real-world course, reached only by flying
     // to Earth on the Star Tour star map. A true Scottish LINKS, so its physics are the OPPOSITE of the
     // exotic worlds: EARTH gravity (`carryMult` 1.0 — the only true-1.0 world), a stiff but FAIR seaside
     // wind, and a wide, firm, treeless character where the danger is deep revetted POT bunkers, wispy
-    // FESCUE/gorse rough, the Swilcan BURN forced carry, and enormous, undulating SHARED double greens —
+    // FESCUE/gorse rough, the Annette BURN forced carry, and enormous, undulating SHARED double greens —
     // never an unfair carry. Every mechanic is a proven-fair one (verdant's creek + deep rough + pots +
     // fescue), so it clears the fairness/death-spiral bars like any parkland. WEIGHT 0: no theme maps to
     // it and `pickBiome` never lands here (the Star Tour Earth course forces the biome by id), exactly
     // like the tournament-only Asgard above — so it stays out of the normal galaxy rotation, and the
     // last table row keeps a positive weight (the `pickBiome(0.999)` span test). NOT balance-exempt
-    // (a fair world, not a brutal lost one). The static Old-Course routing pins its par sequence
+    // (a fair world, not a brutal lost one). The static St Annette’s routing pins its par sequence
     // (GS-hole-plan); these rows give the world its links FEEL when generated.
     id: 'earth-links',
-    name: 'St Andrews Links',
+    name: 'St Annette’s Links',
     weight: 0,
     carryMult: 1.0, // HOME — real Earth gravity, the reference the whole game's carry is tuned against
     carryJitter: 0,
     windBase: 7, // the defining seaside links breeze — always a factor
     windWild: 22, // it can howl off the North Sea, but stays fair (wide fairways absorb it)
-    hazardKinds: ['water'], // the Swilcan Burn / Eden estuary (ordinary penalty water)
+    hazardKinds: ['water'], // the Annette Burn / Eden estuary (ordinary penalty water)
     greensideKind: 'bunker', // deep revetted pots ring the greens (potBunkers biases them toward pots)
     scatter: [], // firm, true links turf — no fantasy surface
     fairwayWidthMult: 1.18, // the famously HUGE shared fairways — links golf is wide off the tee
     doglegBias: 0.18, // mostly straight, out-and-back links routing (subtle bends, not sharp corners)
-    treeDensity: 0, // ICONIC: the Old Course is essentially treeless — gorse and wind, not woods
+    treeDensity: 0, // ICONIC: St Annette’s is essentially treeless — gorse and wind, not woods
     fairwayBunkers: 0.4, // the odd open sand scrape
     potBunkers: 1.9, // signature: deep revetted POT bunkers pinch the landing zones + ring the greens
     fescue: 1.4, // signature: wispy fescue / marram / gorse native rough lines the deep rough
-    waterCreek: true, // signature: the Swilcan Burn crosses the fairway (a forced carry)
+    waterCreek: true, // signature: the Annette Burn crosses the fairway (a forced carry)
     deepRough: 'deeprough', // thick whin/gorse chokes the inside of a cut corner (a hack-out, non-penalty)
     fairwayBreaks: 0.6, // whin-covered humps + sandy waste breaks split the odd fairway
     greenSize: 1.5, // signature: ENORMOUS shared double greens — vast putting surfaces (GS-green-diversity: 1.35 → 1.5, the biggest in the game)
@@ -602,11 +602,11 @@ export const BIOMES: readonly Biome[] = [
     // the defence, not tight twisty corridors.
     // A par-4-leaning links rhythm — but not so extreme that a PROCEDURAL 9-hole earth stop can't break
     // up a 3-in-a-row par run (too few 3s/5s to separate the 4s trips the composer's no-triple guard).
-    // The authentic 14/2/2 Old-Course ratio lives on the static course's PINNED parSequence, not here.
+    // The authentic 14/2/2 St Annette’s ratio lives on the static course's PINNED parSequence, not here.
     parMix: { p3: 0.18, p4: 0.64, p5: 0.18 },
     shapeWeights: { straight: 0.5, dogleg: 0.2, cape: 0.14, double: 0.1, hairpin: 0.06 },
     widthWeights: { classic: 0.2, chute: 0.05, neck: 0.06, hourglass: 0.09, wander: 0.2, thin: 0.05, broad: 0.35 },
-    // GS-biome-difficulty / GS-green-diversity: the ENORMOUS undulating double greens are the Old Course's
+    // GS-biome-difficulty / GS-green-diversity: the ENORMOUS undulating double greens are St Annette’s's
     // signature test — a 100-ft putt across the Valley of Sin, deep pins tucked in the hollows/shelves,
     // contours double-breaking. The largest greens in the game; putting IS the defence here.
     difficulty: { greenComplexity: 1.25, greenTilt: 1.15, pinTuck: 0.45 },
