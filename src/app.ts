@@ -33,6 +33,7 @@ import { holeResult } from './sim/rpg/play';
 import type { PlayedHole } from './sim/round';
 import { betterPlayedHole } from './sim/rpg/match';
 import { storyPartnerBestBallScore } from './sim/rpg/storyTeams';
+import { QUALIFIER_PARTNER_EDGE } from './sim/rpg/storyQualifierFormats';
 import { storySigilProgressHTML } from './app/storySigilHud';
 import { TEAM_PARTNER_EDGE } from './sim/rpg/storyTournaments';
 import { midroundOmen } from './sim/rpg/storyMidround';
@@ -168,7 +169,7 @@ function boot(): void {
  *     come fast on the wide ribbon and the Bifröst trigger fires authentically when you make one).
  *   • `?asgard=1`  — jump STRAIGHT into the Bifröst interlude (the Himinbjörg map → cross → the nine-hole
  *     tournament → win/lose → return), from a real suspended run so "Return to your journey" works.
- *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storymidbeat|storyquestbeat|storyquestoffer|storyshop|storylocker|storyshipyard|shipinterior|storytournament|storyfinale|storychoice|storyinterlude|storyaftermath|storybar` (GS-screen-deeplink) — mount a between-stop
+ *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storymidbeat|storyquestbeat|storyquestoffer|storyshop|storylocker|storyshipyard|shipinterior|storytournament|storyfinale|storychoice|storyinterlude|storyaftermath|storyqualresult|storyqualmatch|storybar` (GS-screen-deeplink) — mount a between-stop
  *     screen directly, so the browser LAYOUT smoke tests (tests/build.test.ts) can reach the travel /
  *     shop / market / clubhouse / lore surfaces WITHOUT playing a full stop (shot animations + watch screens
  *     are flaky to script). The report's highest-risk uncovered surface — the journey map was
@@ -268,10 +269,17 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const intro = reduce(hub, { type: 'storyPlayWorld', courseId: 'standrews-18' });
       return reduce(intro, { type: 'play' });
     }
-    case 'storyqualresult': {
+    case 'storyqualresult':
+    case 'storyqualmatch': {
       // GS-story-qualifiers: mount a QUALIFYING-EVENT recap the honest way — prologue → Chapter 1, then play a
       // non-venue Chapter-1 world (a qualifier) and resolve it, so the smoke exercises the qualifier board.
-      const hub = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      // GS-story-qualifier-formats: the event's FORMAT is drawn off the campaign seed, so the seed is PINNED
+      // here — otherwise each page load would smoke a different recap shape at random. `storyqualresult`
+      // pins a two-ball best-ball (a board with a partner + pair rows); `storyqualmatch` pins a matchplay
+      // (no board at all — a scoreline card), which is the shape most likely to break the recap layout.
+      const seed = screen === 'storyqualmatch' ? 'q0' : 'q6';
+      const hub0 = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+      const hub = hub0.story ? { ...hub0, story: { ...hub0.story, campaignSeed: seed } } : hub0;
       const ch1 = reduce(reduce(reduce(hub, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' }), { type: 'storyRoundContinue' });
       return reduce(pastLore(reduce(ch1, { type: 'storyPlayWorld', courseId: 'verdant2-18' })), { type: 'play' });
     }
@@ -1128,9 +1136,13 @@ function playingBody(animating: boolean): string {
     // the running team total match the finished recap to the stroke; `stopPlayed` stays the player's solo
     // hole, and the resolution folds the ghost, so auto ≡ interactive is untouched).
     const storyBestBall = state.run.storyTeamFormat === 'bestball' && !!state.run.storyTournamentPartner;
+    // GS-story-qualifier-formats: a QUALIFYING EVENT's two-ball carries a deliberately weaker partner than a
+    // Sigil's (your card must decide your own qualifier), so the reveal reads the round's OWN edge — draw the
+    // Sigil ghost here and the revealed ball would not be the ball that scored.
+    const storyPartnerEdge = state.run.storyQualifier ? QUALIFIER_PARTNER_EDGE : TEAM_PARTNER_EDGE;
     const storyPartnerHoleAt = (holeIndex: number, holePar: number): PlayedHole =>
       synthGhostHole(
-        storyPartnerBestBallScore(state.run.storyTournamentPartner!, TEAM_PARTNER_EDGE, String(state.run.seed), holeIndex, holePar),
+        storyPartnerBestBallScore(state.run.storyTournamentPartner!, storyPartnerEdge, String(state.run.seed), holeIndex, holePar),
         holePar,
       );
     const partnerHole =

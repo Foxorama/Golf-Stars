@@ -23,6 +23,9 @@ import { ascensionCutBonus, canWarpStop, currentBoss, effectiveCut, endlessHoleN
 import { getFormat, isMatchplayBoss, isTeamDuelBoss, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
 import { endlessSetGateOverPar, endlessSetLabel, endlessSetToPar, formatToPar, toParColour } from '../sim/rpg/endless';
 import { bestStrokeFor, bestStrokeRounds } from '../sim/rpg/strokePlay';
+import { getCharacter } from '../sim/rpg/characters';
+import { qualifyTop, qualifierFieldSize } from '../sim/rpg/storyQualifiers';
+import { qualifierFormatName } from '../sim/rpg/storyQualifierFormats';
 import { staticCourseSpec } from '../sim/course/staticCourses';
 import type { EndlessCardData } from '../render/endlessCards';
 import { arcSurvivorTarget } from '../sim/rpg/competition';
@@ -166,6 +169,18 @@ function introShared(): {
   const objective = `${(() => {
     const format = getFormat(state.run.formatId);
     if (format.id === STROKEPLAY_FORMAT) {
+      // GS-story-qualifier-formats: a Story QUALIFYING EVENT announces the shape it was DRAWN as — which
+      // format, how long, who's beside you and what the bar is. The player must know they're teeing off a
+      // two-ball scramble matchplay before the first shot, not discover it in the recap.
+      const q = state.run.storyQualifier;
+      if (q) {
+        const bar =
+          q.format === 'pair-match'
+            ? 'win or halve the match to qualify'
+            : `finish top ${qualifyTop(q.chapter)} of ${qualifierFieldSize(q.chapter)} to qualify`;
+        const mate = q.partnerId ? ` with <b>${getCharacter(q.partnerId)?.shortName ?? 'your partner'}</b>` : '';
+        return `🏁 <b>${qualifierFormatName(q)}</b>${mate} · ${q.holes} holes — ${bar}.`;
+      }
       // Star Tour (GS-star-tour): a stroke-play round chasing a personal course record.
       const best = bestStrokeFor(state.strokePlayBest, state.run.staticCourseId ?? '');
       return best

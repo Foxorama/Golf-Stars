@@ -377,13 +377,34 @@ function qualifierRecapHTML(q: NonNullable<NonNullable<typeof state.lastStoryRou
       const cut = pos === q.need && q.leaderboard.length > q.need; // draw the qualifying cut under the N-th row
       const rowBg = you ? (q.qualified ? 'linear-gradient(90deg,#12251a,#0d1a13)' : 'linear-gradient(90deg,#2a1618,#1a0f10)') : 'transparent';
       const nameCol = you ? (q.qualified ? '#9dffce' : '#ffb0b0') : '#c7d2e2';
+      // GS-story-qualifier-formats: a Stableford event is scored in POINTS (higher wins), so the score
+      // column shows what the format actually counts — never a stroke total the board isn't ordered by.
+      const score = q.stableford ? `${g.points ?? 0} pts` : `${g.gross}`;
       return `<div style="display:flex;align-items:center;gap:8px;padding:5px 10px;background:${rowBg};${you ? 'font-weight:800;' : ''}border-radius:6px;">
           <span style="width:24px;text-align:right;color:#7c8aa0;font-variant-numeric:tabular-nums;">${pos}</span>
           <span style="flex:1 1 auto;min-width:0;color:${nameCol};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${you ? '🏌 ' : ''}${g.name}</span>
-          <span style="color:${nameCol};font-variant-numeric:tabular-nums;">${g.gross}</span>
+          <span style="color:${nameCol};font-variant-numeric:tabular-nums;">${score}</span>
         </div>${cut ? `<div style="display:flex;align-items:center;gap:8px;margin:2px 0;"><div style="flex:1;height:1px;background:linear-gradient(90deg,transparent,#3a7a52,transparent);"></div><span style="font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#7fe0a0;">Top ${q.need} qualify</span><div style="flex:1;height:1px;background:linear-gradient(90deg,transparent,#3a7a52,transparent);"></div></div>` : ''}`;
     })
     .join('');
+  // GS-story-qualifier-formats: the format the event was drawn as — the headline the whole recap hangs off
+  // (which shape, who was beside you, and what the partner's ball was worth).
+  const partnerNote = q.partnerName
+    ? `<span style="color:#c6b8e6;"> · with <b>${q.partnerName}</b>${
+        q.partnerCountedHoles ? ` (their ball counted on ${q.partnerCountedHoles} hole${q.partnerCountedHoles === 1 ? '' : 's'})` : ''
+      }</span>`
+    : '';
+  const formatRow = `<div style="font-size:12px;color:#9fb0c8;margin-top:4px;">🎲 ${q.formatName} · 9 holes${partnerNote}</div>`;
+  // A MATCHPLAY event has no board — it has a scoreline, and win-or-halve is the whole bar.
+  const matchRow = q.match
+    ? `<div style="margin-top:8px;background:#0b0f18;border:1px solid #232b3b;border-radius:8px;padding:10px 12px;text-align:center;">
+        <div style="font-size:22px;font-weight:900;color:${q.match.playerWon ? '#9dffce' : q.match.halved ? '#f0c874' : '#ffb0b0'};">${q.match.scoreline}</div>
+        <div style="font-size:12px;color:#9fb0c8;margin-top:2px;">${
+          q.match.playerWon ? 'Match won' : q.match.halved ? 'Match halved — you advance' : 'Match lost'
+        } · thru ${q.match.thru}</div>
+        <div style="font-size:11.5px;color:#8fa0b8;margin-top:3px;">vs ${q.match.opponents}</div>
+      </div>`
+    : '';
   const met = q.qualifiedCount >= q.neededCount;
   const remaining = Math.max(0, q.neededCount - q.qualifiedCount);
   const progress = met
@@ -393,11 +414,11 @@ function qualifierRecapHTML(q: NonNullable<NonNullable<typeof state.lastStoryRou
     <div style="max-width:460px;margin:12px auto 0;text-align:left;">
       <div style="background:${q.qualified ? '#0f1f16' : '#1f1113'};border:1px solid ${q.qualified ? '#2f6a44' : '#6a2f34'};border-radius:12px;padding:12px 14px;">
         <div style="font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:${q.qualified ? '#7fe0a0' : '#e69aa0'};">
-          ${q.qualified ? '✓ Qualified' : '✗ Missed the cut'} · finished ${ordinal(q.place)} of ${q.fieldSize}
+          ${q.qualified ? '✓ Qualified' : '✗ Missed the cut'}${q.match ? '' : ` · finished ${ordinal(q.place)} of ${q.fieldSize}`}
         </div>
-        <div style="margin-top:8px;background:#0b0f18;border:1px solid #232b3b;border-radius:8px;overflow:hidden;padding:4px;">
-          ${rows}
-        </div>
+        ${formatRow}
+        ${matchRow}
+        ${rows ? `<div style="margin-top:8px;background:#0b0f18;border:1px solid #232b3b;border-radius:8px;overflow:hidden;padding:4px;">${rows}</div>` : ''}
         <div style="margin-top:10px;font-size:12.5px;color:#c6bcd6;line-height:1.45;">${progress}</div>
       </div>
     </div>`;
@@ -433,7 +454,10 @@ export function storyResultScreen(): string {
     : r.wasPrologue
       ? `You've won the final round of the World Tour on Earth — the best golfer on the planet.`
       : q
-        ? `${courseName} · finished ${ordinal(q.place)} of ${q.fieldSize} — top ${q.need} qualifies.`
+        ? q.match
+          ? // GS-story-qualifier-formats: a matchplay event has a scoreline, not a placing.
+            `${courseName} · ${q.formatName} — ${q.match.playerWon ? `won ${q.match.scoreline}` : q.match.halved ? 'halved' : `lost ${q.match.scoreline}`}.`
+          : `${courseName} · finished ${ordinal(q.place)} of ${q.fieldSize} — top ${q.need} qualifies.`
         : `You played ${courseName} true.`;
   return `
     <header class="gs-hero gs-storyres">

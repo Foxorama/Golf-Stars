@@ -500,8 +500,15 @@ function storyNavSectionsHTML(w: StarTourWorld, nav: StoryWorldNav | undefined):
       : qu.place !== undefined
       ? `<span style="color:#ffb0b0;font-weight:700;">not yet</span> <span style="opacity:.75;">(best ${ordinalPlace(qu.place)} — replay to improve)</span>`
       : `<span style="opacity:.75;">not yet played</span>`;
+    // GS-story-qualifier-formats: the DRAW SHEET, shown before you fly — the shape, the length, and who
+    // you'd be teeing it up beside. Choosing which of the chapter's three events to play is choosing both.
+    const bar = qu.matchplay ? 'win or halve the match to qualify' : `finish top ${qu.top} of ${qu.field} to qualify`;
     out += `<div class="gs-st-rec" style="margin-top:10px;padding:9px 12px;background:#0c1a22;border:1px solid #234a5a;border-radius:10px;color:#bfe6f5;">
-      🏁 <b>Qualifying event</b> · finish top ${qu.top} of ${qu.field} to qualify — ${verdict}</div>`;
+      🏁 <b>Qualifying event</b> · ${bar} — ${verdict}
+      <div style="margin-top:6px;font-size:11.5px;color:#8fd0e8;">🎲 <b>${qu.formatName}</b> · ${qu.holes} holes${
+        qu.partnerName ? ` · drawn with <b style="color:#e2d4ff;">${qu.partnerName}</b>` : ''
+      }</div>
+      ${qu.formatBlurb ? `<div style="margin-top:3px;font-size:11.5px;color:#9ab8c8;line-height:1.4;">${qu.formatBlurb}</div>` : ''}</div>`;
   }
 
   return out;

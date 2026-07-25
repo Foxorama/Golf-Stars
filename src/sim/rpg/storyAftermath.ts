@@ -30,7 +30,15 @@
  */
 
 import { getCharacter } from './characters';
-import { betrayerId, heraldSeveredId, heraldOpponentIds } from './storyBetrayal';
+import {
+  betrayerId,
+  heraldSeveredId,
+  heraldOpponentIds,
+  partnerStanding,
+  betrayalEnticed,
+  betrayalOverlooked,
+  type PartnerBeatStage,
+} from './storyBetrayal';
 import type { StoryState } from './story';
 import type { StoryTournament } from './storyTournaments';
 import type { LoreLine } from './lore';
@@ -71,11 +79,55 @@ export function tournamentAftermath(
   won: boolean,
 ): TournamentAftermath | undefined {
   const path = story.alignment;
+  // GS-story-qualifier-formats: the TRUNK majors now carry the partner thread — after Sigil 1 and after
+  // Sigil 2, the friend standing apart in your partner tally gets a scene. See `partnerThreadAftermath`.
+  if ((t.chapter === 1 || t.chapter === 2) && won) return partnerThreadAftermath(story, t.chapter === 1 ? 0 : 1);
   if (t.chapter === 4 && path === 'warden') return scorpiusAftermath(won);
   if (t.chapter === 4 && path === 'herald') return won ? undefined : heraldSeveredAftermath(story);
   if (t.chapter === 5 && path === 'warden') return serpentVigilAftermath(story, won);
   if (t.chapter === 5 && path === 'herald') return ghostHarvestAftermath(story, won);
   return undefined;
+}
+
+// ── Ch.1 & Ch.2 trunk — the PARTNER THREAD (GS-story-qualifier-formats) ───────────────────────────────
+
+/**
+ * The early betrayal thread, planted where the player can still steer it. Qualifying events are drawn as
+ * two-balls now, so across a chapter you accumulate a real record of who you stand beside — and the
+ * campaign's betrayal has always been about the friend who ends up standing apart. This beat makes that
+ * arithmetic VISIBLE, twice, long before it hardens: once after the first Sigil, once after the second.
+ *
+ * Which friend, and which way, is `partnerStanding` — the same tally the eventual `betrayerId` resolves
+ * from — so the thread is honest: if you keep drawing the same friend, you watch the Coil start courting
+ * them; if you keep leaving one on the ship, you watch that land. And because the tally keeps moving until
+ * Sigil 2, the beat you get after Sigil 1 is a WARNING you can act on, not a verdict. That is the whole
+ * point of putting it here: player agency over who the story turns into the traitor.
+ *
+ * Fires on a WIN only (a lost Sigil is replayed; the thread would repeat), and a won Sigil can never be
+ * replayed, so each stage lands exactly once. Returns undefined before anything is on record.
+ */
+function partnerThreadAftermath(story: StoryState, stage: PartnerBeatStage): TournamentAftermath | undefined {
+  const standing = partnerStanding(story);
+  if (!standing) return undefined;
+  const name = friendName(standing.id);
+  const enticed = standing.lean === 'most';
+  return {
+    id: `aftermath-partner-${standing.lean}-${stage}`,
+    won: true,
+    accent: enticed ? COIL_VIOLET : '#9b6cc0',
+    kicker: enticed
+      ? stage === 0
+        ? 'Someone has been watching'
+        : 'The courting lands'
+      : stage === 0
+      ? 'Left on the ship'
+      : 'They stopped asking',
+    title: enticed ? `${name}, Noticed` : `${name}, Overlooked`,
+    speaker: name,
+    portrait: `golfer:${standing.id}`,
+    cta: stage === 0 ? 'Let it go →' : 'Say nothing →',
+    lines: enticed ? betrayalEnticed(standing.id, stage) : betrayalOverlooked(standing.id, stage),
+  };
 }
 
 // ── Ch.4 Warden — Scorpius, "the Silent Sting" (the beat the player asked for) ─────────────────────────
