@@ -395,6 +395,19 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     fairway and blended into its surround via UNDER-fairway surround rings + an ON-TOP mown collar
     (GS-green-blend; void/cetus/rainbow/derelict keep their own edge). The derelict's grass-less green is
     seated into a recessed deck bay (GS-ship-deck-blend). Turf bases still emit `#3f8c3f`/`#5fd45a`.
+  - **TURF BLENDS ARE MEASURED IN YARDS, NEVER PIXELS** (GS-green-complex, `shared.ts turfPx`). Every mown
+    transition — the fairway first cut, the green's apron/collar, the tee fringe, the edge ease + crown
+    sheen — is a width of GROUND scaled by `proj.scale` (floored/capped in px). The old fixed-px rings read
+    as a plausible apron on the whole-hole map and collapsed to a hairline at the chip/putt camera, which is
+    exactly where the player studies the turf: the surfaces read as stacked art assets. Ramps grade in ~6
+    even steps (`turfRamp`), and a collar that sits ON an already-dressed surface TINTS it (`turfRampTint`,
+    peak α ≤0.24) — an opaque ring wipes the fairway's mow/sheen and re-reads as paint. **Blending must
+    never cost the green its READABILITY** (the first pass dissolved every putting surface into its
+    corridor — a fairness bug): the apron is wide, the collar is deliberately narrow, and the surface keeps
+    its own base fill + an inward edge ease. A world's green complex is a ROW (`GREEN_COMPLEX` in
+    `style/green.ts`: `apronYd`/`collarYd`/`mowBands`) and the green MOWS IN ITS OWN WORLD'S GRAIN off the
+    shared `mowPattern` dispatch on the corridor's band grid — greens used to stripe horizontally on every
+    world ("most green areas look very similar"). Guarded by `tests/green-complex.test.ts`.
   - **The aim-cone overlay is SCALE-HONEST** — every layout reads the projector's px-per-yard and probes the
     sim's OWN flight walks (never fork them, never hard-code px into the sim). The cone's arcs are
     `shotSpread`'s un-shifted carry clamp; wind rides ONLY `expectedCarry` (the aim line), never the arcs.

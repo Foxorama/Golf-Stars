@@ -8,6 +8,7 @@
 
 import type { Hole, Vec } from '../../sim/course/contract';
 import { dist } from '../../sim/course/contract';
+import type { BiomeArchetype } from '../../sim/course/themes';
 import { mixHex } from '../palette';
 import type { Projector } from '../project';
 
@@ -386,6 +387,94 @@ export function checkerStripes(poly: Vec[], colA: string, colB: string, cell: nu
   }
   return { t: 'clip', clip: poly, children };
 }
+/**
+ * The per-world fairway/green mowing PATTERN (GS-variety-2, generalised by GS-green-complex): each
+ * archetype grooms its turf differently — horizontal stripes (classic parkland), a vertical swept
+ * grain (frost), a faceted/wind diagonal (crystal/tempest/desert), or a lush cross-mown checker
+ * (jungle). Lives HERE (not in `fairway.ts`) because the GREEN mows in the same pattern as its own
+ * fairway now: a world whose corridor is swept vertically and whose green was always striped
+ * horizontally read as two different materials butted together (the "art assets stacked on each
+ * other" report). `b0` is the grid the bands are phased off — pass the CORRIDOR's box for the
+ * fairway pass so broken segments + the apron line up. Pure geometry, zero rng.
+ */
+export function mowPattern(
+  poly: Vec[],
+  hi: string,
+  lo: string,
+  b0: Box,
+  arch: BiomeArchetype,
+  bandH: number,
+): Prim {
+  switch (arch) {
+    case 'frost':
+      return stripesAtV(poly, hi, lo, b0.minX, bandH);
+    case 'crystal':
+      return slantStripes(poly, hi, lo, bandH * 0.95, 0.6);
+    case 'tempest':
+      return slantStripes(poly, hi, lo, bandH, -0.5);
+    case 'desert':
+      return slantStripes(poly, hi, lo, bandH, 0.28);
+    case 'fungal':
+      return checkerStripes(poly, hi, lo, bandH * 0.9);
+    default: // verdant / ocean / inferno / void / cetus / … — the classic horizontal mowing stripes
+      return stripesAt(poly, hi, lo, b0.minY, bandH);
+  }
+}
+
+/**
+ * A turf blend-band's SCREEN width for a band `yd` course-yards wide, at the projector's px-per-yard
+ * `scale` (GS-green-complex).
+ *
+ * Every mown transition on the hole — the fairway's first cut, the green's apron and collar, the tee
+ * pad's fringe — used to be a FIXED PIXEL offset. At the whole-hole map (~1 px/yd) 6px read as a
+ * plausible ~6-yard apron; at the chip/putt camera (~6.6 px/yd), where the player actually looks at
+ * the green, the same 6px collapsed to under a yard, so the green butted the fairway on a hairline
+ * and the two surfaces read as stacked art assets rather than one mown complex. Sizing the bands in
+ * YARDS makes the complex scale-honest — the same apron at every camera. Floored so it never
+ * vanishes at whole-hole zoom, capped so a deep zoom can't flood the frame. Sizes may read the
+ * projection (the camera contract allows colours/sizes; only COUNTS must not), and it is pure.
+ */
+export function turfPx(scale: number, yd: number, minPx = 2, maxPx = 64): number {
+  const px = yd * (scale > 0 ? scale : 1);
+  return px < minPx ? minPx : px > maxPx ? maxPx : px;
+}
+
+/**
+ * A smooth OUTWARD blend ramp around a play surface (GS-green-complex): `steps` nested rings running
+ * from `outerPx` in to the surface edge, each filled with a mix walking `outer` → `inner`. Two or
+ * three opaque rings read as concentric stickers however carefully the tones are picked — the eye
+ * finds the step. Enough steps and the per-step tone jump falls under the banding threshold, so the
+ * transition reads as ground. Widest ring FIRST (each is drawn over the last). Pure, zero rng.
+ */
+export function turfRamp(poly: Vec[], outerPx: number, outer: string, inner: string, steps = 6): Prim[] {
+  const out: Prim[] = [];
+  const n = Math.max(1, Math.round(steps));
+  for (let i = 0; i < n; i++) {
+    const u = i / n; // 0 = the outermost (widest, most `outer`-toned) ring
+    out.push({ t: 'poly', pts: offsetPoly(poly, -outerPx * (1 - u)), fill: mixHex(outer, inner, u) });
+  }
+  return out;
+}
+
+/**
+ * The same ramp drawn as ALPHA tints rather than opaque fills (GS-green-complex) — for a collar that
+ * sits ON TOP of an already-dressed surface (the green's collar over the flared fairway apron). An
+ * opaque ring wipes the fairway's mowing stripes, sheen and texture and re-reads as a painted ring
+ * around the green; a tint carries the same colour walk while the groundskeeping underneath shows
+ * through, so the collar reads as the fairway MOWN DOWN toward the green. Pure, zero rng.
+ */
+export function turfRampTint(poly: Vec[], outerPx: number, col: string, peakAlpha: number, steps = 6): Prim[] {
+  const out: Prim[] = [];
+  const n = Math.max(1, Math.round(steps));
+  for (let i = 0; i < n; i++) {
+    const u = i / n;
+    // Each ring adds another tint layer, so alpha ACCUMULATES inward toward the green edge; keep the
+    // per-ring alpha low and let the stacking do the grading.
+    out.push({ t: 'poly', pts: offsetPoly(poly, -outerPx * (1 - u)), fill: hexAlpha(col, peakAlpha * (0.35 + 0.65 * u)) });
+  }
+  return out;
+}
+
 // GS-inset: ONE global light — the sun sits upper-left (matching the green's lit highlight and the
 // cetus raised-shelf), so every carved feature shades the same way and the hole reads as one lit
 // landform instead of a collage of stickers. Unit vector pointing TOWARD the light.

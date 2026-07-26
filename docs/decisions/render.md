@@ -1452,3 +1452,72 @@ object, and drive it off the shared wall clock — or it will render differently
     shaft meets the HEEL (centre = the old shovel look). Gear-shaft items resolve via `SHAFT_FAMILY`,
     reward clubs off their `<type>`; `itemArtKind` stays `'shaft'` (per-id emblems keep them distinct).
     Pure SVG, no rng/save bump. Eyeball with `scripts/club-icons-preview.mjs`.
+
+---
+
+## GS-green-complex — the green complex reads as one mown surface at every camera (2026-07-26)
+
+**The ask** (playtest): "the fairway, green*s* and green aprons still aren't blending properly, they look
+like art assets stacked on top of each other instead of one smooth hole, and most of the green areas still
+look very similar."
+
+Both halves of that turned out to have ONE root cause each, and both were sitting in plain sight.
+
+### 1. Every turf blend was measured in PIXELS
+
+`styleGreenSurround`, `styleFairways`' first cut, `styleTee`'s fringe, the on-fairway green collar, the
+fairway's edge-ease strokes and crown sheen — all of them offset the PROJECTED polygon by a hard-coded
+pixel count (`offsetPoly(sp, -6)`, `sw: 9`, `shiftPoly(…, 3)`).
+
+The whole-hole map runs at roughly **1 px/yard**, so 6px read as a plausible ~6-yard apron and everything
+looked fine in the gallery — which is the zoom every previous blending pass (GS-green-apron, GS-fairway-2,
+GS-green-blend) was eyeballed at. The chip/putt camera runs at **~6.6 px/yard**. The same 6px is
+**under a yard of ground** there — so at the exact camera where the player leans in and studies the
+turf, every mown transition on the hole collapsed to a hairline and the green butted the fairway on a
+hard cut. Five separate blending passes had all been tuned blind to it.
+
+**The rule now:** `shared.ts turfPx(scale, yards)` — a blend band is a width of GROUND, floored (2px, so
+it never vanishes on a whole-hole map) and capped (64px, so a deep zoom can't flood the frame). Sizes may
+read the projection; only COUNTS may not (the camera contract), and no count changed. Yard values were
+picked to reproduce what the old pixel values read as at map zoom, so the gallery is essentially
+unchanged and the near cameras gain the apron they never had.
+
+The staircase went too: `turfRamp` walks the fringe→collar transition in six even steps, small enough
+that no single tone jump reads as a ring (two or three opaque rings always read as concentric stickers,
+however carefully the tones are chosen — the eye finds the step).
+
+And the on-fairway collar became a **tint**, not a fill (`turfRampTint`, peak α 0.24). Opaque rings wiped
+the corridor's mowing stripes, sheen and texture in a band around the green and re-read as *paint* — the
+very "stacked art asset" tell the collar was added to cure. Tinted, the fairway's own groundskeeping shows
+straight through and the collar reads as the corridor MOWN DOWN into the green.
+
+### 2. The green was dressed identically on every world
+
+However distinct the generator made a green's SHAPE (`greenSize`/`greenAspect`/`greenIrregular` per biome
+profile), the RENDER dressed all of them the same: one fixed two-ring apron, and `stripes(poly, …, 6)` —
+**always horizontal, on every world**, while the fairway had had per-world mowing grain since GS-variety-2.
+A frost corridor swept vertically met a horizontally-striped green at a hard seam; a cross-mown jungle
+corridor met the same horizontal green. Two materials butted together, on every world, at every hole.
+
+So the pattern dispatch moved out of `style/fairway.ts` into `shared.ts` as `mowPattern`, and the green
+now mows in **its own world's grain, phased off the corridor's band grid** — one greenkeeper, one hole.
+Per-world presentation is a ROW (`GREEN_COMPLEX` in `style/green.ts`): `apronYd` (a links/desert green
+runs out into a broad tight-mown apron, the jungle and mire crowd right up to the surface), `collarYd`,
+`mowBands`. A new world is a row; machine-checked for full archetype coverage.
+
+`fairwayBandH` was split out so the corridor's own pitch is one named thing the green can subdivide —
+and it returns each world's classic pitch verbatim, so **the fairway mow is byte-for-byte unchanged**.
+
+### The lesson worth carrying: a blend must not dissolve the thing it blends
+
+The first preview of this change was a straight failure. With the collar at apron width and α 0.5, every
+world's putting surface melted into its corridor — beautiful, seamless, and **unreadable**. That is not a
+polish miss, it is a *fairness* bug: the golf-soul rule is that an absurd course still has to be readable,
+and if you can't see where the green ends you can't judge a chip. The fix is asymmetric by design — a WIDE
+apron and a deliberately NARROW collar, plus the surface keeping its own base fill and an inward edge ease
+that re-states the shape. `tests/green-complex.test.ts` pins `collarYd < apronYd`, the tint alpha ceiling,
+and that `styleGreen` always lays its own base fill.
+
+**Verification:** full suite green (1903 tests), `npx tsc --noEmit` clean, gallery re-shot across all
+worlds, plus `scripts/greenblend-preview.mjs` (approach zoom) and `scripts/green-zoom.mjs` (putt zoom)
+eyeballed before/after — the before/after at putt zoom is where the whole change is visible.
