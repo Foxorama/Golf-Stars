@@ -565,6 +565,16 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     **The putt meter is deliberately untouched**: slowing the sweep / widening the band / defaulting to
     auto-putt are all BALANCE changes and must go through the death-spiral harness (contract 4), not ship
     under an accessibility banner. Guarded by `tests/a11y-motion.test.ts`.
+  - **THE SHOT HAS ONE MECHANIC AND TWO DEVICES** (GS-a11y-keyboard). The pull gesture was the ONLY way
+    to aim or modulate power and it is pointer-only, so a keyboard/switch player could reach Swing but was
+    locked to the seeded aim at the seeded power. Arrows now mirror the drag axes (L/R aim · U/D power ·
+    Shift = quarter-step) through the SAME `setAimPower` the drag calls — `applyDrag` no longer derives its
+    own free target, so the two inputs cannot drift (machine-checked). NO Enter/Space handler: the Swing
+    button already commits, and a global commit key would double-fire with the focused control. **The
+    listener is bound per render, so its cleanup runs at the TOP of `wireShotGesture`, BEFORE every early
+    return** — bound naively each render stacks another `window` listener and one press steps the aim N
+    times; and the early returns are exactly the cases where the decision screen went away (putt, popup,
+    another screen). Guarded by `tests/a11y-keyboard.test.ts`.
   - **CSS classes / DOM ids are GLOBAL and screens can't see each other's names** — new screen chrome gets
     its OWN prefix (bridge HUD `.gs-bhud`, resume `.gs-resume`, lore `.gs-lore`, star-tour content
     `.gs-sthud` — NEVER the play screen's `.gs-hud`, which the #353 map-blur regression proved). Grep the

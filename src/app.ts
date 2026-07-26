@@ -880,6 +880,8 @@ let mapPan: [number, number] = [0, 0];
 let awaitingShotPopup = false;
 /** Stop:hole of the last situation we narrated, so the preamble fires once per hole (GS-a11y-announce). */
 let announcedHoleKey: string | null = null;
+/** Removes the previous render's play-screen key listener (GS-a11y-keyboard) — see wireShotGesture. */
+let playKeyCleanup: (() => void) | null = null;
 let popupTimer = 0;
 // The manual-putt pace meter (a time/DOM side-effect, like the play view) — mounted on the putt
 // screen, torn down on any dispatch.
@@ -960,6 +962,11 @@ function scheduleRender(): void {
  * needed (the old free-aim tap-the-point model is gone — you aim by sliding while you charge).
  */
 function wireShotGesture(app: HTMLElement): void {
+  // Drop the previous render's key listener FIRST, before any early return (GS-a11y-keyboard) — the
+  // early returns are exactly the cases where the decision screen went away (a putt, a popup, another
+  // screen), and a listener left bound there would keep nudging an aim that is no longer on screen.
+  playKeyCleanup?.();
+  playKeyCleanup = null;
   if (state.screen !== 'playing' || !state.play || awaitingShotPopup) return;
   // Only the full-shot decision screen — not the green putt, nor a fringe putt the player chose.
   if (state.play.done || awaitingPutt(state.play) || (canPuttFringe(state.play) && selPutt)) return;
@@ -986,11 +993,20 @@ function wireShotGesture(app: HTMLElement): void {
     const [a, b] = [...pointers.values()];
     return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
   };
+  /**
+   * The shared tail of "the player changed the aim or the power": derive the free target from the
+   * bearing, then refresh the cone. Both the pull-gesture and the keyboard controls (GS-a11y-keyboard)
+   * go through here, so there is ONE place that turns an aim/power intent into a previewed shot and
+   * the two input methods cannot drift apart.
+   */
+  const setAimPower = (bearingDeg: number, power: number): void => {
+    selPower = Math.max(0, Math.min(maxPower, power));
+    selAimBearing = bearingDeg;
+    selFreeTarget = targetFromBearing(play, selectedClubCarry(play), selAimBearing, Math.max(selPower, 0.12));
+  };
   // Apply a drag (client coords) → live power + aim bearing, and re-render so the cone + HUD track.
   const applyDrag = (x: number, y: number): void => {
-    selPower = Math.max(0, Math.min(maxPower, (y - startY) / PULL_RANGE));
-    selAimBearing = startBearing + (x - startX) * AIM_SENS;
-    selFreeTarget = targetFromBearing(play, selectedClubCarry(play), selAimBearing, Math.max(selPower, 0.12));
+    setAimPower(startBearing + (x - startX) * AIM_SENS, (y - startY) / PULL_RANGE);
     charging = true;
     // A ratcheting haptic as the power loads (every 20%).
     const notch = Math.floor(selPower * 5);
@@ -1083,6 +1099,56 @@ function wireShotGesture(app: HTMLElement): void {
       scheduleRender(); // cancelled — restore the resting full-swing cone
     }
   }
+  // ── Keyboard aim + power (GS-a11y-keyboard) ─────────────────────────────────────────────────
+  // The pull gesture is the only way to aim or modulate power, and it is pointer-only — so a player
+  // on a keyboard, a switch, or any assistive pointer alternative could reach the Swing button but
+  // was locked to the seeded aim at the seeded power for the entire game. That is not "harder", it
+  // is a different, worse game.
+  //
+  // The arrows mirror the drag axes exactly (left/right = aim, up/down = power) and go through the
+  // SAME `setAimPower` the drag does, so this is not a second shot mechanic — it is the same one
+  // driven by a different device. Committing is already keyboard-reachable (the Swing button), so
+  // this deliberately adds no Enter/Space handler that could double-fire with a focused control.
+  const AIM_STEP = 2; // degrees per press — a readable nudge at the scale the cone is drawn
+  const POWER_STEP = 0.05; // 5% per press; 20 presses covers the full range
+  const onPlayKey = (e: KeyboardEvent): void => {
+    // Never fight the browser's own shortcuts, a text field, or a raised overlay. The overlay test is
+    // structural rather than a flag check: `applyOverlayFocus` inerts the page behind a sheet, so an
+    // inert direct child of #app IS "a modal is up".
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    const t = e.target as HTMLElement | null;
+    if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+    if (document.querySelector('#app > [inert]')) return;
+    if (state.screen !== 'playing' || !state.play || awaitingShotPopup) return;
+    const fine = e.shiftKey ? 0.25 : 1; // Shift = fine adjustment, for a delicate line
+    const base = selAimBearing ?? bearing(play.ball, pinOf(play.hole));
+    switch (e.key) {
+      case 'ArrowLeft':
+        setAimPower(base - AIM_STEP * fine, selPower);
+        break;
+      case 'ArrowRight':
+        setAimPower(base + AIM_STEP * fine, selPower);
+        break;
+      case 'ArrowUp':
+        setAimPower(base, selPower + POWER_STEP * fine);
+        break;
+      case 'ArrowDown':
+        setAimPower(base, selPower - POWER_STEP * fine);
+        break;
+      default:
+        return;
+    }
+    e.preventDefault(); // arrows would otherwise scroll the page
+    // Same surgical cone refresh the drag uses — a full render() rebuilds the scene and lags.
+    if (shotAimRefresh) shotAimRefresh();
+    else scheduleRender();
+  };
+  // Bound per render (render() replaces the SVG). The previous one was already removed at the top of
+  // this function — without that, every render would stack another live listener on `window` and a
+  // single arrow press would step the aim N times.
+  window.addEventListener('keydown', onPlayKey);
+  playKeyCleanup = () => window.removeEventListener('keydown', onPlayKey);
+
   svg.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     const now = performance.now();
