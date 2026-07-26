@@ -5,7 +5,10 @@ import { autoAimTarget, autoAimClub, aiClub, suggestPlayerClub, layupTarget, pin
 import { beginHole, previewShot, type ShotDecision } from '../src/sim/rpg/play';
 import { startingLoadout } from '../src/sim/rpg/economy';
 import { applyBagTier } from '../src/sim/rpg/bag';
-import { CLUBS, clubDist } from '../src/sim/clubs';
+import { CLUBS, clubDist, type Club } from '../src/sim/clubs';
+import { clubTotalReach, flightCarryScale } from '../src/sim/flight';
+import { lieAt, lieInfo } from '../src/sim/shot';
+import type { FeatureKind } from '../src/sim/course/contract';
 
 /** The longest-carry usable (non-putter) club in a bag — the driver in the default bag. */
 function longestClub(bag = CLUBS) {
@@ -42,11 +45,19 @@ function distToCentreline(hole: Hole, p: Vec): number {
   return best;
 }
 
-/** Max nominal carry the default bag can fly from the tee (yards) — mirrors round.ts maxReachOf. */
+/** Max TOTAL reach the default bag can finish at from the tee (yards) — mirrors round.ts maxReachOf.
+ *  Reads `clubTotalReach`, not the club's bare number: the number is a nominal CARRY and the ball runs
+ *  out past it, so the bare number understates the finish by the legacy roll (GS-carry-roll-real). */
 function maxNominalReach(carryMult: number): number {
   let max = 0;
-  for (const c of CLUBS) if (c.id !== 'putter') max = Math.max(max, c.carry);
+  for (const c of CLUBS) if (c.id !== 'putter') max = Math.max(max, clubTotalReach(c.id, c.carry));
   return max * carryMult;
+}
+
+/** Where a club's FULL swing down the ball→target line first LANDS (yards from the ball) — the flight,
+ *  not the finish. The number every carry decision must be measured against (contract 5's coupling). */
+function flightCarryOf(club: Club, carryMult: number, lie: FeatureKind = 'tee'): number {
+  return clubDist(club) * flightCarryScale(club.id, clubDist(club)) * carryMult * lieInfo(lie).carryMult;
 }
 
 describe('smart default aim (GS-default-aim)', () => {
@@ -163,12 +174,30 @@ describe('smart default aim (GS-default-aim)', () => {
       for (const h of c.holes) {
         if (h.par < 4 || h.widthId?.startsWith('island')) continue;
         const cm = biomeCarryMult(h);
+        const tgt = autoAimTarget(h, h.tee, 'tee', CLUBS, cm);
         const pick = autoAimClub(h, h.tee, 'tee', CLUBS, cm);
         // The whole bug: defaulting to a 5-wood. The fix NEVER pre-arms a club shorter than the auto
         // sim's club-down `aiClub` default — on an OPEN corridor it bombs the driver, on a forced-carry
-        // drive it lays up with `aiClub` (never over-clubbing into the hazard), but never SHORTER.
-        const oldDefault = aiClub(h, h.tee, autoAimTarget(h, h.tee, 'tee', CLUBS, cm), cm, CLUBS);
-        expect(clubDist(pick)).toBeGreaterThanOrEqual(clubDist(oldDefault) - 1e-6);
+        // drive it lays up with `aiClub` (never over-clubbing into the hazard).
+        const oldDefault = aiClub(h, h.tee, tgt, cm, CLUBS);
+        // …with ONE exception, and it is a rule rather than a let-off: `aiClub` reasons about REACHING
+        // the target and never asks where the ball comes DOWN, so on a hole with a second hazard past
+        // the first (a lava field beyond the river, the void past a ship's deck) its club reaches the
+        // target by landing in the water. `autoAimClub` reads the landing, so it steps DOWN below
+        // `aiClub` — correctly: a stroke short in the rough beats a penalty drop. Assert the real
+        // invariant, that a step-down is always FORCED — every longer club would be short of the far
+        // bank or wet on arrival (measured: 3 step-downs in 1,083 tee shots, all forced).
+        if (clubDist(pick) < clubDist(oldDefault) - 1e-6) {
+          const fc = forcedCarry(h, h.tee, tgt);
+          const legalLonger = CLUBS.filter((c) => c.id !== 'putter' && clubDist(c) > clubDist(pick)).filter((c) => {
+            const carry = flightCarryOf(c, cm);
+            if (fc && carry < fc.carry) return false; // short of the far bank — not a legal carry club
+            const u = dist(h.tee, tgt) || 1;
+            const land: Vec = [h.tee[0] + ((tgt[0] - h.tee[0]) / u) * carry, h.tee[1] + ((tgt[1] - h.tee[1]) / u) * carry];
+            return !lieInfo(lieAt(h, land)).penalty; // dry on arrival ⇒ it was a legal option
+          });
+          expect(legalLonger.map((c) => c.id), `clubbed down to ${pick.id} with legal longer clubs left`).toEqual([]);
+        }
         checked++;
         if (pick.id === driver.id) driverPicks++;
       }
@@ -203,8 +232,12 @@ describe('smart default aim (GS-default-aim)', () => {
         if (!fc) continue; // only the forced-carry drives — the ones the bug hit
         carries++;
         const pick = autoAimClub(h, h.tee, 'tee', bag, cm);
-        // The picked club must ALWAYS carry past the hazard's far bank (never drop a soft club into it).
-        expect(clubDist(pick) * cm).toBeGreaterThanOrEqual(fc.carry - 1e-6);
+        // The picked club must ALWAYS carry past the hazard's far bank (never drop a soft club into it),
+        // measured on its FLIGHT — the coupling contract 5 names: a forced carry is cleared in the AIR,
+        // the run cannot be counted on to span water. (This read the club's bare NUMBER before, which is
+        // a nominal carry the ball runs out past — so it was the wrong quantity on both sides of the
+        // split: too lax while `carryFrac` sat below 0.847, too strict above it. GS-carry-roll-real.)
+        expect(flightCarryOf(pick, cm)).toBeGreaterThanOrEqual(fc.carry - 1e-6);
         if (pick.id === driver.id) driverPicks++;
       }
     }

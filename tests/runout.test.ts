@@ -31,7 +31,7 @@ describe('the run-out starts where the flight left off (no speed step)', () => {
     // Measured in game under the old rule, a driver's six hops totalled 87ms and the first was 27ms —
     // under two frames — which is exactly the reported "there is no bounce, the ball drops, touches
     // ground and then rolls a little bit".
-    const p = planRunout({ dist: 30, firm: 0.85, v0: DRIVER_V, carry: 250, descentDeg: 36, vary: 0.5 });
+    const p = planRunout({ dist: 21, firm: 0.85, v0: DRIVER_V, carry: 250, descentDeg: 36, vary: 0.5, clubId: 'D' });
     const first = p.hops[0]!;
     expect(first.dist / first.ms).toBeLessThan(DRIVER_V); // slower than the flight, on purpose
     expect(first.ms, `first hop ${first.ms.toFixed(0)}ms`).toBeGreaterThan(150); // long enough to WATCH
@@ -216,21 +216,23 @@ describe('bounce and run read per CLUB', () => {
       return p.carryFrac >= 1 ? 0 : (1 - p.carryFrac) / p.carryFrac;
     };
     expect(run('D')).toBeGreaterThan(run('3W'));
-    expect(run('3W')).toBeGreaterThan(run('3i'));
-    // A driving iron launches low with little spin and outruns the rescue club it replaced.
-    expect(run('3i')).toBeGreaterThan(run('4H'));
-    expect(run('4H')).toBeGreaterThan(run('7i'));
+    // Woods and hybrids sit together, and both release more than a long iron (GS-carry-roll-real:
+    // woods/hybrids 10-15yd, long/mid irons 5-10). The earlier "driving iron outruns the hybrid"
+    // reading came from tuning, not from the reference numbers.
+    expect(run('3W')).toBeCloseTo(run('4H'), 3);
+    expect(run('4H')).toBeGreaterThan(run('3i'));
+    expect(run('3i')).toBeGreaterThan(run('7i'));
     // …and the wedges hold, which is where the backspin build takes over (GS-backspin-optin).
     expect(run('7i')).toBeGreaterThan(run('PW'));
     expect(run('PW')).toBe(0);
   });
 
-  it('every iron in the bag lands on one side of the split, and 3-5 are the long ones', () => {
+  it('every iron in the bag lands on one side of the split, and 4-6 are the long ones', () => {
     const irons = CLUBS.filter((c) => /^\d+i$/.test(c.id));
     expect(irons.length).toBeGreaterThan(2);
     for (const c of irons) {
       const n = Number(/^(\d+)i$/.exec(c.id)![1]);
-      expect(flightClassOf(c.id), c.id).toBe(n <= 5 ? 'ironLong' : 'ironShort');
+      expect(flightClassOf(c.id), c.id).toBe(n <= 6 ? 'ironLong' : 'ironShort');
     }
   });
 
@@ -424,8 +426,9 @@ describe('the SURFACE decides how the landing dies', () => {
   it('a ball that SKIPS INTO a hazard loses the rest of its train there', () => {
     // "if it lands or bounces into a hazard the remaining bounce and roll should be reduced by the
     // hazard's effect" — the run-out samples the ground each hop lands on, not just the touchdown.
-    const clean = land('D', 62, 0.85);
-    const into = land('D', 62, 0.85, { firmAt: (a) => (a > 20 ? 0.12 : 0.85) });
+    // A driver's realistic release is ~21yd (GS-carry-roll-real), so the hazard sits 8 yards in.
+    const clean = land('D', 21, 0.85);
+    const into = land('D', 21, 0.85, { firmAt: (a) => (a > 8 ? 0.12 : 0.85) });
     expect(into.hops.length).toBeLessThan(clean.hops.length);
     const air = (p: RunoutPlan): number => p.hops.reduce((a, h) => a + h.dist, 0);
     expect(air(into)).toBeLessThan(air(clean));
@@ -434,11 +437,11 @@ describe('the SURFACE decides how the landing dies', () => {
 
 describe('no two shots land alike', () => {
   it('the same club on the same surface varies, and varies deterministically', () => {
-    const plans = [0.05, 0.3, 0.55, 0.8, 0.98].map((v) => land('D', 62, 0.85, { vary: v }));
+    const plans = [0.05, 0.3, 0.55, 0.8, 0.98].map((v) => land('D', 21, 0.85, { vary: v }));
     const firsts = plans.map((p) => p.hops[0]!.dist);
     expect(Math.max(...firsts) / Math.min(...firsts), 'every drive bounced identically').toBeGreaterThan(1.2);
     // …and the SAME variation always gives the same landing (it is a hash, not a draw).
-    expect(land('D', 62, 0.85, { vary: 0.42 })).toEqual(land('D', 62, 0.85, { vary: 0.42 }));
+    expect(land('D', 21, 0.85, { vary: 0.42 })).toEqual(land('D', 21, 0.85, { vary: 0.42 }));
   });
 
   it('the run-out module reaches for no randomness of its own', () => {

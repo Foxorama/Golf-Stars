@@ -46,6 +46,23 @@ absolute; inset: 0`) and the lore portrait a real sibling `<button>` above it in
 because character select is viewport-locked to one mobile screen (GS-select-onescreen) and the
 restructure deserves its own pass + a layout smoke test rather than riding along with an a11y sweep.
 
+**GS-default-aim-full-swing — the pre-armed club is chosen for a full swing it may not want**
+*(found while finishing GS-carry-roll-real; the residual after that pass, not a regression from it)*
+`autoAimClub` now refuses any club whose FULL flight lands in a penalty, so the pre-armed default is dry
+by construction (measured 0 wet landings across 3,072 par-4/5 tee shots, down from 22/1,083 before). What
+it still does not model is POWER: on a lay-up it arms the longest club that stays dry rather than a full
+club dialled down, which is the shot a player would actually pick. The power seed is already per-shot
+(`autoShotPower` does exactly this for the auto sim), so the fix is to let the default pick a
+(club, power) PAIR instead of a club. Deliberately left out — it changes the pre-armed power on shots
+that are currently fine, so it wants its own pass and its own eyes-on.
+
+**GS-auto-ai-weak — the headless auto sim is far weaker than a human, and it gates everything**
+The auto sim stalls around hole 40 of the Unending Universe; human players reach 350+. Every balance
+harness in the suite measures THAT player, so the fences are calibrated to a weak one and have twice now
+been mistaken for statements about the physics (see contract 4). Worth its own pass — richer reach-AI,
+play-back-to-fairway recovery, better club selection — after which the fences can be re-derived and
+tightened honestly. Until then: fences move, physics doesn't.
+
 **GS-flight-arc-tail — the drawn flight drops its last yards almost vertically** *(found while fixing
 GS-flight-pace; a BALANCE change, so deliberately left out of that PR)*
 The height is `arcHeight`, a two-piece sine in the Bézier's PARAMETER, while the ground advances as

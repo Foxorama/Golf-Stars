@@ -1206,3 +1206,128 @@ Confirmed in game: the driver's plan went from `87ms of hops` to `322/239/177/13
 **Guards:** the "first hop at nearly flight speed" test is replaced — it encoded the rule that caused
 the bug — by one asserting the run-out's own time base and a first hop long enough to watch (>150ms),
 plus a bounce-share-of-time floor per club. The hop→roll join test now catches the `hopMinMs` step.
+
+---
+
+## GS-carry-roll-real — the carry/roll split comes from golf, not from the AI (2026-07-26)
+
+> "do the carryFrac fix next, on its own, with harness numbers, ignore or change the death spiral
+> harness. we can fix the AI later if we need to, but hurting the graphics and physics because the auto
+> AI is bad makes for a crappy game for human players. Like the AI can't even get to hole 40 in the
+> unending universe but human players can get to 350+"
+
+Reference roll-out on a standard fairway/green, taken at its midpoint against the club's carry — our
+club number is the TOTAL, so `carryFrac = carry / (carry + roll)`:
+
+| club | roll before | roll now | reference |
+|---|---|---|---|
+| Driver | 62yd | **19.5** | 15–30 |
+| Woods | 47–52 | **11.9–12.9** | 10–15 |
+| Hybrids | 29–33 | **9.1–10.4** | 10–15 |
+| Long/mid irons | 31 | **5.8–6.4** | 5–10 |
+| Short irons | 8.6 | **2.8–3.2** | 2–5 |
+| Wedges | 0–5 | 0–5 | 0–3 |
+
+The iron split moved to **4-6 / 7-9** to match (a 6-iron releases, a 7-iron checks). Wedges stay on
+`carryFrac 1.0`, which keeps the backspin-opt-in path byte-for-byte.
+
+### The harness got better, not worse
+
+| | toPar/hole | floor-hits |
+|---|---|---|
+| before | 0.8740 | 8.65% |
+| **after** | **0.5215** | **5.56%** |
+
+No fence needed moving. The reason is worth keeping: **the split is total-preserving, so over-rolling
+meant under-CARRYING.** The 250-nominal driver was flying 236 and releasing 59; it now flies 272 and
+releases 23, finishing at the same 295 either way. The auto AI had been playing a bag whose clubs did not
+reach, and the bar the harness was defending was partly an artefact of the unrealistic split it was gating.
+
+> Those two figures were first written here as "flying 200 and releasing 62 … now flies 231 and releases
+> 19.5", which understates both by the legacy-roll factor `(1 + legacyRollFraction)` = 1.18 — the flight is
+> `nominal · carryFrac · (1 + legacyRoll)`, not `nominal · carryFrac`, because the split is anchored on the
+> legacy endpoint. It is the same slip `maxReachOf` was making, and it is an easy one: **a club's number is
+> a nominal CARRY, and the ball finishes 18% past it.** Corrected above; see the `default-aim` section
+> below for what the same confusion cost in the aim AI.
+
+That is the general lesson, now written into contract 4: the harness measures the AUTO AI, which is far
+weaker than a human. A harness number is evidence about the AI, never proof that the physics is wrong.
+
+### One coupling this exposed
+
+Hop lengths had been tuned an hour earlier against a 62-yard release. Against a 21-yard one, a single
+skip ate the whole run-out. `hopLenK` 0.16 → 0.05 restores the ladder: a driver now hops
+7.1/3.9/2.1/1.2/0.5yd (38% of the run-out in the air), and every club still bounces at least once and
+still finishes with a visible roll.
+
+### The three red tests, and what each turned out to be saying
+
+All three were behavioural, and only one of them was really about a number.
+
+**`default-aim` — the reach models had inverted, and it was a real bug.** The two models were not just
+"different", they were incoherent: `maxFlightReachOf` returned **258** yards where `maxReachOf` returned
+**237**, i.e. the ball's LANDING was further than its FINISH. The cause is that a club's number is its
+nominal CARRY, not its total — the split is anchored on the legacy roll, so the ball finishes at
+`number · (1 + legacyRoll)` (driver 295) — and `maxReachOf` was using the bare number. That understates
+the finish by 18% and, critically, `flightScaleFor` = `carryFrac · (1 + legacyRoll)` overtakes 1.0 once
+`carryFrac` clears `1/(1+legacyRoll)` = **0.847**. The old driver sat at 0.80, just under the line; the
+real-golf 0.922 crossed it, and the inversion appeared. Both models now derive from `flightScaleFor` ×
+`rollFractionFor` (`clubTotalReach`), so their ratio IS `carryFrac` and they cannot invert again.
+
+Downstream, the inverted pair was aiming the player into a lava river. On ember-world seed 14090 the
+corridor crosses lava twice (138–146yd and 176yd onward); `safeTarget` correctly found a dry carry at
+250yd, the overshoot guard rejected it as past a drive, and the fallback returned a raw centreline
+station **inside the second band**. `forcedCarry` then reported "fly the entire way" and the club pick
+went hunting for a club to carry a bank with no far side. Two holes in the fallback: `clearLine` samples
+strictly BETWEEN its ends so it never tests the station itself, and the fallback never tested it either.
+Both closed, and when the safe line runs long the aim now backs down the corridor to the furthest dry
+station instead of choosing between a wet target and an unreachable one.
+
+That left the club pick arming the longest club at a lay-up — flying it past the target into the water it
+was laid up short of. `autoAimClub` now applies one rule to every positioning shot: the longest club that
+clears what must be cleared and lands playable. An open line is not an empty one. A step-down below
+`aiClub` is legitimate and now machine-checked as forced — `aiClub` reasons about REACHING a target and
+never asks where the ball comes down, so on a double-hazard hole its club reaches by landing wet.
+
+Measured across 3,072 par-4/5 tee shots (three bag/wildness configs): wet aim targets 74 → **0**, wet
+full-swing landings 22 → **0** (better than before the pass), carries short of the far bank **0**, driver
+still pre-armed on 99% of forced carries, and only 3 step-downs in 1,083 tee shots — all forced.
+Harness: **0.5215 → 0.5139** toPar/hole, floor-hits 5.56% → 5.66%. Both well inside the fences, so no
+fence moved.
+
+**`spray-blocking` — a hard-coded fixture, confirmed not a bug.** The cone probes landings out to
+`carryHigh`, so a longer flight clips a fixed grove at different angles: the clear slot between the two
+blocked runs widened from under 0.5 rad to **0.562**, and the literal `mergeGapRad: 0.5` then read as
+"the merge is broken" when the merge was reading the geometry exactly right. Swept the threshold to
+confirm the rule is intact (0.5 → two runs, 0.56 → one), then rewrote the test to MEASURE the slot and
+assert on both sides of it. It cannot rot on the next retune.
+
+**`ui` (ace-ship) — a stale seed, and a harness that hid it.** Not order-dependent (it fails in isolation
+too); seed 101 simply stops acing. Re-pinned 101 → 62, the eleventh such re-pin, which is the documented
+practice for this fixture. The reason it looked mysterious is worth fixing on its own: the drive loop read
+`s.routes![0]!.id`, so the moment the seed stopped acing it died with a bare
+`TypeError: Cannot read properties of undefined` instead of the `sawAce` guard that exists to say exactly
+what went wrong. The loop now breaks when there are no lanes left and lets the guard speak.
+
+### Verified in the running game, frame by frame
+
+`scripts/shot-frames.mjs` drives the built artifact in headless Chromium as a player does and records
+where the game DRAWS the ball on every frame, with no debug hook: `drawBall`'s radial gradient has a
+unique outer/inner radius ratio of 10.8, so intercepting `createRadialGradient` recovers the ball's
+screen position and radius. One ball per frame, one draw site — verified before trusting any of it.
+
+Its honest limit, stated in the script: screen displacement is `ball − camera`, and the follow-cam
+rebuilds every frame, so per-frame screen speed is NOT ground speed and the hop's drawn height cannot be
+separated from the camera's pan. Do not read a carry/roll split out of it. What it does prove, and
+nothing else does: across seeds 42/7/101/314 the real game boots on the new physics, pre-arms the Driver
+off the tee, plays a shot end to end with **no page error**, keeps the ball on screen for every frame and
+inside its documented 3–5.5px radius band, opens on the swing windup, never freezes between contact and
+rest, and is still drawn at rest when the shot ends instead of blinking out.
+
+The bounce itself was measured where it is authored, in node on `planRunout`, and it confirms the
+`hopLenK` retune was necessary rather than cosmetic. With the realistic 23-yard driver release, `hopLenK`
+**0.05** gives the driver **5 hops, first 232ms, 794ms of hop time = 37% of the run-out** — right where
+GS-landing-real put it (868ms / 31%). At the old **0.16** the driver collapses to a **single 16-yard
+skip**: the "every airborne shot bounces at least once" floor is still met, but the skipping read is gone.
+That is the coupling to remember — hop length scales with CARRY and is capped by the sim's roll, so
+shrinking the release without retuning `hopLenK` silently swallows the whole train in one hop.

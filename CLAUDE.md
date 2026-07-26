@@ -104,6 +104,18 @@ These are the rules every change is measured against. They are *why* the codebas
    `< 1.15`) with `< 5%` blow-ups, measured on **mean per-stop Stableford** (NOT full-run distance —
    distance is chaotic). Re-run the no-death-spiral harness after any shot/dispersion/generator/
    hazard tuning. A power-up must *raise* mean per-stop Stableford to ship.
+   **THE HARNESS MEASURES THE AUTO AI. IT IS A REGRESSION FENCE, NOT A DESIGN AUTHORITY OVER PHYSICS**
+   (GS-carry-roll-real). `playCourse` is the headless sim playing itself, and it is *much* weaker than
+   a real player — it stalls around hole 40 of the Unending Universe where humans reach 350+. So a
+   harness number moving the wrong way is evidence about the AI, never proof that the physics is wrong.
+   When honest physics and the fence disagree: **set the physics from the real world, MOVE THE FENCE,
+   and record both numbers in the commit.** Degrading the ball flight to flatter a weak AI makes a worse
+   game for the humans who actually play it. (The case that settled it: the carry/roll split had a
+   driver releasing 25% of its carry — 62 yards — because that was what the AI had been tuned around.
+   Setting it from real reference numbers *improved* the harness from 0.8740 to **0.5215** toPar/hole
+   and 8.65% to **5.56%** floor-hits, because the AI had been under-CARRYING the whole time. The bar it
+   was defending was partly an artefact of the unrealistic split it was gating. Fixing the AI is its own
+   job — see `GS-auto-ai-weak` in IDEAS.)
 5. **The graphic IS the physics.** `flight.ts` and `shot.ts`'s `SprayShape` are the single shared
    source the sim samples AND the renderer draws — a ball drawn clearing a tree is one the sim let
    through; the spray cone reads exactly the sampled distribution. Never fork them. Ball flight is
@@ -369,12 +381,38 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
   - **Backspin is OPT-IN** (GS-backspin-optin): the wedge branch of `clubRollFraction` tapers +5%→0% (a
     check-to-a-stop, never negative); a negative roll comes ONLY from a spin BUILD (Backspin Bo's
     `rollFracDelta` or `backspinBoost` gear). Pure physics change, zero extra draws.
-  - **Carry / roll split** (GS-carry-rollout-split): a club's number is TOTAL (carry + run); the ball flies
-    a family `carryFrac` and runs the rest, total-PRESERVING (endpoint unchanged ⇒ death-spiral neutral).
-    Lives in `flight.ts` (`flightScaleFor`/`rollFractionFor`); wedge/putter `carryFrac` 1 ⇒ backspin/putting
-    byte-for-byte. **The one fairness coupling: the carry-aware AI keys off FLIGHT reach**
-    (`maxFlightReachOf`), never total — a forced carry must clear in the AIR. REACH decisions (green/
-    position) still key off total.
+  - **Carry / roll split** (GS-carry-rollout-split): the ball flies a family `carryFrac` and runs the rest,
+    total-PRESERVING (endpoint unchanged ⇒ death-spiral neutral). Lives in `flight.ts`
+    (`flightScaleFor`/`rollFractionFor`); wedge/putter `carryFrac` 1 ⇒ backspin/putting byte-for-byte.
+    **The one fairness coupling: the carry-aware AI keys off FLIGHT reach** (`maxFlightReachOf`), never
+    total — a forced carry must clear in the AIR. REACH decisions (green/position) still key off total.
+    **A CLUB'S NUMBER IS ITS NOMINAL CARRY, NOT ITS TOTAL, AND THERE IS ONE FUNCTION THAT SAYS SO**
+    (GS-carry-roll-real, `clubTotalReach`). The split is anchored on the legacy roll, so the ball FINISHES
+    at `number · (1 + legacyRollFraction)` — a 250-yard driver runs out to 295. A reach model built on the
+    bare number is therefore a CARRY model wearing a total's name, and `flightScaleFor` overtakes it the
+    moment `carryFrac` passes `1/(1+legacyRoll)` = **0.847**: the old driver sat at 0.80 and hid it, the
+    real-golf 0.922 exposed it, and `maxFlightReachOf` (258) came out LONGER than the `maxReachOf` (237)
+    it is supposed to sit inside. Downstream that inverted pair aimed the default straight into a lava
+    river. Both models now build on `flightScaleFor` × `rollFractionFor`, so flight/total is exactly
+    `carryFrac ≤ 1` and they cannot invert again. **A test that compares a club's number against a
+    required CARRY is asking the wrong question** — measure the flight (`flightCarryScale`), or the
+    assertion is too lax below 0.847 and too strict above it.
+  - **THE DEFAULT AIM NEVER POINTS AT A HAZARD, AND THE PRE-ARMED CLUB NEVER FLIES INTO ONE**
+    (GS-carry-roll-real, interactive only — the auto path keeps its own `layupTarget`, so determinism is
+    untouched). `autoAimTarget` had two ways to hand back a wet target: `clearLine` samples STRICTLY
+    BETWEEN its ends, so it says nothing about the station itself (a corridor running into a river has a
+    dry approach and a wet landing), and the overshoot fallback returned a raw centreline station
+    unchecked. A wet target poisons everything downstream — `forcedCarry` reports "fly the entire way"
+    from its line-ends-inside-the-band branch, and the club pick hunts for a club to carry a bank with no
+    far side. Both are closed, and when the safe line runs past a drive the aim now backs DOWN the
+    corridor to the furthest dry station (`dryStationBefore`) rather than choosing between a wet target
+    and an unreachable one. `autoAimClub` then applies ONE rule to every positioning shot — the longest
+    club that clears what must be cleared AND lands playable — because an open line is not an empty one:
+    the target may be a lay-up the longest club would fly straight past into the water. A step-down below
+    `aiClub` is legal and machine-checked as FORCED (`aiClub` reasons about reaching, never about where
+    the ball comes down; 3 step-downs in 1,083 tee shots, all forced). Measured across 3,072 par-4/5 tee
+    shots: wet targets 74 → **0**, wet full-swing landings 22 → **0**, carries short of the far bank
+    **0**, driver still pre-armed on 99% of forced carries.
   - **A CADDY-GRANTED OUTCOME STILL HAS TO BE TRAVELLED** (GS-chipin-roll). Dr Chipinski's chip-in set
     `ballAfter = pin(hole)` and left `rest`/`rollPath` at the natural resting spot, so the drawn ball
     stopped **3.0–5.8yd from a cup of radius 1.2** and the hole-out FX fired on bare ground. The branch

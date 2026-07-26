@@ -11,6 +11,9 @@ import {
   FLIGHT_PROFILES,
   canopyHeight,
   flightKnockdown,
+  flightCarryScale,
+  clubTotalReach,
+  legacyRollFraction,
 } from '../src/sim/flight';
 import { executeShot } from '../src/sim/round';
 import { lieAt } from '../src/sim/shot';
@@ -58,11 +61,50 @@ describe('per-family flight profiles (GS-flight-3)', () => {
     // and stop. The strike voice and the shop's "irons" are still one thing.
     expect(flightClassOf('3i')).toBe('ironLong');
     expect(flightClassOf('5i')).toBe('ironLong');
-    expect(flightClassOf('6i')).toBe('ironShort');
+    expect(flightClassOf('6i')).toBe('ironLong'); // 4-6 are the long/mid irons (GS-carry-roll-real)
     expect(flightClassOf('7i')).toBe('ironShort');
     expect(flightClassOf('PW')).toBe('wedge'); // ends in W but is a wedge, not a wood
     expect(flightClassOf('SW')).toBe('wedge');
     expect(flightClassOf('putter')).toBe('putter');
+  });
+
+  // GS-carry-roll-real. The ball CANNOT land further than it finishes, and for six months nothing said
+  // so: `maxReachOf` reached for the club's bare NUMBER while `maxFlightReachOf` went through
+  // `flightScaleFor`, which is `carryFrac · (1 + legacyRoll)` — greater than 1 as soon as `carryFrac`
+  // clears 1/(1+legacyRoll) = 0.847. The old driver sat at 0.80, just under the line, so the two models
+  // stayed accidentally ordered; setting the split from real golf crossed it and the bag's flight reach
+  // (258yd) came out LONGER than its "total" reach (237). The aim AI then pointed a drive into a lava
+  // river. Pin the ORDERING and the RATIO, so a future retune of any row cannot reintroduce it.
+  it('a club can never LAND further than it FINISHES, and the ratio is exactly carryFrac', () => {
+    for (const c of CLUBS) {
+      if (c.id === 'putter') continue;
+      const flight = c.carry * flightCarryScale(c.id, c.carry);
+      const total = clubTotalReach(c.id, c.carry);
+      // The ordering is the invariant that matters, and it holds for every row in the bag.
+      expect(flight, `${c.id} flight ${flight.toFixed(1)} > total ${total.toFixed(1)}`).toBeLessThanOrEqual(total + 1e-9);
+      const carryFrac = flightProfileOf(c.id).carryFrac;
+      if (carryFrac < 1) {
+        expect(flight / total, c.id).toBeCloseTo(carryFrac, 9);
+      } else {
+        // The wedge/putter rows are deliberately NOT split — `carryFrac 1` opts them out and they keep
+        // the legacy neutral roll instead (land-and-hold, so a spin build's backspin layers on top
+        // unchanged, GS-backspin-optin). So their flight IS their number and the run is the legacy one:
+        // the ratio is 1/(1+legacyRoll), not 1. Pinned so "carryFrac 1 ⇒ no run" is never assumed.
+        expect(flight).toBeCloseTo(c.carry, 9);
+        expect(flight / total, c.id).toBeCloseTo(1 / (1 + legacyRollFraction(c.carry)), 9);
+      }
+    }
+  });
+
+  it('the endpoint the split preserves is the LEGACY one — the club number is a carry, not a total', () => {
+    // `carryFrac` is a redistribution, never a distance change: flight + run must land exactly where the
+    // pre-split ball finished, `number · (1 + legacyRollFraction)`. This is what makes a `carryFrac`
+    // retune death-spiral neutral, and it is why the number is 18% short of the driver's finish.
+    for (const c of CLUBS) {
+      if (c.id === 'putter') continue;
+      expect(clubTotalReach(c.id, c.carry)).toBeCloseTo(c.carry * (1 + legacyRollFraction(c.carry)), 9);
+    }
+    expect(clubTotalReach('D', 250)).toBeCloseTo(295, 0); // the 250-nominal driver runs out to 295
   });
 
   it('a hybrid flies higher than a wood of the same carry (the rescue-club identity)', () => {
