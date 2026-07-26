@@ -685,3 +685,86 @@ contoured green: the wedge lands at ~61y and spins back toward the 49y flag, bas
     screen's exact framing padded for break bow (aim-INDEPENDENT); ◄/► aim is per-putt scaled with
     hold auto-repeat, and nudges update SURGICALLY (`puttAimRefresh` — a full `render()` resets the
     pace meter mid-aim).
+
+---
+
+## GS-runout-feel — land, bounce, run out (2026-07-26)
+
+**The ask** (playtest): "a ball landing from a shot onto the green contours and the backspin animation
+doesn't feel like a natural golf ball flight. In the words of one tester, it looked like the ball landed
+and then teleported away. The driver/wood fairway land, bounce and run is pretty decent, could maybe be
+improved as well, but we definitely need to do something about the green contours and backspin land,
+bounce and roll."
+
+### What the old run-out actually was
+
+```
+rollDur = clamp(150, 900, |roll| × 20ms)
+ground  = easeOutCubic(rt)  along the path
+height  = amp × |sin(rt·π·hops)| × (1−rt)^…
+```
+
+Three separate structural faults, which is why no amount of tuning had fixed it:
+
+1. **It was tuned at the wrong camera.** `20ms/yard` floored at 150ms reads fine on the whole-hole map
+   (~1 px/yard). The chip/putt camera runs at ~6.6 px/yard — the same yards are six times the pixels, so
+   the same 150ms reads as an instant jump. A short check ran at the floor. (The same class of bug as
+   GS-green-complex's pixel-sized aprons, found in the same session: **anything tuned in time or pixels at
+   map zoom is wrong at green zoom.**)
+2. **The ball decelerated from the instant it touched down.** `easeOutCubic` is at maximum speed at t=0
+   and braking immediately. A real ball leaves its first bounce at very nearly flight speed and covers a
+   large share of its run-out *in the air*; deceleration happens ON CONTACT, in steps.
+3. **The hops were decoupled from the travel.** Height ran on its own `|sin|` clock while the ground
+   position ran on the ease — so the ball was airborne while braking and on the ground while sliding. A
+   jiggle laid over a skid, not a bounce.
+
+And the backspin branch had a fourth: after the forward skid it used `easeInOut` to return to rest, which
+*accelerates away from a dead stop* — the literal shape of a yank — over ~200ms.
+
+### The model
+
+`render/runout.ts` — pure, no DOM, no time source, no rng, unit-tested in node.
+
+- **Bounce share** of the run-out is set by the landing surface's `surfaceFirmness`: a firm fairway skips
+  ~62% of its run out through the air, a plugged bunker ~14%.
+- **Within a hop** the ball flies at CONSTANT horizontal speed (no air drag at this scale) on a clean
+  parabola. It loses a slice of speed at each CONTACT (restitution, also from firmness), so hop distance,
+  hop duration and hop apex all decay off that one number and stay mutually consistent.
+- **The roll** is constant deceleration to a dead stop, entering at the speed the last hop left — floored
+  at 22% of landing speed, because the raw geometric decay hands the roll ~8% and a long drive then spends
+  well over a second crawling its last few yards (measured 1681ms of roll on a 50-yard run-out; the floor
+  brings it to 685ms).
+- **The chain starts at the flight's own final ground speed**, measured off the same
+  `sampleCurvedFlight` / `samplePolylineFlight` the ball was just drawn flying. That is the fix for fault
+  1 and 2 together: there is no velocity step anywhere from strike to rest, and the duration falls out of
+  the physics instead of a per-yard constant.
+- **The backspin check** is two beats: an airborne forward SKID carrying flight momentum (floored at
+  170ms — at flight speed the skid is over in ~30ms, i.e. invisible, and the skid is the beat that *sells*
+  the spin), then the spin bites and drags the ball back on a smoothstep — accelerating out of the grab,
+  easing into the finish. A 12-yard check now takes ~1.2s instead of ~200ms. Real check-backs are slow;
+  this one gets to be.
+
+Sample traces (yards / ms / apex):
+
+```
+driver → fairway, 50y run : 885ms  hops 15.1y·75ms·5.1y ▸ 6.8·50·2.3 ▸ 3.0·34·1.0 ▸ 2.5·41·0.5 ▸ roll 22.6y·685ms
+7-iron → green,   9y run  : 340ms  hops  2.6y·15ms·0.9y ▸ 0.9·9·0.3 ▸ 0.3·6·0.1     ▸ roll  5.1y·166ms
+wedge  → green,  12y check: 1193ms skid to +6.4y, then dragged back to −12y
+into rough,       5y run  : 340ms  one 1.1y hop ▸ roll 3.9y·153ms
+```
+
+### Contract 5 still holds
+
+The sim decided the roll distance and, on a contoured green, the exact curled path (`rollOut` →
+`shot.roll` / `shot.rollPath`). The drawn run-out **walks that path by ARC LENGTH** and ends exactly on
+the resolved rest point; only the time parameterisation and the hop heights are feel. The backspin skid is
+the one drawn segment with no sim path to walk — the sim's path runs the other way — so it is laid down
+the shot bearing and the return leg walks the real path.
+
+Everything is a `RunoutFeel` sub-field spread into `_gsFeel`, so the whole run-out is live-tunable with no
+new top-level `_gs*` flag and no test-hub wiring obligation.
+
+**Verification:** `npm run check` green (1922 tests), including a new `tests/runout.test.ts` that pins the
+three properties whose absence caused the report — no speed step at touchdown, fastest-first with
+deceleration on contact, and a run-out long enough to read — plus the contract-5 endpoint property and
+monotonic progress. Render-only: zero sim rng, zero save change, auto ≡ interactive untouched.
