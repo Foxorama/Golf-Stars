@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { generateCourse, validateFairness, validateCrossings } from '../src/sim/course/generate';
-import { validateCourse } from '../src/sim/course/contract';
-import { wallReflect, wallFlightHit, wallRollHit, wallRollBounce, segHit, WALL_HEIGHT, type ShipWall } from '../src/sim/walls';
-import { rollOut, shotSpread, sprayBlocking, executeShot, biomeCarryMult, containToDeck } from '../src/sim/round';
-import { flightProfileOf } from '../src/sim/flight';
+import { generateCourse, unfoldOffsetEdge, validateFairness, validateCrossings } from '../src/sim/course/generate';
+import { pointInPoly, segDist, validateCourse } from '../src/sim/course/contract';
+import { wallReflect, wallRollHit, wallRollBounce, segHit, WALL_HEIGHT, type ShipWall } from '../src/sim/walls';
+import { rollOut, shotSpread, sprayBlocking, executeShot, biomeCarryMult, containToDeck, shipFlightPath } from '../src/sim/round';
+import { arcApex, ARC_FEEL, flightProfileOf } from '../src/sim/flight';
 import { lieAt, lieInfo } from '../src/sim/shot';
 import { SPACE_DUCKS_GUARD, CONVICT_SHEEP_GUARD } from '../src/sim/rpg/shopItems';
 import { Rng } from '../src/sim/rng';
@@ -17,7 +17,30 @@ import type { Vec } from '../src/sim/course/contract';
 // guard the reflect maths, the arc-height gate, multi-bounce, generation (present on the derelict,
 // absent + byte-identical everywhere else), and determinism.
 
-const prof = flightProfileOf('D');
+
+/** A point a fraction `t` by arc length along the hole's centreline (the corridor spine). */
+function centreAt(hole: Hole, t: number): Vec {
+  const line = hole.centreline;
+  let total = 0;
+  for (let i = 1; i < line.length; i++) total += Math.hypot(line[i]![0] - line[i - 1]![0], line[i]![1] - line[i - 1]![1]);
+  let want = total * Math.max(0, Math.min(1, t));
+  for (let i = 1; i < line.length; i++) {
+    const d = Math.hypot(line[i]![0] - line[i - 1]![0], line[i]![1] - line[i - 1]![1]);
+    if (want <= d) {
+      const f = d ? want / d : 0;
+      return [line[i - 1]![0] + (line[i]![0] - line[i - 1]![0]) * f, line[i - 1]![1] + (line[i]![1] - line[i - 1]![1]) * f];
+    }
+    want -= d;
+  }
+  return line[line.length - 1]!;
+}
+
+/** Open SPACE off the hull — the lost-to-space read the containment keys off. An acid BREACH is a
+ *  hazard ON the deck, not space, so it is deliberately excluded (same rule as the sim's own test). */
+function isSpace(hole: Hole, p: Vec): boolean {
+  const k = lieAt(hole, p);
+  return k !== 'breach' && lieInfo(k).penalty === 'voidlost';
+}
 
 describe('GS-ship-walls — reflection geometry', () => {
   it('reflects a ball heading INTO the wall back inward, leaves an inward ball alone', () => {
@@ -37,53 +60,22 @@ describe('GS-ship-walls — reflection geometry', () => {
   });
 });
 
-describe('GS-ship-walls — flight ricochet', () => {
+describe('GS-ship-walls — the bulkhead is un-clearable, and the ROLLING ricochet', () => {
   // A wall running along x at y=20, inward normal pointing back toward the deck (−y).
   const wall: ShipWall = { a: [-100, 20], b: [100, 20], normal: [0, -1], height: WALL_HEIGHT };
 
-  it('a low shot crossing the wall bounces back inward toward the deck', () => {
-    const low = wallFlightHit([wall], [0, 0], [0, 40], 0, 40, 240, flightProfileOf('D'));
-    expect(low).not.toBeNull();
-    expect(low!.dir[1]).toBeLessThan(0); // bounced back toward the deck (−y)
-    expect(low!.bounces).toBe(1);
-  });
-
-  it('the wall HEIGHT gates the bounce: a shot below it bounces, one over it clears', () => {
-    const from: Vec = [0, 0];
-    const landing: Vec = [0, 240];
-    // A tall wall mid-flight always catches (arc height < 999 everywhere); a ~zero wall is always cleared.
-    const tall: ShipWall = { a: [-100, 120], b: [100, 120], normal: [0, -1], height: 999 };
-    const flat: ShipWall = { a: [-100, 120], b: [100, 120], normal: [0, -1], height: 0.1 };
-    expect(wallFlightHit([tall], from, landing, 0, 240, 240, prof)).not.toBeNull();
-    expect(wallFlightHit([flat], from, landing, 0, 240, 240, prof)).toBeNull();
-  });
-
-  it('a REAL bulkhead (WALL_HEIGHT) cannot be cleared — a full-power lofted wedge still bounces', () => {
-    // WALL_HEIGHT stands above the 60-yd apex cap, so no club at any power flies over. A high, short
-    // wedge (the loftiest arc in the game) crossing the bulkhead must still ricochet back onto the deck.
-    const bulk: ShipWall = { a: [-100, 60], b: [100, 60], normal: [0, -1], height: WALL_HEIGHT };
+  it('a real bulkhead stands above the shot-apex cap — nothing in the bag can fly over one', () => {
+    // The whole premise of the derelict: you play golf sealed INSIDE the corridor. That rests on one
+    // number, so assert it directly rather than through a collision helper. `flight.ts` hard-caps every
+    // shot's apex at ARC_FEEL.peakMax, so a bulkhead above it is un-clearable by any club at any power —
+    // which is exactly why the deck-boundary bounce in round.ts needs no height gate at all.
+    expect(WALL_HEIGHT).toBeGreaterThan(ARC_FEEL.peakMax);
     for (const club of ['SW', 'PW', '9i', 'D'] as const) {
       const p = flightProfileOf(club);
-      const hit = wallFlightHit([bulk], [0, 0], [0, 120], 0, 120, 120, p);
-      expect(hit, club).not.toBeNull();
-      expect(hit!.dir[1], club).toBeLessThan(0); // bounced back toward the deck
+      // Apex of a full shot of this family, at the most-lofted (shortest-relative) carry there is.
+      expect(arcApex(60, 240, ARC_FEEL, p.peakMult)).toBeLessThan(WALL_HEIGHT);
+      expect(arcApex(240, 240, ARC_FEEL, p.peakMult)).toBeLessThan(WALL_HEIGHT);
     }
-  });
-
-  it('hits TWO facing walls → bounces twice', () => {
-    // A narrow chute: a right wall (inward −x) then a left wall (inward +x). Tall so the gate never
-    // interferes — this isolates the multi-bounce geometry.
-    const rightWall: ShipWall = { a: [6, -100], b: [6, 100], normal: [-1, 0], height: 999 };
-    const leftWall: ShipWall = { a: [-6, -100], b: [-6, 100], normal: [1, 0], height: 999 };
-    const hit = wallFlightHit([rightWall, leftWall], [0, 0], [20, 20], 45, 28, 240, prof);
-    expect(hit).not.toBeNull();
-    expect(hit!.bounces).toBe(2);
-  });
-
-  it('no walls / a shot that never crosses one flies clean', () => {
-    expect(wallFlightHit([], [0, 0], [0, 40], 0, 40, 240, prof)).toBeNull();
-    // Landing short of the wall → no crossing.
-    expect(wallFlightHit([wall], [0, 0], [0, 10], 0, 10, 240, prof)).toBeNull();
   });
 
   it('wallRollHit stops a ball rolling OUTWARD into a wall, ignores one rolling inward', () => {
@@ -323,9 +315,14 @@ describe('GS-ship-wall-caddy — a caddy guard SAVES a miss on a walled corridor
                 const r = executeShot(hole, hole.tee, 'tee', target, DR, { carryMult, power: 1, guard }, rng);
                 if (!r.log.result.redirect) continue;
                 redirects++;
-                // A caddy guard PROMISES a save onto the short grass — it may never end lost to space, and
+                // A caddy guard PROMISES a save onto the short grass — it may never end LOST TO SPACE, and
                 // it may never also register a wall bounce (that double-processing was the bad interaction).
-                expect(r.log.penalty, `guard ${guard.kind} seed ${s} w${wildness} lost`).not.toBe('voidlost');
+                // An on-deck acid BREACH is an ordinary hazard, not space: the guard puts the ball back in
+                // play, and a save that then runs 20 yd into a breach is the same fair outcome as a save
+                // that trickles into a pond on a parkland hole. The guard was never hazard-immune.
+                expect(['shiprough', 'voidrough'], `guard ${guard.kind} seed ${s} w${wildness} lost to space`).not.toContain(
+                  r.log.lieTo,
+                );
                 expect(r.log.wallHit, `guard ${guard.kind} seed ${s} redirect+wallHit conflict`).toBeFalsy();
               }
             }
@@ -545,5 +542,266 @@ describe('GS-ship-walls — generation', () => {
         expect(validateCrossings(a)).toEqual([]);
       }
     }
+  });
+});
+
+describe('GS-ship-corridor-fold — the corridor has no phantom void at a bend', () => {
+  // A mitred offset (`p ± normal·halfWidth`) folds back on itself on the INSIDE of a bend once the
+  // half-width outgrows the turn radius. `pointInPoly` fills even-odd, so the fold reads as a HOLE:
+  // "not corridor" surrounded by corridor. On the derelict, off-corridor is open SPACE, so that hole is
+  // a void the renderer never draws (it offsets with the fold-proof `dilateUnion`) and no bulkhead
+  // stands on — measured on 13% of walled holes, up to 15 yd across. `unfoldOffsetEdge` splices the
+  // loop out so the corner is cut by a straight chord instead.
+  it('splices a folded offset edge back into a simple polyline, keeping its endpoints', () => {
+    // A hairpin offset: the inner edge doubles back through itself.
+    const folded: Vec[] = [[0, 0], [10, 0], [10, 10], [5, 10], [5, -5], [-5, -5]];
+    const crosses = (pts: Vec[]): boolean => {
+      for (let i = 0; i < pts.length - 1; i++)
+        for (let j = i + 2; j < pts.length - 1; j++) if (segHit(pts[i]!, pts[i + 1]!, pts[j]!, pts[j + 1]!)) return true;
+      return false;
+    };
+    expect(crosses(folded), 'the fixture really does fold').toBe(true);
+    const clean = unfoldOffsetEdge(folded);
+    expect(crosses(clean), 'the spliced edge is simple').toBe(false);
+    expect(clean[0]).toEqual(folded[0]);
+    expect(clean[clean.length - 1]).toEqual(folded[folded.length - 1]);
+    // A polyline that never folds is returned untouched (every other world's ribbon is unaffected).
+    const straight: Vec[] = [[0, 0], [10, 0], [20, 0], [30, 0], [40, 0]];
+    expect(unfoldOffsetEdge(straight)).toEqual(straight);
+  });
+
+  it('a walled hole\'s corridor polygon barely ever disagrees with itself about what is deck', () => {
+    // The precise measurement of the bug: sample the corridor and compare the two polygon fill rules.
+    // NON-ZERO winding says "inside", EVEN-ODD (what `pointInPoly` implements, and therefore what the
+    // sim plays) says "outside" — that difference IS the fold, and nothing else produces it.
+    let holes = 0;
+    let holesWithFold = 0;
+    for (let s = 1; s <= 12; s++) {
+      for (const wildness of [0.3, 0.6, 0.9]) {
+        const c = generateCourse(s, { biome: 'derelict-ship', themeId: 'derelict', holes: 9, wildness });
+        for (const hole of c.holes) {
+          if (!hole.walls?.length) continue;
+          holes++;
+          const fw = hole.features.filter((f) => f.kind === 'fairway');
+          let folded = false;
+          for (let i = 1; i < 120 && !folded; i++) {
+            const cp = centreAt(hole, i / 120);
+            const a = centreAt(hole, (i - 1) / 120);
+            const b = centreAt(hole, (i + 1) / 120);
+            const dx = b[0] - a[0];
+            const dy = b[1] - a[1];
+            const L = Math.hypot(dx, dy) || 1;
+            for (let k = -60; k <= 60 && !folded; k++) {
+              const lat = k * 0.5;
+              const p: Vec = [cp[0] + (-dy / L) * lat, cp[1] + (dx / L) * lat];
+              const evenOdd = fw.some((f) => pointInPoly(p, f.poly));
+              const nonZero = fw.some((f) => windingInside(p, f.poly));
+              if (nonZero && !evenOdd) folded = true;
+            }
+          }
+          if (folded) holesWithFold++;
+        }
+      }
+    }
+    expect(holes).toBeGreaterThan(100);
+    // Measured 13% of walled holes before the splice (folds up to 15 yd across); the residue is the
+    // genuinely SELF-OVERLAPPING corridor — a hairpin whose two limbs cross — which no single simple
+    // band can model. Those are held harmless by the flight ricochet's "a bulkhead must actually be
+    // standing there" rule below, not by the geometry.
+    expect(holesWithFold / holes, 'mitre folds are gone').toBeLessThan(0.05);
+  });
+});
+
+/** Point-in-polygon by the NON-ZERO winding rule — the `pointInPoly` (even-odd) counterpart, used only
+ *  to detect where a polygon's two fill rules disagree (i.e. where it self-intersects). */
+function windingInside(p: Vec, poly: Vec[]): boolean {
+  let wind = 0;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i]![0], yi = poly[i]![1], xj = poly[j]![0], yj = poly[j]![1];
+    const side = (xi - xj) * (p[1] - yj) - (p[0] - xj) * (yi - yj);
+    if (yj <= p[1]) {
+      if (yi > p[1] && side > 0) wind++;
+    } else if (yi <= p[1] && side < 0) wind--;
+  }
+  return wind !== 0;
+}
+
+describe('GS-ship-wall-phantom — the ball only ever bounces off a bulkhead you can SEE', () => {
+  const DR = CLUBS.find((c) => c.id === 'D')!;
+
+  it('a line the aim cone reads CLEAR never ricochets, and every ricochet was shaded', () => {
+    // The player report: "even if it's not going close to the wall it clips the bounce effect and goes
+    // in a completely different direction than what it looks like it's going to do graphically" — the
+    // cone had its OWN per-segment predictor while the sim resolved the deck boundary, and they
+    // disagreed on 42% of real bounces. One source of truth now: the cone probes `firstSolidDeparture`.
+    let cones = 0;
+    let bounced = 0;
+    let clearButBounced = 0;
+    for (let s = 1; s <= 10; s++) {
+      for (const wildness of [0.3, 0.6, 0.9]) {
+        const course = generateCourse(s, { biome: 'derelict-ship', themeId: 'derelict', holes: 9, wildness });
+        for (const hole of course.holes) {
+          if (!hole.walls?.length || hole.par < 4) continue;
+          const carryMult = biomeCarryMult(hole);
+          const bend = hole.centreline[1] ?? hole.green;
+          const fx = bend[0] - hole.tee[0];
+          const fy = bend[1] - hole.tee[1];
+          const fl = Math.hypot(fx, fy) || 1;
+          for (const ang of [-0.25, -0.12, 0, 0.12, 0.25]) {
+            const ca = Math.cos(ang);
+            const sa = Math.sin(ang);
+            const dx = (fx / fl) * ca - (fy / fl) * sa;
+            const dy = (fx / fl) * sa + (fy / fl) * ca;
+            const target: Vec = [hole.tee[0] + dx * 230, hole.tee[1] + dy * 230];
+            const sp = shotSpread(hole, hole.tee, 'tee', target, DR, { carryMult, power: 1 });
+            const shaded = sprayBlocking(hole, sp, undefined, { walls: hole.walls }).some((r) => r.src === 'walls');
+            cones++;
+            for (let k = 0; k < 6; k++) {
+              const rng = new Rng(90000 + s * 37 + k + Math.round(wildness * 10) + Math.round(ang * 100));
+              const r = executeShot(hole, hole.tee, 'tee', target, DR, { carryMult, power: 1 }, rng);
+              if (!r.log.wallHit) continue;
+              bounced++;
+              if (!shaded) clearButBounced++;
+            }
+          }
+        }
+      }
+    }
+    expect(cones).toBeGreaterThan(200);
+    expect(bounced, 'the corridor still bounces plenty of balls').toBeGreaterThan(500);
+    expect(clearButBounced, 'no ricochet the drawn cone called clear').toBe(0);
+  });
+
+  it('every mid-air ricochet happens at a DRAWN bulkhead, not out over open deck', () => {
+    // The ricochets that read as "it hit a wall that isn't there" turned at the ribbon's rounded END CAP
+    // at a torn-hull gap lip, or in the notch inside a hard corner — 10–20 yd from any rail, on deck the
+    // renderer draws with nothing standing on it.
+    let bounces = 0;
+    let farFromWall = 0;
+    for (let s = 1; s <= 10; s++) {
+      for (const wildness of [0.3, 0.6, 0.9]) {
+        const course = generateCourse(s, { biome: 'derelict-ship', themeId: 'derelict', holes: 9, wildness });
+        for (const hole of course.holes) {
+          if (!hole.walls?.length || hole.par < 4) continue;
+          const carryMult = biomeCarryMult(hole);
+          const bend = hole.centreline[1] ?? hole.green;
+          const fx = bend[0] - hole.tee[0];
+          const fy = bend[1] - hole.tee[1];
+          const fl = Math.hypot(fx, fy) || 1;
+          for (const ang of [-0.3, -0.15, 0.15, 0.3]) {
+            const ca = Math.cos(ang);
+            const sa = Math.sin(ang);
+            const dx = (fx / fl) * ca - (fy / fl) * sa;
+            const dy = (fx / fl) * sa + (fy / fl) * ca;
+            const target: Vec = [hole.tee[0] + dx * 230, hole.tee[1] + dy * 230];
+            for (let k = 0; k < 6; k++) {
+              const rng = new Rng(4100 + s * 17 + k + Math.round(ang * 100));
+              const r = executeShot(hole, hole.tee, 'tee', target, DR, { carryMult, power: 1 }, rng);
+              const path = r.log.flightPath;
+              if (!r.log.wallHit || !path) continue;
+              // Every interior vertex of the flight polyline is a bulkhead impact.
+              for (let i = 1; i < path.length - 1; i++) {
+                bounces++;
+                let d = Infinity;
+                for (const w of hole.walls) d = Math.min(d, segDist(path[i]!, w.a, w.b));
+                if (d > 10) farFromWall++;
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(bounces).toBeGreaterThan(300);
+    expect(farFromWall, 'no ricochet off empty deck').toBe(0);
+  });
+
+  it('a shot CARRYING open space to deck beyond it is never slapped back at the lip', () => {
+    // Deck ahead on your line is a promise the ball flies on — a torn-hull gap between hull sections, or
+    // the notch inside a corner when you cut the dogleg. Fire straight down each corridor's own
+    // centreline: the line is over drawn deck at both ends, so it may never register a bounce.
+    let checked = 0;
+    for (let s = 1; s <= 14; s++) {
+      for (const wildness of [0.3, 0.6, 0.9]) {
+        const course = generateCourse(s, { biome: 'derelict-ship', themeId: 'derelict', holes: 9, wildness });
+        for (const hole of course.holes) {
+          if (!hole.walls?.length || hole.par < 4) continue;
+          for (let i = 1; i <= 5; i++) {
+            const from = centreAt(hole, i / 8);
+            const to = centreAt(hole, i / 8 + 0.2);
+            if (isSpace(hole, from) || isSpace(hole, to)) continue;
+            // The straight line leaves the deck somewhere and comes back — a carry, not a wall.
+            let leaves = false;
+            for (let k = 1; k < 60; k++) {
+              const t = k / 60;
+              if (isSpace(hole, [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t])) leaves = true;
+            }
+            if (!leaves) continue;
+            checked++;
+            const sf = shipFlightPath(hole, from, to);
+            expect(sf.bounces, `seed ${s} w${wildness} carry over a gap was bounced at the lip`).toBe(0);
+            expect(sf.landing[0]).toBeCloseTo(to[0], 6);
+            expect(sf.landing[1]).toBeCloseTo(to[1], 6);
+          }
+        }
+      }
+    }
+    expect(checked, 'the scenario really does cross open space').toBeGreaterThan(20);
+  });
+});
+
+describe('GS-ship-breach-restore — the derelict actually has acid-etched deck breaches', () => {
+  it('breaches survive generation, sit ON the deck, and never break the fairness validators', () => {
+    // GS-ship-calm-space armed the derelict's lost-rough at EVERY wildness, which quietly routed every
+    // derelict hole through `clearVoidHazards` — a filter written for island-pad worlds that drops every
+    // penalty hazard outright. It deleted 100% of the ship's breaches: "there doesn't appear to be any
+    // acid etched hole hazards that show up at all". Measured before the fix: 0 breaches in 2,160 holes.
+    let holes = 0;
+    let withBreach = 0;
+    let breaches = 0;
+    for (let s = 1; s <= 20; s++) {
+      for (const wildness of [0.15, 0.4, 0.7, 1]) {
+        const course = generateCourse(s, { biome: 'derelict-ship', themeId: 'derelict', holes: 9, wildness });
+        expect(validateCourse(course)).toEqual([]);
+        expect(validateFairness(course)).toEqual([]);
+        expect(validateCrossings(course)).toEqual([]);
+        for (const hole of course.holes) {
+          if (!hole.walls?.length) continue;
+          holes++;
+          const mine = hole.hazards.filter((h) => h.kind === 'breach');
+          if (mine.length) withBreach++;
+          breaches += mine.length;
+          for (const b of mine) {
+            // A breach is a hole eaten through the DECK — it must sit on the corridor, not float in space
+            // (that is the one thing `clearVoidHazards` still does for a walled hole).
+            const onDeck = hole.features.some(
+              (f) => (f.kind === 'fairway' || f.kind === 'green' || f.kind === 'tee') && b.poly.some((v) => pointInPoly(v, f.poly)),
+            );
+            expect(onDeck, `seed ${s} w${wildness} breach floating in space`).toBe(true);
+          }
+        }
+      }
+    }
+    expect(holes).toBeGreaterThan(500);
+    expect(breaches, 'the ship is pocked with acid breaches again').toBeGreaterThan(500);
+    expect(withBreach / holes, 'most walled holes carry at least one').toBeGreaterThan(0.6);
+  });
+
+  it('a breach is a real penalty the ball can fall through, and is NOT space (the walls never save it)', () => {
+    const course = generateCourse(7, { biome: 'derelict-ship', themeId: 'derelict', holes: 9, wildness: 0.8 });
+    const hole = course.holes.find((h) => h.walls?.length && h.hazards.some((z) => z.kind === 'breach'))!;
+    expect(hole).toBeTruthy();
+    const b = hole.hazards.find((z) => z.kind === 'breach')!;
+    let cx = 0;
+    let cy = 0;
+    for (const v of b.poly) {
+      cx += v[0] / b.poly.length;
+      cy += v[1] / b.poly.length;
+    }
+    const centre: Vec = [cx, cy];
+    expect(lieAt(hole, centre)).toBe('breach');
+    expect(lieInfo('breach').penalty).toBe('voidlost');
+    // The containment backstop must LEAVE a breach alone — it is a deliberate hazard on the deck, not a
+    // ball that slipped off the hull, so `containToDeck` may never tuck it back into play.
+    expect(containToDeck(hole, centre)).toBeNull();
   });
 });

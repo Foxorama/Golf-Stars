@@ -40,7 +40,7 @@ import {
 } from './contract';
 
 /** Bump when the generation algorithm changes in a way that alters output. */
-export const GENERATOR_VERSION = 43; // GS-green-clear: drop penalty greenside blobs that poke onto the putting surface / approach (no lava/acid/water/void ON the green)
+export const GENERATOR_VERSION = 44; // GS-ship-corridor-fold: the derelict's corridor edges are un-folded (no phantom void at a bend) and its acid breaches survive generation again
 
 /**
  * Signature-mechanic gates (GS-19), the "fair early, brutal late" dial. A world's lost-rough (void)
@@ -302,7 +302,100 @@ function pinInGreen(c: Vec, poly: Vec[], rng: Rng, tuck = 0): Vec {
  *    green) instead of a flat cut or a sharp point — so the start/end look naturally shaped.
  * Winding: left edge tee→green, round the green nose, right edge green→tee, round the tee nose.
  */
-function ribbon(line: Vec[], leftHW: number[], rightHW: number[], roundStart = true, roundEnd = true): Vec[] {
+/**
+ * Remove the SELF-INTERSECTION LOOPS from an offset polyline (GS-ship-corridor-fold). A mitred offset
+ * (`p ± normal·halfWidth`) folds back on itself on the INSIDE of a bend once the half-width outgrows the
+ * local turn radius: the edge crosses itself and encloses a little bowtie. `pointInPoly` fills even-odd,
+ * so that bowtie reads as a HOLE — a patch of "not fairway" sitting in the middle of the corridor, with
+ * corridor on both sides of it. On an ordinary world the hole is only a patch of rough; on the DERELICT,
+ * off-corridor is open space, so it is a phantom void the renderer never draws (the render layer offsets
+ * with the fold-proof `dilateUnion`) and no bulkhead stands on — the ball ricochets off nothing, or is
+ * lost mid-deck. See `docs/decisions/sim-generator.md`.
+ *
+ * The fix is the standard offset-curve cleanup: walk the polyline and, wherever segment i crosses a LATER
+ * segment j, splice the loop out — keep the crossing point and resume at j+1. The corner is cut by a
+ * straight chord (the true offset outline) instead of folding back, so the band is simple by construction
+ * and the fold region becomes what it looks like: solid corridor. Endpoints are always preserved. Pure
+ * geometry, ZERO rng, O(n²) on a ≤37-point edge.
+ */
+export function unfoldOffsetEdge(pts: Vec[]): Vec[] {
+  const n = pts.length;
+  if (n < 4) return pts.slice();
+  const out: Vec[] = [pts[0]!];
+  let i = 0;
+  while (i < n - 1) {
+    // The FARTHEST later segment this one crosses — splicing to the outermost crossing collapses a
+    // whole multi-segment fold in one step (an inner crossing would leave the rest of the loop behind).
+    let jump = -1;
+    let cross: Vec | null = null;
+    for (let j = n - 2; j >= i + 2; j--) {
+      const x = segCross(pts[i]!, pts[i + 1]!, pts[j]!, pts[j + 1]!);
+      if (x) {
+        jump = j;
+        cross = x;
+        break;
+      }
+    }
+    if (jump >= 0 && cross) {
+      out.push(cross);
+      i = jump + 1;
+      out.push(pts[i]!);
+    } else {
+      i++;
+      out.push(pts[i]!);
+    }
+  }
+  return out;
+}
+
+/** Intersection point of segments AB and CD, or null (the `walls.ts segHit` twin, kept local so the
+ *  generator has no runtime dependency on the sim's collision module). Pure. */
+function segCross(a: Vec, b: Vec, c: Vec, d: Vec): Vec | null {
+  const r0 = b[0] - a[0], r1 = b[1] - a[1];
+  const s0 = d[0] - c[0], s1 = d[1] - c[1];
+  const den = r0 * s1 - r1 * s0;
+  if (Math.abs(den) < 1e-9) return null;
+  const t = ((c[0] - a[0]) * s1 - (c[1] - a[1]) * s0) / den;
+  const u = ((c[0] - a[0]) * r1 - (c[1] - a[1]) * r0) / den;
+  if (t < 0 || t > 1 || u < 0 || u > 1) return null;
+  return [a[0] + r0 * t, a[1] + r1 * t];
+}
+
+/**
+ * The two mitred offset edges of a corridor — the SINGLE source the fairway ribbon AND the ship's
+ * bulkhead rails are built from, so the deck the sim reads and the wall the renderer paints are the
+ * same line (contract 5). `unfold` runs the fold cleanup above; it is armed for WALLED holes only, so
+ * every other world's ribbon is byte-for-byte the old mitred edges.
+ */
+function ribbonEdges(line: Vec[], leftHW: number[], rightHW: number[], unfold: boolean): { left: Vec[]; right: Vec[] } {
+  const m = line.length;
+  const left: Vec[] = [];
+  const right: Vec[] = [];
+  for (let i = 0; i < m; i++) {
+    const prev = line[Math.max(0, i - 1)]!;
+    const next = line[Math.min(m - 1, i + 1)]!;
+    let dx = next[0] - prev[0];
+    let dy = next[1] - prev[1];
+    const len = Math.hypot(dx, dy) || 1;
+    dx /= len;
+    dy /= len;
+    const nx = -dy;
+    const ny = dx;
+    const p = line[i]!;
+    left.push([p[0] + nx * leftHW[i]!, p[1] + ny * leftHW[i]!]);
+    right.push([p[0] - nx * rightHW[i]!, p[1] - ny * rightHW[i]!]);
+  }
+  return unfold ? { left: unfoldOffsetEdge(left), right: unfoldOffsetEdge(right) } : { left, right };
+}
+
+function ribbon(
+  line: Vec[],
+  leftHW: number[],
+  rightHW: number[],
+  roundStart = true,
+  roundEnd = true,
+  unfold = false,
+): Vec[] {
   const m = line.length;
   const frame = (i: number) => {
     const prev = line[Math.max(0, i - 1)]!;
@@ -314,14 +407,9 @@ function ribbon(line: Vec[], leftHW: number[], rightHW: number[], roundStart = t
     dy /= len;
     return { nx: -dy, ny: dx, tx: dx, ty: dy }; // left normal + unit tangent (play dir)
   };
-  const left: Vec[] = [];
-  const right: Vec[] = [];
-  for (let i = 0; i < m; i++) {
-    const f = frame(i);
-    const p = line[i]!;
-    left.push([p[0] + f.nx * leftHW[i]!, p[1] + f.ny * leftHW[i]!]);
-    right.push([p[0] - f.nx * rightHW[i]!, p[1] - f.ny * rightHW[i]!]);
-  }
+  const edges = ribbonEdges(line, leftHW, rightHW, unfold);
+  const left: Vec[] = edges.left;
+  const right: Vec[] = edges.right;
   // A rounded nose from the LEFT edge endpoint around to the RIGHT edge endpoint (skipping the two
   // endpoints, already on the edges). `fwdSign` bulges it forward (green) or backward (tee).
   const nose = (p: Vec, f: ReturnType<typeof frame>, hwL: number, hwR: number, fwdSign: number): Vec[] => {
@@ -359,21 +447,40 @@ function densifyCentreline(line: Vec[], n: number): Vec[] {
  * never a lost card — so a broken fairway needs no fairness exemption. Returns [] only if every run
  * was too short (the caller falls back to one solid ribbon).
  */
-function brokenCorridor(dense: Vec[], leftHW: number[], rightHW: number[], gapBands: [number, number][]): Vec[][] {
-  const n = dense.length;
-  const inGap = (u: number) => gapBands.some(([a, b]) => u >= a && u <= b);
+function brokenCorridor(
+  dense: Vec[],
+  leftHW: number[],
+  rightHW: number[],
+  gapBands: [number, number][],
+  unfold = false,
+): Vec[][] {
   const segs: Vec[][] = [];
+  for (const run of corridorRuns(dense.length, gapBands)) {
+    segs.push(ribbon(run.map((i) => dense[i]!), run.map((i) => leftHW[i]!), run.map((i) => rightHW[i]!), true, true, unfold));
+  }
+  return segs;
+}
+
+/**
+ * The contiguous index runs of a corridor that are NOT carved out by `gapBands` — the SINGLE source
+ * both the deck ribbons (`brokenCorridor`) and the ship's bulkhead rails (`buildShipWalls`) are cut
+ * from, so a wall can never stand where there is no deck and vice versa. A run shorter than 3 points
+ * is dropped (it reads as rough / open hull, and `ribbon` can't cap it). Pure, zero rng.
+ */
+function corridorRuns(n: number, gapBands: [number, number][]): number[][] {
+  const inGap = (u: number) => gapBands.some(([a, b]) => u >= a && u <= b);
+  const runs: number[][] = [];
   let run: number[] = [];
   const flush = () => {
-    if (run.length >= 3) segs.push(ribbon(run.map((i) => dense[i]!), run.map((i) => leftHW[i]!), run.map((i) => rightHW[i]!)));
+    if (run.length >= 3) runs.push(run);
     run = [];
   };
   for (let i = 0; i < n; i++) {
-    if (inGap(i / (n - 1))) flush();
+    if (inGap(n === 1 ? 0 : i / (n - 1))) flush();
     else run.push(i);
   }
   flush();
-  return segs;
+  return runs;
 }
 
 /**
@@ -384,31 +491,25 @@ function brokenCorridor(dense: Vec[], leftHW: number[], rightHW: number[], gapBa
  * toward space bounces back onto the deck). Pure geometry, zero rng.
  */
 function buildShipWalls(dense: Vec[], leftHW: number[], rightHW: number[], gapBands: [number, number][], height: number): ShipWall[] {
-  const n = dense.length;
-  if (n < 2) return [];
-  const inGap = (u: number) => gapBands.some(([a, b]) => u >= a && u <= b);
-  // Left normal + inward normals, matching `ribbon`'s frame ([-dy, dx] is the left normal).
-  const frame = (i: number): { nx: number; ny: number } => {
-    const prev = dense[Math.max(0, i - 1)]!;
-    const next = dense[Math.min(n - 1, i + 1)]!;
-    let dx = next[0] - prev[0];
-    let dy = next[1] - prev[1];
-    const len = Math.hypot(dx, dy) || 1;
-    dx /= len;
-    dy /= len;
-    return { nx: -dy, ny: dx };
-  };
-  const leftEdge: Vec[] = dense.map((p, i) => { const f = frame(i); return [p[0] + f.nx * leftHW[i]!, p[1] + f.ny * leftHW[i]!]; });
-  const rightEdge: Vec[] = dense.map((p, i) => { const f = frame(i); return [p[0] - f.nx * rightHW[i]!, p[1] - f.ny * rightHW[i]!]; });
+  if (dense.length < 2) return [];
   const walls: ShipWall[] = [];
   const unit = (a: Vec, b: Vec): Vec => { const dx = b[0] - a[0], dy = b[1] - a[1]; const L = Math.hypot(dx, dy) || 1; return [dx / L, dy / L]; };
-  for (let i = 0; i < n - 1; i++) {
-    // A wall segment spans dense[i]→dense[i+1]; skip it if either endpoint sits in a gap (open hull).
-    if (inGap(i / (n - 1)) || inGap((i + 1) / (n - 1))) continue;
+  // One rail pair PER DECK RUN, off the SAME `ribbonEdges` (fold-cleaned) the deck ribbon is built from
+  // — so a bulkhead stands exactly on the deck edge the sim reads, on every run, including at a bend
+  // where the raw mitred edge used to fold (GS-ship-corridor-fold). Previously the rails were framed off
+  // the GLOBAL point list while the deck was framed per run, so the two drifted apart at every gap edge.
+  for (const run of corridorRuns(dense.length, gapBands)) {
+    const { left, right } = ribbonEdges(run.map((i) => dense[i]!), run.map((i) => leftHW[i]!), run.map((i) => rightHW[i]!), true);
     // Left wall: inward normal points toward the centreline (opposite the left normal).
-    { const t = unit(leftEdge[i]!, leftEdge[i + 1]!); walls.push({ a: leftEdge[i]!, b: leftEdge[i + 1]!, normal: [t[1], -t[0]], height }); }
+    for (let i = 0; i < left.length - 1; i++) {
+      const t = unit(left[i]!, left[i + 1]!);
+      walls.push({ a: left[i]!, b: left[i + 1]!, normal: [t[1], -t[0]], height });
+    }
     // Right wall: inward normal points the other way.
-    { const t = unit(rightEdge[i]!, rightEdge[i + 1]!); walls.push({ a: rightEdge[i]!, b: rightEdge[i + 1]!, normal: [-t[1], t[0]], height }); }
+    for (let i = 0; i < right.length - 1; i++) {
+      const t = unit(right[i]!, right[i + 1]!);
+      walls.push({ a: right[i]!, b: right[i + 1]!, normal: [-t[1], t[0]], height });
+    }
   }
   return walls;
 }
@@ -804,11 +905,19 @@ function dedupeHazardOverlaps(hazards: Feature[]): Feature[] {
  * (sand: a genuine clifftop cove) AND actually sits ON a pad (overlaps a fairway/green/tee feature).
  * Sanctioned forced-carry crossings are load-bearing so they always survive (none spawn on the
  * void/cetus biomes, but the exemption keeps the rule honest).
+ *
+ * WALLED holes are the exception (GS-ship-breach-restore). A derelict corridor is a CONTINUOUS hull
+ * deck, not a chain of pads floating in the deep — and its signature on-deck danger is a PENALTY kind:
+ * the acid-etched `breach` eaten through the plating. GS-ship-calm-space armed the derelict's lost-rough
+ * at every wildness, which quietly routed every derelict hole through this filter and deleted 100% of
+ * its breaches ("there are no acid holes at all"). So on a walled hole the ON-A-PAD test is the WHOLE
+ * rule and it applies to penalty kinds too: a breach that sits on the deck survives, a blob stranded out
+ * in space is still dropped. Void/cetus (no walls) keep the old rule byte-for-byte.
  */
-function clearVoidHazards(hazards: Feature[], pads: Feature[]): Feature[] {
+function clearVoidHazards(hazards: Feature[], pads: Feature[], walled = false): Feature[] {
   return hazards.filter((h) => {
     if (CROSSING_KINDS.has(h.kind)) return true;
-    if (lieInfo(h.kind).penalty) return false; // the abyss is the only penalty on an island hole
+    if (!walled && lieInfo(h.kind).penalty) return false; // the abyss is the only penalty on an island hole
     return pads.some((p) => polysOverlap(h.poly, p.poly));
   });
 }
@@ -1042,8 +1151,13 @@ function generateHole(
     const minGapU = ISLAND_GAP_MIN_YD / arcLen;
     gapBands.push(...separateIslandGaps(rawGaps, maxGapU, minPadU, minGapU, ISLAND_GAP_SPAN));
   }
-  const corridorSegs = brokenCorridor(dense, leftHW, rightHW, gapBands);
-  if (corridorSegs.length === 0) corridorSegs.push(ribbon(dense, leftHW, rightHW)); // never carve it all away
+  // `unfold` (GS-ship-corridor-fold) is armed for WALLED holes only: on the derelict the corridor edge
+  // IS the physics boundary AND the bulkhead line, so a self-intersecting mitred fold at a bend punches
+  // a phantom void into the deck that nothing draws and no wall stands on. Every other world keeps the
+  // raw mitred edges byte-for-byte (there a fold is only a patch of rough, and re-cutting it would
+  // reflow every seeded course).
+  const corridorSegs = brokenCorridor(dense, leftHW, rightHW, gapBands, ship);
+  if (corridorSegs.length === 0) corridorSegs.push(ribbon(dense, leftHW, rightHW, true, true, ship)); // never carve it all away
   // The corridor feature(s). An island-green par 3 overrides this with a compact green-centred island
   // once the green radius is known (just below).
   let corridorFeatures: Feature[] = corridorSegs.map((poly) => ({ kind: 'fairway', poly }));
@@ -1900,7 +2014,7 @@ function generateHole(
   // every normal world + calm void/cetus stop stays byte-identical.
   if (lostRough) {
     const pads = features.filter((f) => f.kind === 'fairway' || f.kind === 'green' || f.kind === 'tee');
-    cleanHazards = clearVoidHazards(cleanHazards, pads);
+    cleanHazards = clearVoidHazards(cleanHazards, pads, ship);
   }
 
   // Wind: biome base + wildness ramp; vacuum biomes stay near-calm.

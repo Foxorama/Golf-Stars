@@ -15,20 +15,23 @@
  * Walls only ever SAVE a ball that would be lost to space (off-deck is the `voidlost` penalty), so
  * they only raise mean per-stop Stableford — the death-spiral bar can only improve (contract 4).
  *
- * NB — these per-segment collisions are NOT the physics flight bounce anymore, and NOT the containment
+ * NB — the per-segment collisions in this file are NOT the FLIGHT bounce, and NOT the containment
  * GUARANTEE. Two parallel wall rails per corridor section can't form a closed fence on a hull that zigzags
  * with hard-angular corners, so a share of shots leak off-hull through the corner openings and past the chain
- * ends. The real derelict physics treats the DRAWN DECK as the true bulkhead, in `round.ts` `executeShot`:
- * `flightWallBounce` bounces the FLIGHT at the first point it leaves a SOLID stretch of hull
- * (GS-ship-wall-bounce), and `containToDeck` is the rest backstop (GS-ship-corridor-contain — see
- * docs/decisions/sim-generator.md). `wallFlightHit` here now feeds ONLY the aim cone (`sprayBlocking`),
- * where the cheaper per-segment check is enough and the deck-boundary search would be too costly. Change the
- * wall FEEL / cone here; do NOT try to make these segments watertight — that's the trap five attempts fell into.
+ * ends. The real derelict physics treats the DRAWN DECK as the true bulkhead, in `round.ts`:
+ * `firstSolidDeparture`/`shipFlightPath` bounce the FLIGHT at the first point it runs out of hull
+ * (GS-ship-wall-bounce / GS-ship-wall-phantom), and `containToDeck` is the rest backstop
+ * (GS-ship-corridor-contain — see docs/decisions/sim-generator.md). What lives here is the ROLLING
+ * ricochet (`wallRollBounce`, the ground pinball) and the shared `wallReflect` maths those callers use.
+ * The old per-segment FLIGHT collision (`wallFlightHit`) is gone: it was the aim cone's private
+ * predictor, it disagreed with the sim on 42% of real bounces, and a second source of truth for one
+ * bounce is exactly how the cone came to promise clean shots the ball never played
+ * (GS-ship-wall-phantom). Change the wall FEEL here; do NOT try to make these segments watertight —
+ * that's the trap five attempts fell into.
  */
 
 import type { Vec, ShipWall } from './course/contract';
 import { dist } from './course/contract';
-import { arcApex, arcHeight, ARC_FEEL, flightApexT, flightControl, flightGround, type FlightProfile } from './flight';
 
 export type { ShipWall };
 
@@ -90,77 +93,6 @@ export interface WallHit {
   t: number;
   /** How many walls were struck this flight (1 or 2 — "hit two walls, bounce twice"). */
   bounces: number;
-}
-
-/**
- * Walk the curved flight path; return the wall ricochet (with the FINAL reflected direction after up
- * to two bounces) or null if the ball never crosses a wall. Same curved Bézier the renderer draws (no
- * rng). Only a ball crossing OUTWARD (into a wall's face, toward space) bounces; the FIRST wall the
- * path crosses below the wall height wins. The per-wall arc-height gate is kept for generality, but
- * generated derelict bulkheads (`WALL_HEIGHT` = 72 yd) tower over the 60-yd apex cap, so in practice
- * NOTHING clears them — every outward shot bounces back onto the deck.
- */
-export function wallFlightHit(
-  walls: readonly ShipWall[],
-  from: Vec,
-  landing: Vec,
-  bearingDeg: number,
-  carry: number,
-  nominalCarry: number,
-  profile: FlightProfile,
-  steps = 30,
-): WallHit | null {
-  if (!walls.length || carry <= 0) return null;
-  const control = flightControl(from, landing, bearingDeg);
-  const apex = arcApex(carry, nominalCarry, ARC_FEEL, profile.peakMult);
-  const apexT = flightApexT(profile);
-  let prev = from;
-  let firstHit: WallHit | null = null;
-  for (let i = 1; i <= steps && !firstHit; i++) {
-    const t = i / steps;
-    const pos = flightGround(from, control, landing, t);
-    const h = arcHeight(apex, t, apexT);
-    const travel = norm([pos[0] - prev[0], pos[1] - prev[1]]);
-    for (const w of walls) {
-      if (h >= w.height) continue; // flying over this wall → clears it (arc-height gate, per wall)
-      if (travel[0] * w.normal[0] + travel[1] * w.normal[1] >= -0.02) continue; // not crossing outward
-      const x = segHit(prev, pos, w.a, w.b);
-      if (!x) continue;
-      firstHit = { wall: w, point: x, dir: wallReflect(w.normal, travel), carry: dist(from, x), t, bounces: 1 };
-      break;
-    }
-    prev = pos;
-  }
-  if (!firstHit) return null;
-  // SECOND bounce: from the impact, does the reflected line cross ANOTHER wall before the ball would
-  // land? A straight probe along the reflected dir over the remaining flight distance. Hit two walls,
-  // bounce twice.
-  const remaining = Math.max(0, carry - firstHit.carry);
-  if (remaining > 2) {
-    const p0 = firstHit.point;
-    const p1: Vec = [p0[0] + firstHit.dir[0] * remaining, p0[1] + firstHit.dir[1] * remaining];
-    let best: { x: Vec; w: ShipWall } | null = null;
-    let bestD = Infinity;
-    for (const w of walls) {
-      if (w === firstHit.wall) continue;
-      if (firstHit.dir[0] * w.normal[0] + firstHit.dir[1] * w.normal[1] >= -0.02) continue;
-      const x = segHit(p0, p1, w.a, w.b);
-      if (!x) continue;
-      const dd = dist(p0, x);
-      if (dd < bestD) { bestD = dd; best = { x, w }; }
-    }
-    if (best) {
-      return {
-        wall: best.w,
-        point: best.x,
-        dir: wallReflect(best.w.normal, firstHit.dir),
-        carry: firstHit.carry + bestD,
-        t: firstHit.t,
-        bounces: 2,
-      };
-    }
-  }
-  return firstHit;
 }
 
 /** The wall a rolling segment `a→b` crosses OUTWARD (toward space) plus the impact point — the

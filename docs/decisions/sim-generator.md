@@ -1187,6 +1187,116 @@ touching the others' streams.
 
 ---
 
+## GS-ship-corridor-fold + GS-ship-wall-phantom + GS-ship-breach-restore — the derelict's walls stop lying (7th pass)
+
+**The report.** *"If the ball lands close to the wall, when you hit the ball, even if it's not going close
+to the wall it clips the 'bounce' effect and goes in a completely different direction than what it looks
+like it's going to do graphically. It's especially bad around dog legs when you land on the inside path and
+it looks like you have a clean shot, but then the ball clips a wall and bounces into the void. Additionally,
+there doesn't appear to be any acid etched hole hazards that show up at all."*
+
+Three separate bugs, all of them the same shape: something the player can SEE disagreeing with something the
+sim does. Every one was found by measurement, not by reading the code.
+
+### 1. The corridor had invisible holes in it at every bend (`GS-ship-corridor-fold`)
+
+`ribbon` offsets the centreline by a MITRE (`p ± normal·halfWidth`). On the inside of a bend, once the
+half-width outgrows the turn radius, that offset edge crosses ITSELF and encloses a little bowtie — and
+`pointInPoly` fills **even-odd**, so the bowtie reads as *not fairway*. On an ordinary world that is a patch
+of rough nobody notices. On the derelict, off-corridor is open SPACE, so it is a **phantom void punched into
+the middle of the deck**: the renderer draws solid plating over it (the render layer offsets with the
+fold-proof `dilateUnion` — the very function written to fix this same fold on the Cetus pads), no bulkhead
+stands on it, and the ball ricochets off nothing or is lost mid-deck. Measured over 398 walled holes:
+**13% carried a fold, up to 15.5 yd across**, concentrated on exactly the shapes the player named —
+`*-dogleg-*`, `*-double-*`, `*-hairpin-*`, `*-cape-*`.
+
+**The fix.** `unfoldOffsetEdge` — the standard offset-curve cleanup: walk the edge polyline and, wherever
+segment *i* crosses a LATER segment *j*, splice the loop out (keep the crossing point, resume at *j+1*), so
+the corner is cut by a straight chord instead of folding back. Both the deck ribbon (`brokenCorridor`) and
+the bulkhead rails (`buildShipWalls`) now build from ONE shared `ribbonEdges`, cut into the same
+`corridorRuns` — previously the rails were framed off the GLOBAL point list while the deck was framed per
+run, so the two quietly drifted apart at every gap edge. Result: **13% → 2%** of walled holes fold. The
+residue is the genuinely SELF-OVERLAPPING corridor (a hairpin whose two limbs cross), which no single simple
+band can model; it is held harmless by fix 2 instead of by geometry. Gated on `biome.walls` (`unfold` flag),
+zero rng, so every other world's ribbon is byte-for-byte the old mitred edges.
+
+### 2. The ricochet fired off bulkheads that were not there (`GS-ship-wall-phantom`)
+
+A headless sweep of 74,213 shots aimed straight down real derelict corridors: **2,348 bounced, 995 of them
+(42%) invisible to the aim cone, and 520 bounced with the whole flight line more than 6 yd from every drawn
+bulkhead** — 287 of those more than 16 yd away. Two-thirds of the surprises turned the ball ≥30°. Two causes,
+both "the graphic isn't the physics":
+
+- **The aim cone had its own predictor.** `sprayBlocking` probed `wallFlightHit` (per-SEGMENT collision along
+  a CURVED parkland arc); the sim resolved `firstSolidDeparture` (the DRAWN DECK boundary along a STRAIGHT
+  corridor line). Two sources of truth for one bounce, and they disagreed 42% of the time — so the cone
+  promised clean shots the ball never played. `wallFlightHit` is now DELETED and the cone probes the sim's
+  own predicate: one departure per cone ANGLE (the derelict's flight is a straight line, so the departure
+  found at the far radius is the one every shorter radius on that line meets) instead of the old K-deep
+  radius loop. Exact instead of approximate, and cheaper.
+- **A departure could bounce off a rail 22 yd away.** `CONTAIN_MAX_WALL_DIST` was shared between the resting
+  backstop and the mid-air carom. Those are not the same problem: nobody watches where a stopped ball gets
+  tucked back in, but everyone watches the ball turn. The offenders were the ribbon's rounded END CAP at a
+  torn-hull gap lip and the notch inside a hard corner — drawn deck with nothing standing on it. The flight
+  now needs a bulkhead within `FLIGHT_BOUNCE_MAX_WALL_DIST` = 6 yd; the rest backstop keeps its 22.
+- **And the biggest one: a clean CARRY was being slapped back at the lip.** `firstSolidDeparture` bounced at
+  the first off-deck sample at a "solid station", but a gap lip's nose bulges forward, so its nearest
+  centreline point is still on the solid side. A ball flying a sanctioned carry across a torn-hull gap — or
+  cutting the corner of a dogleg over the notch between two limbs, *the player's exact scenario* — got
+  caromed sideways off nothing at the lip. The rule now: **deck ahead on your line is a promise the ball
+  flies on.** A departure only ricochets if the deck does NOT resume further along the segment.
+
+Measured after: over the same sweep, **zero** bounces on shots aimed down the corridor; over 19,400 fanned
+tee shots, every one of 9,420 bounces was shaded by the cone (0 surprises), bounces down 24% and balls lost
+to space down 2.8%. The corridor still pinballs — it just only pinballs off bulkheads you can see.
+
+### 3. There were no acid breaches AT ALL (`GS-ship-breach-restore`)
+
+`clearVoidHazards` drops every penalty hazard on a lost-rough hole, because on an island-pad world the abyss
+is the only penalty and a pond floating in the deep reads wrong. GS-ship-calm-space (above) armed the
+derelict's lost-rough at EVERY wildness — which quietly routed every derelict hole through that filter and
+deleted **100% of the ship's breaches** (measured: 0 breaches in 2,160 holes, at every wildness). The
+world's one signature on-deck danger, the acid-etched hole through the plating, had silently stopped
+existing.
+
+**The fix.** A walled hole is a CONTINUOUS hull deck, not a chain of pads floating in the deep, so on it the
+ON-A-PAD test is the whole rule and applies to penalty kinds too: a breach that sits on the deck survives, a
+blob stranded in space is still dropped. Void/cetus keep the old rule byte-for-byte. Result: **0 → 2,831
+breaches** over 1,565 walled holes, ~3 per hole at wildness 1, mean radius 4.5 yd on a 37 yd corridor
+half-width, on 99.7% of wild holes — and `validateCourse`/`validateFairness`/`validateCrossings` stay clean
+(the placement check was always a padded mirror of the validator; nothing had ever validated it because
+nothing had ever survived).
+
+**Test fallout (honest).** The caddy-guard invariant asserted `penalty !== 'voidlost'`, which a `breach`
+also raises — so with breaches back, 1.8% of guard saves tripped it. The invariant is *never lost to SPACE*,
+not *immune to hazards*: a guard save that runs 20 yd into a breach is the same fair outcome as one that
+trickles into a pond on a parkland hole, and no other world's guard is hazard-immune. The assertion now
+reads the rest LIE.
+
+**One incidental win.** `lieAt` is the hottest read in the game and had no BBOX prefilter — dozens of 10–45
+vertex polygons tested in full for every point. Putting the cone on the deck-boundary probe made that
+visible, so `lieAt` now memoises per-hole bounding boxes and rejects cheaply. Behaviour-identical by
+construction (a point outside a bbox cannot be inside the polygon); the whole aim cone got **~2× faster than
+before this work**, and `tests/walls.test.ts` runs in 22s instead of 36s.
+
+`GENERATOR_VERSION` 43 → 44. Guards: `tests/walls.test.ts` gains a fold-differential measurement (even-odd vs
+non-zero winding is *exactly* the fold and nothing else), a `unfoldOffsetEdge` unit test, "a line the cone
+called clear never ricochets", "every ricochet is at a drawn bulkhead", "a carry over open space is never
+slapped back at the lip", and two breach guards. Full suite green (1,886).
+
+**Known gap, deliberately left.** The greenside breach RING (`ringAllowed = !ship || !lostRough`) is still
+off on the derelict for the same GS-ship-calm-space reason. Unlike the shoulder breaches that is not a
+regression — it was only ever a calm-derelict feature — and re-arming it consumes new draws and reflows
+every derelict hole, so it is a separate change (IDEAS.md).
+
+**The lesson (the seventh time).** Every one of these three is the same failure: **two things describing one
+boundary.** A render offset that can't fold vs. a sim offset that can. A cone predictor vs. a physics
+predictor. A resting tolerance vs. a flight tolerance. Whenever the derelict's walls have lied, it has been
+because some second description of the deck was allowed to exist. The rule is not "make the walls better" —
+it is *there is one description of where the deck ends, and everything reads it.*
+
+---
+
 ## GS-compose — a stop is a COMPOSED routing, not IID hole samples
 
 **Player report.** *"Almost every biome has the exact same effective course layout, and increased
