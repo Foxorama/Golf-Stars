@@ -382,6 +382,20 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
   fresh, planned session.
 
 ## Later
+- **GS-ship-greenside-ring — re-arm the derelict's greenside breach RING.** `ringAllowed = !ship ||
+  !lostRough` gates the sanctioned ring of greenside penalty blobs off on any lost-rough hole; since
+  GS-ship-calm-space armed the derelict's lost-rough at every wildness, that means always. Not a
+  regression (it was only ever a calm-derelict feature) but the derelict now has no greenside danger at
+  all. The predicate wants to be "skip on an island-PAD hole", not "skip on lost-rough" — a walled
+  corridor is neither. Cheap in code; it consumes new draws so it RE-ROLLS every derelict hole, and the
+  ring blobs need `validateGreenApproach` re-proved and the new pad-overlap filter checked (a stranded
+  ring blob is now dropped rather than floating in space). Own PR, own sweep.
+- **Phantom voids exist in EVERY world, not just the derelict.** The same mitred-offset fold
+  (GS-ship-corridor-fold) puts a patch of "not fairway" inside the corridor at tight bends everywhere —
+  it is only a lost ball on the walled derelict, but elsewhere it is a silent patch of rough mid-fairway
+  that no one drew. Fixing it globally (un-fold every ribbon, or move `pointInPoly` to non-zero winding)
+  reflows every seeded course in the game, so it needs its own session with the balance harnesses re-run,
+  not a rider on a bug fix.
 - **GS-5b — Flux biome/boss art.** Card system + art hook shipped (PR #9); needs the image-gen tooling
   (absent in-session) — see `reports/art-pipeline-2026-06-24.md`. Pass `artUrl` to `courseCardHTML` once
   images exist.
@@ -393,6 +407,15 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-ship-corridor-fold / GS-ship-wall-phantom / GS-ship-breach-restore** — the derelict's walls stop
+  lying (7th pass). A mitred ribbon self-intersects at a bend and even-odd `pointInPoly` reads the fold as
+  a phantom VOID mid-deck (13% of walled holes, up to 15 yd) — spliced out, and the deck + the bulkhead
+  rails now come from ONE `ribbonEdges`. The aim cone had its own bounce predictor that disagreed with the
+  sim on 42% of real bounces — `wallFlightHit` deleted, the cone probes `firstSolidDeparture`. A carry over
+  a torn-hull gap (or a cut dogleg corner) was being slapped back at the lip: deck ahead on your line now
+  means the ball flies on, and a mid-air carom needs a bulkhead within 6 yd, not the resting backstop's 22.
+  And `clearVoidHazards` had been deleting 100% of the acid breaches since GS-ship-calm-space — 0 → ~3 per
+  wild hole. `docs/decisions/sim-generator.md`.
 - **GS-save-transfer** — save export/import, finally wired to a button. `CLAUDE.md` has claimed
   "export/import from day one" since v1; the save LAYER had it (`downloadSave`/`importAndStore`) and
   nothing in the UI ever called them. A backup is a BUNDLE of all three blobs (`gs_save` + `gs_story` +

@@ -519,17 +519,51 @@ const SURFACE_PRIORITY: Record<string, number> = {
 };
 
 /**
+ * Per-hole bounding boxes for every hazard/feature polygon, memoised — a pure BBOX PREFILTER for
+ * `lieAt`, which is the single hottest read in the game (every roll-out step, every validator sweep,
+ * and now every aim-cone angle on a walled hole). A hole carries dozens of 10–45-vertex polygons and
+ * almost none of them contain any given point, so the cheap reject pays for itself many times over.
+ * Behaviour-identical by construction: a point outside a polygon's bbox cannot be inside the polygon.
+ */
+type LieBox = readonly [number, number, number, number]; // minX, minY, maxX, maxY
+const lieBoxCache = new WeakMap<Hole, { hz: LieBox[]; ft: LieBox[] }>();
+const bboxOf = (poly: Vec[]): LieBox => {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const v of poly) {
+    if (v[0] < minX) minX = v[0];
+    if (v[0] > maxX) maxX = v[0];
+    if (v[1] < minY) minY = v[1];
+    if (v[1] > maxY) maxY = v[1];
+  }
+  return [minX, minY, maxX, maxY];
+};
+const inBox = (b: LieBox, p: Vec): boolean => p[0] >= b[0] && p[0] <= b[2] && p[1] >= b[1] && p[1] <= b[3];
+function lieBoxes(hole: Hole): { hz: LieBox[]; ft: LieBox[] } {
+  const hit = lieBoxCache.get(hole);
+  if (hit) return hit;
+  const out = { hz: hole.hazards.map((f) => bboxOf(f.poly)), ft: hole.features.map((f) => bboxOf(f.poly)) };
+  lieBoxCache.set(hole, out);
+  return out;
+}
+
+/**
  * Read the lie at a point. Hazards are checked first (they're drawn on top and they
  * dominate play). Among the underlying features we pick the HIGHEST-precedence surface
  * containing the point (see `SURFACE_PRIORITY`) so a green that overlaps the fairway reads
  * as green, not fairway. Off everything → DEFAULT_LIE.
  */
 export function lieAt(hole: Hole, p: Vec): FeatureKind {
-  for (const f of hole.hazards) if (pointInPoly(p, f.poly)) return f.kind;
+  const { hz, ft } = lieBoxes(hole);
+  for (let i = 0; i < hole.hazards.length; i++) {
+    const f = hole.hazards[i]!;
+    if (!inBox(hz[i]!, p)) continue;
+    if (pointInPoly(p, f.poly)) return f.kind;
+  }
   let best: FeatureKind | undefined;
   let bestPri = -Infinity;
-  for (const f of hole.features) {
-    if (!pointInPoly(p, f.poly)) continue;
+  for (let i = 0; i < hole.features.length; i++) {
+    const f = hole.features[i]!;
+    if (!inBox(ft[i]!, p) || !pointInPoly(p, f.poly)) continue;
     const pri = SURFACE_PRIORITY[f.kind] ?? 1;
     if (pri > bestPri) {
       bestPri = pri;

@@ -178,6 +178,18 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     bulkheads is a REAL loss (containment only where a wall actually exists). Ship painters live in
     `style/ship.ts` etc.; `breach` is EXCLUDED from the generic `scatterHaz` bucket (else a purple blob
     paints over the acid hole). Guarded by `tests/walls.test.ts` end-to-end drives.
+    **THERE IS ONE DESCRIPTION OF WHERE THE DECK ENDS, AND EVERYTHING READS IT** — every derelict bug
+    (7 passes now) has been a SECOND description sneaking in. So: the ribbon edges and the bulkhead
+    rails come from ONE `ribbonEdges`/`corridorRuns`, fold-spliced for walled holes only
+    (GS-ship-corridor-fold — a mitred offset self-intersects at a bend and even-odd `pointInPoly` reads
+    the fold as a phantom VOID mid-deck that nothing draws); the aim cone probes the sim's OWN
+    `firstSolidDeparture`, never a private predictor (GS-ship-wall-phantom — `wallFlightHit` is deleted;
+    it disagreed with the sim on 42% of bounces); and a mid-air carom needs a bulkhead within
+    `FLIGHT_BOUNCE_MAX_WALL_DIST` 6, NOT the resting backstop's 22. **Deck ahead on your line is a
+    promise the ball flies on** — a departure that resumes on deck is a CARRY (a gap, a cut corner),
+    never a bounce. `clearVoidHazards` is an ISLAND-PAD rule: on a walled hole it keeps on-deck penalty
+    hazards (GS-ship-breach-restore — it had been deleting 100% of the acid breaches since
+    GS-ship-calm-space armed lost-rough at all wildness).
   - **Static courses** (GS-static-courses) — a pinned `StaticCourseSpec` rebuilt on demand through the
     live `generateCourse` pipeline; deterministic within a `GENERATOR_VERSION` (a bump re-rolls it). NO
     course is frozen (the `FROZEN_COURSES` mechanism is kept but unused). A course's identity is a valid

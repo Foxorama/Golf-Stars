@@ -37,7 +37,7 @@ import type { Rng } from './rng';
 import { usableBag } from './rpg/economy';
 import { arcApex, ARC_FEEL, flightBlockedBy, flightCarryScale, flightClassOf, flightKnockdown, flightObstacles, flightProfileOf, flightScaleFor, rollFractionFor, type FlightClass, type FlightProfile } from './flight';
 import { insideTent, tentFlightHit, tradeTents, TENT_BOUNCE_MIN, type TentHit, type TentEffectId, type TradeTent } from './tents';
-import { wallFlightHit, wallRollBounce, wallReflect, WALL_BOUNCE_MIN, WALL_ROLL_RESTITUTION, type WallHit } from './walls';
+import { wallRollBounce, wallReflect, WALL_BOUNCE_MIN, WALL_ROLL_RESTITUTION, type WallHit } from './walls';
 import type { ShipWall } from './course/contract';
 import { inScorch, meteorScorch, SCORCHABLE, SCORCH_LIE } from './scorch';
 import { effectPatches, inPatch, PATCHABLE, PATCH_SPECS, type PatchKind } from './patches';
@@ -1722,14 +1722,24 @@ export function sprayBlocking(
         cause = 'tents';
         break;
       }
-      // Ship-corridor bulkhead (GS-ship-walls): the SAME curved-flight ricochet check the sim
-      // resolves shots with — a cone line whose arc would cross a wall reads BLOCKED from the impact
-      // out, so a bounce is never a surprise.
-      const wh = walls ? wallFlightHit(walls, s.origin, landing, s.bearing, r, s.nominalCarry, s.flight) : null;
-      if (wh) {
-        hitAt = wh.carry;
-        cause = 'walls';
-        break;
+    }
+    // Ship-corridor bulkhead (GS-ship-wall-phantom): probe the cone with the sim's OWN ricochet test —
+    // `firstSolidDeparture` off the drawn deck, the exact predicate `shipFlightPath` resolves the shot
+    // with — instead of the cheaper per-segment `wallFlightHit`. The two disagreed on 42% of real
+    // bounces (measured over 74k corridor drives), which is the "the aim cone said clean and the ball
+    // caromed away" report: the cone walked a CURVED parkland arc against wall SEGMENTS while the sim
+    // flies a STRAIGHT corridor line against the deck edge. One probe per ANGLE, not per (angle, radius):
+    // the derelict's flight is a straight line, so the departure found along the FAR radius is the same
+    // departure every shorter radius on that line would meet — cheaper than the K-deep radius loop it
+    // replaces, and exact rather than approximate.
+    if (walls && hitAt < 0) {
+      const dep = firstSolidDeparture(hole, s.origin, landAt(a, rHigh));
+      if (dep) {
+        const d = dist(s.origin, dep.prev);
+        if (d <= rHigh) {
+          hitAt = d;
+          cause = 'walls';
+        }
       }
     }
     if (hitAt < 0) {
@@ -2288,6 +2298,19 @@ const CONTAIN_MARGIN = 4; // extra yards past the recovered deck edge so the bal
  */
 const CONTAIN_MAX_WALL_DIST = 22;
 
+/**
+ * How close a DRAWN bulkhead must be to the point where the ball leaves the deck for the FLIGHT to
+ * ricochet off it (GS-ship-wall-phantom). The resting backstop above may reach 22 yd — it is pulling a
+ * ball that has already stopped back inside, and nobody watches *where* that happened. A mid-air carom
+ * is the opposite: the player watches the ball turn, and if there is no bulkhead at the turn it reads as
+ * the ball bouncing off thin air ("it clips a wall that isn't there and goes somewhere else entirely").
+ * The deck edge and the bulkhead rails are built from the SAME offset line, so a genuine sideways exit
+ * departs within a step (~3 yd) of a rail; the departures that sat 10–20 yd from any bulkhead were the
+ * ribbon's rounded END CAPS at a torn-hull gap lip and the notch inside a corner — deck the renderer
+ * draws with no wall on it. Those now fly on instead of caroming off nothing.
+ */
+const FLIGHT_BOUNCE_MAX_WALL_DIST = 6;
+
 /** Distance (yards) from `p` to the nearest DRAWN bulkhead segment, or Infinity if the hole has no walls. */
 function nearestWallDist(hole: Hole, p: Vec): number {
   const walls = hole.walls;
@@ -2306,26 +2329,53 @@ function isLostToSpace(lie: FeatureKind): boolean {
   return lie !== 'breach' && lieInfo(lie).penalty === 'voidlost';
 }
 
-/** The centreline point nearest `p`, found on a FINE sample (own local search — never touches the
- *  coarser `nearestCentrelineT` the AI reads, so no seeded path shifts). */
-function nearestCentrePoint(hole: Hole, p: Vec): Vec {
-  let bestT = 0;
-  let bestD = Infinity;
+/**
+ * The 161-point centreline sample the deck tests search, plus each sample's on-deck flag — MEMOISED per
+ * hole. Pure function of the hole, so the memo cannot change an answer; it exists because the deck tests
+ * are now on the aim-cone redraw path (the cone probes the sim's own ricochet, GS-ship-wall-phantom) and
+ * re-walking the centreline + re-reading `lieAt` for every one of ~70 cone angles cost ~14 ms a frame.
+ */
+const centreSampleCache = new WeakMap<Hole, { pts: Vec[]; lost: boolean[] }>();
+function centreSamples(hole: Hole): { pts: Vec[]; lost: boolean[] } {
+  const hit = centreSampleCache.get(hole);
+  if (hit) return hit;
+  const pts: Vec[] = [];
+  const lost: boolean[] = [];
   for (let i = 0; i <= 160; i++) {
-    const t = i / 160;
-    const d = dist(pointAlong(hole.centreline, t), p);
+    const p = pointAlong(hole.centreline, i / 160);
+    pts.push(p);
+    lost.push(isLostToSpace(lieAt(hole, p)));
+  }
+  const out = { pts, lost };
+  centreSampleCache.set(hole, out);
+  return out;
+}
+
+/** Index of the centreline sample nearest `p` (own local search — never touches the coarser
+ *  `nearestCentrelineT` the AI reads, so no seeded path shifts). */
+function nearestCentreIndex(hole: Hole, p: Vec): number {
+  const { pts } = centreSamples(hole);
+  let best = 0;
+  let bestD = Infinity;
+  for (let i = 0; i < pts.length; i++) {
+    const d = dist(pts[i]!, p);
     if (d < bestD) {
       bestD = d;
-      bestT = t;
+      best = i;
     }
   }
-  return pointAlong(hole.centreline, bestT);
+  return best;
+}
+
+/** The centreline point nearest `p`, found on a FINE sample. */
+function nearestCentrePoint(hole: Hole, p: Vec): Vec {
+  return centreSamples(hole).pts[nearestCentreIndex(hole, p)]!;
 }
 
 /** The corridor is SOLID at `p`'s station iff the centreline point nearest `p` is itself on the deck
  *  (a torn-hull gap has an off-deck centreline). */
 function corridorSolidAt(hole: Hole, p: Vec): boolean {
-  return !isLostToSpace(lieAt(hole, nearestCentrePoint(hole, p)));
+  return !centreSamples(hole).lost[nearestCentreIndex(hole, p)]!;
 }
 
 /** The nearest centreline point to `p` that is ON the hull deck (not lost-to-space) — the corridor's safe
@@ -2381,11 +2431,23 @@ function inwardReflect(hole: Hole, at: Vec, travel: Vec): { dir: Vec; wall: Ship
   return { dir, wall: bw };
 }
 
-/** The first point a STRAIGHT segment `a→b` leaves the hull deck (lost-to-space) at a SOLID station — the
- *  bulkhead it clangs off. Returns the last on-deck point + the inward-reflected direction + the struck
- *  wall, or null if the segment stays on the deck OR only departs at a non-solid station (a sanctioned
- *  forward carry over a torn-hull gap — flown clean). The step count scales with the segment length so a
- *  long drive resolves the wall to ~3 yd. Pure, zero rng. */
+/**
+ * The first point a STRAIGHT segment `a→b` leaves the hull deck for good — the bulkhead it clangs off.
+ * Returns the last on-deck point + the inward-reflected direction + the struck wall, or null if the
+ * segment never runs out of corridor. The step count scales with the segment length so a long drive
+ * resolves the wall to ~3 yd. Pure, zero rng.
+ *
+ * Three things have to be true before the ball is turned mid-air, and each of them is something the
+ * player can SEE (GS-ship-wall-phantom):
+ *  1. the deck does NOT resume further along this line. A shot that leaves the deck and comes back to it
+ *     is CARRYING open space, not hitting a wall — a torn-hull gap between hull sections, or the notch
+ *     inside a hard corridor corner when you cut the dogleg. The drawn deck ahead on your line is the
+ *     promise that the ball flies on, and it used to be broken: the ribbon's rounded end cap at a gap lip
+ *     reads as a "solid station", so a clean carry got slapped sideways off nothing at the lip;
+ *  2. the station is SOLID (`corridorSolidAt`) — the corridor exists here at all;
+ *  3. a DRAWN bulkhead stands within `FLIGHT_BOUNCE_MAX_WALL_DIST` of the departure — you can see the
+ *     thing it hit.
+ */
 function firstSolidDeparture(hole: Hole, a: Vec, b: Vec): { prev: Vec; dir: Vec; wall: ShipWall } | null {
   const walls = hole.walls;
   if (!walls || !walls.length) return null;
@@ -2393,23 +2455,26 @@ function firstSolidDeparture(hole: Hole, a: Vec, b: Vec): { prev: Vec; dir: Vec;
   const steps = Math.min(240, Math.max(24, Math.ceil(len / 3)));
   const dx = b[0] - a[0];
   const dy = b[1] - a[1];
-  let prev = a;
-  let prevLost = isLostToSpace(lieAt(hole, a));
+  const at = (i: number): Vec => [a[0] + (dx * i) / steps, a[1] + (dy * i) / steps];
+  const lostAt: boolean[] = [];
+  for (let i = 0; i <= steps; i++) lostAt.push(isLostToSpace(lieAt(hole, at(i))));
+  // `deckAhead[i]` — is there any on-deck sample strictly after i? (suffix scan, so the "does the deck
+  // resume?" test below is O(1) per candidate departure).
+  const deckAhead: boolean[] = new Array<boolean>(steps + 1).fill(false);
+  for (let i = steps - 1; i >= 0; i--) deckAhead[i] = !lostAt[i + 1] || deckAhead[i + 1]!;
   for (let i = 1; i <= steps; i++) {
-    const t = i / steps;
-    const pos: Vec = [a[0] + dx * t, a[1] + dy * t];
-    const lost = isLostToSpace(lieAt(hole, pos));
-    // Only ricochet off a DRAWN bulkhead (GS-ship-space-boundary): a departure at a torn-hull gap opening
-    // (walls removed for that span) or clean past the wall ends has no bulkhead to bounce off, so the ball
-    // flies FREE through the opening rather than caroming off an invisible boundary out in space.
-    if (lost && !prevLost && corridorSolidAt(hole, pos) && nearestWallDist(hole, prev) <= CONTAIN_MAX_WALL_DIST) {
-      const l = Math.hypot(pos[0] - prev[0], pos[1] - prev[1]) || 1;
-      const travel: Vec = [(pos[0] - prev[0]) / l, (pos[1] - prev[1]) / l];
-      const { dir, wall } = inwardReflect(hole, prev, travel);
-      return { prev, dir, wall: wall ?? walls[0]! };
-    }
-    prev = pos;
-    prevLost = lost;
+    if (!lostAt[i] || lostAt[i - 1]) continue;
+    // (1) Deck ahead on this line ⇒ the ball is carrying a gap / cutting a corner over open space.
+    if (deckAhead[i]) continue;
+    const prev = at(i - 1);
+    const pos = at(i);
+    // (2) + (3): a real corridor station, with a bulkhead you can see standing at the departure.
+    if (!corridorSolidAt(hole, pos)) continue;
+    if (nearestWallDist(hole, prev) > FLIGHT_BOUNCE_MAX_WALL_DIST) continue;
+    const l = Math.hypot(pos[0] - prev[0], pos[1] - prev[1]) || 1;
+    const travel: Vec = [(pos[0] - prev[0]) / l, (pos[1] - prev[1]) / l];
+    const { dir, wall } = inwardReflect(hole, prev, travel);
+    return { prev, dir, wall: wall ?? walls[0]! };
   }
   return null;
 }
@@ -2439,7 +2504,7 @@ export interface ShipFlight {
  * other world never enters here, so it's byte-for-byte irrelevant there (contracts 1 & 2). It only ever keeps
  * a ball that would else be lost ON the deck, so Stableford can only rise (contract 4).
  */
-function shipFlightPath(hole: Hole, from: Vec, landing0: Vec, maxBounces = 8): ShipFlight {
+export function shipFlightPath(hole: Hole, from: Vec, landing0: Vec, maxBounces = 8): ShipFlight {
   const path: Vec[] = [from];
   let pos = from;
   const total = Math.hypot(landing0[0] - from[0], landing0[1] - from[1]);
