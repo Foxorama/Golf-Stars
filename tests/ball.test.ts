@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   advanceFlightSpin,
+  ballSVG,
   advanceRollPhase,
   ballRadiusPx,
   ballSkinFor,
@@ -60,25 +61,55 @@ function recordingCtx(): {
   return { ctx, arcs, fillAlphas, fills, strokes };
 }
 
+/**
+ * The cameras the game actually uses, measured by playing one hole out at 390x844: the shot views run
+ * 0.53–5.7 px/yard, the putt views 7.6–17.1, and a tap-in reaches ~35.
+ */
+const MAP_CAMS = [0.53, 1.83];
+const SHOT_CAMS = [2.56, 3.41, 5.7];
+const PUTT_CAMS = [7.56, 10.95, 17.1, 35];
+
 describe('ball size (the camera decides, within limits)', () => {
-  it('floors at the OLD fixed radius on the whole-hole map, so that view is unchanged', () => {
-    // The map runs at ~1 px/yard. Before this feature every ball everywhere was exactly 3px.
-    expect(ballRadiusPx(0.6)).toBe(3);
-    expect(ballRadiusPx(1)).toBe(3);
-    expect(ballRadiusPx(2.4)).toBe(3);
+  it('sits on the OLD fixed radius at the whole-hole cameras, so that view is unchanged', () => {
+    // Before this feature every ball everywhere was exactly 3px — so the whole-hole view has to land
+    // back on it to within a fraction of a pixel, or the map people already know changes under them.
+    for (const px of MAP_CAMS) {
+      expect(ballRadiusPx(px), `${px} px/yd`).toBeGreaterThanOrEqual(3);
+      expect(ballRadiusPx(px), `${px} px/yd`).toBeLessThan(3.15);
+    }
   });
 
   it('grows at the chip/putt camera — which is the whole point of zooming in', () => {
-    // ~6.6 px/yard is the chip/putt camera (GS-green-complex measured it). A ball you can see
-    // turning needs surface detail, and surface detail needs pixels.
-    const putt = ballRadiusPx(6.6);
-    expect(putt).toBeGreaterThan(ballRadiusPx(1));
+    const putt = ballRadiusPx(7.56);
+    expect(putt).toBeGreaterThan(ballRadiusPx(1.83));
     expect(putt).toBeGreaterThanOrEqual(DEFAULT_BALL_FEEL.dimpleMinPx);
   });
 
-  it('caps, so a deep zoom draws a golf ball and not a beachball', () => {
-    expect(ballRadiusPx(40)).toBe(DEFAULT_BALL_FEEL.ballMaxPx);
+  it('keeps growing all the way in — a tap-in draws a bigger ball than a 20-footer', () => {
+    // The first cut grew LINEARLY and hit its cap by 7.5 px/yd, so every putt in the game drew the
+    // same maximum ball: too big AND flat, which loses the size cue exactly where the player is
+    // studying the ground. Sub-linear growth keeps the cue without the bulk.
+    const rs = PUTT_CAMS.map((px) => ballRadiusPx(px));
+    for (let i = 1; i < rs.length; i++) {
+      expect(rs[i]!, `${PUTT_CAMS[i]} vs ${PUTT_CAMS[i - 1]} px/yd`).toBeGreaterThan(rs[i - 1]!);
+    }
+  });
+
+  it('never gets big enough to swamp the scene it sits in', () => {
+    // The fixed-size markers around it: the tee dot is r5 and the flagstick is 14 units tall. The
+    // reported "really big balls" was an 18px-wide ball on a green — taller than the whole flagstick.
+    for (const px of [...SHOT_CAMS, ...PUTT_CAMS, 60, 1000]) {
+      expect(ballRadiusPx(px), `${px} px/yd`).toBeLessThanOrEqual(5.5);
+    }
     expect(ballRadiusPx(1000)).toBe(DEFAULT_BALL_FEEL.ballMaxPx);
+  });
+
+  it('the EXAGGERATION shrinks as you zoom in — you zoom to see closer to the truth', () => {
+    // A real ball is 0.0467yd across. The drawn ball is always oversized; what matters is that the
+    // overstatement gets smaller the closer the camera gets, not larger.
+    const over = (px: number): number => (ballRadiusPx(px) * 2) / px / 0.0467;
+    expect(over(17.1)).toBeLessThan(over(5.7));
+    expect(over(5.7)).toBeLessThan(over(1.83));
   });
 
   it('is bigger at the flight apex than on the deck (it reads as nearer the camera)', () => {
@@ -111,7 +142,7 @@ describe('roll (measured in screen distance, deliberately)', () => {
     // The failure modes on either side: too few turns and the ball is a sliding disc (the bug this
     // fixes), too many and it strobes. Walk a 40-yard run-out at 60fps at the map camera and at the
     // chip camera and assert both land in the band.
-    for (const pxPerYard of [1, 6.6]) {
+    for (const pxPerYard of [1.83, 17.1]) {
       const r = ballRadiusPx(pxPerYard);
       const totalPx = 40 * pxPerYard;
       let phase = 0;
@@ -225,5 +256,49 @@ describe('ball skins are content-as-data', () => {
       expect(s.shade, id).toMatch(/^#/);
       expect(s.dimple, id).toMatch(/^#/);
     }
+  });
+});
+
+describe('the RESTING ball on the aim map (the same ball, in SVG)', () => {
+  // The animated ball was dimpled from day one and the aim screen — where the player actually spends
+  // their time looking at it — kept a bare `<circle r="4" fill="#fff">`. You lined a shot up with a
+  // plain white dot, watched a dimpled ball fly, and got the dot back at rest, so as far as the player
+  // was concerned the cosmetic did not exist.
+  it('wears the cover: dimples, the band and the mark, not a white disc', () => {
+    const svg = ballSVG(50, 50, ballRadiusPx(17.1), BALL_SKINS.classic);
+    expect(svg).toContain(BALL_SKINS.classic.cover);
+    expect(svg).toContain(BALL_SKINS.classic.dimple);
+    expect(svg).toContain(BALL_SKINS.classic.band!);
+    expect(svg).toContain(BALL_SKINS.classic.mark!);
+  });
+
+  it('shows the equipped cosmetic, so a Story ball is visible while you AIM it', () => {
+    const skin = ballSkinFor({ ballTracer: { shape: 'ember', color: '#ff4c22', glow: '#ff6a2a' } });
+    const svg = ballSVG(50, 50, 5, skin);
+    expect(svg).toContain('#ff4c22');
+    expect(svg).toContain('#ff6a2a');
+  });
+
+  it('agrees with the CANVAS ball on where every surface feature sits', () => {
+    // Both emitters go through the one `surfaceProjector` + the one `DIMPLES` field, so this is a
+    // structural guarantee rather than a coincidence — but it is the guarantee worth pinning, because
+    // a divergence would show as the ball changing pattern the instant the swing starts.
+    const r = 5.2;
+    const canvas = recordingCtx();
+    drawBall(canvas.ctx, 50, 50, r, { phase: 0, dirX: 1, dirY: 0, skin: BALL_SKINS.classic });
+    const svg = ballSVG(50, 50, r, BALL_SKINS.classic);
+    const svgPts = [...svg.matchAll(/<circle cx="([-\d.]+)" cy="([-\d.]+)"/g)].map((m) => `${m[1]},${m[2]}`);
+    const canvasPts = new Set(canvas.arcs.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`));
+    // Every dimple/mark the SVG places is one the canvas places too (the SVG adds its own two-circle
+    // sphere body, which the canvas does with a gradient instead).
+    const shared = svgPts.filter((p) => canvasPts.has(p));
+    expect(shared.length).toBeGreaterThan(8);
+  });
+
+  it('emits no SVG ids — several hole SVGs share one document', () => {
+    // `holeIdPrefix` exists because ids are document-global and the gallery/test hub put many hole
+    // SVGs on one page; a gradient id here would make every ball reference the first panel's.
+    expect(ballSVG(50, 50, 5, BALL_SKINS.comet)).not.toMatch(/\bid=/);
+    expect(ballSVG(50, 50, 5, BALL_SKINS.comet)).not.toContain('url(#');
   });
 });

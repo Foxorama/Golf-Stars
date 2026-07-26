@@ -23,6 +23,7 @@ import { tradeTents } from '../sim/tents';
 import { archetypeFor, type BiomeArchetype } from '../sim/course/themes';
 import { holeProjector } from './project';
 import { buildScene, holeIdPrefix, scenePrimsToSvg, type ArtFeel } from './style';
+import { ballRadiusPx, ballSVG, ballSkinFor, type BallSkin } from './ball';
 
 /** Spray-cone display geometry (GS-dispersion-2). The cone is drawn straight from the shot's
  *  asymmetric `SprayShape`: a fixed-width GREEN centre wedge (±`greenZ·σ0`) and per-side ORANGE/RED
@@ -120,6 +121,10 @@ export interface RenderOptions {
   themeId?: string;
   /** Draw a ball marker at this course-space position (interactive play). */
   ball?: Vec;
+  /** The COVER that ball wears (GS-ball-art). The aim map is where the player spends their time
+   *  looking at the ball, so it wears the same skin the animated one does — absent ⇒ plain white
+   *  `classic`, i.e. unchanged. */
+  ballSkin?: BallSkin;
   /** Draw the aiming spray cone for the contemplated shot (interactive play). */
   spray?: ShotSpread;
   /** STABLE spread to FIT the whole-hole view around (GS-power). The live `spray` changes every
@@ -593,9 +598,12 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
 
   if (opts.ball) {
     const [bx, by] = place(opts.ball);
-    parts.push(
-      `<circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="4" fill="#fff" stroke="#1a1a1a" stroke-width="1.5" />`,
-    );
+    // The resting ball wears its cover (GS-ball-art round 2). It was a bare white circle, so you
+    // lined a shot up with a plain dot, watched a dimpled ball fly, and got the dot back at rest —
+    // as far as the player was concerned the cosmetic didn't exist. Sized by the SAME
+    // `ballRadiusPx` the animation uses, off this view's own scale, so the ball doesn't change size
+    // at the moment the swing starts.
+    parts.push(ballSVG(bx, by, ballRadiusPx(proj.scale), opts.ballSkin ?? ballSkinFor(undefined)));
   }
 
   parts.push('</svg>');

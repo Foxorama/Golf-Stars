@@ -1760,3 +1760,74 @@ property, the readable-turns band at both camera extremes, that the drawn surfac
 the phase and returns after a full turn, that the axis follows travel, shadow behaviour, no rng, and
 the skin table). Eyes-on: `node scripts/ball-preview.mjs` — every cover through a full turn, the size
 ladder, a hop with its shadow, and a decelerating roll.
+
+---
+
+## GS-ball-art round 2 — the size was tuned against a camera the game never uses (2026-07-26)
+
+Two follow-ups from play-testing the first pass.
+
+> "chip and putting zoom show some really big balls."
+> "the ball skin shows white when it is resting while you aim a shot."
+
+### The cameras: measured, not assumed
+
+The first pass sized the ball against "~6.6 px/yd at the chip/putt camera", a number taken from
+GS-green-complex's notes. So I measured what the game actually hands the projector, by playing a hole
+out at 390×844 and logging every distinct `proj.scale`:
+
+| view | px per yard |
+|---|---|
+| whole hole / long shots | 0.53 – 1.83 |
+| approach / chip | 2.56 – 5.7 |
+| **putts** | **7.56 – 17.1** |
+| tap-in (`puttViewRadius` floor 5.5yd) | **~35** |
+
+The putt camera is **5× what the size curve was tuned for**. With linear growth and a 9px cap, every
+putt in the game drew the ball at its maximum — 18px across, which is *taller than the whole flagstick
+marker* (14 units) and nearly double the tee dot (r5). And because it was pinned to the cap, a tap-in
+and a 20-footer drew exactly the same ball, so the size cue vanished at precisely the range where the
+player is studying the ground.
+
+Growth is now **sub-linear** (`3 + 0.5·√(px − 1.8)`, capped 5.5). This is the better shape, not just a
+smaller number:
+
+| camera | before | after |
+|---|---|---|
+| 1.83 (map) | 3.0 | 3.1 |
+| 5.7 (chip) | 6.8 | 4.0 |
+| 7.56 (putt) | 9.0 (cap) | 4.2 |
+| 17.1 (putt) | 9.0 (cap) | 5.0 |
+| 35 (tap-in) | 9.0 (cap) | 5.5 (cap) |
+
+The ball keeps growing all the way in, so the cue survives — and the **exaggeration shrinks** as you
+zoom, which is the right direction: you zoom in to get closer to the truth, not further from it. A
+test pins that relationship rather than the numbers.
+
+Because the ball is smaller, the dimple radius went up (`r·0.13` → `r·0.16`) and `dimpleMinPx` down
+(4.6 → 3.8), so the texture still reads at r≈4.
+
+### The resting ball
+
+The aim screen is `renderHoleSVG` — a different renderer — and it still drew
+`<circle r="4" fill="#fff" stroke="#1a1a1a">`. So you lined a shot up with a plain white dot, watched
+a dimpled ball fly, and got the dot back at rest. As far as the player was concerned the cosmetic did
+not exist, since the aim screen is where they spend nearly all their time.
+
+`ballSVG` now emits the same cover. The important part is structural: the surface geometry was
+extracted into `surfaceProjector` + `bandPoint` + `MARK_POINT`, shared with the canvas painter, so
+there is **one description of where a point on the cover lands** and the two emitters cannot drift —
+a divergence would show as the ball changing pattern at the instant the swing starts. Sized by the
+same `ballRadiusPx` off the view's own scale, so it doesn't change size either.
+
+Two constraints on the SVG version:
+
+- **No ids.** `holeIdPrefix` exists because SVG ids are document-global and the gallery and test hub
+  put many hole SVGs on one page. A gradient id here would make every ball reference the first
+  panel's, so the lit sphere is two overlaid circles instead.
+- It takes the phase-0 pose, matching the teed ball the animation starts from.
+
+**Guards:** four new cases in `tests/ball.test.ts` — the cover appears, the equipped cosmetic shows
+while aiming, the SVG's feature positions coincide with the canvas's, and no ids are emitted. Plus the
+size ladder is now asserted at the **measured** cameras, including that the ball keeps growing across
+the putt range and never exceeds the cap.
