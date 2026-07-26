@@ -121,7 +121,7 @@ describe('milestones & unlocks (GS-unending)', () => {
         expect(canBuyShip(ship, 999999, [])).toBe(false);
       }
     }
-    // The ladder: bag @40, cap @60, pants @80, the Green Jacket @100, the secret ship @150.
+    // The ladder: bag @40, cap @60, pants @80, the Evergreen Blazer @100, the secret ship @150.
     expect(ENDLESS_UNLOCKS.map((u) => u.holes)).toEqual([40, 60, 80, 100, 150]);
     expect(endlessUnlocksEarned(100).map((u) => u.id)).toEqual([
       'bag-evergreen',

@@ -27,7 +27,7 @@ import { addEndlessRecord, endlessUnlocksCrossed } from '../sim/rpg/endless';
 import { addStrokeRecord, isNewCourseRecord, type StrokePlayRecord } from '../sim/rpg/strokePlay';
 import { playTotals } from '../sim/score';
 import { archetypeFor } from '../sim/course/themes';
-import { namedCaddyOwned } from '../sim/rpg/economy';
+import { namedCaddyOwned, aceCount } from '../sim/rpg/economy';
 import { pickLoreEvent, type LoreContext } from '../sim/rpg/lore';
 import { ASGARD_FORMAT } from '../sim/rpg/formats';
 import { matchOpponentFor, runField } from '../sim/rpg/league';
@@ -404,7 +404,10 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
     !run.storyQuest && played.length >= state.course.holes.length,
   );
   // GS-story-ships: a hole-in-one on any Story round earns the secret Comet Rider (the ace ship).
-  const aces = played.filter((p) => p.record.strokes === 1).length;
+  // Counted through the canonical `aceCount` — an ace is `holed && strokes === 1`, and the local
+  // filter used to omit the `holed` half, so a one-stroke hole that never dropped (a partial round
+  // closed out early) could bank a false ace.
+  const aces = aceCount(played);
   const aced = aces > 0;
   let story = aced ? grantStoryAceShip(cleared) : cleared;
 
@@ -495,8 +498,16 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
     story,
     // GS-story-ace-tally: a hole-in-one on a Story round still counts toward the cross-mode lifetime ace
     // tally shown on the title (the ace celebration already reads `state.lifetimeAces + 1`). The campaign's
-    // OTHER progression (credits/best/ships) stays inside `gs_story`; only this global stat crosses over.
+    // OTHER progression (credits/best) stays inside `gs_story`; these global stats cross over.
     lifetimeAces: state.lifetimeAces + aces,
+    // GS-ace-ship: the Comet Rider is GLOBAL ownership like every other ship, and the ace takeover tells
+    // the player to "fly it on any golfer from the Clubhouse" — which reads `state.ownedShips`. Granting
+    // it only into the story garage (`grantStoryAceShip`, above) left that promise permanently false in
+    // Story Tour: the ship never appeared in the Clubhouse, and because the overlay's already-owned check
+    // also reads `ownedShips`, EVERY later ace re-announced the same "SECRET UNLOCKED" reveal. It now
+    // lands in both pools — the story keeps its own copy (and auto-equips it) for the campaign's
+    // ship-credit progression. Pure + idempotent, and identical to the grant every other mode uses.
+    ownedShips: aceShipUnlock(state.ownedShips, aces),
     played,
     stopPlayed: undefined,
     play: undefined,
@@ -687,14 +698,21 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
   story = recordCaddyRound(story);
   const finalSigil = won && !alreadyWon && story.trophyIds.length >= STORY_CHAPTER_COUNT;
   // GS-story-ace-tally: a hole-in-one during a major still ticks the cross-mode lifetime ace tally. Count
-  // over the BANKED holes (a closed-out match may have truncated `played`) so it matches what was played.
-  const aces = played.filter((p) => p.record.strokes === 1).length;
+  // over the BANKED holes (a closed-out match may have truncated `played`) so it matches what was played,
+  // and through the canonical `aceCount` so an ace means `holed && strokes === 1` here exactly as it does
+  // everywhere else (the local filter omitted the `holed` half).
+  const aces = aceCount(played);
+  // GS-ace-ship: a major is a Story round like any other, so an ace earns the Comet Rider here too — into
+  // the story garage AND the global pool the Clubhouse reads. This path granted it to NEITHER, so acing a
+  // major banked the lifetime tally and nothing else while the takeover promised a ship.
+  if (aces > 0) story = grantStoryAceShip(story);
 
   return {
     ...state,
     run: { ...run, status: 'ended', endedReason: 'banked' },
     story,
     lifetimeAces: state.lifetimeAces + aces,
+    ownedShips: aceShipUnlock(state.ownedShips, aces),
     played,
     stopPlayed: undefined,
     play: undefined,

@@ -518,7 +518,7 @@ never negative). A NEGATIVE roll — the ball pulled back — is now supplied ON
 - **Backspin Bo** carries the whole check himself (his `clubMods` `rollFracDelta`, loft-scaled −0.05 on
   the 5-iron → ~−0.10 on the shortest wedge). He's the ONE golfer who spins it back — his identity,
   tuned to bite-and-hold (a few yards of controllable check), not the old land-over-and-pray extreme.
-- **Spin gear** (`backspinBoost`: Spin-Milled Wedges, Spin Guide Card, Spin Trajectory Computer, and
+- **Spin gear** (`backspinBoost`: Fresh-Groove Wedges, Spin Guide Card, Spin Trajectory Computer, and
   every story-mode ball/wedge) still subtracts from the roll fraction, so it's a real opt-in upgrade.
 
 So a plain wedge (any of the other three golfers, no gear) lands and HOLDS predictably; backspin is a

@@ -304,8 +304,8 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   {
     // The legendary flat-stick (GS-proshop-variety): the apex of the putting ladder, a general-use
     // legendary that isn't a named caddy — so a legendary is actually buyable deep in the voyage.
-    id: 'pinseeker-putter',
-    name: 'Pinseeker Putter',
+    id: 'pinseeker-putter', // slug kept for save compat; display name is generic (GS-tm-names)
+    name: 'Truesight Putter',
     cost: 340,
     desc: 'A face-milled precision blade — the steadiest stroke & longest break read in the galaxy',
     rarity: 'legendary',
@@ -715,7 +715,7 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   {
     // The CURSE gamble (GS-curses): a real risk you opt into — wilder misses for a big payout multiplier.
     id: 'glass-cannon',
-    name: 'Grip It & Rip It',
+    name: 'Full Send',
     cost: 150,
     desc: 'CURSE: swing out of your shoes — wider misses (hook & slice up) but +60% credits earned. High risk, high reward.',
     rarity: 'epic',
@@ -743,10 +743,10 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
   },
   {
     // Increased backspin (backspinBoost): milled grooves rip more check so approaches bite & hold.
-    id: 'spin-milled',
-    name: 'Spin-Milled Wedges',
+    id: 'spin-milled', // slug kept for save compat; display name is generic (GS-tm-names)
+    name: 'Fresh-Groove Wedges',
     cost: 130,
-    desc: 'Freshly milled grooves rip backspin — your approaches bite and check up instead of running on',
+    desc: 'Freshly cut grooves rip backspin — your approaches bite and check up instead of running on',
     rarity: 'rare',
     apply: (m) => ({ ...m, backspinBoost: (m.backspinBoost ?? 0) + 0.07, perks: [...m.perks, 'spin-milled'] }),
   },
