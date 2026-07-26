@@ -427,6 +427,22 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     camera-proof (GS-biome-relief). Per-world identity (flora, OB, decor, ambient air, wind tint, water/sand
     palettes) is ALL archetype-keyed table+dispatch (`tests/biome-identity.test.ts` guards full coverage); a
     flora variant consumes EXACTLY the classic two draws.
+  - **THE BALL IS A BALL** (GS-ball-art, `render/ball.ts` — pure geometry + spin maths, node-tested;
+    painters take a ctx and nothing else). It was `ctx.arc(x,y,3)` filled `#fff` at three sites, at a
+    FIXED 3px whatever the camera did — so it could never look like it was ROLLING (a featureless disc
+    can't) and the run-out's hops were INVISIBLE (a 3px disc rising 1.5px off a static shadow is not a
+    bounce; the model had been hopping the whole time). Three rules: the drawn ball SCALES with
+    `proj.scale` about an exaggerated `ballDrawYd` — floored at the old 3px so the whole-hole map is
+    unchanged, capped so a deep zoom isn't a beachball (a real ball is 0.047yd = a THIRD OF A PIXEL at
+    the putt camera, so a scale model was never on the table); **roll is the ONE thing measured in
+    SCREEN px, not yards** (`dθ = ds/r` with BOTH taken as drawn — real yards and a real radius give 68
+    turns per 10 yards, a grey strobe — so the ball turns as fast as it LOOKS like it should at every
+    zoom, capped per frame against aliasing); and the phase rides the ball's OWN screen displacement,
+    which buys the two properties that sell it for free — it stops turning exactly when the ball stops,
+    and a backspin check turns it backwards with no special case. In the AIR on its flight it carries
+    steady BACKspin off the clock instead. Ball skins are a ROW (`BALL_SKINS`); an equipped Story BALL
+    dresses the cover from the SAME `ballTracer` row that colours its trail, so one cosmetic is one
+    item. Guarded by `tests/ball.test.ts`; eyes-on `scripts/ball-preview.mjs`.
   - Merges: platforms + hazard families through `render/merge.ts` — platforms `dilateUnion(…,14)` (never a
     mitred outset), sand/liquid families `unionClose` bridging near pairs with a slim neck (GS-hazard-merge,
     render-only, sim penalty polys unchanged). Lost-rough cliffs extrude from the REAL lower silhouette
