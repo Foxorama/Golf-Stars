@@ -60,10 +60,10 @@ const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
  *  club row picks up a sensible flight (and strike voice) with zero engine edits. */
 export type FlightClass = 'driver' | 'wood' | 'hybrid' | 'ironLong' | 'ironShort' | 'wedge' | 'putter';
 
-/** Irons split at this NUMBER: 3-5 are the low-launch, long-running driving irons; 6 and up climb
- *  and stop (GS-runout-club). Convention-based like the rest of `flightClassOf`, so a new `4i` row
- *  picks up the long-iron flight with zero engine edits. */
-export const LONG_IRON_MAX = 5;
+/** Irons split at this NUMBER: 4-6 are the long/mid irons, 7 and up the short ones. The boundary is
+ *  the one real golf uses (GS-carry-roll-real) — a 6-iron releases, a 7-iron checks. Convention-based
+ *  like the rest of `flightClassOf`, so a new `4i` row picks up the long-iron flight with no edits. */
+export const LONG_IRON_MAX = 6;
 
 export function flightClassOf(clubId?: string): FlightClass {
   // The neutral mid-bag flight when no club is known — a 7-iron, i.e. the SHORT-iron row.
@@ -107,14 +107,17 @@ export interface FlightProfile {
  * putter row keeps the legacy neutral arc (its "flights" are tap-length chips).
  */
 export const FLIGHT_PROFILES: Record<FlightClass, FlightProfile> = {
-  driver: { apexAt: 0.6, peakMult: 0.85, carryFrac: 0.8 },
-  wood: { apexAt: 0.61, peakMult: 0.95, carryFrac: 0.82 },
-  hybrid: { apexAt: 0.64, peakMult: 1.12, carryFrac: 0.85 },
-  // GS-runout-club: the irons used to be ONE row at 0.9, which put every iron in the bag BELOW the
-  // hybrid for run and made a 3-iron indistinguishable from a 9-iron. A driving iron launches low
-  // with little spin and runs further than the rescue club it replaced; a 9-iron climbs and sits.
-  ironLong: { apexAt: 0.63, peakMult: 0.92, carryFrac: 0.835 },
-  ironShort: { apexAt: 0.68, peakMult: 1.06, carryFrac: 0.94 },
+  // GS-carry-roll-real: the carry/roll split is set from REAL golf, not from what the auto sim found
+  // comfortable. Reference roll-out on a standard fairway/green — driver 15-30yd, woods and hybrids
+  // 10-15, long/mid irons 5-10, short irons 2-5, wedges 0-3 — taken at its midpoint against the
+  // club's carry, since a club's number here is its TOTAL. The old numbers had a driver releasing 25%
+  // of its carry (62 yards) and a long iron 20% (31), which is not golf; and because the split is
+  // total-preserving, over-rolling meant under-CARRYING — a 250yd driver flew 200.
+  driver: { apexAt: 0.6, peakMult: 0.85, carryFrac: 0.922 },
+  wood: { apexAt: 0.61, peakMult: 0.95, carryFrac: 0.945 },
+  hybrid: { apexAt: 0.64, peakMult: 1.12, carryFrac: 0.945 },
+  ironLong: { apexAt: 0.63, peakMult: 0.92, carryFrac: 0.959 },
+  ironShort: { apexAt: 0.68, peakMult: 1.06, carryFrac: 0.976 },
   wedge: { apexAt: 0.7, peakMult: 1.12, carryFrac: 1.0 },
   putter: { apexAt: 0.75, peakMult: 1.0, carryFrac: 1.0 },
 };

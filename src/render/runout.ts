@@ -143,7 +143,7 @@ export const DEFAULT_RUNOUT_FEEL: RunoutFeel = {
   restitutionFirm: 0.74,
   bounceSoft: 0.16,
   bounceFirm: 0.62,
-  hopLenK: 0.16,
+  hopLenK: 0.05,
   hopApexK: 0.05,
   hopApexMax: 6,
   hopMinYd: 0.35,
