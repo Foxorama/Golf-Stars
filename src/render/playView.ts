@@ -15,6 +15,7 @@ import type { Hole, Vec } from '../sim/course/contract';
 import type { PuttLog, ShotLog } from '../sim/round';
 import type { ShotRedirect } from '../sim/shot';
 import { playBoundsCorners, surfaceFirmness } from '../sim/round';
+import { lieAt } from '../sim/shot';
 import { inScorch, meteorScorch as meteorScorchFor } from '../sim/scorch';
 import { effectPatches as effectPatchesFor, inPatch, PATCH_SPECS, type PatchKind } from '../sim/patches';
 import { TENT_LINES } from '../sim/tents';
@@ -40,6 +41,7 @@ import {
 import {
   easeOutCubic,
   flightDurationMs,
+  flightT,
   sampleCurvedFlight,
   samplePolylineFlight,
   DEFAULT_FLIGHT_FEEL,
@@ -160,6 +162,22 @@ function fabricateRedirect(
 
 /** Tiny deterministic PRNG (mulberry32) — the house style, so the ambient FX are stable. */
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
+
+/**
+ * A stable 0..1 variation for a shot, from the shot's own geometry (GS-landing-real).
+ *
+ * Landings need to differ — "if it's the same bounce and run on every drive it doesn't feel real" —
+ * but the render path may not touch rng: `Math.random` is banned in any deterministic render path,
+ * and a sim draw would move every seeded stream (contract 1). So the variation is HASHED out of
+ * numbers the shot already has. Same shot, same landing, every replay; different shots, different
+ * landings; zero draws.
+ */
+function shotVariance(shot: { result: { landing: Vec; carry: number }; rest: Vec }): number {
+  const bits =
+    shot.result.landing[0] * 7919 + shot.result.landing[1] * 104_729 + shot.rest[0] * 1543 + shot.rest[1] * 21 + shot.result.carry * 3.7;
+  const x = Math.sin(bits) * 43_758.545_312;
+  return x - Math.floor(x);
+}
 const easeInOut = (t: number): number => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
 // Caddy-effect SLO-MO + callout (GS-caddy-slomo): when a caddy's signature effect fires (a guard
@@ -366,6 +384,8 @@ export function mountPlayView(
   let ballPhase = 0;
   let ballDir: Vec = [1, 0];
   let ballPrev: Vec | null = null; // last COURSE position, not the last screen position
+  /** Where the ball finished — kept so it can go on being drawn after the animation ends. */
+  let ballRest: Vec | null = null;
   /**
    * Roll the ball to a new COURSE position: advance the phase by how far it moved through the WORLD,
    * measured in today's pixels. Taking the delta between two screen positions from DIFFERENT frames
@@ -437,6 +457,7 @@ export function mountPlayView(
     ballPhase = 0;
     ballDir = [1, 0];
     ballPrev = null;
+    ballRest = null;
     redirectFiredShot = -1;
     sparksFiredShot = -1;
     impactFiredShot = -1;
@@ -792,16 +813,60 @@ export function mountPlayView(
       if (runoutShot !== shotIndex) {
         runoutShot = shotIndex;
         const VEPS = 0.02;
-        const endAt = (t: number): Vec =>
+        // The ball's ARRIVAL speed, measured off the drawn pace (GS-flight-pace) — `u` is animation
+        // progress, so the curved flight maps through `flightT` exactly as the drawn ball does. Before
+        // that mapping existed this measured the bottom of the Bézier's speed collapse and handed the
+        // whole run-out chain 2% of the flight's average speed.
+        const endAt = (u: number): Vec =>
           shot.flightPath && shot.flightPath.length > 1
-            ? samplePolylineFlight(shot.flightPath, t, peak, apexT).ground
-            : sampleCurvedFlight(shot.from, touchdown, bearing, t, peak, apexT).ground;
+            ? samplePolylineFlight(shot.flightPath, u, peak, apexT).ground
+            : sampleCurvedFlight(shot.from, touchdown, bearing, flightT(u, F), peak, apexT).ground;
         const a = endAt(1 - VEPS);
         const b = endAt(1);
         const v0 = Math.hypot(b[0] - a[0], b[1] - a[1]) / Math.max(1, VEPS * flightDur);
-        runoutPlan = planRunout(rollYds, landFirm, v0, isCheck, F, shot.club.id);
+        // How STEEPLY it came down, over the closing tenth of the ground rather than the last
+        // fraction (where the arc has a near-vertical tangent — see GS-flight-pace). Shallow arrivals
+        // skip and run; steep ones pop up and stop, and that one number is most of why the clubs feel
+        // different on the ground.
+        const closeAt = (frac: number): { g: number; h: number } => {
+          const u = 1 - frac;
+          const smp =
+            shot.flightPath && shot.flightPath.length > 1
+              ? samplePolylineFlight(shot.flightPath, u, peak, apexT)
+              : sampleCurvedFlight(shot.from, touchdown, bearing, flightT(u, F), peak, apexT);
+          return { g: Math.hypot(touchdown[0] - smp.ground[0], touchdown[1] - smp.ground[1]), h: smp.height };
+        };
+        const close = closeAt(0.12);
+        const descentDeg = (Math.atan2(close.h, Math.max(0.5, close.g)) * 180) / Math.PI;
+        // Per-shot variation with ZERO rng (contract 1): a stable hash of the shot's own geometry, so
+        // the same shot always lands the same way and no two drives land alike.
+        const vary = shotVariance(shot);
+        // The ground a given distance INTO the run-out — how a hazard gets to act on the bounce.
+        const rollDir: Vec = (() => {
+          const dx = rest[0] - touchdown[0];
+          const dy = rest[1] - touchdown[1];
+          const l = Math.hypot(dx, dy);
+          return l > 1e-6 ? [dx / l, dy / l] : [0, 1];
+        })();
+        const firmAt = (along: number): number =>
+          surfaceFirmness(lieAt(hole, [touchdown[0] + rollDir[0] * along, touchdown[1] + rollDir[1] * along]));
+        const land = {
+          dist: rollYds,
+          firm: landFirm,
+          v0,
+          carry,
+          descentDeg,
+          checking: isCheck,
+          holed: shot.holed,
+          clubId: shot.club.id,
+          vary,
+          firmAt,
+        };
+        runoutPlan = planRunout(land, F);
       }
-      const plan = runoutPlan ?? planRunout(rollYds, landFirm, 0.2, isCheck, F, shot.club.id);
+      const plan =
+        runoutPlan ??
+        planRunout({ dist: rollYds, firm: landFirm, v0: 0.2, carry, descentDeg: 45, checking: isCheck, clubId: shot.club.id }, F);
       const rollDur = plan.totalMs;
       // A swing windup leads each full shot: the ball rests at address while the golfer winds
       // up and swings, and the actual flight clock starts at CONTACT (lead ms in).
@@ -846,6 +911,14 @@ export function mountPlayView(
             (shot.result.landing[1] - shot.from[1]) * -Math.sin(brq);
           const mf = carry > 0 ? Math.abs(lat) / carry : 0;
           opts.onImpact?.('shot', Math.max(0, 1 - mf / 0.2), shot.club.id);
+          // Dr Chipinski (GS-caddy-voices) answers the call AT THE STRIKE, not as the ball drops in.
+          // Firing it on the hole-out made the chip-in read as a verdict handed down after the fact —
+          // "it feels like cheating instead of chipping in". The doctor calls it as the ball leaves
+          // the club and you watch the shot make good on it, which is the whole joke.
+          if (shot.chipIn && chipInFiredShot !== shotIndex) {
+            chipInFiredShot = shotIndex;
+            fireCaddyEffect(opts.caddyId);
+          }
         }
         let ground: Vec;
         let height: number;
@@ -855,6 +928,11 @@ export function mountPlayView(
         let zoomTarget = 1; // redirect zoom-to-impact target (1 = no zoom); eased into cineZoom below
         if (elapsed < flightDur) {
           const tg = elapsed / flightDur;
+          // GS-flight-pace: the SAMPLING parameter. `tg` stays the raw animation progress (the caddy
+          // redirect cinematic gates on it), and `tf` is where along the Bézier that progress actually
+          // puts the ball — near-constant GROUND speed instead of a curve that stops dead at the
+          // landing. The path is identical; only the pacing moves.
+          const tf = flightT(tg, F);
           // Real caddy-guard redirect (GS-caddy), or — in the force-redirect DEMO — a fabricated one so
           // the throw fires on every shot. caddyProjectile(cornerCaddyId) is the active guard's kind.
           const projKind = caddyProjectile(cornerCaddyId);
@@ -870,7 +948,7 @@ export function mountPlayView(
             // Eyes-on feel; the SCORE already used the redirected landing.
             const interceptFrac = REDIRECT_HIT_FRAC;
             const fireFrac = REDIRECT_FIRE_FRAC;
-            const sI = sampleCurvedFlight(shot.from, rd.originalLanding, bearing, interceptFrac, peak, apexT);
+            const sI = sampleCurvedFlight(shot.from, rd.originalLanding, bearing, flightT(interceptFrac, F), peak, apexT);
             // Intercept screen point, recomputed EVERY frame so it tracks the camera pan + zoom.
             const impactScreen: Vec = [0, 0];
             {
@@ -918,9 +996,9 @@ export function mountPlayView(
             else if (tg < interceptFrac + 0.14) zoomTarget = REDIRECT_ZOOM;
             else zoomTarget = REDIRECT_ZOOM + (1 - REDIRECT_ZOOM) * easeInOut(clamp01((tg - interceptFrac - 0.14) / 0.3));
 
-            height = sampleCurvedFlight(shot.from, touchdown, bearing, tg, peak, apexT).height;
+            height = sampleCurvedFlight(shot.from, touchdown, bearing, tf, peak, apexT).height;
             if (tg < interceptFrac) {
-              ground = sampleCurvedFlight(shot.from, rd.originalLanding, bearing, tg, peak, apexT).ground;
+              ground = sampleCurvedFlight(shot.from, rd.originalLanding, bearing, tf, peak, apexT).ground;
             } else {
               const e = easeInOut((tg - interceptFrac) / (1 - interceptFrac));
               ground = [
@@ -958,7 +1036,7 @@ export function mountPlayView(
               }
             }
           } else {
-            const s = sampleCurvedFlight(shot.from, touchdown, bearing, tg, peak, apexT);
+            const s = sampleCurvedFlight(shot.from, touchdown, bearing, tf, peak, apexT);
             ground = s.ground;
             height = s.height;
           }
@@ -988,12 +1066,6 @@ export function mountPlayView(
             spawnLandFX([tdx, tdy], landLie, tdPenalty);
             // The surface also ANSWERS in sound (GS-audio-3) — same resolved lie the FX just showed.
             opts.onLand?.(landLie, tdPenalty, shot.knockedDown);
-          }
-          // Dr Chipinski chip-in (GS-caddy-voices): as the ball drops in, slow the world and have the
-          // doctor "answer the call" — the phone glyph + "You rang?" bubble + voice. Fires once.
-          if (shot.chipIn && chipInFiredShot !== shotIndex) {
-            chipInFiredShot = shotIndex;
-            fireCaddyEffect(opts.caddyId);
           }
           // Trade-camp tent ricochet (GS-tents): the ball just bounced off a tent — pop an "Ow!" /
           // "Watch it!" bubble at the struck tent + cue the sound. A little screen-shake for the bonk.
@@ -1063,7 +1135,10 @@ export function mountPlayView(
         // buildProj next frame). zoomTarget is 1 outside a redirect, so non-redirect shots hold at 1.
         cineZoom += (zoomTarget - cineZoom) * 0.2;
         const [gx, gy] = proj.project(ground);
-        const ballY = gy - height * proj.scale * F.heightExaggeration;
+        // The drawn height. A bounce is exaggerated well past its modelled yards (GS-landing-real):
+        // a real first bounce peaks ~2yd over a ~15yd skip, which at the shot camera's ~2px/yd is four
+        // pixels under a ball drawn at three. The flight needs no such help — it is already 25yd up.
+        const ballY = gy - height * proj.scale * F.heightExaggeration * (rollPhase ? F.hopDrawBoost : 1);
 
         // Golfer holds the follow-through at the address point, fading as the ball flies off.
         if (F.golfer && elapsed < F.followMs) {
@@ -1130,6 +1205,7 @@ export function mountPlayView(
         // The BALL. In the air on its flight it carries steady BACKSPIN (a struck ball does, and its
         // screen displacement there is 40 rad a frame, which is neither true nor watchable); the
         // moment it is running out it rolls off its own screen movement instead.
+        ballRest = ground;
         if (rollPhase) rollBallTo(ground, (q) => proj.project(q), ballR);
         else {
           ballPhase = advanceFlightSpin(ballPhase, dt, F);
@@ -1149,7 +1225,10 @@ export function mountPlayView(
         // and start the rest-hold pause.
         if (elapsed >= flightDur + rollDur && lastImpactShot !== shotIndex) {
           lastImpactShot = shotIndex;
-          if (shot.holed) spawnImpact([rsx, rsy], 1);
+          if (shot.holed) {
+            spawnImpact([rsx, rsy], 1);
+            ballRest = null; // it went IN — do not leave it sitting on the lip
+          }
           else if (shot.knockedDown) spawnLeaves([tdx, tdy]);
           // A ball that landed safe and then rolled off into a penalty (a lost-rough void/cetus island)
           // fires its lost-ball implosion + voice HERE, at the ball's actual resting point in the void —
@@ -1218,6 +1297,7 @@ export function mountPlayView(
       // is at its biggest and every turn is legible — including the break, since the roll direction
       // comes from the ball's own screen motion along the curved path.
       const puttR = ballRadiusPx(proj.scale, 0, F);
+      ballRest = putt.holed ? null : cur; // a holed putt is IN the cup, not sitting beside it
       rollBallTo(cur, (q) => proj.project(q), puttR);
       drawBall(ctx, gx[0], gx[1], puttR, {
         phase: ballPhase,
@@ -1234,9 +1314,27 @@ export function mountPlayView(
         puttIndex++;
         segStart = now + F.gapMs;
       }
-    } else if (!done) {
-      done = true;
-      opts.onDone?.();
+    } else {
+      // The ball STAYS on the screen once everything has played (GS-landing-real). The canvas keeps
+      // painting frames until the app swaps the screen, and this branch used to draw nothing at all —
+      // so the ball blinked out of existence and the player watched an empty fairway for the handful
+      // of frames before the next screen arrived. Draw it at rest, exactly where it finished.
+      if (ballRest) {
+        const [fx, fy] = proj.project(ballRest);
+        const restR = ballRadiusPx(proj.scale, 0, F);
+        drawBallShadow(ctx, fx, fy, restR, 0);
+        drawBall(ctx, fx, fy, restR, {
+          phase: ballPhase,
+          dirX: ballDir[0],
+          dirY: ballDir[1],
+          skin: ballSkinFor(opts.golferLook),
+          feel: F,
+        });
+      }
+      if (!done) {
+        done = true;
+        opts.onDone?.();
+      }
     }
 
     // Caddy-guard projectile (laser/boomerang) flying from the caddy to the ball mid-flight — drawn

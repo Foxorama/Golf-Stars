@@ -46,6 +46,19 @@ absolute; inset: 0`) and the lore portrait a real sibling `<button>` above it in
 because character select is viewport-locked to one mobile screen (GS-select-onescreen) and the
 restructure deserves its own pass + a layout smoke test rather than riding along with an a11y sweep.
 
+**GS-flight-arc-tail — the drawn flight drops its last yards almost vertically** *(found while fixing
+GS-flight-pace; a BALANCE change, so deliberately left out of that PR)*
+The height is `arcHeight`, a two-piece sine in the Bézier's PARAMETER, while the ground advances as
+`2t − t²`. Expressed against ground the descending half therefore falls as `√(1−G)` — an infinite slope
+at touchdown. Measured: at 98% of the ground a driver is still **8.8 yards up**, and drops it over the
+last five yards. It reads as a ball plunging in rather than descending, and it is why the honest descent
+angle has to be measured over the closing TENTH of the ground instead of the last percent.
+The fix is to map height against the GROUND fraction (`arcHeight(apex, groundFrac, profile.apexAt)`)
+rather than the parameter. That changes the (ground, height) pairs — which is exactly what the sim's
+knockdown walk tests, so trees near a landing would start blocking shots they currently clear. Contract
+5 says the two must agree, so BOTH sides move together and the death-spiral harness has to be re-run.
+Worth doing: the tail is the least convincing part of the flight now that the pacing is right.
+
 **GS-green-surface-bite — non-penalty hazards eat the putting surface** *(found while building
 GS-green-backstop; real, measured, deliberately left out of that PR)*
 `lieAt` gives HAZARDS precedence over FEATURES, so any hazard blob overlapping the green polygon turns

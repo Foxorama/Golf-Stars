@@ -393,23 +393,34 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     render-only (`backspinRoll` is PURE — the mean roll through the same `rollOut`, so the drawn run IS the
     physics, contract 5). Read range is shoppable gear (`spinReadBonus`/`spinReadFull`, each paired with a
     small `backspinBoost` so auto still gains).
-  - **LAND → BOUNCE → RUN-OUT is a BALLISTIC model, not an ease curve** (GS-runout-feel,
-    `render/runout.ts` — pure, node-testable, render-only). The sim owns WHERE the ball finishes and the
-    curved path it takes; this owns WHEN it is where and how high off the ground. The run-out splits into a
-    BOUNCE phase and a ROLL phase by landing `surfaceFirmness`; within a hop the ball flies at CONSTANT
-    horizontal speed and loses a slice at each CONTACT, so hop distance/duration/apex all decay off one
-    restitution; the roll is constant deceleration. **The chain starts at the flight's own final ground
-    speed** (measured off the same `sampleCurvedFlight`/`samplePolylineFlight` the ball was just drawn
-    flying), so there is no velocity step from strike to rest. The BACKSPIN check is two beats — an airborne
-    forward SKID carrying flight momentum, then the spin bites and drags the ball back, accelerating out of
-    the grab and easing to rest. Three things caused the "the ball landed and then teleported away" report
-    and all three are structural, not tuning: a 150ms floor tuned at MAP zoom and played at the ~6.6×
-    chip/putt zoom; `easeOutCubic`, which is at max speed at t=0 and braking immediately (a real ball leaves
-    its first bounce at nearly flight speed); and a `|sin|` hop train on its OWN clock, so the ball was
-    airborne while braking and sliding while grounded. Knobs are `RunoutFeel` spread into `_gsFeel` — a
-    SUB-FIELD, so no test-hub wiring. Guarded by `tests/runout.test.ts`; contract 5 holds (the walk is by
-    ARC LENGTH along the sim's own `rollPath`, ending exactly on the resolved rest point).
-  - **BOUNCE AND RUN READ PER CLUB, AND THEY COME FROM DIFFERENT PLACES** (GS-runout-club). The RUN is
+  - **THE SHOT HAS TO ARRIVE** (GS-flight-pace). `flightControl` puts the Bézier's control point ON the
+    landing for any shot that finishes on its line, so the curve degenerates to `2t − t²` — ground speed
+    `2(1−t)`, i.e. **twice the average at the strike and exactly ZERO at the landing**. Measured on the
+    drawn arc: 75% of the ground covered in the first HALF of the animation, 99% by t=0.9, touchdown at
+    **2% of average speed**. The ball rocketed off the club and floated down, and every downstream
+    number inherited it — the run-out chain starts from the measured arrival speed, so it was faithfully
+    continuous from a broken one. `flightT(u)` maps animation time to the parameter for near-constant
+    GROUND speed (tapering only as far as `flightDragTaper` — a drive loses a third of its horizontal
+    speed, not all of it); arrival speed went 0.0067 → 0.28 yd/ms. The drawn PATH is untouched: the same
+    `t` still feeds ground AND `arcHeight`, so every (ground, height) pair the sim's knockdown walk tests
+    is one the renderer draws (contract 5). `samplePolylineFlight` is exempt — it already walked by arc
+    length, i.e. it was already right.
+  - **THE LANDING IS BUILT FROM THE FLIGHT, NOT A CLASS LOOKUP** (GS-landing-real, `render/runout.ts`
+    `Landing`). A hop's LENGTH scales with `carry·cos²(descent)` and its APEX with `carry·sin²(descent)`,
+    so how far it flew and how steeply it fell decide the landing: driver 36° down skips 12yd six times,
+    a wedge at 62° pops once. Descent is measured off the drawn arc over the closing TENTH of the ground
+    (the last 1% has a near-vertical tangent artefact). Three rules: **every airborne shot bounces at
+    least once** (wedges planned ZERO hops before — their run is shorter than the old length floor);
+    **the hop train can never outrun the sim** (capped so a closing roll always remains, and since the
+    sim's own `dist` collapses on soft ground the surface kills the bounce through the physics); and
+    **speed is chained** off the arrival. A hop lands ON ground it samples (`firmAt`) so skipping INTO a
+    bunker kills the rest of the train. Per-shot variation is a HASH of the shot's own geometry — zero
+    rng, zero draws (contract 1) — because an identical bounce every drive is the tell that it is
+    animation. `hopDrawBoost` is deliberately SMALL (1.8): height is exaggerated and length is not, so
+    the boost multiplies the drawn height-to-length ratio directly and 4× turned a skip into a pop-up.
+    `rollEntryFloor` is retired to 0 — flooring an entry speed IS a velocity step. Eyes-on:
+    `scripts/landing-preview.mjs`.
+  - **BOUNCE AND RUN READ PER CLUB  - **BOUNCE AND RUN READ PER CLUB, AND THEY COME FROM DIFFERENT PLACES** (GS-runout-club). The RUN is
     the SIM's — `FLIGHT_PROFILES.carryFrac`, total-preserving — and the irons were ONE row at 0.9, so
     every iron ran LESS than a hybrid and a 3-iron was indistinguishable from a 9-iron. `flightClassOf`
     now splits them at the NUMBER (`ironLong` ≤5 / `ironShort`), still convention-based so a new `4i`
@@ -428,6 +439,16 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     tail (13yd after 7yd off a firm driver) — every hop is now a clean geometric share and the leftover
     rolls. **A piecewise run-out must test `ds/dt` across EVERY phase join**: the old suite pinned
     touchdown alone and shipped a hard stop mid-animation. Guarded by `tests/runout.test.ts`.
+  - **THE BALL STAYS ON THE SCREEN, AND A SHADOW UNDER THE BALL IS NO SHADOW** (GS-landing-real). The
+    play view drew NOTHING once every shot and putt had played, so the ball blinked out and the player
+    watched an empty fairway until the screen changed; it is now drawn at rest until unmount (cleared
+    on a hole-out — it went IN). And `drawBallShadow` drew concentric with the ball at the same radius,
+    so on the ground — most of a run-out — the ball covered it completely: "I can't see any shadows at
+    all" was a shadow drawn every frame, underneath the ball. It is now OFFSET down-right off `LIGHT_UL`
+    and wider than the ball.
+  - **A CADDY CALLS THE SHOT, IT DOES NOT ADJUDICATE IT** (GS-landing-real). Dr Chipinski's "You rang?"
+    fired as the ball dropped in, which read as a verdict handed down after the fact — "it feels like
+    cheating instead of chipping in". It fires at the STRIKE now and the shot makes good on it.
   - Greens layer 1–2 contour LOBES (`Hole.greenContour`, own side stream) over the plane; `greenSlopeAt` is
     the ONE field the resolver, preview, read AND arrows sample (`sim/contour.ts`). `rollOut` samples it per
     step and CURLS (roll is ARC length; straight-roll invariance holds only on lobe-less holes); the first
