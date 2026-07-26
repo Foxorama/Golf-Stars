@@ -231,9 +231,65 @@ export function hasBackspin(nominalCarry: number): boolean {
  * `rollOut`. Consumes EXACTLY one rng draw (same as the old `rollYards`), so a 0-delta shot keeps the
  * same rng budget and auto≡interactive holds. */
 function rollPotential(profile: FlightProfile, nominalCarry: number, carry: number, rng: Rng, rollFracDelta = 0): number {
-  const frac = rollFractionFor(profile, nominalCarry) + rollFracDelta;
+  let frac = rollFractionFor(profile, nominalCarry) + rollFracDelta;
+  // A spin build can take the RUN off any club in the bag; it can only spin BACK the clubs that spin
+  // back (GS-spin-gate). `hasBackspin` has always been the predicate for "clubs whose roll a spin
+  // build can turn into a real BACKSPIN check" — PW and below — and this is the code that never asked
+  // it. Stacking two spin items (0.26 + 0.2) against a driver's 0.25 run fraction sent it NEGATIVE, so
+  // a driver checked back to the −18yd MAX_CHECK: a 250-yard drive that lands and sucks 18 yards
+  // backwards across a contoured green. Above the wedge threshold the spin now bottoms out at a dead
+  // stop, which is the honest trade — you bought spin, you gave up your run.
+  if (frac < 0 && !hasBackspin(nominalCarry)) frac = 0;
+  // The rng draw is consumed either way, so the stream is identical whether or not the clamp bites.
   const raw = carry * frac * rng.range(0.85, 1.15);
   return Math.max(-MAX_CHECK, Math.min(ROLL_ENERGY_CAP, raw));
+}
+
+/**
+ * The path a HOLED-OUT chip takes from where it would have stopped to the cup (GS-chipin-roll).
+ *
+ * Dr Chipinski's chip-in is a caddy-granted OUTCOME: the sim decides the ball drops, sets the next
+ * ball position to the pin, and — before this — left `rest` and `rollPath` at the natural resting spot.
+ * So the ball was drawn rolling to a halt an average of four yards from the flag, and the hole-out
+ * explosion fired there, on ground with no hole in it. Measured across six chip-ins the drawn finish
+ * was 3.0–5.8 yards from a cup of radius 1.2.
+ *
+ * The last few yards therefore have to be drawn, and on a contoured green they have to BREAK, or the
+ * ball tracks to the cup like a magnet. The curve is a quadratic Bézier whose control point is pushed
+ * off the chord by the green's own perpendicular slope component at the midpoint — the same field that
+ * breaks a putt (`greenSlopeAt`) and curls a run-out — so the trickle bends the way the topo rings say
+ * the ground bends. It ends EXACTLY on the cup, because that outcome is already decided.
+ *
+ * Pure, zero rng: geometry after the fact, so auto ≡ interactive and every seeded stream is untouched.
+ */
+const CHIPIN_BOW_K = 0.22; // chord-fraction of break per unit of perpendicular slope
+const CHIPIN_BOW_MAX = 2.2; // yards — a trickle that curls, never a banana
+const CHIPIN_STEPS = 8;
+export function chipInPath(hole: Hole, from: Vec, cup: Vec): { path: Vec[]; length: number } {
+  const dx = cup[0] - from[0];
+  const dy = cup[1] - from[1];
+  const chord = Math.hypot(dx, dy);
+  if (chord < 1e-6) return { path: [from, cup], length: 0 };
+  const ux = dx / chord;
+  const uy = dy / chord;
+  const mid: Vec = [from[0] + dx * 0.5, from[1] + dy * 0.5];
+  const s = greenSlopeAt(mid, hole.greenSlope, hole.greenContour);
+  // Perpendicular component of the fall line: the direction (and amount) a putt would break here.
+  const perp = s[0] * -uy + s[1] * ux;
+  const bow = Math.max(-CHIPIN_BOW_MAX, Math.min(CHIPIN_BOW_MAX, perp * chord * CHIPIN_BOW_K));
+  const cx = mid[0] + -uy * bow;
+  const cy = mid[1] + ux * bow;
+  const path: Vec[] = [];
+  for (let i = 0; i <= CHIPIN_STEPS; i++) {
+    const t = i / CHIPIN_STEPS;
+    const w = (1 - t) * (1 - t);
+    const w2 = 2 * (1 - t) * t;
+    const w3 = t * t;
+    path.push([w * from[0] + w2 * cx + w3 * cup[0], w * from[1] + w2 * cy + w3 * cup[1]]);
+  }
+  let length = 0;
+  for (let i = 1; i < path.length; i++) length += dist(path[i]!, path[i - 1]!);
+  return { path, length };
 }
 
 /**
@@ -1362,6 +1418,19 @@ export function executeShot(
     holed = true;
     ballAfter = pin(hole);
     lieAfter = 'green';
+    // …and the ball actually GOES there (GS-chipin-roll). The outcome was already decided above; what
+    // was missing is the travel, so the renderer had the ball stop short and the hole-out fire on bare
+    // ground. Extend the recorded run-out along a contour-broken trickle into the cup: `rest` IS the
+    // cup, `roll` grows by the arc it covers, and `rollPath` carries the curve the play view walks.
+    const cup = pin(hole);
+    const trickle = chipInPath(hole, rest, cup);
+    log.rollPath = log.rollPath && log.rollPath.length > 1 ? [...log.rollPath, ...trickle.path.slice(1)] : trickle.path;
+    // POSITIVE and total: the ball's journey now ends forward, in the cup, so the recorded run is the
+    // whole arc it travelled to get there. A wedge that checked back four yards and then trickled five
+    // into the hole covered nine yards of ground, and that is what the card and the drawn walk both
+    // want — a "−4yd check" on a ball that finished forward in the hole is neither.
+    log.roll = Math.abs(log.roll ?? 0) + trickle.length;
+    log.rest = cup;
   }
 
   return { log, ballAfter, lieAfter, restLie, penaltyStrokes, holed };

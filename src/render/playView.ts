@@ -785,6 +785,10 @@ export function mountPlayView(
       // flight, which is half of why a short check read as a teleport.
       const rollYds = Math.abs(shot.roll ?? 0);
       const landFirm = surfaceFirmness(shot.landLie ?? shot.lieTo);
+      // A backspin CHECK is drawn as a forward skid that reverses. A Dr Chipinski chip-in
+      // (GS-chipin-roll) appends a forward trickle into the cup, so its path ends AHEAD of the pitch
+      // mark and is walked straight through — the ball going in beats the check drama.
+      const isCheck = (shot.roll ?? 0) < -0.3 && !shot.chipIn;
       if (runoutShot !== shotIndex) {
         runoutShot = shotIndex;
         const VEPS = 0.02;
@@ -795,9 +799,9 @@ export function mountPlayView(
         const a = endAt(1 - VEPS);
         const b = endAt(1);
         const v0 = Math.hypot(b[0] - a[0], b[1] - a[1]) / Math.max(1, VEPS * flightDur);
-        runoutPlan = planRunout(rollYds, landFirm, v0, (shot.roll ?? 0) < -0.3, F, shot.club.id);
+        runoutPlan = planRunout(rollYds, landFirm, v0, isCheck, F, shot.club.id);
       }
-      const plan = runoutPlan ?? planRunout(rollYds, landFirm, 0.2, (shot.roll ?? 0) < -0.3, F, shot.club.id);
+      const plan = runoutPlan ?? planRunout(rollYds, landFirm, 0.2, isCheck, F, shot.club.id);
       const rollDur = plan.totalMs;
       // A swing windup leads each full shot: the ball rests at address while the golfer winds
       // up and swings, and the actual flight clock starts at CONTACT (lead ms in).
