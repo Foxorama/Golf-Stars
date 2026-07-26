@@ -35,7 +35,7 @@ import type { HoleRecord } from './score';
 import type { HoleStat } from './stats';
 import type { Rng } from './rng';
 import { usableBag } from './rpg/economy';
-import { arcApex, ARC_FEEL, flightBlockedBy, flightCarryScale, flightClassOf, flightKnockdown, flightObstacles, flightProfileOf, flightScaleFor, rollFractionFor, type FlightClass, type FlightProfile } from './flight';
+import { arcApex, ARC_FEEL, clubTotalReach, flightBlockedBy, flightCarryScale, flightClassOf, flightKnockdown, flightObstacles, flightProfileOf, flightScaleFor, rollFractionFor, type FlightClass, type FlightProfile } from './flight';
 import { insideTent, tentFlightHit, tradeTents, TENT_BOUNCE_MIN, type TentHit, type TentEffectId, type TradeTent } from './tents';
 import { wallRollBounce, wallReflect, WALL_BOUNCE_MIN, WALL_ROLL_RESTITUTION, type WallHit } from './walls';
 import type { ShipWall } from './course/contract';
@@ -2140,19 +2140,26 @@ export function layupTarget(
 }
 
 /** Effective max TOTAL reach (yards) the bag can finish at from this lie — where the ball ends
- *  (carry + run). This is the number a green/position REACH decision keys off; the carry/roll split
- *  preserves the total, so it is unchanged. */
+ *  (carry + run). This is the number a green/position REACH decision keys off.
+ *  Reads `clubTotalReach`, NOT the club's bare number (GS-carry-roll-real): the split is anchored on
+ *  the legacy roll, so a club finishes `number · (1 + legacyRoll)` — the bare number was a CARRY, and
+ *  using it here understated the driver's finish by 18% and let `maxFlightReachOf` overtake it once
+ *  `carryFrac` passed 0.847. Flight now sits inside total by construction (their ratio IS `carryFrac`). */
 function maxReachOf(bag: readonly Club[], carryMult: number, lie: FeatureKind): number {
   let max = 0;
-  for (const c of bag) if (c.id !== 'putter') max = Math.max(max, c.carry);
-  return max * carryMult * lieInfo(lie).carryMult;
+  const lieM = lieInfo(lie).carryMult;
+  for (const c of bag) {
+    if (c.id === 'putter') continue;
+    max = Math.max(max, clubTotalReach(c.id, c.carry) * carryMult * lieM);
+  }
+  return max;
 }
 
 /** Effective max FLIGHT reach (yards) the bag can CARRY from this lie — where the ball first LANDS,
  *  the number a forced-carry decision needs (GS-carry-rollout-split). The split lands the ball at
  *  `flightCarryScale` of its total, so a carry over water must be cleared in the AIR, not by the run —
  *  this is what tells the AI to lay up when its reduced flight can't span the hazard. Wedge/putter
- *  (scale 1) are unchanged; the longest club (driver, ~0.94×) drives this. */
+ *  (scale 1) are unchanged; the longest club drives this. Always ≤ `maxReachOf` — same anchor. */
 function maxFlightReachOf(bag: readonly Club[], carryMult: number, lie: FeatureKind): number {
   let max = 0;
   const lieM = lieInfo(lie).carryMult;
@@ -2193,13 +2200,38 @@ export function autoAimTarget(
   const t0 = nearestCentrelineT(hole, ball);
   const tAim = stationAtDistance(hole, ball, t0, maxReach * WIDTH_LAYUP.meanLandFrac);
   const aimPt = pointAlong(hole.centreline, tAim);
-  // If the straight line to that station is penalty-free, aim there. Otherwise a forced carry blocks it:
-  // defer to the shared safe logic toward the green (carry it, or lay up short — fair by construction),
-  // but never aim a positioning shot PAST a drive (the fractional side-hazard advance can overshoot on a
-  // wandering corridor), so fall back to the reachable station if the safe line runs long.
-  if (clearLine(hole, ball, aimPt)) return aimPt;
+  // If the station is playable AND the straight line to it is penalty-free, aim there. Otherwise a
+  // forced carry blocks it: defer to the shared safe logic toward the green (carry it, or lay up short —
+  // fair by construction), but never aim a positioning shot PAST a drive (the fractional side-hazard
+  // advance can overshoot on a wandering corridor).
+  // `clearLine` samples the line STRICTLY BETWEEN its ends, so it says nothing about the station
+  // itself — a corridor that runs into a river has a dry approach and a wet landing. Ask both.
+  if (clearLine(hole, ball, aimPt) && !lieInfo(lieAt(hole, aimPt)).penalty) return aimPt;
   const safe = safeTarget(hole, ball, pin, maxReach, maxFlightReachOf(bag, carryMult, lie));
-  return dist(ball, safe) <= maxReach + 1e-6 ? safe : aimPt;
+  if (dist(ball, safe) <= maxReach + 1e-6) return safe;
+  // The safe line runs PAST a drive, so keep the positioning station — but never a wet one. `aimPt` is
+  // a raw centreline station, and on a hole whose corridor runs THROUGH a river the station itself sits
+  // in the water; the whole chain downstream then reads a lie it must never be handed (`forcedCarry`
+  // reports "fly the entire way" from its line-ends-inside-the-band branch, and the club pick hunts for
+  // a club to carry a bank that has no far side). Back it DOWN the corridor to the furthest dry station
+  // instead: that keeps both properties the two candidates each broke on their own — a target that is
+  // playable AND inside one drive. Returns `aimPt` untouched whenever it is already dry.
+  return dryStationBefore(hole, t0, tAim) ?? safe;
+}
+
+/** The furthest penalty-free centreline station at or before `tAim` (walking back toward `t0`), or null
+ *  if the whole stretch is wet. Used by the interactive default aim so a positioning target is always a
+ *  place the ball can actually SIT — a corridor that runs through a river has wet stations on it, and a
+ *  drive aimed at one is unreadable. Zero rng, and it returns `tAim` itself whenever that is already dry
+ *  (so the ordinary hole is unchanged). */
+function dryStationBefore(hole: Hole, t0: number, tAim: number): Vec | null {
+  const STEPS = 16;
+  for (let i = 0; i <= STEPS; i++) {
+    const t = tAim - ((tAim - t0) * i) / STEPS;
+    const p = pointAlong(hole.centreline, t);
+    if (!lieInfo(lieAt(hole, p)).penalty) return p;
+  }
+  return null;
 }
 
 /**
@@ -2236,22 +2268,32 @@ export function autoAimClub(
   }
   const cand = bag.filter((c) => c.id !== 'putter');
   if (cand.length === 0) return bag[0]!;
-  // Open positioning down the corridor → send the LONGEST club (driver off the tee).
+  // ONE rule for every positioning shot: the LONGEST club that clears whatever has to be cleared and
+  // comes DOWN on a playable spot. The two cases differ only in what to do when no club manages it.
   const longest = cand.reduce((a, b) => (clubDist(b) > clubDist(a) ? b : a));
-  if (clearLine(hole, ball, target)) return longest;
+  const dry = longestCarryClub(hole, ball, target, lie, carryMult, cand);
+  // Open line down the corridor → the driver off the tee. The landing check still applies: an open line
+  // is not an empty one, and the target may be a deliberate lay-up SHORT of a hazard (GS-carry-roll-real
+  // taught `autoAimTarget` to lay up rather than aim into a river). Arming the longest club there would
+  // fly the ball straight past the lay-up into the water it was laid up short of — the pre-armed default
+  // must not be the one shot the player would never choose. Nothing dry ⇒ the longest club, unchanged.
+  if (clearLine(hole, ball, target)) return dry ?? longest;
   // Blocked line: the aim flies OVER a hazard (a forced carry — a lay-up SHORT would leave the line
   // clear). A player takes the driver to carry it, not a clubbed-down wood, so send the LONGEST club
   // that still clears the far bank AND lands on a penalty-free spot. Only if none can (the hazard is
   // out of every club's carry — a genuine lay-up short) fall back to the controlled `aiClub` reach.
-  return longestCarryClub(hole, ball, target, lie, carryMult, cand) ?? aiClub(hole, ball, target, carryMult, bag);
+  return dry ?? aiClub(hole, ball, target, carryMult, bag);
 }
 
 /**
- * The LONGEST club that safely CARRIES the hazard on the ball→target line and comes down on a
+ * The LONGEST club that safely CARRIES any hazard on the ball→target line and comes down on a
  * penalty-free spot — the club a player reaches for on a forced-carry drive (more club = the safer
- * carry). Walks longest→shortest and returns the first whose nominal carry clears the hazard's far
+ * carry). Walks longest→shortest and returns the first whose FLIGHT carry clears the hazard's far
  * bank and whose landing isn't itself a penalty (so a bomb that would overshoot into a SECOND hazard
- * steps down to the longest club that stays dry). Null when no club can clear it (lay up short).
+ * steps down to the longest club that stays dry). Null when no club manages both (lay up short).
+ * A clear line is the same question with nothing to clear — the landing test still has to be asked,
+ * because the target may be a lay-up short of a hazard the longest club would fly into
+ * (GS-carry-roll-real), so `forcedCarry` being absent narrows the rule rather than skipping it.
  * Pure, zero rng — used only by the interactive default-club pick.
  */
 function longestCarryClub(
@@ -2263,7 +2305,7 @@ function longestCarryClub(
   cand: readonly Club[],
 ): Club | null {
   const fc = forcedCarry(hole, ball, target);
-  if (!fc) return null; // not actually a carry — nothing to clear
+  const mustCarry = fc ? fc.carry : 0;
   const total = dist(ball, target);
   if (total < 1) return null;
   const ux = (target[0] - ball[0]) / total;
@@ -2275,7 +2317,7 @@ function longestCarryClub(
     // the reach by the club's flight fraction — a club whose TOTAL clears but whose landing drops into
     // the hazard is not a carry club.
     const carry = clubDist(c) * flightCarryScale(c.id, clubDist(c)) * carryMult * lieM;
-    if (carry < fc.carry) continue; // doesn't reach past the far bank → would drop into the hazard
+    if (carry < mustCarry) continue; // doesn't reach past the far bank → would drop into the hazard
     const land: Vec = [ball[0] + ux * carry, ball[1] + uy * carry];
     if (lieInfo(lieAt(hole, land)).penalty) continue; // overshoots into another penalty → try shorter
     return c;

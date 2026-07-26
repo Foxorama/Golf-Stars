@@ -183,6 +183,24 @@ export function clubRollFraction(clubId: string | undefined, nominalCarry: numbe
 }
 
 /**
+ * Where a club of `nominalCarry` FINISHES — its flight plus the run it releases (GS-carry-roll-real).
+ * THE ENDPOINT IS THE THING THE SPLIT PRESERVES, AND THIS IS THE ONE PLACE THAT SAYS WHAT IT IS: a
+ * club's number is NOT its total (the split is anchored on the legacy roll, so the ball finishes
+ * `nominalCarry · (1 + legacyRollFraction)` — a 250-yard driver runs out to 295). A reach model that
+ * used the bare number instead was silently a CARRY number, and `flightScaleFor` outgrew it the moment
+ * `carryFrac` rose past `1/(1+legacyRoll)` = 0.847 — which is how a flight reach ended up LONGER than
+ * the "total" reach it is supposed to sit inside. Built from `flightScaleFor` × `rollFractionFor` so
+ * flight/total is exactly `carryFrac ≤ 1` by construction and the two can never invert again. Pure. */
+export function totalReachFor(profile: FlightProfile, nominalCarry: number): number {
+  return nominalCarry * flightScaleFor(profile, nominalCarry) * (1 + rollFractionFor(profile, nominalCarry));
+}
+
+/** `totalReachFor` keyed by club id. Pure. */
+export function clubTotalReach(clubId: string | undefined, nominalCarry: number): number {
+  return totalReachFor(flightProfileOf(clubId), nominalCarry);
+}
+
+/**
  * The profile's apex position converted from GROUND fraction to flight-PARAM fraction. The curved
  * path's Bézier param covers ground non-uniformly (a straight shot's ground progress is 2t−t², fast
  * early, slow late), so placing the apex at ground fraction `apexAt` means peaking at param

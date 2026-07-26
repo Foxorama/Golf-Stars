@@ -381,12 +381,38 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
   - **Backspin is OPT-IN** (GS-backspin-optin): the wedge branch of `clubRollFraction` tapers +5%→0% (a
     check-to-a-stop, never negative); a negative roll comes ONLY from a spin BUILD (Backspin Bo's
     `rollFracDelta` or `backspinBoost` gear). Pure physics change, zero extra draws.
-  - **Carry / roll split** (GS-carry-rollout-split): a club's number is TOTAL (carry + run); the ball flies
-    a family `carryFrac` and runs the rest, total-PRESERVING (endpoint unchanged ⇒ death-spiral neutral).
-    Lives in `flight.ts` (`flightScaleFor`/`rollFractionFor`); wedge/putter `carryFrac` 1 ⇒ backspin/putting
-    byte-for-byte. **The one fairness coupling: the carry-aware AI keys off FLIGHT reach**
-    (`maxFlightReachOf`), never total — a forced carry must clear in the AIR. REACH decisions (green/
-    position) still key off total.
+  - **Carry / roll split** (GS-carry-rollout-split): the ball flies a family `carryFrac` and runs the rest,
+    total-PRESERVING (endpoint unchanged ⇒ death-spiral neutral). Lives in `flight.ts`
+    (`flightScaleFor`/`rollFractionFor`); wedge/putter `carryFrac` 1 ⇒ backspin/putting byte-for-byte.
+    **The one fairness coupling: the carry-aware AI keys off FLIGHT reach** (`maxFlightReachOf`), never
+    total — a forced carry must clear in the AIR. REACH decisions (green/position) still key off total.
+    **A CLUB'S NUMBER IS ITS NOMINAL CARRY, NOT ITS TOTAL, AND THERE IS ONE FUNCTION THAT SAYS SO**
+    (GS-carry-roll-real, `clubTotalReach`). The split is anchored on the legacy roll, so the ball FINISHES
+    at `number · (1 + legacyRollFraction)` — a 250-yard driver runs out to 295. A reach model built on the
+    bare number is therefore a CARRY model wearing a total's name, and `flightScaleFor` overtakes it the
+    moment `carryFrac` passes `1/(1+legacyRoll)` = **0.847**: the old driver sat at 0.80 and hid it, the
+    real-golf 0.922 exposed it, and `maxFlightReachOf` (258) came out LONGER than the `maxReachOf` (237)
+    it is supposed to sit inside. Downstream that inverted pair aimed the default straight into a lava
+    river. Both models now build on `flightScaleFor` × `rollFractionFor`, so flight/total is exactly
+    `carryFrac ≤ 1` and they cannot invert again. **A test that compares a club's number against a
+    required CARRY is asking the wrong question** — measure the flight (`flightCarryScale`), or the
+    assertion is too lax below 0.847 and too strict above it.
+  - **THE DEFAULT AIM NEVER POINTS AT A HAZARD, AND THE PRE-ARMED CLUB NEVER FLIES INTO ONE**
+    (GS-carry-roll-real, interactive only — the auto path keeps its own `layupTarget`, so determinism is
+    untouched). `autoAimTarget` had two ways to hand back a wet target: `clearLine` samples STRICTLY
+    BETWEEN its ends, so it says nothing about the station itself (a corridor running into a river has a
+    dry approach and a wet landing), and the overshoot fallback returned a raw centreline station
+    unchecked. A wet target poisons everything downstream — `forcedCarry` reports "fly the entire way"
+    from its line-ends-inside-the-band branch, and the club pick hunts for a club to carry a bank with no
+    far side. Both are closed, and when the safe line runs past a drive the aim now backs DOWN the
+    corridor to the furthest dry station (`dryStationBefore`) rather than choosing between a wet target
+    and an unreachable one. `autoAimClub` then applies ONE rule to every positioning shot — the longest
+    club that clears what must be cleared AND lands playable — because an open line is not an empty one:
+    the target may be a lay-up the longest club would fly straight past into the water. A step-down below
+    `aiClub` is legal and machine-checked as FORCED (`aiClub` reasons about reaching, never about where
+    the ball comes down; 3 step-downs in 1,083 tee shots, all forced). Measured across 3,072 par-4/5 tee
+    shots: wet targets 74 → **0**, wet full-swing landings 22 → **0**, carries short of the far bank
+    **0**, driver still pre-armed on 99% of forced carries.
   - **A CADDY-GRANTED OUTCOME STILL HAS TO BE TRAVELLED** (GS-chipin-roll). Dr Chipinski's chip-in set
     `ballAfter = pin(hole)` and left `rest`/`rollPath` at the natural resting spot, so the drawn ball
     stopped **3.0–5.8yd from a cup of radius 1.2** and the hole-out FX fired on bare ground. The branch

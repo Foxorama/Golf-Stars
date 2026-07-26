@@ -46,24 +46,15 @@ absolute; inset: 0`) and the lore portrait a real sibling `<button>` above it in
 because character select is viewport-locked to one mobile screen (GS-select-onescreen) and the
 restructure deserves its own pass + a layout smoke test rather than riding along with an a11y sweep.
 
-**GS-carry-roll-real — FINISH IT: three behavioural tests still red** *(IN FLIGHT — the work is
-committed and pushed on `claude/mobile-accessibility-layout-4ahe9f`, stacked on #613. Do NOT restart it
-from scratch and do NOT revert it on harness grounds — read contract 4's note first.)*
-What landed: `FLIGHT_PROFILES.carryFrac` set from real reference roll-outs (driver 19.5yd, woods/hybrids
-9–13, long-mid irons 6, short irons 3, wedges 0–5), the iron split moved to 4-6 / 7-9, and `hopLenK`
-retuned 0.16 → 0.05 because a 21-yard release cannot carry hop lengths tuned for a 62-yard one.
-**Measured: death-spiral harness 0.8740 → 0.5215 toPar/hole, 8.65% → 5.56% floor-hits — it got BETTER,
-by a lot.** Everything else in `npm run check` is green.
-Three tests remain red, all genuine behavioural shifts rather than stale numbers:
-- `tests/default-aim.test.ts` "never clubs DOWN off the tee" — `autoAimClub` now picks a 173yd club
-  where `aiClub` picks 217. The two use DIFFERENT reach models (flight reach vs total reach) and raising
-  `carryFrac` pulled them apart. **Start here** — it is telling us something real about the two models,
-  not asking for a bumped constant.
-- `tests/spray-blocking.test.ts` sub-threshold gap merge — seeded geometry; the spray depends on carry,
-  so the blocked-run shape moved. Probably a fixture update, but confirm it is not hiding a real change
-  in what the cone reports as blocked.
-- `tests/ui.test.ts` GS-ace-ship — a seeded flow that no longer aces. It PASSED on one isolated run, so
-  check for order-dependence before rewriting it.
+**GS-default-aim-full-swing — the pre-armed club is chosen for a full swing it may not want**
+*(found while finishing GS-carry-roll-real; the residual after that pass, not a regression from it)*
+`autoAimClub` now refuses any club whose FULL flight lands in a penalty, so the pre-armed default is dry
+by construction (measured 0 wet landings across 3,072 par-4/5 tee shots, down from 22/1,083 before). What
+it still does not model is POWER: on a lay-up it arms the longest club that stays dry rather than a full
+club dialled down, which is the shot a player would actually pick. The power seed is already per-shot
+(`autoShotPower` does exactly this for the auto sim), so the fix is to let the default pick a
+(club, power) PAIR instead of a club. Deliberately left out — it changes the pre-armed power on shots
+that are currently fine, so it wants its own pass and its own eyes-on.
 
 **GS-auto-ai-weak — the headless auto sim is far weaker than a human, and it gates everything**
 The auto sim stalls around hole 40 of the Unending Universe; human players reach 350+. Every balance

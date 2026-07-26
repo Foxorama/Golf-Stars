@@ -461,14 +461,15 @@ describe('ui reducer', () => {
   });
 
   it('a hole-in-one unlocks the secret Comet Rider ship, through the full play flow (GS-ace-ship)', () => {
-    // Seed 101 (voyage, feather-fade) aces a hole on an early stop — drive the reducer to it and assert
+    // Seed 62 (voyage, feather-fade) aces a hole on an early stop — drive the reducer to it and assert
     // the ship lands in the global owned pool exactly when the ace is scored (auto-play path).
     // (Re-pinned 185 → 339 → 471 across the GS-green-contour-2 physics passes, → 430 for GS-fuel-4,
     // → 699 for GS-fairway-width, → 107 for GS-compose, → 63 for GS-biome-profile, → 138 for
     // GS-biome-difficulty, → 79 for GS-biome-variety, → 25 for GS-green-diversity, → 42 for
-    // GS-backspin-optin, → 101 for GS-carry-rollout-split: a roll/physics change legitimately shifts
-    // which seeded runs ace.)
-    let s = started(101, 'voyage');
+    // GS-backspin-optin, → 101 for GS-carry-rollout-split, → 62 for GS-carry-roll-real: a roll/physics
+    // change legitimately shifts which seeded runs ace. This one is a FIXTURE, not a bar — it asserts
+    // the ace→unlock wiring, so re-pin it and move on; nothing about the game is claimed by the number.)
+    let s = started(62, 'voyage');
     expect(s.ownedShips).not.toContain('comet-rider'); // not owned at the off
     let sawAce = false;
     for (let stop = 0; stop < 4 && s.run.status === 'active'; stop++) {
@@ -484,7 +485,11 @@ describe('ui reducer', () => {
       if (s.screen === 'gameover') break;
       s = reduce(s, { type: 'continue' });
       s = reduce(s, { type: 'leaveShop' });
-      s = reduce(s, { type: 'route', routeId: s.routes![0]!.id });
+      // Stop driving if the run has no lanes left to fly. Asserting `s.routes![0]` here instead threw a
+      // bare `TypeError: Cannot read properties of undefined` the moment the pinned seed stopped acing,
+      // burying the actual finding (the fixture went stale) under a crash in the harness.
+      if (!s.routes?.length) break;
+      s = reduce(s, { type: 'route', routeId: s.routes[0]!.id });
     }
     expect(sawAce).toBe(true); // fixture guard: the pinned seed really does ace within the window
   });

@@ -132,8 +132,18 @@ describe('sprayBlocking (GS-spray-block / GS-spray-block-2, pure)', () => {
     const s = shotSpread(twin, [0, 0], 'tee', [0, 400], driver, {});
     const split = sprayBlocking(twin, s, undefined, { mergeGapRad: 0.001, minSpanRad: 0.01 });
     expect(split.length).toBe(2);
-    // With a merge threshold wider than the slot they fuse into ONE readable region.
-    const merged = sprayBlocking(twin, s, undefined, { mergeGapRad: 0.5, minSpanRad: 0.01 });
+    // The slot is MEASURED off the runs, never hard-coded. How wide it is depends on the club's CARRY:
+    // the cone probes landings out to `carryHigh`, so a longer flight clips a fixed grove at different
+    // angles and the clear slot between the two runs moves with it. GS-carry-roll-real widened this one
+    // from under 0.5 rad to 0.562, and a literal `mergeGapRad: 0.5` then read as "the merge is broken"
+    // when the merge was reading the geometry exactly right. Assert the RULE on both sides of the real
+    // gap instead — that is the behaviour worth pinning, and it cannot rot on a physics retune.
+    const slot = split[1]!.a0 - split[0]!.a1;
+    expect(slot).toBeGreaterThan(0);
+    // A threshold UNDER the slot leaves the two runs alone (a genuine clear gap stays readable)…
+    expect(sprayBlocking(twin, s, undefined, { mergeGapRad: slot * 0.9, minSpanRad: 0.01 })).toHaveLength(2);
+    // …and one OVER it fuses them into a single region spanning both (no barcode striping).
+    const merged = sprayBlocking(twin, s, undefined, { mergeGapRad: slot * 1.2, minSpanRad: 0.01 });
     expect(merged.length).toBe(1);
     expect(merged[0]!.a0).toBeCloseTo(split[0]!.a0, 6);
     expect(merged[0]!.a1).toBeCloseTo(split[1]!.a1, 6);
