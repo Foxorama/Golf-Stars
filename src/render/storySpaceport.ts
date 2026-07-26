@@ -683,6 +683,9 @@ const SPACEPORT_STYLE = `<style>
   .gs-sclub-caddy{position:absolute;background:none;border:0;padding:0;cursor:pointer;color:inherit;text-align:center;
     transform:translate(-50%,-100%);z-index:16;transition:transform .15s ease;}
   .gs-sclub-caddy:hover,.gs-sclub-caddy:focus-visible{outline:none;transform:translate(-50%,-100%) scale(1.06);z-index:22;}
+  /* GS-a11y-focus: restore the keyboard rings the outline:nones above suppressed (hover kept). */
+  .gs-sclub-hot:focus-visible,.gs-sclub-golfer:focus-visible,.gs-sclub-caddy:focus-visible{
+    outline:2px solid var(--gs-info);outline-offset:3px;}
   .gs-sclub-caddy--on{z-index:19;}
   .gs-sclub-cav{display:block;width:23cqw;max-width:132px;margin:0 auto -2cqw;filter:drop-shadow(0 4px 4px #000a);}
   .gs-sclub-cav canvas{width:100%;height:auto;display:block;}

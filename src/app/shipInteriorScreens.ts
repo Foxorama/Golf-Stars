@@ -303,6 +303,11 @@ const SI_STYLE = `<style>
     background:linear-gradient(180deg,#161c2a,#10141d);border:1px solid #262f42;border-top:3px solid var(--ac,#5b8bd0);
     border-radius:12px;padding:10px 9px;position:relative;color:inherit;font:inherit;transition:transform .12s ease,box-shadow .12s ease;}
   .si-card:hover,.si-card:focus-visible{outline:none;transform:translateY(-2px);box-shadow:0 6px 16px -8px var(--ac,#5b8bd0);}
+  /* GS-a11y-focus: these controls fold :hover and :focus-visible into one rule, so a keyboard user's
+     only cue was a 2px lift — and outline:none beat the global ring on specificity. Give the ring
+     back; the hover styling above is untouched. */
+  .si-caddy:focus-visible,.si-friend:focus-visible,.si-tab:focus-visible,.si-card:focus-visible{
+    outline:2px solid var(--gs-info);outline-offset:2px;}
   .si-card-badge{position:absolute;top:7px;right:7px;font-size:10px;font-weight:800;padding:1px 6px;border-radius:20px;
     background:#0b0f18;border:1px solid var(--ac,#5b8bd0);color:var(--ac,#5b8bd0);}
   .si-card-art{width:104px;height:58px;}

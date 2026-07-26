@@ -115,6 +115,7 @@ import { storyMidBeatScreen, storyQuestBeatScreen, storyQuestOfferScreen } from 
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
 import { exitConfirmOverlay, priceNoticeOverlay, saveView, scrambleChoiceOverlay, settingsOverlay, settingsSheetInner, shotPopupOverlay } from './app/overlays';
+import { applyOverlayFocus, captureFocusOrigin, preservingFocus, wireRoleButtonKeys } from './app/focus';
 import {
   BackupError,
   applyBackup,
@@ -2715,8 +2716,13 @@ function refreshSettings(): void {
     render();
     return;
   }
-  sheet.innerHTML = settingsSheetInner();
-  wireSettingsSheet(sheet);
+  // Surgical re-renders destroy the focused control too (GS-a11y-focus). Without this a keyboard
+  // player flipping a switch is thrown back to the sheet's first button on EVERY tap, because the
+  // overlay pass sees focus on <body> and re-seats it at the top of the dialog.
+  preservingFocus(sheet, () => {
+    sheet.innerHTML = settingsSheetInner();
+    wireSettingsSheet(sheet);
+  });
 }
 
 function render(): void {
@@ -2952,6 +2958,9 @@ function render(): void {
   // The leave-the-round confirm (GS-android-back) rides over every screen like the settings sheet;
   // only a back press inside a run can raise it.
   const exitConfirm = state.pendingExit ? exitConfirmOverlay() : '';
+  // Note what has focus BEFORE the DOM is torn down (GS-a11y-focus) — it is the last moment the
+  // information exists, and closing an overlay needs it to hand focus back to whatever opened it.
+  captureFocusOrigin();
   app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}${fit ? ' gs-main--fit' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${introTraits}${introField}${priceNotice}${exitConfirm}`;
   app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
 
@@ -3013,9 +3022,18 @@ function render(): void {
     });
   }
 
-  // Wire actions.
+  // Wire actions. Most carriers are real `<button>`s, which give us Tab focus and Enter/Space for
+  // free — but a handful are `role="button"` spans/divs (the golfer-card lore portrait, the locker
+  // rows, the star-map nodes), and those got neither: no tabindex, no key handler, so the feature
+  // behind them was mouse-only (GS-a11y-focus). Rather than chase each one, give every non-native
+  // carrier the keyboard contract here, once.
   app.querySelectorAll<HTMLElement>('[data-action]').forEach((el) => {
     el.addEventListener('click', () => dispatch(JSON.parse(el.dataset.action!) as Action));
+    // A `<div>`/`<span>` carrier is not focusable and announces as nothing. Give it the role and a
+    // tab stop; `wireRoleButtonKeys` below supplies Enter/Space for every such control at once.
+    if (el.tagName === 'BUTTON' || el.tagName === 'A' || el.tagName === 'INPUT') return;
+    if (!el.hasAttribute('role')) el.setAttribute('role', 'button');
+    if (!el.hasAttribute('tabindex')) el.tabIndex = 0;
   });
   // GS-story-intro: "Answer the call" on the prologue victory plays the recruitment cinematic (the Mothership
   // + the Parrot), THEN continues to the spaceport clubhouse. Under reduced-motion the cinematic is skipped
@@ -3890,6 +3908,13 @@ function render(): void {
       animatedPutts = state.play.puttLogs.length;
     }
   }
+
+  // LAST, after every screen and overlay is mounted and wired (GS-a11y-focus). Both passes run on
+  // every render so a NEW control or overlay gets the behaviour by existing, without its builder
+  // knowing: keyboard activation for every non-native `role="button"`, then modal-dialog semantics,
+  // backgrounding and focus placement for whatever overlay is up.
+  wireRoleButtonKeys(app);
+  applyOverlayFocus(app);
 }
 
 /**

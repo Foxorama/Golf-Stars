@@ -75,6 +75,8 @@ function eclubStyle(): string {
     .gs-eclub-golfer svg{width:100%;height:auto;display:block;}
     .gs-eclub-shadow{display:block;width:80%;height:1.4cqw;min-height:5px;margin:0 auto -1cqw;border-radius:50%;}
     .gs-eclub-golfer:hover,.gs-eclub-golfer:focus-visible{translate:0 -3px;outline:none;filter:drop-shadow(0 10px 8px #000a) brightness(1.08);}
+    /* GS-a11y-focus: restore the keyboard ring outline:none above suppressed (hover styling kept). */
+    .gs-eclub-golfer:focus-visible{outline:2px solid var(--gs-info);outline-offset:3px;}
     .gs-eclub-golfer:hover .gs-eclub-hint,.gs-eclub-golfer:focus-visible .gs-eclub-hint{opacity:1;}
     .gs-eclub-hint{position:absolute;top:-1.8cqw;left:50%;transform:translateX(-50%);font-size:clamp(8px,2cqw,11px);
       font-weight:700;opacity:0;transition:opacity .15s ease;white-space:nowrap;background:#000a;color:#ffe6a6;
