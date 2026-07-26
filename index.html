@@ -1066,26 +1066,31 @@
       .gs-hud-top {
         top: calc(8px + env(safe-area-inset-top)); left: 8px;
         right: 56px; /* clear the top-right nav column */
-        padding: 6px 11px 7px;
+        padding: 5px 10px 6px;
       }
       /* Readout sizing (GS-hud-frame): the play-test verdict on a Pixel 9a was that these numbers —
          the hole, the yardage, the score, the lie — were simply too small to parse at a glance while
          playing. Bumped a step across the whole frame; the chip still occludes little of the cone. */
+      /* GS-play-hud-space: the gaps carry the row, so they can come in without costing legibility.
+         What the row must NOT do is wrap — a wrapped stats row measured 49px for one line's worth of
+         content, the single biggest waste in the whole chip. The hole/par/live-distance triplet fits
+         one line at this size; the hole's shape/width LABELS moved down to the conditions line (they
+         are conditions, like the lie and the wind), which is what stopped the wrap. */
       .gs-hud-top .gs-stats {
-        display: flex; align-items: center; gap: 9px 11px; flex-wrap: wrap;
+        display: flex; align-items: center; gap: 6px 9px; flex-wrap: wrap;
         font-size: 14.5px; color: var(--gs-dim);
       }
       .gs-hud-top .gs-stats b { color: var(--gs-ink); }
       /* The distance slot keeps a floor width so the stats row wraps the SAME way whether it reads
          "347y" or "…in flight" — the info bar used to visibly reflow the instant you struck a shot
-         (GS-hud-frame). */
-      .gs-hud-top .gs-hud-dist { min-width: 88px; }
+         (GS-hud-frame). 78px still clears the longest label ("…in flight") at this size. */
+      .gs-hud-top .gs-hud-dist { min-width: 78px; }
       /* …and the score/placing chips get their OWN row rather than trailing the stats and wrapping
          whenever the line above them grew — the two groups now never trade places. */
-      .gs-hud-top .gs-stats--score { margin-top: 2px; }
+      .gs-hud-top .gs-stats--score { margin-top: 1px; }
       .gs-hud-top .gs-stats--score .gs-shotscore { margin-left: 0; }
-      .gs-hud-top .gs-sub { font-size: 12.5px; opacity: .9; line-height: 1.4; margin-top: 3px;
-        display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .gs-hud-top .gs-sub { font-size: 12.5px; opacity: .9; line-height: 1.35; margin-top: 2px;
+        display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
       /* ── The persistent play frame's ACTION ZONE (GS-hud-frame) ──────────────────────────────
          One skeleton for all six play states: caddy slot · controls panel · action column, bottom-
          anchored so the thumb-critical row (commit button · caddy · auto-finish) lands at the same
@@ -1095,12 +1100,16 @@
         /* flex-end (not stretch) so the caddy badge + round button sit at their NATURAL height,
            bottom-aligned to the controls panel — the badge no longer stretches tall to match the
            controls column (the "caddy frame too tall for the graphic" bug). */
-        display: flex; align-items: flex-end; gap: 8px;
+        display: flex; align-items: flex-end; gap: 6px;
       }
       /* The caddy's PERMANENT slot — a fixed cell present in every state, so the bar's left edge
          never jumps (the badge used to ride the aim screen only, and only a putting specialist on
-         the green). Fixed width whether or not a caddy is hired. */
-      .gs-hud-caddy { flex: 0 0 78px; width: 78px; display: flex; flex-direction: column; }
+         the green). Fixed width whether or not a caddy is hired.
+         GS-play-hud-space: 78px → 66px. The flanking columns cost the controls panel a THIRD of the
+         screen width (78 caddy + 40 button + gaps of 390), which is what wrapped the power read and
+         the spray legend onto second lines — vertical height spent to buy horizontal emptiness. The
+         badge keeps its frame, glow and rotating sheen; it is 15% smaller, not demoted. */
+      .gs-hud-caddy { flex: 0 0 66px; width: 66px; display: flex; flex-direction: column; }
       .gs-hud-caddy .gs-caddybadge { width: 100%; }
       /* On the bag but with no read on this shot (a distance/guard caddy on the green): the portrait
          dims and stops glowing rather than disappearing. */
@@ -1110,7 +1119,7 @@
          and the empty slot quietly advertises the hire. */
       .gs-hud-caddy--empty {
         align-items: center; justify-content: center; gap: 3px;
-        height: 74px; border-radius: 15px; opacity: .38;
+        height: 66px; border-radius: 15px; opacity: .38;
         border: 1.5px dashed rgba(255, 220, 120, .38);
         background: rgba(10, 13, 19, .5);
       }
@@ -1140,8 +1149,8 @@
          other (with or without Sam's extra read line); the putt state is genuinely taller because a
          pace meter is, and the bottom-anchored commit row absorbs the difference. */
       .gs-hud-controls {
-        flex: 1 1 auto; min-width: 0; padding: 7px 11px 8px; min-height: 132px;
-        display: flex; flex-direction: column; gap: 5px;
+        flex: 1 1 auto; min-width: 0; padding: 6px 9px 6px; min-height: 118px;
+        display: flex; flex-direction: column; gap: 4px;
       }
       .gs-clubrow { display: flex; align-items: center; gap: 7px; }
       .gs-clubrow .gs-clubname { flex: 1 1 auto; text-align: center; font-weight: 700;
@@ -1153,13 +1162,13 @@
       .gs-clubrow .gs-btn { margin: 0; padding: 9px 11px; font-size: 16px; }
       .gs-clubrow .gs-btn[disabled] { opacity: .38; }
       .gs-clubrow .gs-mini { padding: 7px 9px; font-size: 13px; }
-      .gs-legend-line { font-size: 12.5px; line-height: 1.4; opacity: .95; }
+      .gs-legend-line { font-size: 12.5px; line-height: 1.3; opacity: .95; }
       /* Caddy badge — the hired caddy, framed so it really stands out (GS-fullmap / GS-caddy-display):
          a glowing gold frame, a warm radial backdrop, and a slow rotating sheen behind the figure +
          a pulsing glow, so it reads as a "premium" hire, not a plain portrait. */
       .gs-caddybadge {
         position: relative; isolation: isolate; overflow: hidden;
-        flex: 0 0 auto; width: 78px; padding: 5px 5px 4px;
+        flex: 0 0 auto; width: 66px; padding: 4px 4px 3px;
         display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
         border-radius: 15px;
         border: 1.5px solid rgba(255, 220, 120, .8);
@@ -1178,10 +1187,10 @@
         animation: gs-caddyspin 5s linear infinite;
       }
       .gs-caddybadge canvas, .gs-caddybadge .gs-caddyname { position: relative; z-index: 1; }
-      .gs-caddybadge canvas { display: block; width: 64px; height: 60px; }
+      .gs-caddybadge canvas { display: block; width: 56px; height: 52px; }
       .gs-caddybadge .gs-caddyname {
         font-size: 9.5px; font-weight: 800; letter-spacing: .03em; line-height: 1;
-        color: #ffe6a3; margin-top: 1px; max-width: 72px; text-align: center;
+        color: #ffe6a3; margin-top: 1px; max-width: 60px; text-align: center;
         text-shadow: 0 0 6px rgba(255,196,84,.5);
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       }
@@ -1196,7 +1205,7 @@
       }
       /* Floating round action button (auto-finish) tucked by the controls. */
       .gs-roundbtn {
-        flex: 0 0 auto; width: 40px; height: 46px; padding: 0;
+        flex: 0 0 auto; width: 36px; height: 46px; padding: 0;
         display: flex; align-items: center; justify-content: center;
         font-size: 17px; color: var(--gs-ink);
         border-radius: 12px; cursor: pointer;

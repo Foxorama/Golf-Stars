@@ -10,7 +10,7 @@ import { scoreName, playTotals, stablefordPoints } from './sim/score';
 import { mountPlayView, type PlayViewHandle } from './render/playView';
 import { installDecorProbe } from './render/decorProbe';
 import { renderHoleSVG, renderPuttOverlaySVG, PUTT_OVERLAY_ID, renderShotOverlaySVG, SHOT_OVERLAY_ID } from './render/holeView';
-import { fitFrame, type ProjectOptions } from './render/project';
+import { bandCentreBias, clearOfPanelBias, fitFrame, type ProjectOptions } from './render/project';
 import { shotView, previewShot, previewBackspin, resolveAimTarget, awaitingPutt, canPuttFringe, type AimMode } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
 import { drawStoryFigure, hasStoryFigure } from './render/storyFigure';
@@ -835,6 +835,11 @@ let mapZoom = 1;
 // follow radius to match) and before any decision has rendered (resume) — those fall back to the
 // travel-framed reach.
 let decisionRadius: number | null = null;
+// The follow-cam BIAS the decision map is currently framed at — decisionRadius's twin, and stored for
+// the same reason (GS-play-hud-space). It is now measured off the HUD rather than a constant, so the
+// watch camera must reuse the exact value the player was aiming with; re-measuring at release would
+// read the WATCH state's panel and pop the camera on every swing.
+let decisionBias: number | null = null;
 // The framing for the aim/putt weather overlay's animated world-decor (moving Cetus river / drifting
 // ship junk / meteor strikes, GS-cetus-flow / GS-ship-feel / GS-meteor-strikes). Set by the shot-
 // decision + putt branches to the SVG map's exact projector options so the overlay canvas lines the
@@ -845,6 +850,8 @@ let overlayDecor: { mapProj: ProjectOptions; drift: boolean; meteorScorch: boole
 // so the strike→watch cut keeps the exact green zoom instead of popping out to a fixed radius (the
 // "weird zoom on the green" bug). Fixed per putt (aim-nudge-independent) so the camera holds still.
 let puttViewRadius: number | null = null;
+// …and the putt screen's framed BIAS, handed to the putts-only watch for the same reason.
+let puttViewBias: number | null = null;
 // Surgical refresh for aim nudges: redraws the putt map SVG + the aim readout IN PLACE, without a
 // full render() — a full render remounts the pace meter (resetting its sweep) on every tap, which
 // made reading a long break slow and painful. Assigned by the putt branch; buttons call it.
@@ -1173,6 +1180,46 @@ function mapFrame(): { width: number; height: number } {
   return mapFrameCache;
 }
 
+// ── Framing the golf INSIDE the HUD (GS-play-hud-space) ──────────────────────────────────────────
+// The info chip and the control panel float OVER a full-bleed map, so the map's usable strip is the
+// band between them — and the camera used to ignore it entirely. `DMAP_BIAS` put the ball at 0.84 of
+// the frame, which on a 390×844 phone is y≈709 against a panel whose top edge is y≈645: the ball, and
+// the whole shot the player had just hit, spent the flight BEHIND the controls. So measure the band
+// and frame to it.
+//
+// Measured per PLAY MODE rather than off whatever is in the DOM right now, because the panel's height
+// legitimately differs between states (a pace meter is taller than a power bar) and a body is built
+// while the PREVIOUS state's HUD is still mounted. Each mode self-corrects once, on its first visit.
+type PlayBand = { top: number; bottom: number };
+const playBandByMode: Partial<Record<'aim' | 'putt' | 'watch', PlayBand>> = {};
+/** How far above the control panel the ball rides. Enough to read the ball + its shadow clear of the
+ *  panel's edge, not so much that it gives away the "see ahead" framing the low ball buys. */
+const BALL_CLEARANCE_PX = 28;
+
+/** The clear strip of map for a play state, in container px — bottom of the info chip to top of the
+ *  control panel. null until that state has been on screen once. */
+function bandFor(mode: 'aim' | 'putt'): PlayBand | null {
+  return playBandByMode[mode] ?? null;
+}
+
+/** Where the ball sits vertically on the aim/watch camera, as a fraction of the frame: as LOW as it
+ *  can while staying clear of the control panel, so the shot ahead still fills the view but the ball
+ *  is never behind the controls. Falls back to the classic constant when the band is unmeasured. */
+function playFocusBias(): number {
+  const band = bandFor('aim');
+  if (!band) return DMAP_BIAS;
+  return clearOfPanelBias(band.bottom, mapContainerPx().h, BALL_CLEARANCE_PX, DMAP_BIAS);
+}
+
+/** The putt camera's bias: the ball↔cup span centred in the CLEAR band rather than in the frame. The
+ *  putt screen carries the tallest panel of any state (the pace meter), so a frame-centred read sat
+ *  low and crowded the controls. */
+function puttFocusBias(): number {
+  const band = bandFor('putt');
+  if (!band) return 0.5;
+  return bandCentreBias(band.top, band.bottom, mapContainerPx().h);
+}
+
 /** Reset the map view to the default follow-cam (called on a new shot / new hole). */
 function resetMapView(): void {
   mapView = 'follow';
@@ -1203,7 +1250,7 @@ function decisionView(play: NonNullable<UiState['play']>, spray: ShotSpread, aim
   // when the auto aim went down the fairway.) Degenerate (aim ≈ the ball) falls back to tee→green
   // inside the projector.
   const up: [number, number] = [aimTarget[0] - play.ball[0], aimTarget[1] - play.ball[1]];
-  return { ...base, focus, viewRadius: reach, focusBias: DMAP_BIAS, up };
+  return { ...base, focus, viewRadius: reach, focusBias: playFocusBias(), up };
 }
 
 // The hole index whose ace has already been celebrated, so the full-screen overlay fires exactly
@@ -1469,8 +1516,11 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
     const puttRadius = Math.max(5.5, v.distToPin * 0.6 + 3 + Math.min(14, Math.max(bow.max, -bow.min)) * 0.6);
     puttViewRadius = puttRadius;
     // One frame for the whole putt screen — the SVG, its break-line overlay and the weather canvas
-    // must agree exactly, and re-measuring per call could straddle a resize.
+    // must agree exactly, and re-measuring per call could straddle a resize. Same for the bias, which
+    // is also what the putts-only watch reuses so the strike→roll cut holds the frame perfectly still.
     const puttFrame = mapFrame();
+    const puttBias = puttFocusBias();
+    puttViewBias = puttBias;
     const buildPuttSvg = (aim: number) => renderHoleSVG(play.hole, {
       // No flight tracers here (GS-tracer bug fix): on the tight green-zoom the prior shots' curved
       // Bézier flight lines projected across the tiny view, smearing tracer arcs "all over the green".
@@ -1488,7 +1538,9 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
       // view); the +3 keeps a little green around the cup so the break/hole read has context.
       focus: puttMid,
       viewRadius: puttRadius,
-      focusBias: 0.5,
+      // Centred in the CLEAR band, not in the frame (GS-play-hud-space) — the putt screen carries the
+      // tallest panel of any state, so a frame-centred span sat low and crowded the controls.
+      focusBias: puttBias,
       // Cup up-screen, ball below — the putt reads bottom-to-top (matches the pace meter).
       up: [puttPin[0] - play.ball[0], puttPin[1] - play.ball[1]],
       puttPath: puttPathPreview(play.ball, puttPin, slope, aim, MANUAL_IDEAL_PACE, contour),
@@ -1507,7 +1559,7 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
     // tight green zoom (the reported "very small … looks super weird" bug). The projector is the putt
     // map's exact focus/zoom so a strike still lands on a drawn crater.
     overlayDecor = {
-      mapProj: { ...puttFrame, focus: puttMid, viewRadius: puttRadius, focusBias: 0.5, up: puttUp },
+      mapProj: { ...puttFrame, focus: puttMid, viewRadius: puttRadius, focusBias: puttBias, up: puttUp },
       drift: false,
       meteorScorch: scorchActive(),
     };
@@ -1521,7 +1573,7 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
           height: puttFrame.height,
           focus: puttMid,
           viewRadius: puttRadius,
-          focusBias: 0.5,
+          focusBias: puttBias,
           up: puttUp,
           puttPath: puttPathPreview(play.ball, puttPin, slope, aim, MANUAL_IDEAL_PACE, contour),
           puttReadFrac,
@@ -1649,6 +1701,7 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
   // Remember the follow-cam radius the player is LOOKING AT — the shot animation starts at this
   // exact zoom so releasing the gesture never skip-jumps to a different framing (GS-power).
   decisionRadius = mapOpts.viewRadius ?? null;
+  decisionBias = mapOpts.focusBias ?? null;
   // Arm the aim-overlay's animated world-decor (moving Cetus river / drifting ship junk / meteor
   // strikes) — but only in FOCUS/FOLLOW mode: the whole-hole fit folds `extra` points into its
   // projector that the overlay can't reproduce, so it would misalign (the SVG keeps its static decor
@@ -1714,7 +1767,7 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
           ? 'aim: pin'
           : aimModeMeta(selAim).note;
     return `<div class="gs-powerbar"><span class="gs-powerfill" style="width:${Math.min(100, (selPower / maxPower) * 100).toFixed(0)}%;background:${powerCol};"></span>${maxPower > 1 ? `<span class="gs-power100" style="left:${(100 / maxPower).toFixed(0)}%;"></span>` : ''}</div>
-      <div class="gs-powerlabel"><b style="color:${powerCol};">${over ? '⚡ ' : ''}Power ${powerPct}%</b> · ${aimNote} · <span style="opacity:.7;">${charging ? 'release to hit' : 'pull DOWN to power'}</span></div>`;
+      <div class="gs-powerlabel"><b style="color:${powerCol};">${over ? '⚡ ' : ''}Power ${powerPct}%</b> · ${aimNote} · <span style="opacity:.7;">${charging ? 'release to hit' : 'pull ↓ to power'}</span></div>`;
   };
   const powerHud = `<div class="gs-power" id="gs-powerhud">${powerHudInner()}</div>`;
   // Condensed spray odds + carry range (the cone on the map carries the detail). Sam (if hired) adds a
@@ -2695,7 +2748,9 @@ function render(): void {
       birdCelebratedHole = -1;
       strokeAutoAdvancedHole = -1;
       decisionRadius = null;
+      decisionBias = null;
       puttViewRadius = null;
+      puttViewBias = null;
       resetMapView();
     }
     animatingPlay = pendingAnimation(state.play);
@@ -3514,6 +3569,29 @@ function render(): void {
     if (mapEl && `${Math.round(mapEl.clientWidth)}x${Math.round(mapEl.clientHeight)}` !== mapFrameFor) scheduleRender();
   }
 
+  // GS-play-hud-space: learn this play state's CLEAR BAND — the strip of map between the info chip and
+  // the control panel, which is what the camera frames the golf into. Measured here because it is the
+  // one place the state's OWN HUD is mounted (a body is built while the previous state's is still up),
+  // and cached per mode so each state is framed by its own panel height. A mode self-corrects once, on
+  // its first visit; the 6px threshold stops content jitter (a match row appearing, a longer club name)
+  // from re-rendering. 'watch' is measured but never re-rendered for — it reuses the stored aim/putt
+  // bias, and a remount mid-flight would restart the shot.
+  if (state.screen === 'playing' && state.play) {
+    const shotEl = document.querySelector<HTMLElement>('.gs-shot--full[data-playmode]');
+    const mode = shotEl?.dataset.playmode as 'aim' | 'putt' | 'watch' | undefined;
+    const chip = shotEl?.querySelector('.gs-hud-top')?.getBoundingClientRect();
+    const panel = shotEl?.querySelector('.gs-hud-bottom')?.getBoundingClientRect();
+    if (shotEl && mode && chip && panel && panel.top > chip.bottom) {
+      const host = shotEl.getBoundingClientRect();
+      const band: PlayBand = { top: Math.round(chip.bottom - host.top), bottom: Math.round(panel.top - host.top) };
+      const prev = playBandByMode[mode];
+      if (!prev || Math.abs(prev.top - band.top) > 6 || Math.abs(prev.bottom - band.bottom) > 6) {
+        playBandByMode[mode] = band;
+        if (mode !== 'watch') scheduleRender();
+      }
+    }
+  }
+
   // Animated weather over the aim/putt map (GS-journey-fx rework): the sky + air are alive while you
   // line up, drawn by the SAME shared module the in-flight view uses. Skipped while a shot animates
   // (the play view owns the canvas + draws its own weather then).
@@ -3526,7 +3604,7 @@ function render(): void {
         wEl,
         state.play.hole,
         [pin[0] - ball[0], pin[1] - ball[1]],
-        { ...mapFrame(), focusBias: DMAP_BIAS },
+        { ...mapFrame(), focusBias: awaitingPutt(state.play) || (canPuttFringe(state.play) && selPutt) ? puttViewBias ?? 0.5 : decisionBias ?? DMAP_BIAS },
         // Animate the world-decor twins over the aim/putt map too (GS-cetus-flow / GS-ship-feel /
         // GS-meteor-strikes) — armed by the decision/putt branch with the map's exact projector so the
         // river/junk/craters line up beneath. null in whole-hole fit (can't align) ⇒ sky-only overlay.
@@ -3653,9 +3731,13 @@ function render(): void {
         // keeps the PUTT screen's framing the same way (puttViewRadius) — the old fixed 25 popped the
         // camera out and back around every stroke on the green.
         viewRadius: hadShots ? decisionRadius ?? decisionReach(travel) : puttViewRadius ?? 25,
-        // Putts-only: centre the ball↔cup span (bias 0.5) exactly like the putt screen; a shot
-        // watch keeps the low decision-map bias so more of the hole ahead stays in view.
-        focusBias: hadShots ? DMAP_BIAS : 0.5,
+        // The bias the player was just LOOKING at, exactly as viewRadius above (GS-play-hud-space):
+        // it is measured off the HUD now, and this state's panel is not the aim/putt panel, so
+        // re-deriving it here would pop the camera on every swing. A shot watch keeps the decision
+        // map's low-but-clear-of-the-panel bias — which is the fix for the reported "ball flight keeps
+        // getting obscured by the bottom shot window": the ball used to fly at 0.84 of the screen,
+        // some 60px INSIDE the control panel, for the whole shot. Putts-only reuses the putt frame.
+        focusBias: hadShots ? decisionBias ?? playFocusBias() : puttViewBias ?? puttFocusBias(),
         up: animUp,
         // Follow the ball only when there's a real shot in flight; a green putt holds the frame
         // still so the heavy scene builds ONCE, not every frame (GS-putt-watch-lag).
