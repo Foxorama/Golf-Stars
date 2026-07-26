@@ -58,10 +58,12 @@ import {
   rgbaParts,
   fadeCol,
   n1,
+  turfPx,
+  turfRampTint,
 } from './style/shared';
 import { landHullCourse, lostPlatformsCourse, mergedHazardsFor, derelictBreachesFor } from './style/land';
 import { rainbowRibbon, styleFairways, styleTee } from './style/fairway';
-import { styleGreen, styleGreenSurround, greenSlopeArt } from './style/green';
+import { styleGreen, styleGreenSurround, greenSlopeArt, greenComplexFor } from './style/green';
 import {
   styleSandFamily,
   styleLiquidFamily,
@@ -564,9 +566,9 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // the green/fairway junction, its own collar handling that seam) so the apron only ever shows in the
     // rough. The green surface itself is still drawn flush, on top, in the feature loop below.
     for (const f of hole.features) {
-      if (f.kind === 'green') prims.push(...styleGreenSurround(projPoly(f.poly, proj), collar, grFringe));
+      if (f.kind === 'green') prims.push(...styleGreenSurround(projPoly(f.poly, proj), collar, grFringe, arch, proj.scale));
     }
-    prims.push(...styleFairways(fairwaySps, art, fwShade, fwFringe, arch, groundedFw ? fwCollar : undefined));
+    prims.push(...styleFairways(fairwaySps, art, fwShade, fwFringe, arch, groundedFw ? fwCollar : undefined, proj.scale));
     // Derelict corridor → riveted metal DECK PLATING (GS-ship-deck): panel seams, a painted hazard-
     // caution edge stripe, directional deck chevrons, and the scuffs/scorch of abandonment, clipped to
     // the corridor. Pure geometry, zero rng; gated to the derelict so every other world is untouched.
@@ -601,9 +603,14 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // banished) melt that junction: fairway → collar → fringe → green. Grounded worlds only — void/cetus
     // edge their green with a glow rim / raised shelf, rainbow rides its own ribbon, so all stay
     // byte-for-byte. Pure geometry, zero rng.
+    // GS-green-complex: that two-ring collar is now a per-world-width RAMP in course yards, drawn as
+    // accumulating TINTS rather than opaque fills. Two opaque rings wiped the fairway's mowing stripes,
+    // sheen and texture and re-read as a painted ring around the green — the very "stacked art assets"
+    // tell they were added to cure. A tint carries the same green-ward colour walk while the corridor's
+    // groundskeeping shows straight through, so the collar reads as the fairway MOWN DOWN into the
+    // green: fairway → collar → apron → green, one continuous surface.
     if (groundedFw && arch !== 'derelict' && f.kind === 'green') {
-      prims.push({ t: 'poly', pts: offsetPoly(sp, -6), fill: mixHex(grShade.base, fwShade.base, 0.62) });
-      prims.push({ t: 'poly', pts: offsetPoly(sp, -3), fill: mixHex(grShade.base, fwShade.base, 0.34) });
+      prims.push(...turfRampTint(sp, turfPx(proj.scale, greenComplexFor(arch).collarYd), grShade.base, 0.24, 4));
     }
     // GS-ship-deck-blend: the derelict gets NO grass apron (no flaring on a ship), so seat its green
     // into the metal DECK with a machined turf-pad bay instead — the "blend the fairway into the deck"
@@ -613,8 +620,10 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // GS-inset-2: the green reads FLUSH with the fairway — no cast shadow (a drop shadow made the
     // putting surface float proud of the turf like a raised sticker). Its own mown fringe/collar
     // rings ease it into the land; the shelf/void-glow worlds still model their raised edge.
-    if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, arch, greenSlopeArt(hole, f.poly, proj)));
-    else if (f.kind === 'tee') prims.push(...styleTee(sp, art, teeShade, teeFringe));
+    // The green mows on the CORRIDOR's band grid (GS-green-complex) so its cut lines share a phase
+    // with the fairway's instead of jumping at the collar — one greenkeeper, one hole.
+    if (f.kind === 'green') prims.push(...styleGreen(sp, art, grShade, arch, greenSlopeArt(hole, f.poly, proj), fairwaySps[0] ? bboxOf(fairwaySps[0]) : undefined, proj.scale));
+    else if (f.kind === 'tee') prims.push(...styleTee(sp, art, teeShade, teeFringe, proj.scale));
     // The derelict's `waste`/`sand` scatter reads as an intact riveted steel DECK PLATE (a firm lie),
     // NOT the default tan sand patch — a beach-sand flat on a steel hull was the odd "bunker" look.
     else if (arch === 'derelict' && (f.kind === 'waste' || f.kind === 'sand')) prims.push(...styleShipPlates([f.poly], proj));

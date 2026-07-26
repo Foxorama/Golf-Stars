@@ -15,27 +15,83 @@ import type { Projector } from '../project';
 import {
   type Prim,
   type ArtFeel,
+  type Box,
   centroidOf,
   bboxOf,
-  offsetPoly,
-  stripes,
   hexAlpha,
+  mowPattern,
+  turfPx,
+  turfRamp,
   LIGHT_UL,
 } from './shared';
 
-/** The green's two OUTWARD ease-in rings — an outer first-cut fringe, then the darker collar/apron —
- *  a uniform-width OFFSET (not a centroid scale) so a long ice-shelf or kidney green keeps an even
- *  surround instead of ballooning at the ends. Split OUT of styleGreen (GS-green-apron) so the app can
- *  draw them UNDER the fairway pass: they grow past the green edge, and a green sitting at the end of a
- *  fairway ribbon painted them as a dark ring ON TOP of the bright fairway. Drawn under the fairway they
- *  ease the green into the ROUGH (where they belong) and are simply covered where the fairway meets the
- *  green — the fairway's own collar handles that junction. */
-export function styleGreenSurround(poly: Vec[], collar: string, fringe: string): Prim[] {
-  return [
-    { t: 'poly', pts: offsetPoly(poly, -6.5), fill: fringe },
-    { t: 'poly', pts: offsetPoly(poly, -3.4), fill: collar },
-  ];
+/**
+ * Per-world GREEN COMPLEX identity (GS-green-complex). The putting surface used to be DRESSED
+ * identically on every world — one two-ring apron at a fixed pixel width, and an always-horizontal
+ * six-band mow — so however distinct the generator made the green's SHAPE, every world's green read
+ * as the same pale blob dropped on the corridor ("most of the green areas still look very similar").
+ * A world now declares how its green complex is presented; content-as-data, so a new world is a ROW,
+ * never an engine edit. Every field is a width/pitch — the mow PATTERN comes from the world's own
+ * fairway grain (`mowPattern`), so the green is groomed by the same greenkeeper as its corridor.
+ */
+export interface GreenComplexLook {
+  /** Mown apron width around the green, in COURSE YARDS (scale-honest via `turfPx`) — the band that
+   *  eases the surface out into the ROUGH, drawn under the fairway pass. */
+  apronYd: number;
+  /** The COLLAR: the narrow ring of fairway-height grass the surface is cut down out of, in course
+   *  yards. Deliberately much narrower than the apron — a collar is a band you can identify, not a
+   *  gradient. Widen it and the green stops reading as a green (the first GS-green-complex preview:
+   *  every world's putting surface dissolved into its corridor, which is a fairness bug — an arcade
+   *  golf hole must stay readable however smoothly it blends). */
+  collarYd: number;
+  /** Mow bands across the green — a finer cut than the corridor's, varying per world. */
+  mowBands: number;
 }
+/** Tuned per world's character: a links/desert green runs out into a broad tight-mown apron, a lush
+ *  jungle or swamp green is ringed by a narrow abrupt collar, an ice shelf keeps a wide frozen skirt. */
+const GREEN_COMPLEX: Record<BiomeArchetype, GreenComplexLook> = {
+  verdant: { apronYd: 7, collarYd: 2.4, mowBands: 6 },
+  desert: { apronYd: 10, collarYd: 3.4, mowBands: 5 }, // firm run-offs — you can putt from off the surface
+  frost: { apronYd: 9, collarYd: 3, mowBands: 7 }, // a broad frozen skirt around the shelf
+  inferno: { apronYd: 5, collarYd: 1.8, mowBands: 5 }, // scorched ground gives up quickly at the edge
+  void: { apronYd: 6, collarYd: 2.2, mowBands: 6 },
+  crystal: { apronYd: 6, collarYd: 2, mowBands: 8 }, // finely faceted
+  tempest: { apronYd: 8, collarYd: 2.6, mowBands: 6 },
+  fungal: { apronYd: 4, collarYd: 1.6, mowBands: 7 }, // the jungle crowds right up to the surface
+  ocean: { apronYd: 9, collarYd: 3.2, mowBands: 6 }, // seaside links run-offs
+  cetus: { apronYd: 6, collarYd: 2.2, mowBands: 6 },
+  swamp: { apronYd: 4, collarYd: 1.6, mowBands: 5 }, // the mire closes in
+  metal: { apronYd: 6, collarYd: 2, mowBands: 5 },
+  derelict: { apronYd: 5, collarYd: 1.8, mowBands: 5 },
+  asgard: { apronYd: 8, collarYd: 2.8, mowBands: 7 },
+  earth: { apronYd: 11, collarYd: 3.6, mowBands: 6 }, // the widest run-offs — a real links green complex
+};
+/** The green-complex look for a world. Exported so the scene builder can size the ON-FAIRWAY collar
+ *  from the SAME row the apron uses — one description of how wide this world's green complex runs. */
+export function greenComplexFor(arch: BiomeArchetype): GreenComplexLook {
+  return GREEN_COMPLEX[arch];
+}
+
+/** The green's OUTWARD ease-in apron — a uniform-width OFFSET ramp (not a centroid scale) so a long
+ *  ice-shelf or kidney green keeps an even surround instead of ballooning at the ends. Split OUT of
+ *  styleGreen (GS-green-apron) so the app can draw it UNDER the fairway pass: it grows past the green
+ *  edge, and a green sitting at the end of a fairway ribbon painted it as a dark ring ON TOP of the
+ *  bright fairway. Drawn under the fairway it eases the green into the ROUGH (where it belongs) and is
+ *  simply covered where the fairway meets the green — the fairway's own collar handles that junction.
+ *  GS-green-complex: the two hard rings became a per-world-width ramp in COURSE YARDS, walked in even
+ *  steps fringe → collar so the eye can't find a ring edge. */
+export function styleGreenSurround(
+  poly: Vec[],
+  collar: string,
+  fringe: string,
+  arch: BiomeArchetype,
+  scale = 1,
+): Prim[] {
+  const apron = turfPx(scale, greenComplexFor(arch).apronYd);
+  return turfRamp(poly, apron, fringe, collar, APRON_STEPS);
+}
+/** Even tone steps the green's apron / on-fairway collar are walked in. */
+const APRON_STEPS = 6;
 
 export function styleGreen(
   poly: Vec[],
@@ -43,6 +99,8 @@ export function styleGreen(
   s: Shade,
   arch: BiomeArchetype,
   slope?: GreenSlopeArt,
+  mowGrid?: Box,
+  scale = 1,
 ): Prim[] {
   const c = centroidOf(poly);
   // The outward fringe/collar rings that ease the green into the land are drawn separately, UNDER the
@@ -69,12 +127,37 @@ export function styleGreen(
   // A CONTOURED green mutes its mow stripe hard (S+ round 2): the full-contrast bands fought the
   // relief art — gradient, rings and arrows all read against striped noise (the frost screenshot).
   // The stripe stays as a whisper of turf texture; the relief owns the value range now.
+  const gb = bboxOf(poly);
   if (art.stripes) {
     const lm = contoured ? 0.26 : softGreen ? 0.52 : 0.7;
     const dm = contoured ? 0.18 : softGreen ? 0.36 : 0.5;
-    out.push(stripes(poly, mixHex(s.base, s.light, lm), mixHex(s.base, s.dark, dm), 6));
+    // GS-green-complex: the green is mown in its OWN WORLD'S GRAIN, on the corridor's band grid — the
+    // same `mowPattern` dispatch the fairway uses, just at a finer per-world pitch. The green used to
+    // stripe horizontally on every world regardless of how its fairway was groomed, so a swept-grain
+    // frost corridor or a cross-mown jungle corridor met a horizontally-striped green at a hard seam
+    // and the two read as different materials butted together. Phasing off the CORRIDOR's box (when
+    // the scene builder passes one) makes the two cuts share one grid, so the mow lines carry through
+    // the apron instead of jumping phase at the collar.
+    const bands = greenComplexFor(arch).mowBands;
+    const grid = mowGrid ?? gb;
+    const pitch = arch === 'frost' ? (gb.maxX - gb.minX) / bands : (gb.maxY - gb.minY) / bands;
+    out.push(mowPattern(poly, mixHex(s.base, s.light, lm), mixHex(s.base, s.dark, dm), grid, arch, Math.max(1, pitch)));
   }
-  const gb = bboxOf(poly);
+  // GS-green-complex: the surface's OWN outer edge, eased INWARD — a clipped stroke toned from the
+  // putting green toward its collar cut, so the boundary reads as the last mown pass rather than a
+  // cut-out laid on the corridor. Strokes, not a deep inset (the GS-fairway-2 lesson: an inset larger
+  // than a shelf green's local half-width folds); scale-honest, so the ease is the same band of
+  // ground at map and putt zoom alike. It also DEFINES the green — the transition has to soften the
+  // step without dissolving the shape, or the hole stops being readable.
+  const edgeCol = mixHex(s.base, s.dark, 0.4);
+  out.push({
+    t: 'clip',
+    clip: poly,
+    children: [
+      { t: 'poly', pts: poly, fill: 'none', stroke: hexAlpha(edgeCol, 0.26), sw: turfPx(scale, 2.4) },
+      { t: 'poly', pts: poly, fill: 'none', stroke: hexAlpha(edgeCol, 0.2), sw: turfPx(scale, 1) },
+    ],
+  });
   if (slope && (slope.mag > 0.05 || contoured)) {
     const span = Math.max(gb.maxX - gb.minX, gb.maxY - gb.minY);
     if (slope.mag > 0.05 && !contoured) {
