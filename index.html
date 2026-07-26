@@ -114,6 +114,27 @@
          .si-card …) and, more usefully, every control written from here on. */
       :focus-visible { outline: 2px solid var(--gs-info); outline-offset: 2px; }
 
+      /* ── Reduced motion, from the SETTING (GS-a11y-motion) ────────────────────────────────
+         The ~19 `@media (prefers-reduced-motion: reduce)` blocks below answer the OS. They cannot
+         see the in-app toggle — so a player who turned "Reduced motion" on without an OS-level
+         preference still got every entrance animation, sheen, drift and pulse in the app.
+
+         This is the blunt instrument, and deliberately so: it fires only when the player has
+         explicitly ASKED for calm, and at that point "some animations, tastefully reduced" is not
+         what they asked for. The bespoke blocks below still run for the OS preference and do nicer
+         things (fading sparks out rather than snapping them), so this never has to be clever.
+
+         Durations go to ~0 rather than `animation: none`, because several entrance animations
+         start at `opacity: 0` and would otherwise never arrive at their end state. */
+      .gs-reduced *, .gs-reduced *::before, .gs-reduced *::after {
+        animation-duration: .001ms !important;
+        animation-delay: 0ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .001ms !important;
+        transition-delay: 0ms !important;
+        scroll-behavior: auto !important;
+      }
+
       /* Visually hidden, still announced (GS-a11y-announce). NOT `display:none` or
          `visibility:hidden` — both remove the node from the accessibility tree, which is exactly
          what a live region must not be. The 1px clipped box is the standard technique. */

@@ -59,7 +59,7 @@ import { mountShopArrival } from './render/shopArrival';
 import { staticCourseSpec } from './sim/course/staticCourses';
 import { sfx, resumeAudio, landVoiceOf } from './render/audio';
 import {
-  getSettings, setSetting, toggleSetting, applyReaderSettings, clampUiScale, type Settings,
+  getSettings, setSetting, toggleSetting, applyReaderSettings, clampUiScale, reducedMotion, type Settings,
 } from './settings';
 import { HAPTICS, haptic } from './render/haptics';
 import { showAceCelebration, showBirdCelebration, showEndlessMilestone, showSectorScan, showVoyageVictory } from './render/celebrations';
@@ -3045,7 +3045,7 @@ function render(): void {
     el.addEventListener('click', () => {
       resumeAudio();
       const go = (): void => dispatch({ type: 'storyRoundContinue' });
-      if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      if (reducedMotion()) {
         go();
         return;
       }
@@ -3087,7 +3087,7 @@ function render(): void {
             betrayerName: state.story ? betrayerName(state.story) : undefined,
           });
       };
-      if (!state.story || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      if (!state.story || reducedMotion()) {
         // Reduced motion (or no campaign): skip the battle — straight to the recap (the gate verdict).
         dispatch({ type: 'engageStoryFinale', strike: 'clean' });
         return;
@@ -3117,7 +3117,7 @@ function render(): void {
       const r = state.lastStoryTournament;
       const go = (): void => dispatch({ type: 'storyTournamentContinue' });
       const sigilId = r?.sigilId;
-      if (!sigilId || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      if (!sigilId || reducedMotion()) {
         go();
         return;
       }
@@ -3967,7 +3967,7 @@ function shouldPlayIntro(): boolean {
     const q = new URLSearchParams(location.search).get('intro');
     if (q === '1') return true;
     if (q === '0') return false;
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
+    if (reducedMotion()) return false;
     if (sessionStorage.getItem('gs_introSeen') === '1') return false;
   } catch {
     return false;

@@ -9,6 +9,7 @@
  * `onDone` always fires (a fault can never strand the player), and reduced-motion resolves instantly.
  */
 
+import { reducedMotion } from '../settings';
 import { shipCardSVG } from './shipArt';
 import { spaceLookFor, roughBaseFor } from './palette';
 import type { BiomeArchetype } from '../sim/course/themes';
@@ -28,7 +29,7 @@ export function mountShopArrival(opts: {
 }): ShopArrivalHandle {
   const reduce =
     typeof window !== 'undefined' &&
-    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    reducedMotion();
 
   let finished = false;
   let timer = 0;
