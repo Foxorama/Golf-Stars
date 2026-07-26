@@ -62,10 +62,13 @@ function feelSpeed(key: 'cetusFlowSpeed' | 'shipDriftSpeed'): number {
  * A projector that maps course space onto the OVERLAY CANVAS pixels so an animated decor twin (the
  * Cetus star-waterfall, the derelict's drifting junk, a meteor strike) sits EXACTLY on the static SVG
  * map beneath it (GS-cetus-flow / GS-ship-feel / GS-meteor-strikes on the aim/putt screen). The SVG
- * has a fixed `viewBox` (DMAP_W×DMAP_H) that CSS scales into the container by the default
- * `preserveAspectRatio` (meet — uniform, centred), so we build the map's OWN projector at the viewBox
- * size and compose the meet-fit letterbox transform onto the canvas's real pixels. Only valid in
- * FOCUS mode (the SVG's whole-hole fit folds in `extra` points this can't see) — the caller gates it.
+ * has a `viewBox` that CSS scales into the container by the default `preserveAspectRatio` (meet —
+ * uniform, centred), so we build the map's OWN projector at the viewBox size and compose the meet-fit
+ * transform onto the canvas's real pixels. Since GS-play-fullframe the map's frame is fitted to the
+ * container's aspect, so that transform is normally the IDENTITY — it is kept because it stays exactly
+ * right for the frame the caller passes, whatever it is (a stale frame during a resize, a preview
+ * harness at a fixed size). Only valid in FOCUS mode (the SVG's whole-hole fit folds in `extra` points
+ * this can't see) — the caller gates it.
  */
 function alignedProjector(hole: Hole, mapProj: ProjectOptions, cw: number, ch: number): Projector {
   const vbW = mapProj.width ?? 360;
