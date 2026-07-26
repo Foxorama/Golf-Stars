@@ -124,6 +124,9 @@ export function mountWeatherOverlay(
   cv.width = cw * dpr;
   cv.height = ch * dpr;
   cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;border-radius:10px;';
+  // Purely atmospheric (rain, meteors, aurora) — nothing here is information, and the weather that
+  // MATTERS is the wind, which the live region speaks in the situation preamble (GS-a11y-announce).
+  cv.setAttribute('aria-hidden', 'true');
   el.appendChild(cv);
   const ctx = cv.getContext('2d');
   if (!ctx) return null;

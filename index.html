@@ -114,6 +114,14 @@
          .si-card …) and, more usefully, every control written from here on. */
       :focus-visible { outline: 2px solid var(--gs-info); outline-offset: 2px; }
 
+      /* Visually hidden, still announced (GS-a11y-announce). NOT `display:none` or
+         `visibility:hidden` — both remove the node from the accessibility tree, which is exactly
+         what a live region must not be. The 1px clipped box is the standard technique. */
+      .gs-sr-only {
+        position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+        overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+      }
+
       /* ── Reader-friendly type (GS-a11y-readable-text) ────────────────────────────────
          Set on <html> by the "Readable text" toggle. The full reasoning, with citations,
          is in docs/decisions/accessibility.md. The short version, because it drives what
@@ -2628,6 +2636,11 @@
   </head>
   <body>
     <div id="app"></div>
+    <!-- Live region for screen-reader narration (GS-a11y-announce). Deliberately OUTSIDE #app:
+         render() replaces app.innerHTML wholesale, and a live region that is destroyed and rebuilt
+         every render is not reliably announced — the element has to persist for its content change
+         to register as a change. `polite` because a shot resolving is news, not an alert. -->
+    <div id="gs-live" role="status" aria-live="polite" aria-atomic="true" class="gs-sr-only"></div>
     <!-- Probe: does ANY ES module execute in this browser? If modules are unsupported or
          the bundle fails to parse, this never sets the flag and the watchdog reports it. -->
     <script type="module">

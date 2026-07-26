@@ -538,6 +538,21 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     **click** so there is no second activation path to keep in step. A bare `:focus-visible` ring is a
     specificity FLOOR (0,1,0), so bespoke rings still win — but a rule that sets `outline:none` must restore
     one. Guarded by `tests/a11y-focus.test.ts`.
+  - **THE GAME SAYS WHAT IT IS DOING** (GS-a11y-announce, `app/announce.ts`). Everything that happens
+    happens on a CANVAS, so without narration a screen-reader player got silence for a whole round. PURE
+    sentence builders (node-testable) read the SAME `ShotLog` fields the shot card draws ⇒ spoken and drawn
+    can't drift; a guarded writer puts them in `#gs-live`. Three rules: the region lives **OUTSIDE `#app`**
+    (`render()` replaces `app.innerHTML`, and a live region rebuilt every render is never reliably
+    announced — it must PERSIST for a content change to register); it is **`polite`, never `assertive`** (a
+    shot resolving is news, not an alert); and it is hidden by CLIPPING (`.gs-sr-only`), never
+    `display:none`/`visibility:hidden`, which would drop it from the a11y tree. The situation preamble fires
+    once per HOLE keyed on the COURSE SEED (per-shot would be noise — each shot's report already ends with
+    the distance left); the shot report fires beside the sfx on settle, NOT with the visible card (which may
+    be 300ms away or skipped under Fast Shots), and its lateral miss is measured off the AIM RAY like the
+    card's. A repeat message blanks-then-re-sets so two pars in a row both speak. Decorative canvases/SVGs
+    are `aria-hidden`; the hole map is `role="img"` + a name (it was leaking loose `<text>` yardages); and
+    anything encoded in COLOUR ALONE needs a `.gs-sr-only` twin (the momentum pips had none). Guarded by
+    `tests/a11y-announce.test.ts`.
   - **CSS classes / DOM ids are GLOBAL and screens can't see each other's names** — new screen chrome gets
     its OWN prefix (bridge HUD `.gs-bhud`, resume `.gs-resume`, lore `.gs-lore`, star-tour content
     `.gs-sthud` — NEVER the play screen's `.gs-hud`, which the #353 map-blur regression proved). Grep the

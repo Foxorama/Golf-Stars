@@ -141,11 +141,11 @@ export function puttCaddyId(): string | undefined {
  *  The figure is drawn to the canvas in the render wiring (keyed off `data-caddy`). '' when none. */
 export function caddyBadgeHTML(id: string | undefined): string {
   if (hasCaddyArt(id))
-    return `<div class="gs-caddybadge"><canvas class="gs-caddycv" width="128" height="120" data-caddy="${id}"></canvas><span class="gs-caddyname">${CADDY_LABEL[id]}</span></div>`;
+    return `<div class="gs-caddybadge"><canvas class="gs-caddycv" width="128" height="120" data-caddy="${id}" aria-hidden="true"></canvas><span class="gs-caddyname">${CADDY_LABEL[id]}</span></div>`;
   // GS-story-quality: a Coil VOLUNTEER (Herald caddy) has a story figure but no CADDY_LABEL entry.
   if (id && isHeraldAgent(id)) {
     const short = heraldAgent(id)?.name.replace(/^.*?["']([^"']+)["'].*$/, '$1') ?? 'Coil';
-    return `<div class="gs-caddybadge"><canvas class="gs-caddycv" width="128" height="120" data-caddy="${id}"></canvas><span class="gs-caddyname">${short}</span></div>`;
+    return `<div class="gs-caddybadge"><canvas class="gs-caddycv" width="128" height="120" data-caddy="${id}" aria-hidden="true"></canvas><span class="gs-caddyname">${short}</span></div>`;
   }
   return '';
 }

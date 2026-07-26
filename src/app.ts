@@ -116,6 +116,7 @@ import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SH
 import type { CourseEffectId } from './sim/rpg/effects';
 import { exitConfirmOverlay, priceNoticeOverlay, saveView, scrambleChoiceOverlay, settingsOverlay, settingsSheetInner, shotPopupOverlay } from './app/overlays';
 import { applyOverlayFocus, captureFocusOrigin, preservingFocus, wireRoleButtonKeys } from './app/focus';
+import { announce, shotSentence, situationSentence } from './app/announce';
 import {
   BackupError,
   applyBackup,
@@ -127,7 +128,7 @@ import {
 import { backIntent } from './ui/back';
 import { isNativeShell } from './native';
 import { primeHaptics } from './render/haptics';
-import { hazardLabel, mapTopInfo, puttAimLabel, puttAimRow, puttBreakLine } from './app/playHud';
+import { hazardLabel, mapTopInfo, puttAimLabel, puttAimRow, puttBreakLine, windRead } from './app/playHud';
 import { mountWeatherOverlay, playCaddyVoice, playTentBonk, syncMusic } from './app/playFx';
 import { metaFromSave, persist, persistStory } from './app/persist';
 
@@ -877,6 +878,8 @@ let mapPan: [number, number] = [0, 0];
 // before the next decision, so each shot gets its own beat. Module-level (a timed view
 // effect, not reducer state — like animatedShots above).
 let awaitingShotPopup = false;
+/** Stop:hole of the last situation we narrated, so the preamble fires once per hole (GS-a11y-announce). */
+let announcedHoleKey: string | null = null;
 let popupTimer = 0;
 // The manual-putt pace meter (a time/DOM side-effect, like the play view) — mounted on the putt
 // screen, torn down on any dispatch.
@@ -3826,6 +3829,13 @@ function render(): void {
             if (!landVoiceOf(lastShot.lieTo, lastShot.penalty)) sfx.penalty();
             haptic(HAPTICS.bad);
           }
+          // Narrate the shot for a screen reader (GS-a11y-announce). Fired here, with the sfx, because
+          // this is the moment the ball is DOWN and the outcome is known — the visible shot card may
+          // be several hundred ms away (or skipped entirely under Fast Shots). Built from the same
+          // ShotLog the card draws, so the spoken and drawn reports cannot drift.
+          if (lastShot) {
+            announce(shotSentence(lastShot, play.holed ? undefined : dist(play.ball, pinOf(play.hole))));
+          }
           // Hold a beat after the ball settles so the finish reads as finished before the next screen
           // — chipping/putting used to cut to the follow-up instantly. Cases:
           //  • a HOLE-IN-ONE → a brief beat for the ball to drop, then the celebration overlay (which
@@ -3907,6 +3917,35 @@ function render(): void {
       animatedShots = state.play.shots.length;
       animatedPutts = state.play.puttLogs.length;
     }
+  }
+
+  // Announce the situation ONCE per hole (GS-a11y-announce) — the hole, its par and length, where the
+  // ball is and what the wind is doing, i.e. what a sighted player takes off the map in one glance.
+  // Per HOLE, not per render or per shot: each shot's own report already ends with the distance left,
+  // so repeating the preamble every stroke would be noise, not information.
+  if (state.screen === 'playing' && state.play && !state.play.done) {
+    const p = state.play;
+    // Keyed on the COURSE SEED, not a stop counter: the seed reproduces the course, so it changes
+    // exactly when the stop does — including a replayed stop, which should narrate again.
+    const key = `${state.course.seed}:${p.holeIndex}`;
+    if (key !== announcedHoleKey) {
+      announcedHoleKey = key;
+      const w = windRead(p.hole);
+      announce(
+        situationSentence({
+          holeNumber: p.holeIndex + 1,
+          holeCount: state.course.holes.length,
+          par: p.hole.par,
+          holeYards: dist(p.hole.tee, p.hole.green),
+          lie: p.lie,
+          distToPin: dist(p.ball, pinOf(p.hole)),
+          windMph: w.spd,
+          windLabel: w.kind,
+        }),
+      );
+    }
+  } else if (state.screen !== 'playing') {
+    announcedHoleKey = null; // leaving the round re-arms the preamble for the next hole played
   }
 
   // LAST, after every screen and overlay is mounted and wired (GS-a11y-focus). Both passes run on
