@@ -231,7 +231,7 @@ You travel the galaxy in a **field** of golfers, not alone. Three layers, all pu
     auto≡interactive holds; each absent/0 ⇒ no extra rng, byte-for-byte: (1) **`windResist`** (Wind-Cheater
     Balls, stackable→0.6) scales DOWN BOTH the wind's carry loss + crosswind push in `resolveShot` AND the
     upwind compensation in `aimWithWind` by the same factor, so wind bites less without desyncing the aim;
-    (2) **`backspinBoost`** (Spin-Milled Wedges) subtracts from the roll fraction in the SAME single
+    (2) **`backspinBoost`** (Fresh-Groove Wedges) subtracts from the roll fraction in the SAME single
     roll-energy draw (more check, less run); (3) **`hazardImmune: string[]`** (Floater Balls→water, Magma
     Skimmers→lava, Void-Walkers→void+voidlost) — a penalty kind the ball SKIMS across with NO stroke:
     `rollOut` treats an immune penalty as a fast skim surface (`SKIM_ROLL`) and keeps rolling toward dry

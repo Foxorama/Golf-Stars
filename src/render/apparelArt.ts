@@ -444,7 +444,7 @@ function shirtDetail(
       }
       break;
     case 'blazer':
-      // The tailored jacket (GS-unending's Green Jacket): notched gold-trimmed lapels down to a
+      // The tailored jacket (GS-unending's Evergreen Blazer): notched gold-trimmed lapels down to a
       // single button, a breast-pocket crest, and a hint of shirt in the open V.
       detail = `<path d="M-5,-9.5 L0,-4 L5,-9.5 L2.4,4 L-2.4,4 Z" fill="#f4f6f2" opacity="0.9"/>
         <path d="M-6,-10 L-1,-4.5 L-2.6,5 L-5.4,-1" fill="none" stroke="${accent}" stroke-width="1.3"/>

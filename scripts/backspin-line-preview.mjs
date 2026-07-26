@@ -70,7 +70,7 @@ const play = { ...beginHole(hole), ball: [G[0] - u[0] * 40, G[1] - u[1] * 40], l
 const tiers = [
   ['base (short guide)', startingLoadout()],
   ['Spin Guide Card', loadoutFromPerks(['spin-guide'])],
-  ['+ Spin-Milled', loadoutFromPerks(['spin-guide', 'spin-milled'])],
+  ['+ Fresh-Groove', loadoutFromPerks(['spin-guide', 'spin-milled'])],
   ['Trajectory Computer', loadoutFromPerks(['spin-computer', 'spin-milled'])],
 ];
 let cells = '';

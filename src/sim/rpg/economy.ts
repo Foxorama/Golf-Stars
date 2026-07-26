@@ -288,7 +288,7 @@ export interface PlayerLoadout {
    */
   windResist?: number;
   /**
-   * Increased backspin (GS-proshop-2, Spin-Milled wedges/balls): 0..1 subtracted from a shot's roll
+   * Increased backspin (GS-proshop-2, Fresh-Groove wedges/balls): 0..1 subtracted from a shot's roll
    * fraction — freshly milled grooves rip more check so approaches BITE and hold the green (less
    * run-out, a touch more check on the wedges). Folded into the SAME single roll-energy rng draw, so
    * undefined/0 is byte-for-byte unchanged.

@@ -20,7 +20,7 @@ import { RARITY_C } from './loot';
  *     LIFETIME-once, exactly like the cosmetic unlocks below: `finishStop` floors the crossing at the
  *     reducer's persisted lifetime-best hole, so a milestone re-reached in a later run banks nothing.
  *
- *   • UNLOCKS — the Evergreen cosmetic set (bag → cap → pants → the Green Jacket) unlocks at
+ *   • UNLOCKS — the Evergreen cosmetic set (bag → cap → pants → the Evergreen Blazer) unlocks at
  *     40/60/80/100, and a SECRET mythic ship waits at hole 150. Unlocks are permanent (pushed into
  *     the owned-cosmetics pools by the UI reducer, keyed off the lifetime-best hole count).
  *
@@ -132,9 +132,9 @@ export interface EndlessUnlock {
 /** The Evergreen set + the hole-150 secret. Ids resolve against the cosmetic catalogues. */
 export const ENDLESS_UNLOCKS: readonly EndlessUnlock[] = [
   { holes: 40, kind: 'apparel', id: 'bag-evergreen', name: 'Evergreen Tour Bag' },
-  { holes: 60, kind: 'apparel', id: 'cap-baggy-green', name: 'Baggy Green Cap' },
+  { holes: 60, kind: 'apparel', id: 'cap-baggy-green', name: 'Evergreen Soft Cap' },
   { holes: 80, kind: 'apparel', id: 'pants-evergreen', name: 'Evergreen Pro Pants' },
-  { holes: 100, kind: 'apparel', id: 'jacket-green', name: 'The Green Jacket' },
+  { holes: 100, kind: 'apparel', id: 'jacket-green', name: 'The Evergreen Blazer' },
   { holes: 150, kind: 'ship', id: 'infinity-ace', name: 'The Infinity Ace', secret: true },
 ];
 
