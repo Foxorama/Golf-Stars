@@ -420,7 +420,18 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     the boost multiplies the drawn height-to-length ratio directly and 4× turned a skip into a pop-up.
     `rollEntryFloor` is retired to 0 — flooring an entry speed IS a velocity step. Eyes-on:
     `scripts/landing-preview.mjs`.
-  - **BOUNCE AND RUN READ PER CLUB  - **BOUNCE AND RUN READ PER CLUB, AND THEY COME FROM DIFFERENT PLACES** (GS-runout-club). The RUN is
+  - **BOUNCE AND RUN READ PER CLUB  - **THE RUN-OUT HAS ITS OWN TIME BASE, AND PRETENDING OTHERWISE MADE THE BOUNCE INVISIBLE**
+    (GS-landing-real, `runoutTimeScale`). The drawn FLIGHT is **~8× real time** — 750ms for a 250yd
+    drive that really takes six seconds — so GS-runout-feel's "no velocity step from strike to rest"
+    chained the bounce to an 8× arrival speed and made it physically right and visually impossible:
+    measured in game, a driver's six hops totalled **87ms**, the first **27ms** = 1.6 frames, drawn lift
+    **0.6px**, zero perceptible peaks. GS-flight-pace made it WORSE by fixing the arrival speed. The
+    run-out now runs on its own slower base; continuity is kept WITHIN it (hop→hop→roll, and the roll
+    enters at the last hop's ACTUAL speed, which `hopMinMs` can stretch below the chained one). Hops
+    must also cover real DISTANCE or they are a blip before a long roll — `hopLenK` 0.085→0.16 took the
+    driver from 87ms/8% to **868ms/31%** of the run-out. Measured per club, never guessed
+    (`scripts/landing-preview.mjs` + a frame-by-frame in-game track).
+  - **BOUNCE AND RUN READ PER CLUB, AND THEY COME FROM DIFFERENT PLACES** (GS-runout-club). The RUN is
     the SIM's — `FLIGHT_PROFILES.carryFrac`, total-preserving — and the irons were ONE row at 0.9, so
     every iron ran LESS than a hybrid and a 3-iron was indistinguishable from a 9-iron. `flightClassOf`
     now splits them at the NUMBER (`ironLong` ≤5 / `ironShort`), still convention-based so a new `4i`

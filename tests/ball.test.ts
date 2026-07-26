@@ -82,7 +82,10 @@ describe('ball size (the camera decides, within limits)', () => {
   it('grows at the chip/putt camera — which is the whole point of zooming in', () => {
     const putt = ballRadiusPx(7.56);
     expect(putt).toBeGreaterThan(ballRadiusPx(1.83));
-    expect(putt).toBeGreaterThanOrEqual(DEFAULT_BALL_FEEL.dimpleMinPx);
+    // Dimples arrive a little further in than the shallowest putt camera now that the ball is smaller
+    // ("it looks like a tennis ball and not a golf ball when doing wedges and putters"); the band and
+    // the mark carry the rotation below that, which is what they are for.
+    expect(ballRadiusPx(17.1)).toBeGreaterThanOrEqual(DEFAULT_BALL_FEEL.dimpleMinPx);
   });
 
   it('keeps growing all the way in — a tap-in draws a bigger ball than a 20-footer', () => {
@@ -214,7 +217,10 @@ describe('the painter', () => {
     expect(on.arcs.length).toBe(1);
     const sh = on.arcs[0]!;
     expect(Math.hypot(sh.x - 50, sh.y - 50), 'shadow sits exactly under the ball').toBeGreaterThan(1);
-    expect(sh.r, 'shadow is wider than the ball, or it never peeks out').toBeGreaterThan(6);
+    // It peeks out from UNDER the ball on the offset, not by being bigger — an oversized shadow was
+    // the next report ("the shadow is too large"), so it now sits just inside the ball's own radius.
+    expect(sh.r, 'shadow is a puddle, not a pool').toBeLessThan(6);
+    expect(sh.r).toBeGreaterThan(3);
   });
 
   it('the shadow spreads as the ball climbs and fades with it', () => {

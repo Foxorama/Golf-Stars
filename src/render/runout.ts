@@ -62,6 +62,10 @@ export interface RunoutFeel {
    *  at least ONE hop: every full shot arrives out of the air. */
   hopMinYd: number;
   hopMax: number;
+  /** Floor on a single hop's DURATION (ms). A wedge's hop is under a yard, which at the run-out's own
+   *  time base is ~70ms — four frames, and you see nothing. The floor only bites on hops that are too
+   *  brief to watch, and on those the ball is going UP more than forward anyway. */
+  hopMinMs: number;
   /** SAFETY NET for the first hop: at least this share of the run-out, up to `hopFloorMax` yards. A
    *  wedge's modelled skip is a few inches — true, and unwatchable; the ball has to be SEEN to land.
    *  The cap keeps it a net and not a second model: a club whose own bounce is bigger keeps it. */
@@ -107,6 +111,21 @@ export interface RunoutFeel {
    * cannot introduce a join.
    */
   rollEntryFloor: number;
+  /**
+   * The run-out's own TIME BASE, as a fraction of the flight's.
+   *
+   * The drawn flight is ~8x real time — 750ms for a 250-yard drive that really takes six seconds.
+   * Chaining the bounce to the ball's arrival speed therefore inherits that 8x, and the bounce becomes
+   * physically correct and visually impossible: measured in game, a driver's six hops totalled **87ms**
+   * and the first was **27ms**, under two frames at 60fps. The report was "there is no bounce. the ball
+   * drops, touches ground and then rolls a little bit", and that is exactly what 87ms looks like.
+   *
+   * So the run-out owns a slower time base than the flight, deliberately. That IS a discontinuity at
+   * touchdown, and pretending otherwise is what produced an invisible bounce — the honest thing is to
+   * name it. Everything WITHIN the run-out stays chained (hop to hop to roll), which is the continuity
+   * that actually shows.
+   */
+  runoutTimeScale: number;
   /** Clamp on the whole run-out's animation (ms). */
   runoutMinMs: number;
   runoutMaxMs: number;
@@ -124,23 +143,25 @@ export const DEFAULT_RUNOUT_FEEL: RunoutFeel = {
   restitutionFirm: 0.74,
   bounceSoft: 0.16,
   bounceFirm: 0.62,
-  hopLenK: 0.085,
+  hopLenK: 0.16,
   hopApexK: 0.05,
   hopApexMax: 6,
   hopMinYd: 0.35,
   hopMax: 6,
+  hopMinMs: 130,
   hopFirstMinShare: 0.35,
   hopFloorMax: 2.5,
-  apexOverLen: 0.4,
+  apexOverLen: 0.3,
   minAirCarry: 12,
-  rollMinShare: 0.12,
+  rollMinShare: 0.3,
   holedEndSpeed: 0.45,
-  hopDrawBoost: 1.8,
+  hopDrawBoost: 3,
   varyLen: 0.22,
   varyApex: 0.3,
   rollEntryFloor: 0,
+  runoutTimeScale: 0.16,
   runoutMinMs: 340,
-  runoutMaxMs: 1500,
+  runoutMaxMs: 2400,
   backspinSkidFrac: 0.55,
   backspinSkidMax: 7,
   backspinMsPerYd: 55,
@@ -327,7 +348,9 @@ export function planRunout(landing: Landing, feel: RunoutFeel = DEFAULT_RUNOUT_F
   // Never let the bounce swallow the whole run-out: the ball has to be SEEN rolling to a stop.
   const airBudget = D * (1 - feel.rollMinShare);
   const hops: Hop[] = [];
-  let v = speed * kh; // speed leaving the first contact — chained off the arrival, so no step
+  // Speed leaving the first contact, in the RUN-OUT's own time base (see `runoutTimeScale`). Every
+  // duration below derives from this one number, so hop→hop→roll stays continuous throughout.
+  let v = speed * kh * feel.runoutTimeScale;
   let used = 0;
   let khRun = kh;
   let kvRun = kv;
@@ -348,7 +371,7 @@ export function planRunout(landing: Landing, feel: RunoutFeel = DEFAULT_RUNOUT_F
     // …and a hop is never taller than it is long by much, or the ball reads as bouncing vertically
     // off the turf instead of skipping along it.
     const apex = Math.max(0.05, Math.min(hopApex, want * feel.apexOverLen));
-    hops.push({ dist: want, ms: want / Math.max(0.01, v), apex });
+    hops.push({ dist: want, ms: Math.max(feel.hopMinMs, want / Math.max(0.01, v)), apex });
     used += want;
     v *= khRun;
     hopLen *= khRun * khRun; // constant horizontal speed within a hop ⇒ length decays as k²
@@ -356,8 +379,11 @@ export function planRunout(landing: Landing, feel: RunoutFeel = DEFAULT_RUNOUT_F
   }
 
   const rollDist = Math.max(0, D - used);
-  // Continuous by construction: the roll enters at exactly the speed the last hop left at.
-  const vRoll = Math.max(v, speed * feel.rollEntryFloor);
+  // The roll enters at the speed the LAST HOP ACTUALLY LEFT AT — `hopMinMs` can stretch a hop below
+  // its chained speed, and reading `v` here would then start the roll faster than the hop that fed it.
+  const last = hops[hops.length - 1];
+  const vLast = last && last.ms > 0 ? Math.min(v, last.dist / last.ms) : v;
+  const vRoll = Math.max(vLast, speed * feel.rollEntryFloor);
   // A roll that ends in the CUP keeps some pace: distance = mean speed x time, so the same ground at
   // a higher mean takes less time and the ball is still travelling when it disappears.
   const rollEndFrac = landing.holed ? feel.holedEndSpeed : 0;
