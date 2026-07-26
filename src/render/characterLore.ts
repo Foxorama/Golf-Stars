@@ -159,13 +159,13 @@ export function characterLoreCardHTML(ch: Character | undefined): string {
     </div>
   </div>
   <style>
-    .gs-charlore-ov{position:fixed;inset:0;z-index:80;display:flex;align-items:flex-end;justify-content:center;
+    .gs-charlore-ov{position:fixed;inset:0;z-index:80;display:flex;align-items:safe flex-end;justify-content:center;
       background:rgba(4,6,11,0.72);backdrop-filter:blur(3px);animation:gs-charlore-fade .16s ease both;}
     .gs-charlore{position:relative;width:100%;max-width:470px;margin:0 8px;overflow:hidden;
       background:linear-gradient(180deg,#141a27,#0d1017);border:1px solid #2c3547;border-radius:20px 20px 0 0;
       box-shadow:0 -12px 40px #000c;animation:gs-charlore-rise .24s cubic-bezier(.2,.8,.2,1) both;
-      max-height:92vh;display:flex;flex-direction:column;}
-    @media(min-width:560px){.gs-charlore-ov{align-items:center;}.gs-charlore{border-radius:20px;}}
+      max-height:calc(var(--gs-dvh) * .92);display:flex;flex-direction:column;}
+    @media(min-width:560px){.gs-charlore-ov{align-items:safe center;}.gs-charlore{border-radius:20px;}}
     .gs-charlore-x{position:absolute;top:9px;right:9px;z-index:3;width:34px;height:34px;border-radius:50%;
       border:1px solid #ffffff33;background:#0009;color:#eef;font-size:15px;cursor:pointer;line-height:1;
       backdrop-filter:blur(2px);}

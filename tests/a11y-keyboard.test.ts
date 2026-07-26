@@ -1,5 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
-import { execSync } from 'node:child_process';
+import { describe, it, expect } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -65,9 +64,6 @@ describe('the listener does not stack', () => {
 
 // --- real browser: arrows actually move the aim and the power ---------------------
 const dist = resolve(root, 'dist/index.html');
-beforeAll(() => {
-  execSync('npx vite build', { cwd: root, stdio: 'ignore' });
-}, 180_000);
 
 function findChromium(): string | null {
   const bases = [
@@ -99,7 +95,10 @@ describe('arrow keys drive the shot (real browser)', () => {
       const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
       try {
         const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-        await page.goto('file://' + dist, { waitUntil: 'load' });
+        // `?intro=0`: the boot cinematic is a <body>-level takeover that now (correctly) marks
+        // #app `inert` while it plays, so a test that clicks into the app has to skip it — and a
+        // test that DOESN'T skip it is silently racing the animation either way.
+        await page.goto('file://' + dist + '?intro=0', { waitUntil: 'load' });
         await page.waitForFunction(
           () => document.getElementById('app')?.getAttribute('data-booted') === '1',
           { timeout: 8000 },

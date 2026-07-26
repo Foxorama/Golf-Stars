@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -14,12 +13,26 @@ import { resolve } from 'node:path';
 const dist = resolve(__dirname, '../dist/index.html');
 let html = '';
 
+// `dist` is built ONCE by tests/globalSetup.ts — never here. A per-file `vite build` deletes it
+// out from under a sibling test file's `page.goto` (emptyOutDir); see globalSetup for the story.
 beforeAll(() => {
-  execSync('npx vite build', { cwd: resolve(__dirname, '..'), stdio: 'ignore' });
   html = readFileSync(dist, 'utf8');
-}, 120_000);
+});
 
 describe('build output (regression guards)', () => {
+  it('no test file builds dist itself — globalSetup owns it', () => {
+    // Vitest runs test files in parallel workers and the game build is `emptyOutDir: true`, so a
+    // per-file `vite build` DELETES dist out from under whichever sibling is mid-`page.goto`. The
+    // symptom is a bare `net::ERR_FILE_NOT_FOUND at file:///…/dist/index.html` on a different test
+    // each run — CI built the same commit twice and got one pass and one failure. Eleven test files
+    // read dist; exactly one process may write it, and that is tests/globalSetup.ts.
+    const offenders = readdirSync(__dirname)
+      .filter((f) => f.endsWith('.test.ts'))
+      // Match the CALL, not the prose — this very file explains the rule in a comment.
+      .filter((f) => /exec(?:Sync|FileSync)?\([^)]*vite build/.test(readFileSync(resolve(__dirname, f), 'utf8')));
+    expect(offenders, `test files building dist (use tests/globalSetup.ts): ${offenders.join(', ')}`).toEqual([]);
+  });
+
   it('is a single self-contained file — no external script/asset to 404', () => {
     // No <script src=...> or <link href=...assets...> — everything inlined.
     expect(/<script[^>]+src=/.test(html)).toBe(false);
@@ -93,7 +106,10 @@ describe('build output (real browser)', () => {
         const page = await browser.newPage();
         const errors: string[] = [];
         page.on('pageerror', (e) => errors.push(e.message));
-        await page.goto('file://' + dist, { waitUntil: 'load' });
+        // `?intro=0`: the boot cinematic is a <body>-level takeover that now (correctly) marks
+        // #app `inert` while it plays, so a test that clicks into the app has to skip it — and a
+        // test that DOESN'T skip it is silently racing the animation either way.
+        await page.goto('file://' + dist + '?intro=0', { waitUntil: 'load' });
         await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', { timeout: 8000 });
         const text = (await page.textContent('#app')) || '';
         expect(errors).toEqual([]);

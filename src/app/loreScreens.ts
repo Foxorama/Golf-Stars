@@ -96,7 +96,7 @@ function lorePortrait(portrait: string): string {
 export function loreScreen(): string {
   const event = loreEventById(state.pendingLoreId);
   if (!event) {
-    return `<div style="min-height:60vh;display:flex;align-items:center;justify-content:center;padding:24px;">${btn(
+    return `<div style="min-height:calc(var(--gs-dvh) * .6);display:flex;align-items:center;justify-content:center;padding:24px;">${btn(
       'Continue →',
       { type: 'dismissLore' },
       { variant: 'primary' },

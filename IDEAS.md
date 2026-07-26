@@ -11,6 +11,15 @@ under the new format). Avenue (1), a full top-down RPG shell, stays deferred unt
 
 ## Now / next
 
+**GS-a11y-bridge-idpod — the travel bridge loses the golfer's name at a large scale** *(surfaced by
+the 2026-07-26 mobile-layout sweep; the one thing it left visibly wrong)*
+`.gs-bhud__idpod` is a fixed-height pill holding `🚩 <name>` + a `white-space: nowrap` "Hole n" chip. At
+the top UI-scale rung the chip wins the space and the name ellipsises to nothing — you cannot see which
+golfer you are flying as, on their own bridge. Letting `.gs-bhud__who` wrap was tried and rejected: the
+name spills below the pill's rounded frame and reads as a rendering fault. It wants a real layout pass on
+the pod (a two-line pod at a tight fit, or the progress chip moving into the stat pod), plus a browser
+assertion that the name's `scrollWidth` fits its box at every rung. Small, self-contained, needs eyes-on.
+
 **GS-a11y-putt-assist — the pace meter has no alternative** *(surfaced by the 2026-07-26 accessibility
 sweep; deliberately NOT done there, because it is a balance change wearing an accessibility hat)*
 Putting is a 1250ms sweeping canvas meter you must stop at the right moment (`render/puttMeter.ts`,

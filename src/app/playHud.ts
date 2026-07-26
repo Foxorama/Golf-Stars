@@ -218,10 +218,17 @@ function widthLabel(widthId?: string): string {
  * worth of content, the biggest single waste in the chip. They belong here anyway; "Drivable" and
  * "Tight approach" are facts about the hole in front of you, exactly like the lie and the wind.
  */
+/**
+ * The hole's shape + corridor-width descriptors ("Drivable", "Ribbon fairway"). Marked
+ * `gs-hud-brief` because that is what they are — BRIEFING, not live state: both are fixed for the
+ * whole hole and both are already read on the tee card before you play it. At a tight fit
+ * (GS-a11y-tight-fit) the CSS drops them, because at the top text size they cost two of the info
+ * chip's four lines and the live lie/wind/distance have to win that argument.
+ */
 function shapeWidthLabels(hole: Hole): string {
   return [shapeLabel(hole.shapeId), widthLabel(hole.widthId)]
     .filter(Boolean)
-    .map((l) => ` <span style="color:var(--gs-info);">${l}</span>`)
+    .map((l) => ` <span class="gs-hud-brief" style="color:var(--gs-info);">${l}</span>`)
     .join('');
 }
 

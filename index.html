@@ -191,6 +191,14 @@
          instead, which is what the BDA style guide asks for. */
       .gs-readable i, .gs-readable em, .gs-readable [style*="italic"] { font-style: normal; font-weight: 700; }
       .gs-readable [style*="text-align:justify"], .gs-readable [align="justify"] { text-align: left !important; }
+      /* SVG TEXT IS GEOMETRY, NOT PROSE — the tracking must not reach it. `letter-spacing` and
+         `word-spacing` are inherited properties, so the pair set on `body` reaches every `<text>` in
+         every hole map, star chart and card illustration. Those labels are placed at coordinates and
+         cannot wrap or reflow: widening them ran the travel map's three lane captions into each other
+         and off the right edge of the chart, and pushes the hole map's yardage markers off the feature
+         they annotate. The reader still gets the legible FAMILY here (that part inherits fine, and it is
+         the part that survives on a fixed-position label); only the spacing is held back. */
+      .gs-readable svg text, .gs-readable svg tspan { letter-spacing: normal; word-spacing: normal; }
 
       /* ── Buttons ─────────────────────────────────────────────────────────── */
       .gs-btn {
@@ -315,7 +323,7 @@
         border-radius: 12px; overflow: hidden; border: 1px solid var(--gs-line-2);
         line-height: 0; background: #0d1016;
       }
-      .gs-holeintro-map svg { display: block; width: 100%; height: auto; max-height: 44vh; margin: 0 auto; }
+      .gs-holeintro-map svg { display: block; width: 100%; height: auto; max-height: calc(var(--gs-dvh) * .44); margin: 0 auto; }
       .gs-holeintro-ctas { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
       .gs-holeintro-ctas .gs-btn { flex: 1 1 auto; text-align: center; }
       .gs-holeintro-ctas .gs-btn--primary { flex: 2 1 40%; font-size: 16px; padding: 13px 16px; }
@@ -439,7 +447,11 @@
       /* ── Shop-stop top row (GS-shop-stop-layout): the Travel-Onward hero button beside a compact
              Fuel Depot, so the next action + the tank live together at the top of the screen. ─── */
       .gs-shoptop {
-        display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+        /* `auto-fit` + `minmax(min(…))`, not `1fr 1fr`: a bare `1fr` keeps a min-content floor, and at a
+           large UI scale the two halves both wanted more than half — the hero CTA's own
+           `overflow: hidden` then clipped it to "Trave / onwa". Now the pair stacks when the row can no
+           longer carry both. A breakpoint can't make this call: it can't see `--gs-uiscale`. */
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); gap: 10px;
         align-items: stretch; margin: 6px 0 12px;
       }
       /* Travel Onward — the whole card is the primary CTA: a starfield ship-art banner over a green
@@ -458,7 +470,7 @@
       .gs-travelcard__art { display: block; flex: 1 1 auto; min-height: 58px; line-height: 0; }
       .gs-travelcard__art svg { width: 100%; height: 100%; }
       .gs-travelcard__body { display: flex; flex-direction: column; gap: 2px; padding: 9px 12px 11px; }
-      .gs-travelcard__k { font-size: 15px; font-weight: 800; letter-spacing: .01em; }
+      .gs-travelcard__k { font-size: 15px; font-weight: 800; letter-spacing: .01em; overflow-wrap: anywhere; }
       .gs-travelcard__sub { font-size: 11.5px; opacity: .82; }
 
       /* ── Combined Pro Shop intro (GS-shop-stop-layout): the pro greeting + credits purse + reroll
@@ -1013,7 +1025,7 @@
       @media (max-width: 640px) {
         .gs-play { flex-direction: column; gap: 10px; }
         .gs-map { width: 100%; max-width: 100%; flex: none; display: flex; justify-content: center; }
-        .gs-map svg { width: auto; height: auto; max-height: 56vh; max-width: 100%; }
+        .gs-map svg { width: auto; height: auto; max-height: calc(var(--gs-dvh) * .56); max-width: 100%; }
         .gs-controls { width: 100%; }
         .gs-hitbar {
           position: sticky; bottom: 0; z-index: 20; display: flex; gap: 8px;
@@ -1292,6 +1304,35 @@
       .gs-clubrow .gs-btn[disabled] { opacity: .38; }
       .gs-clubrow .gs-mini { padding: 7px 9px; font-size: 13px; }
       .gs-legend-line { font-size: 12.5px; line-height: 1.3; opacity: .95; }
+
+      /* ── TIGHT FIT: give the controls panel its width back (GS-a11y-tight-fit) ──────────────────
+         GS-play-hud-space already found the shape of this bug and named it: "the flanking caddy/action
+         columns cost the controls panel a THIRD of the screen width, which is what wrapped the power
+         read and the spray legend onto second lines — vertical height spent to buy horizontal
+         emptiness." At the top UI-scale rung it stops being a third and becomes half. The phone lays
+         out in 269 units; caddy 66 + action 40 + four gaps leave the panel **135**, and the control
+         stack answers by growing from 265 units tall to 380 — the top bar and the bottom bar together
+         take 83% of the screen and the player cannot see the ball they are aiming.
+         So when — and only when — the room genuinely isn't there, the two flanking blocks stop being
+         COLUMNS and become badges floating just above the panel, over the map. Nothing is removed and
+         nothing moves between play states (GS-hud-frame's rule): the caddy is still bottom-left, the
+         auto-finish still bottom-right, both at the same size. The panel simply gets the whole width.
+         `data-gs-fit` is stamped by `app/viewportFit.ts` because a media query cannot see the root
+         zoom (GS-a11y-scale-wrap); at the two lower rungs on a phone it reads "roomy" and the bar the
+         player already knows is untouched. */
+      :root[data-gs-fit="tight"] .gs-hud-bottom { position: absolute; }
+      :root[data-gs-fit="tight"] .gs-hud-bottom > .gs-hud-caddy,
+      :root[data-gs-fit="tight"] .gs-hud-bottom > .gs-hud-actions {
+        position: absolute; bottom: 100%; margin-bottom: 6px; z-index: 1;
+      }
+      :root[data-gs-fit="tight"] .gs-hud-bottom > .gs-hud-caddy { left: 0; }
+      :root[data-gs-fit="tight"] .gs-hud-bottom > .gs-hud-actions { right: 0; }
+      :root[data-gs-fit="tight"] .gs-hud-bottom > .gs-hud-controls { flex: 1 1 100%; }
+      /* The two hole DESCRIPTORS come off the conditions line. They are constant for the hole and are
+         already on the tee card you just read; the lie, the wind and the yardage are the live ones and
+         they need the room. At the top rung this line was four wrapped rows — 136 of the info chip's
+         325 units, more than the hole/par/score rows put together. */
+      :root[data-gs-fit="tight"] .gs-hud-top .gs-hud-brief { display: none; }
       /* Caddy badge — the hired caddy, framed so it really stands out (GS-fullmap / GS-caddy-display):
          a glowing gold frame, a warm radial backdrop, and a slow rotating sheen behind the figure +
          a pulsing glow, so it reads as a "premium" hire, not a plain portrait. */
@@ -1429,10 +1470,29 @@
         padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
         box-shadow: 0 -12px 40px rgba(0, 0, 0, .55);
         animation: gs-sheet-up .18s ease;
+        /* A SHEET IS BOTTOM-ANCHORED, SO A SHEET TALLER THAN THE SCREEN LOSES ITS TOP — AND A
+           `position: fixed` box cannot be reached by scrolling the page (GS-a11y-sheet-scroll).
+           At the top UI-scale rung the settings sheet measures ~1515px against an 844px phone:
+           everything above "Save data" was off-screen and unrecoverable, which made the scale
+           control itself a one-way trip. Cap to the viewport (in the scale-corrected token, never
+           raw dvh) and scroll INSIDE instead. `overscroll-behavior: contain` stops a flick at the
+           end of the list from scrolling the page behind the backdrop. */
+        max-height: calc(var(--gs-vh) - 12px);
+        max-height: calc(var(--gs-dvh) - 12px - env(safe-area-inset-top));
+        overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+      }
+      .gs-sheet::-webkit-scrollbar { width: 5px; }
+      .gs-sheet::-webkit-scrollbar-thumb { background: var(--gs-line); border-radius: 3px; }
+      /* The head stays put while the body scrolls, so the title + ✕ are always reachable — the ✕ is
+         the only affordance that says "this is dismissible" once the list is long enough to scroll. */
+      .gs-sheet > .gs-sheet-head {
+        position: sticky; top: -14px; z-index: 2; margin: -14px -16px 8px; padding: 14px 16px 8px;
+        background: linear-gradient(180deg, #141823 78%, #14182300);
       }
       @keyframes gs-sheet-up { from { transform: translateY(18px); opacity: .4; } to { transform: none; opacity: 1; } }
       @media (min-width: 560px) {
-        .gs-sheet-backdrop { align-items: center; }
+        .gs-sheet-backdrop { align-items: safe center; }
         .gs-sheet { border: 1px solid var(--gs-line); border-radius: var(--gs-r-lg); }
       }
       .gs-sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
@@ -1459,7 +1519,17 @@
       .gs-toggle--on .gs-knob { transform: translateX(19px); background: #ecffe9; }
       /* Compact icon on/off toggle CHIPS (GS-settings-chips) — Audio + Feel prefs bundled two-per-row
          so they take a fraction of the height the old full-width rows did. Each is a real switch. */
-      .gs-chipgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 9px; }
+      /* `1fr` carries an automatic MIN-CONTENT minimum, so a track whose chip cannot shrink any
+         further pushes the whole grid wider than the sheet — which is how "Music", "Fast shots" and
+         "Readable text" ended up hanging off the right edge at a large UI scale. `auto-fit` +
+         `minmax(min(…))` fixes both halves at once: the track can always shrink to the container, and
+         when two chips no longer fit side by side the grid drops to one column ON ITS OWN — a
+         `max-width` breakpoint could not, because it cannot see `--gs-uiscale` (GS-a11y-scale-wrap).
+         At the ship scale two columns still fit on every phone, so the sheet is unchanged. */
+      .gs-chipgrid {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+        gap: 8px; margin-top: 9px;
+      }
       .gs-setchip {
         display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
         padding: 10px 11px; border-radius: var(--gs-r); cursor: pointer; color: var(--gs-dim);
@@ -1469,7 +1539,10 @@
       }
       .gs-setchip:active { background: #ffffff0d; }
       .gs-setchip-i { font-size: 18px; line-height: 1; flex: 0 0 auto; }
-      .gs-setchip-t { font-size: 13px; font-weight: 700; flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      /* WRAP, don't ellipsis: "Reduced motion" and "Readable text" are the two longest labels in the
+         sheet and the two that matter most to the player this feature is for — "Reduced …" is not a
+         label. Two lines cost 17px; a truncated accessibility toggle costs the setting. */
+      .gs-setchip-t { font-size: 13px; font-weight: 700; flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
       .gs-setchip-sw {
         flex: 0 0 auto; width: 30px; height: 18px; border-radius: 999px;
         background: #2a3142; border: 1px solid #3a4356; position: relative;
@@ -1552,8 +1625,11 @@
 
       /* ── Hole-in-one celebration overlay (GS-ace) ──────────────────────────────────── */
       .gs-ace {
-        position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+        position: fixed; inset: 0; z-index: 60; display: flex; align-items: safe center; justify-content: center;
         padding: max(20px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom));
+        /* A fixed takeover that outgrows the screen is unreachable content (GS-a11y-sheet-scroll) —
+           the reward list is the whole point of the card, so let the backdrop scroll it. */
+        overflow-y: auto; overscroll-behavior: contain;
         background: radial-gradient(120% 90% at 50% 18%, rgba(20,28,46,.86), rgba(8,9,14,.96));
         backdrop-filter: blur(2px); cursor: pointer; animation: gs-ace-fade .35s ease-out both;
       }
@@ -1593,15 +1669,16 @@
 
       /* ── Eagle / albatross fly-over celebration (GS-bird) ──────────────────────────── */
       .gs-bird {
-        position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; justify-content: center;
+        position: fixed; inset: 0; z-index: 60; display: flex; align-items: safe flex-end; justify-content: center;
         padding: max(20px, env(safe-area-inset-top)) 18px max(34px, env(safe-area-inset-bottom));
+        overflow-y: auto; overscroll-behavior: contain;
         background: radial-gradient(120% 90% at 50% 22%, rgba(14,20,38,.82), rgba(7,8,13,.96));
         backdrop-filter: blur(2px); cursor: pointer; animation: gs-ace-fade .35s ease-out both;
       }
       .gs-bird-fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
       .gs-bird-card {
         position: relative; z-index: 1; text-align: center; max-width: 460px; width: 100%;
-        padding: 22px 22px; border-radius: 20px; cursor: default; margin-bottom: 4vh;
+        padding: 22px 22px; border-radius: 20px; cursor: default; margin-bottom: calc(var(--gs-dvh) * .04);
         background: linear-gradient(180deg, rgba(18,22,34,.78), rgba(11,13,18,.88));
         animation: gs-ace-pop .5s cubic-bezier(.18,.9,.3,1.3) both;
       }
@@ -1629,8 +1706,9 @@
 
       /* ── Voyage-victory takeover (GS-victory) ──────────────────────────────────────── */
       .gs-win {
-        position: fixed; inset: 0; z-index: 62; display: flex; align-items: center; justify-content: center;
+        position: fixed; inset: 0; z-index: 62; display: flex; align-items: safe center; justify-content: center;
         padding: max(20px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom));
+        overflow-y: auto; overscroll-behavior: contain;
         background: radial-gradient(120% 90% at 50% 16%, rgba(38,30,10,.9), rgba(8,9,14,.97));
         backdrop-filter: blur(2px); cursor: pointer; animation: gs-ace-fade .4s ease-out both;
       }
@@ -1702,7 +1780,22 @@
         grid-auto-rows: 1fr; gap: 8px; margin-top: 9px;
       }
       @media (max-width: 999px) {
-        .gs-charwrap { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+        /* ONE SCREEN IS A GOAL, NOT A CAGE (GS-a11y-scale-wrap). GS-select-onescreen fits the roster
+           to the viewport, and at the ship default it still does. But at a large UI scale the cards
+           genuinely need more room than the phone has, and `overflow: hidden` on a viewport-locked
+           column turned "doesn't quite fit" into "the bottom row is gone" — with `grid-auto-rows: 1fr`
+           squeezing every card until its stats and trait line were clipped mid-word. So: rows keep the
+           height their content asks for (`min-content` floor) and the roster SCROLLS when the sum
+           exceeds one screen. When it fits — the ship default at every phone size — `1fr` still wins
+           and the layout is unchanged. */
+        .gs-charwrap {
+          flex: 1 1 auto; min-height: 0;
+          overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+          scrollbar-width: thin;
+          grid-auto-rows: minmax(min-content, 1fr);
+        }
+        .gs-charwrap::-webkit-scrollbar { width: 5px; }
+        .gs-charwrap::-webkit-scrollbar-thumb { background: var(--gs-line); border-radius: 3px; }
       }
       /* A full 4-across roster lineup on desktop — never an orphan 3+1 row. */
       @media (min-width: 1000px) { .gs-charwrap { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; } }
@@ -1743,7 +1836,12 @@
       @media (hover: hover) { .gs-charcard:hover .gs-charcard-sheen { animation: gs-char-sheen .7s ease; } }
       @keyframes gs-char-sheen { 0% { opacity: 0; transform: translateX(-120%); } 35% { opacity: .8; } 100% { opacity: 0; transform: translateX(120%); } }
       .gs-charcard > * { position: relative; z-index: 2; }
-      .gs-charcard-top { flex: 0 0 auto; display: flex; gap: 9px; align-items: center; }
+      /* The portrait + name sit side by side while the name has room for it. At a large UI scale the
+         id column was squeezed to ~33px and the name broke one letter per line ("Fea/the/r/Fad/e"), so
+         give the column a flex BASIS it must be granted and let the row wrap when it can't be: the
+         portrait then takes its own line and the name gets the full card width. A breakpoint cannot
+         make this call — it cannot see `--gs-uiscale` (GS-a11y-scale-wrap). */
+      .gs-charcard-top { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 9px; align-items: center; }
       /* GS-char-lore: the portrait square is its OWN tap target — tapping it opens the golfer's lore
          popup (the surrounding card still selects). A hover lift + an "ⓘ Lore" badge advertise it. */
       .gs-charcard-port {
@@ -1768,9 +1866,20 @@
         opacity: .82; pointer-events: none;
       }
       .gs-charcard-port:hover .gs-charcard-lore, .gs-charcard-port:focus-visible .gs-charcard-lore { opacity: 1; }
-      .gs-charcard-id { flex: 1 1 auto; min-width: 0; }
-      .gs-charcard-name { display: block; font-size: 15px; line-height: 1.15; text-shadow: 0 0 14px color-mix(in srgb, var(--cc) 55%, transparent); }
-      .gs-charcard-org { font-size: 10.5px; opacity: .65; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .gs-charcard-id { flex: 1 1 78px; min-width: 0; }
+      /* `overflow-wrap: anywhere` NOT `break-word`: at 1.45x "Longshot" is wider than half a 390px
+         phone on its own, and only `anywhere` will break inside a word that has no break opportunity.
+         Inert at the ship scale, where every name already fits. */
+      .gs-charcard-name {
+        display: block; font-size: 15px; line-height: 1.15; overflow-wrap: anywhere; hyphens: auto;
+        text-shadow: 0 0 14px color-mix(in srgb, var(--cc) 55%, transparent);
+      }
+      /* Two lines beat one ellipsis: at a large scale the nowrap version clipped every origin to
+         three letters ("Nai…"), which tells the player nothing. */
+      .gs-charcard-org {
+        font-size: 10.5px; opacity: .65; margin-top: 3px; overflow-wrap: anywhere;
+        display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+      }
       .gs-charcard-blurb { flex: 0 0 auto; font-size: 12.5px; opacity: .9; margin: 0; line-height: 1.45; }
       /* Phone-sized cards: the one-line ✓ strength · ▲ quirk hint stands in for the blurb + full
          pros/cons list, which come back at desktop width (same markup, media-query visibility). */
@@ -1874,8 +1983,8 @@
            living star sky) fills the empty screen space instead of sitting as a short strip. When the
            chart is shorter than the panel it centres in the starfield; a long voyage grows to the cap
            then scrolls internally (`safe center` keeps the top reachable when it overflows). */
-        min-height: 56vh;
-        max-height: 82vh; overflow-y: auto; overflow-x: hidden;
+        min-height: calc(var(--gs-dvh) * .56);
+        max-height: calc(var(--gs-dvh) * .82); overflow-y: auto; overflow-x: hidden;
         scrollbar-width: thin; -webkit-overflow-scrolling: touch; touch-action: pan-y;
         padding: 4px 2px;
         display: flex; flex-direction: column; justify-content: safe center;
@@ -2030,7 +2139,9 @@
          + its own top-rail `::before`, so a livery is still a table row. */
       .gs-bhud__console {
         position: absolute; left: 10px; right: 10px; bottom: 10px; height: 60px;
-        display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 0 10px;
+        /* `minmax(0, …)`, not a bare `1fr`: a bare `1fr` keeps a min-content floor, so a wide fuel
+           gauge pushed its track past its share and the readout slid under the centre command dial. */
+        display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; padding: 0 10px;
         pointer-events: auto; border-radius: 16px;
         border: 1px solid color-mix(in srgb, var(--hud-accent) 40%, var(--gs-line));
         background: linear-gradient(180deg, color-mix(in srgb, var(--hud-accent) 7%, rgba(15,20,30,0.92)), rgba(8,11,17,0.96));
@@ -2072,6 +2183,17 @@
         mask: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
       }
       .gs-bhud__console--noexit .gs-bhud__deck { left: 14px; }
+      /* The deck is pure cockpit dressing (`pointer-events: none`). When the console is short of room
+         it is the first thing to go, so the three CONTROLS keep theirs (GS-a11y-tight-fit). */
+      :root[data-gs-fit="tight"] .gs-bhud__deck { display: none; }
+      /* …and the tank gauge drops its CELL BAR, keeping the ⛽ + the number. A 12-cell bar at its fixed
+         cell width is wider than the console's right track, and `justify-self: end` overflows an
+         oversized item LEFTWARDS — the gauge was sliding under the centre command dial. Shrinking the
+         cells to fit leaves them 8px for twelve, which communicates nothing; the number and its
+         low-fuel colour carry the read here, and the gauge's own `aria-label` still says "Fuel n of m",
+         so nothing is lost to a screen reader. */
+      :root[data-gs-fit="tight"] .gs-bhud__slot--fuel .gs-fuelbar__cells { display: none; }
+      :root[data-gs-fit="tight"] .gs-bhud__slot--fuel .gs-fuelbar__n { font-size: 15px; }
       .gs-bdeck { display: block; flex: 0 0 auto; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--hud-glow) 60%, transparent)); }
       .gs-bdeck--wheel   { width: 40px; height: 40px; }
       .gs-bdeck--gauge   { width: 30px; height: 30px; }
@@ -2704,7 +2826,7 @@
         if (app) {
           app.innerHTML =
             '<pre style="color:#9fd8e6;white-space:pre-wrap;padding:16px;margin:0;' +
-            'font:12px/1.5 monospace;background:#0b0d12;min-height:100vh;">⛳ Golf Stars — loading… (build ' +
+            'font:12px/1.5 monospace;background:#0b0d12;min-height:var(--gs-vh);">⛳ Golf Stars — loading… (build ' +
             BUILD + ')</pre>';
         }
         // Defensive: Golf Stars IS now a PWA, but it shares an origin with other projects
@@ -2729,7 +2851,7 @@
           if (app && app.getAttribute('data-booted') !== '1') {
             app.innerHTML =
               '<pre style="color:' + (isError ? '#ff8a8a' : '#9fd8e6') + ';white-space:pre-wrap;padding:16px;margin:0;' +
-              'font:12px/1.5 monospace;background:#0b0d12;min-height:100vh;">⛳ Golf Stars (build ' +
+              'font:12px/1.5 monospace;background:#0b0d12;min-height:var(--gs-vh);">⛳ Golf Stars (build ' +
               BUILD + ') — ' + msg + '</pre>';
           }
         }
