@@ -118,6 +118,20 @@ export function toggleSetting(key: keyof Settings): Settings {
 }
 
 /**
+ * THE reduced-motion answer (GS-a11y-motion). Every motion gate reads this, never `matchMedia`
+ * directly.
+ *
+ * `reducedMotion` is seeded from the OS preference on first run and is the player's own from then on,
+ * so it is strictly more informed than the media query: a player who turns the toggle ON without an
+ * OS-level preference was, before this, still shown every full-screen cinematic, because four gates
+ * asked the OS instead of the setting. Consulting the media query again here would re-introduce the
+ * opposite bug — a player who deliberately turns the toggle OFF could not get their animations back.
+ */
+export function reducedMotion(): boolean {
+  return getSettings().reducedMotion;
+}
+
+/**
  * Push the reader's type choices onto `<html>` (GS-a11y-readable-text) — the ONE place the
  * accessibility settings meet the DOM. Both land on the root element, not on `<body>`, because
  * `--gs-vh`/`--gs-dvh` are resolved at `:root`: a scale set further down would leave every
@@ -128,5 +142,8 @@ export function applyReaderSettings(s: Settings = getSettings()): void {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
   root.classList.toggle('gs-readable', !!s.readableFont);
+  // GS-a11y-motion: the CSS `@media (prefers-reduced-motion)` blocks can only see the OS. This is
+  // how the in-app toggle reaches the stylesheet.
+  root.classList.toggle('gs-reduced', !!s.reducedMotion);
   root.style.setProperty('--gs-uiscale', String(clampUiScale(s.uiScale)));
 }

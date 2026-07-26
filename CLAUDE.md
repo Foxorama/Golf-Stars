@@ -553,6 +553,18 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     are `aria-hidden`; the hole map is `role="img"` + a name (it was leaking loose `<text>` yardages); and
     anything encoded in COLOUR ALONE needs a `.gs-sr-only` twin (the momentum pips had none). Guarded by
     `tests/a11y-announce.test.ts`.
+  - **THERE IS ONE REDUCED-MOTION ANSWER AND IT IS `settings.reducedMotion()`** (GS-a11y-motion). The
+    setting is SEEDED from `prefers-reduced-motion` and is the player's own after that, so it is strictly
+    more informed than the query — a gate that re-asks the OS ignores a player who turned the toggle ON
+    (four cinematic gates did exactly that), and one that only asks the OS ignores a player who turned it
+    OFF. **No module outside `settings.ts` may read `matchMedia` for reduced motion** (machine-checked). The
+    setting reaches CSS through a `.gs-reduced` class on `<html>` + ONE blunt rule collapsing every
+    animation/transition DURATION (not `animation:none` — several entrances start at `opacity:0` and would
+    never arrive); the ~19 bespoke `@media` blocks still serve the OS preference. Camera shake is
+    AMPLITUDE-gated, never branched around, so all 12 `shake = Math.max(…)` sites keep one code path.
+    **The putt meter is deliberately untouched**: slowing the sweep / widening the band / defaulting to
+    auto-putt are all BALANCE changes and must go through the death-spiral harness (contract 4), not ship
+    under an accessibility banner. Guarded by `tests/a11y-motion.test.ts`.
   - **CSS classes / DOM ids are GLOBAL and screens can't see each other's names** — new screen chrome gets
     its OWN prefix (bridge HUD `.gs-bhud`, resume `.gs-resume`, lore `.gs-lore`, star-tour content
     `.gs-sthud` — NEVER the play screen's `.gs-hud`, which the #353 map-blur regression proved). Grep the

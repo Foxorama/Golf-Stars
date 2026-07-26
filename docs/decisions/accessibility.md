@@ -297,15 +297,66 @@ confirmation with a real screen reader.**
 
 Guarded by `tests/a11y-announce.test.ts`.
 
+---
+
+## GS-a11y-motion — the reduced-motion toggle actually reduces motion
+
+### The problem
+
+The in-app **Reduced motion** toggle and the OS `prefers-reduced-motion` query are two different
+questions, and the app was asking the wrong one in two ways at once:
+
+- **Four full-screen cinematic gates consulted the OS directly** (`app.ts` ×4, `shopArrival.ts`), so a
+  player who ticked the box but had no OS-level preference still got the story intro, the ending, the
+  Sigil ceremony and the shop arrival, at full length.
+- **The ~19 CSS `@media (prefers-reduced-motion: reduce)` blocks can only ever see the OS**, so the
+  toggle never touched a single entrance animation, sheen, drift or pulse.
+
+And the single most nauseogenic thing on the screen — the **landing camera shake** — had no gate at
+all, in either direction.
+
+### The fix
+
+**One answer, `settings.reducedMotion()`, and everything asks it.** The setting is seeded from the
+media query on first run and is the player's own from then on, so it is strictly more informed than
+the query. Re-consulting the media query inside the gate would reintroduce the mirror-image bug: a
+player who deliberately turns the toggle *off* could not get their animations back. A source guard
+now fails the build if any module outside `settings.ts` reads `matchMedia` for reduced motion.
+
+**The setting reaches CSS via a `.gs-reduced` class on `<html>`** plus one blunt rule that collapses
+every animation and transition duration. Blunt is correct here: it fires only when the player has
+explicitly asked for calm, and at that point "some animations, tastefully reduced" is not what they
+asked for. The bespoke `@media` blocks still run for the OS preference and do nicer things (fading
+sparks out rather than snapping them), so this never has to be clever. Durations go to ~0 rather than
+`animation: none`, because several entrance animations start at `opacity: 0` and would otherwise
+never arrive at their end state.
+
+**Camera shake is amplitude-gated, not branched around.** Setting the amplitude to 0 keeps the decay
+running, so all twelve `shake = Math.max(…)` call sites behave identically and there is no second
+code path to drift. Resolved once at mount, not per frame — the setting cannot change mid-flight, and
+a localStorage-backed read per frame would be silly.
+
+Guarded by `tests/a11y-motion.test.ts`.
+
+### Deliberately NOT changed: the putt meter
+
+The pace meter is a 1250ms sweeping canvas bar you must stop at the right moment — a hard timing
+requirement with no alternative, which is a real accessibility barrier for motor and cognitive
+impairment. It is **not** a reduced-motion problem, though, and the fixes all change difficulty:
+slowing the sweep, widening the make band, or defaulting to the auto-putt path that the Penelope
+Putter caddy already provides (`takePutt(…, control?)`).
+
+Every one of those is a **balance change**, and this repo holds a hard line on that (contract 4: no
+death spiral; a power-up must *raise* mean per-stop Stableford to ship). An assist that makes putting
+easier has to be measured against the death-spiral harness and decided as a design question, not
+slipped in under an accessibility banner. Flagged for the owner rather than done unilaterally.
+
 ### Still open (next passes)
 
 Recorded here so the audit isn't lost:
 
-- **Power and free-aim are pointer-only.** A keyboard user gets default aim at default power. The
-  putt is a 1250ms sweeping canvas meter with no alternative.
-- **The hole map SVG has no accessible name** and leaks loose `<text>` yardages.
-- **Screen shake, the putt meter and the star-map rAF ignore reduced motion**, and four cinematic
-  gates read `matchMedia` directly instead of the in-app `reducedMotion` setting.
+- **Power and free-aim are pointer-only.** A keyboard user gets default aim at default power.
+- **An assisted-putting option** — see above; needs a balance decision and a harness run.
 - **The golfer card is invalid HTML** — a `<button>` containing `<p>`, `<div>` and now a focusable
   `role="button"`. It works in every browser and is keyboard-operable, but the honest fix is to make
   the card a container with a stretched select-button behind its contents. Deferred because character

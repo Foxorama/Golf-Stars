@@ -49,6 +49,7 @@ import { flightApexT, flightProfileOf } from '../sim/flight';
 import { planRunout, sampleRunout, DEFAULT_RUNOUT_FEEL, type RunoutFeel, type RunoutPlan } from './runout';
 import { GOLFER_COLORS, lookFromColor, drawGolfer, type GolferLook } from './golferArt';
 import { canvasRatio } from './pixelRatio';
+import { reducedMotion } from '../settings';
 
 // The on-course golfer's look now lives in golferArt.ts; re-export it so existing importers
 // (e.g. src/app/helpers.ts) keep resolving `GolferLook` from this module.
@@ -289,6 +290,9 @@ export function mountPlayView(
   const width = opts.width ?? 360;
   const height = opts.height ?? 640;
   const dpr = canvasRatio();
+  // Resolved once at mount, not per frame — the setting cannot change mid-flight, and reading it in
+  // the draw loop would put a localStorage-backed lookup on every frame.
+  const shakeAmp = reducedMotion() ? 0 : F.shakeAmp;
 
   const canvas = document.createElement('canvas');
   canvas.width = width * dpr;
@@ -645,11 +649,14 @@ export function mountPlayView(
       weather.setWind(windScreenDir()); // keep the wind reading true as the camera pans
     }
 
-    // Screen-shake offset (deterministic decay).
+    // Screen-shake offset (deterministic decay). Reduced motion zeroes the AMPLITUDE rather than
+    // skipping the block (GS-a11y-motion): the decay still runs, so every `shake = Math.max(…)` call
+    // site downstream behaves identically and there is no second code path. Camera shake is the
+    // single most nauseogenic thing on this screen and it had no motion gate at all.
     ctx.save();
     if (shake > 0) {
-      const amp = F.shakeAmp * shake;
-      ctx.translate(Math.sin(now * 0.08) * amp, Math.cos(now * 0.11) * amp);
+      const amp = shakeAmp * shake;
+      if (amp > 0) ctx.translate(Math.sin(now * 0.08) * amp, Math.cos(now * 0.11) * amp);
       shake = Math.max(0, shake - 0.06);
     }
 
