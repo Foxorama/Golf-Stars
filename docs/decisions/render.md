@@ -1521,3 +1521,55 @@ and that `styleGreen` always lays its own base fill.
 **Verification:** full suite green (1903 tests), `npx tsc --noEmit` clean, gallery re-shot across all
 worlds, plus `scripts/greenblend-preview.mjs` (approach zoom) and `scripts/green-zoom.mjs` (putt zoom)
 eyeballed before/after — the before/after at putt zoom is where the whole change is visible.
+
+## GS-play-fullframe — the play map is drawn at the SCREEN'S shape, not a fixed 9:16 frame (2026-07-26)
+
+**The report:** "the putt-make window still gets black borders."
+
+**The cause, measured.** The decision/putt map SVG was authored at a hard-coded `360×640` viewBox
+(`DMAP_W`/`DMAP_H`) and handed to CSS as `width:100%; height:100%` inside a `.gs-bigmap` that is
+`position:absolute; inset:0` — i.e. the whole viewport. With no `preserveAspectRatio` attribute the
+browser applies the default **meet** fit: scale uniformly to FIT, then CENTRE. Any aspect mismatch
+therefore became dead bands of bare page background (`--gs-bg: #0b0d12`) at the ends of the longer
+axis. Probed on a 390×844 phone: `getScreenCTM()` returned `scale 1.0833, offY 75.33` — a 390×693
+map centred in an 844px box, **75px of black above and 75px below, 18% of the screen**. On a 412×915
+Pixel it is 91px each.
+
+Why it read as a *putt/whole-map* bug rather than an everywhere bug: the outer `<svg>` clips to its
+ELEMENT box, not its viewBox, so course-space geometry that happens to project past the frame paints
+straight into the bands and hides them. A hit-test (`elementsFromPoint` across each band) showed the
+aim view's bands full of spilled starfield decor, and the **whole-hole view's bottom band returning
+`NONE` at every probe point** — nothing drawn, pure page background. That is the black bar.
+
+**The fix: fit the FRAME to the container, don't fit the container to the frame.**
+`project.ts fitFrame(cw, ch, dw, dh)` keeps the meet SCALE the browser would have chosen
+(`s = min(cw/dw, ch/dh)`) and returns the design frame GROWN to `cw/s × ch/s`. The SVG's aspect then
+equals the container's, meet becomes the identity, and the reclaimed bands are simply more map.
+
+Three properties make this the right shape of fix, and all three are pinned by `tests/map-frame.test.ts`:
+- **Nothing changes size.** Every stroke width, font size and marker radius in `buildScene` is a number
+  of design units; keeping the meet scale means they all land at exactly the pixel size they had. A
+  stretch would distort them and a `slice` fit would have cropped the ball clean off a landscape screen.
+- **Nothing moves.** Focus mode is width-limited on a portrait frame (`scale = min((W-2p)/2R, …)`), and
+  the width is untouched — so the corridor frames identically and `focusBias` still lands the ball at
+  the same fraction of the screen. The extra height is purely more hole, ahead and behind.
+- **The 9:16 reference is byte-for-byte.** A container already at the design aspect returns `360×640`
+  unchanged, so the frame only ever grows on the starved axis.
+
+**Threading it.** `mapFrame()` in `app.ts` caches the fit against the measured container key, and the
+aim map, the putt map, both surgical overlay refreshers (`renderShotOverlaySVG` / `renderPuttOverlaySVG`),
+`overlayDecor.mapProj` and the weather overlay's `dims` all read the SAME value — a re-measure per call
+could straddle a resize and shear the cone off the scene. `playFx.alignedProjector` needed no change: its
+meet-fit composition is now the identity but stays correct for whatever frame it is handed.
+
+**Keeping it honest when the container moves.** `mapFrame()` measures the PREVIOUS render's element (or
+the window on first arrival), so after mounting, render() compares the real element against the key the
+frame was built for and re-renders once on a mismatch; a `resize` listener does the same for a rotate or
+a desktop window drag. Both are armed only while the SVG map is what's mounted — a shot animation puts a
+CANVAS there, already sized to real pixels, and a remount mid-flight would restart the shot. Verified
+non-looping: a `MutationObserver` on the play screen counted **0 re-renders idle over 2s**.
+
+**Verification:** headless-Chromium drive of the real app at 390×844 through aim → whole-hole → watch →
+putt. Before: `viewBox 0 0 360 640`, bands 75/75, whole-hole bottom band `NONE×5`. After:
+`viewBox 0 0 360 779`, bands **0/0**, geometry hit at every probe point along the bottom edge, and
+`scale` unchanged at 1.0833 — proving nothing shrank. Full suite green (1879 tests), typecheck clean.

@@ -407,6 +407,16 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     (`render/style.ts buildScene` → `Prim[]`), SVG = static map, Canvas2D = animated play view. `style.ts`
     is the ORCHESTRATOR only (GS-style-split): painters live in per-domain `src/render/style/*` and NEVER
     import style.ts (`shared.ts` is the dependency root). **A new painter = a new `style/` module.**
+  - **THE MAP IS DRAWN AT THE SCREEN'S SHAPE** (GS-play-fullframe, `project.ts fitFrame`). The scene is
+    AUTHORED in a `360×640` design frame (every stroke width / font size / marker radius is a number of
+    those units) but never DRAWN at it: `mapFrame()` grows that frame to the container's aspect, keeping
+    the meet scale the browser would have picked. A fixed viewBox in an `inset:0` container is
+    letterboxed by `preserveAspectRatio`'s default meet fit — 75px of bare page background above AND
+    below on a 390×844 phone, reading as black bars wherever no geometry spilled past the frame. Grow the
+    frame, never stretch (distorts) or `slice` (crops the ball off a landscape screen); a container
+    already at the design aspect is unchanged, so 9:16 is byte-for-byte. ONE fitted frame feeds the map,
+    both surgical overlay refreshers, `overlayDecor` and the weather canvas — a re-measure per call can
+    straddle a resize and shear the cone off the scene. Guarded by `tests/map-frame.test.ts`.
   - All scene randomness is mulberry32 seeded off `hashHole()` on documented streams; adding a draw must not
     perturb stream order. The scene is CAMERA-PROOF (the follow-cam rebuilds per frame): rng counts never
     read the projection, `posHash` keys are course-space, `archetypeDecor` pushes unconditionally

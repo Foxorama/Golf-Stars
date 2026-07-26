@@ -10,7 +10,7 @@ import { scoreName, playTotals, stablefordPoints } from './sim/score';
 import { mountPlayView, type PlayViewHandle } from './render/playView';
 import { installDecorProbe } from './render/decorProbe';
 import { renderHoleSVG, renderPuttOverlaySVG, PUTT_OVERLAY_ID, renderShotOverlaySVG, SHOT_OVERLAY_ID } from './render/holeView';
-import { type ProjectOptions } from './render/project';
+import { fitFrame, type ProjectOptions } from './render/project';
 import { shotView, previewShot, previewBackspin, resolveAimTarget, awaitingPutt, canPuttFringe, type AimMode } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
 import { drawStoryFigure, hasStoryFigure } from './render/storyFigure';
@@ -163,6 +163,14 @@ function boot(): void {
     // auto-resumed — so the format choice is always reachable.
     setState(initState(seed, meta, save.activeRun, story));
     applyDebugParams(); // GS-asgard: test-hub-only `?rainbow=` / `?asgard=` jumps (dormant in the live game)
+    // A rotate / desktop window resize changes the play map's frame (GS-play-fullframe). Re-render so
+    // the SVG is rebuilt at the new aspect instead of meet-fitting black bands back in. rAF-throttled,
+    // and armed only while the SVG map is what's actually mounted — a shot animation puts a CANVAS
+    // there instead (sized to real pixels, so it never letterboxed), and a remount mid-flight would
+    // restart the shot the player is watching.
+    window.addEventListener('resize', () => {
+      if (state.screen === 'playing' && document.querySelector('.gs-shot--full .gs-bigmap > svg')) scheduleRender();
+    });
     stage('init');
     render();
     stage('rendered');
@@ -1102,9 +1110,13 @@ function wireShotGesture(app: HTMLElement): void {
   });
 }
 
-// Decision/putt map geometry — portrait so the map fills the screen. The reach factor zooms the
+// Decision/putt map DESIGN frame — portrait so the map fills the screen. The reach factor zooms the
 // follow-cam in on the contemplated shot (smaller = tighter); the playable corridor fills the
 // frame and the rough/OB legitimately stretch off-screen.
+//
+// This is the frame the scene is AUTHORED in — every stroke width, font size and marker radius in
+// `buildScene` is a number of these units. It is NOT the frame the map is drawn at: `mapFrame()`
+// stretches it to the real container's aspect so nothing letterboxes (GS-play-fullframe).
 const DMAP_W = 360;
 const DMAP_H = 640;
 // Ball sits LOW — near the bottom of the map, just above the floating bottom control panel — so
@@ -1120,6 +1132,45 @@ const DMAP_BIAS = 0.84;
  *  stretch off-screen (the "zoom in, let the hole run off the edges" ask). */
 function decisionReach(carryHigh: number): number {
   return Math.max(30, carryHigh * 0.36);
+}
+
+// The container size `mapFrameCache` was fitted for ("390x844"), and the fitted frame itself. The
+// render pass compares the MOUNTED container against this key: a mismatch (first arrival on the play
+// screen, a rotate, a desktop window resize) means the SVG on screen is a frame behind the real
+// viewport, so it re-renders once. Never loops — the next pass measures the same element it checks.
+let mapFrameFor = '';
+let mapFrameCache: { width: number; height: number } = { width: DMAP_W, height: DMAP_H };
+
+/** The play map's container in CSS px. On the full-bleed play screen `.gs-bigmap` is `inset: 0`, so
+ *  this IS the viewport — measured off the live element when one is mounted (the previous render's,
+ *  which render() has not replaced yet), else the window, else the design frame. */
+function mapContainerPx(): { w: number; h: number } {
+  const el = document.querySelector<HTMLElement>('.gs-shot--full .gs-bigmap');
+  const w = Math.round(el?.clientWidth || window.innerWidth || DMAP_W);
+  const h = Math.round(el?.clientHeight || window.innerHeight || DMAP_H);
+  return { w: Math.max(1, w), h: Math.max(1, h) };
+}
+
+/**
+ * The viewBox the decision/putt map is drawn at on THIS device (GS-play-fullframe): the design frame
+ * grown to the container's aspect, so `preserveAspectRatio`'s meet fit has nothing left to letterbox.
+ * The map used to be authored at a hard 360×640 and CSS-scaled into a container of whatever shape the
+ * phone happened to be — on a 390×844 screen that centred a 390×693 map and left 75px of bare page
+ * background above and below it (black bars, plainly visible in the whole-hole view's sky).
+ *
+ * Growing the frame rather than stretching or cropping it keeps the meet SCALE the browser would have
+ * picked, so every drawn element is exactly the size it was; the reclaimed bands are simply more map.
+ * The camera is unmoved too — focus mode is width-limited on a portrait frame, so the corridor frames
+ * identically and the extra height shows more of the hole ahead and behind.
+ */
+function mapFrame(): { width: number; height: number } {
+  const { w, h } = mapContainerPx();
+  const key = `${w}x${h}`;
+  if (key !== mapFrameFor) {
+    mapFrameFor = key;
+    mapFrameCache = fitFrame(w, h, DMAP_W, DMAP_H);
+  }
+  return mapFrameCache;
 }
 
 /** Reset the map view to the default follow-cam (called on a new shot / new hole). */
@@ -1141,7 +1192,7 @@ function mapViewMoved(): boolean {
  * onto the contemplated shot, offset by `mapPan` and scaled by `mapZoom`.
  */
 function decisionView(play: NonNullable<UiState['play']>, spray: ShotSpread, aimTarget: Vec): ProjectOptions {
-  const base: ProjectOptions = { width: DMAP_W, height: DMAP_H };
+  const base: ProjectOptions = { ...mapFrame() };
   if (mapView === 'whole') return base; // whole-hole fit — see the green + full layout (tee→green up)
   const reach = decisionReach(spray.carryHigh) / mapZoom;
   const focus: [number, number] = [play.ball[0] + mapPan[0], play.ball[1] + mapPan[1]];
@@ -1417,6 +1468,9 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
     // perfectly still while the player nudges the read.
     const puttRadius = Math.max(5.5, v.distToPin * 0.6 + 3 + Math.min(14, Math.max(bow.max, -bow.min)) * 0.6);
     puttViewRadius = puttRadius;
+    // One frame for the whole putt screen — the SVG, its break-line overlay and the weather canvas
+    // must agree exactly, and re-measuring per call could straddle a resize.
+    const puttFrame = mapFrame();
     const buildPuttSvg = (aim: number) => renderHoleSVG(play.hole, {
       // No flight tracers here (GS-tracer bug fix): on the tight green-zoom the prior shots' curved
       // Bézier flight lines projected across the tiny view, smearing tracer arcs "all over the green".
@@ -1426,8 +1480,8 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
       tradeTents: tentsActive(),
       meteorScorch: scorchActive(),
       groundPatch: patchActive(),
-      width: DMAP_W,
-      height: DMAP_H,
+      width: puttFrame.width,
+      height: puttFrame.height,
       ball: play.ball,
       // Zoom in on the ball↔cup span (midpoint-centred) so both ends frame with even margin. A lower
       // floor lets a SHORT putt actually zoom in (the old flat 9-yd floor left a tap-in tiny in a big
@@ -1453,7 +1507,7 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
     // tight green zoom (the reported "very small … looks super weird" bug). The projector is the putt
     // map's exact focus/zoom so a strike still lands on a drawn crater.
     overlayDecor = {
-      mapProj: { width: DMAP_W, height: DMAP_H, focus: puttMid, viewRadius: puttRadius, focusBias: 0.5, up: puttUp },
+      mapProj: { ...puttFrame, focus: puttMid, viewRadius: puttRadius, focusBias: 0.5, up: puttUp },
       drift: false,
       meteorScorch: scorchActive(),
     };
@@ -1463,8 +1517,8 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
       const overlay = document.getElementById(PUTT_OVERLAY_ID);
       if (overlay) {
         overlay.outerHTML = renderPuttOverlaySVG(play.hole, {
-          width: DMAP_W,
-          height: DMAP_H,
+          width: puttFrame.width,
+          height: puttFrame.height,
           focus: puttMid,
           viewRadius: puttRadius,
           focusBias: 0.5,
@@ -1707,8 +1761,10 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
           );
           const spinNow = previewBackspin(play, sprayNow, state.run.loadout);
           overlay.outerHTML = renderShotOverlaySVG(play.hole, {
-            width: DMAP_W,
-            height: DMAP_H,
+            // The frame the map under it was built at (mapOpts carries it) — a re-measure here could
+            // straddle a resize and shear the cone off the scene.
+            width: mapOpts.width,
+            height: mapOpts.height,
             focus: mapOpts.focus,
             viewRadius: mapOpts.viewRadius,
             focusBias: mapOpts.focusBias,
@@ -3448,6 +3504,16 @@ function render(): void {
     }
   }
 
+  // GS-play-fullframe: the map was just built for whatever container `mapFrame()` could measure at
+  // the time — the PREVIOUS render's element, or the window on first arrival. Now that the real one
+  // is mounted, check it. A mismatch means the SVG on screen is a frame behind the viewport and its
+  // meet fit is letterboxing it, so re-render once at the honest size. Skipped mid-animation (the
+  // play view owns the canvas then, sized to real pixels already, and a remount would restart the shot).
+  if (state.screen === 'playing' && state.play && !animatingPlay) {
+    const mapEl = document.querySelector<HTMLElement>('.gs-shot--full .gs-bigmap');
+    if (mapEl && `${Math.round(mapEl.clientWidth)}x${Math.round(mapEl.clientHeight)}` !== mapFrameFor) scheduleRender();
+  }
+
   // Animated weather over the aim/putt map (GS-journey-fx rework): the sky + air are alive while you
   // line up, drawn by the SAME shared module the in-flight view uses. Skipped while a shot animates
   // (the play view owns the canvas + draws its own weather then).
@@ -3460,7 +3526,7 @@ function render(): void {
         wEl,
         state.play.hole,
         [pin[0] - ball[0], pin[1] - ball[1]],
-        { width: DMAP_W, height: DMAP_H, focusBias: DMAP_BIAS },
+        { ...mapFrame(), focusBias: DMAP_BIAS },
         // Animate the world-decor twins over the aim/putt map too (GS-cetus-flow / GS-ship-feel /
         // GS-meteor-strikes) — armed by the decision/putt branch with the map's exact projector so the
         // river/junk/craters line up beneath. null in whole-hole fit (can't align) ⇒ sky-only overlay.

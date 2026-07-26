@@ -38,6 +38,30 @@ export interface ProjectOptions {
   up?: Vec;
 }
 
+/**
+ * The viewBox a map should be AUTHORED at so it fills a `cw×ch` container with no letterbox, while
+ * every stroke width, font size and marker radius keeps the apparent size it has in the `dw×dh`
+ * design frame.
+ *
+ * An SVG with a fixed design viewBox is scaled into its container by `preserveAspectRatio`'s default
+ * meet fit — uniform and CENTRED — so any aspect mismatch becomes dead bands of page background at
+ * the ends of the longer axis. On a 390×844 phone the 360×640 play-map frame lost 75px top AND
+ * bottom: 18% of the screen, reading as black bars wherever the scene had no geometry spilling past
+ * the frame (the whole-hole view's sky, most obviously).
+ *
+ * Stretching would distort and slicing would crop the ball off a landscape screen, so instead keep
+ * the meet scale the browser would have chosen and GROW the frame on the starved axis: the aspect
+ * then matches exactly, meet becomes the identity, and the reclaimed bands become map. A container
+ * that already matches the design aspect returns the design frame unchanged — so the common 9:16
+ * phone draws byte-for-byte what it drew before.
+ */
+export function fitFrame(cw: number, ch: number, dw = 360, dh = 640): { width: number; height: number } {
+  const s = Math.min(cw / dw, ch / dh);
+  if (!Number.isFinite(s) || s <= 0) return { width: dw, height: dh }; // unmeasurable container
+  // `min` above pins one axis at its design size; `max` only guards the other against rounding down.
+  return { width: Math.max(dw, Math.round(cw / s)), height: Math.max(dh, Math.round(ch / s)) };
+}
+
 export interface Projector {
   width: number;
   height: number;
