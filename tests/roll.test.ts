@@ -12,9 +12,16 @@ describe('bounce & roll-out (GS feedback #2)', () => {
       const hole = generateCourse(seed, { holes: 1 }).holes[0]!;
       for (const s of playHole(hole, new Rng(`${seed}:play`)).shots) {
         if (s.penalty) continue;
-        // `roll` is SIGNED (long clubs run forward, wedges check to a stop); the rest is that
-        // many yards from touchdown, so the distance equals its magnitude.
-        expect(dist(s.rest, s.result.landing)).toBeCloseTo(Math.abs(s.roll), 1);
+        // `roll` is SIGNED (long clubs run forward, wedges check to a stop) and is measured as ARC
+        // length along the run-out — which on a CONTOURED green CURLS (GS-green-contour-2). So the
+        // straight-line chord from touchdown to rest is the arc's chord: never longer, and shorter by
+        // more the further the ball runs and the more the green tilts. Assert that relationship,
+        // rather than a fixed epsilon that only held while every club ran the same short distance
+        // (GS-runout-club gave the long irons 19.8% run against the old flat 11.1%, and a 30-yard
+        // curled run bows past a 0.05yd tolerance).
+        const chord = dist(s.rest, s.result.landing);
+        expect(chord).toBeLessThanOrEqual(Math.abs(s.roll) + 1e-6);
+        expect(chord).toBeGreaterThan(Math.abs(s.roll) * 0.9 - 0.05);
         if (s.roll > 0.5) sawRoll = true;
       }
     }

@@ -131,13 +131,17 @@ describe('fairness invariant holds across all biomes at max wildness', () => {
       }
     }
     const toParPerHole = (strokes - par) / holes;
-    expect(toParPerHole).toBeLessThan(1.0); // hard, but not a death machine (0.77 with the width-aware AI)
+    expect(toParPerHole).toBeLessThan(1.0); // hard, but not a death machine (0.874 after GS-runout-club)
     // GS-fairway-width-2 taught the auto reach-AI to READ the corridor width (lay up to the wide bay
     // short of a genuinely tight driving-zone pinch instead of bombing a full club into it), which
     // pulled the max-wildness floor-hit rate from ~7.55% to ~7.36% and let this fence tighten a notch
     // (0.12 → 0.10). Still a REGRESSION FENCE, not the design target — closing the remaining gap to the
     // aspirational <5% is the broader post-rough rebalance (richer starter bags / play-back-to-fairway
     // reach-AI, GS-rough-gradient-rebalance), never by softening the rough.
-    expect(blowups / holes).toBeLessThan(0.1);
+    // GS-runout-club split the one iron flight row in two, and both halves helped: short irons now
+    // fly closer to their number (carryFrac 0.90 → 0.94) so approaches finish nearer the pin, and long
+    // irons release like the driving irons they are. Measured on this exact harness, 2,880 holes:
+    // toPar/hole 0.8958 → 0.8740, floor-hits 9.48% → 8.65%. Ratchet the fence down a notch to hold it.
+    expect(blowups / holes).toBeLessThan(0.09);
   });
 });

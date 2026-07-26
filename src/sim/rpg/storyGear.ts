@@ -684,7 +684,13 @@ export const STORY_GEAR: readonly StoryGearItem[] = [
     ],
     apply: (m) => ({
       ...m,
-      minCarryBoostByClass: addFamilyMinCarry(m.minCarryBoostByClass, 'iron', 0.16),
+      // "Irons" is one thing to the player — the flight split (GS-runout-club) is invisible to the
+      // shop, so a set of irons lifts BOTH rows or it only half-works on half your bag.
+      minCarryBoostByClass: addFamilyMinCarry(
+        addFamilyMinCarry(m.minCarryBoostByClass, 'ironLong', 0.16),
+        'ironShort',
+        0.16,
+      ),
       dispersionMult: m.dispersionMult * 0.95,
     }),
   },

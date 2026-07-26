@@ -26,7 +26,7 @@ import type { BiomeArchetype } from '../src/sim/course/themes';
 import type { PenaltyKind } from '../src/sim/shot';
 
 const ARCHES = Object.keys(ARCHETYPE_TURF) as BiomeArchetype[];
-const CLASSES: readonly StrikeClass[] = ['driver', 'wood', 'hybrid', 'iron', 'wedge', 'putter'];
+const CLASSES: readonly StrikeClass[] = ['driver', 'wood', 'hybrid', 'ironLong', 'ironShort', 'wedge', 'putter'];
 
 describe('strike voices (GS-audio-2)', () => {
   it('every club in the taxonomy resolves to a strike class', () => {
@@ -40,14 +40,16 @@ describe('strike voices (GS-audio-2)', () => {
     expect(strikeClassOf('3W')).toBe('wood');
     expect(strikeClassOf('5W')).toBe('wood');
     expect(strikeClassOf('2H')).toBe('hybrid');
-    expect(strikeClassOf('7i')).toBe('iron');
+    // Both iron rows share the voice — the GS-runout-club split is a FLIGHT distinction.
+    expect(strikeClassOf('3i')).toBe('ironLong');
+    expect(strikeClassOf('7i')).toBe('ironShort');
     expect(strikeClassOf('PW')).toBe('wedge');
     expect(strikeClassOf('SW')).toBe('wedge');
     expect(strikeClassOf('64')).toBe('wedge');
     expect(strikeClassOf('chip')).toBe('wedge');
     expect(strikeClassOf('putter')).toBe('putter');
     // No club known → the neutral mid-bag voice, never a throw.
-    expect(strikeClassOf(undefined)).toBe('iron');
+    expect(strikeClassOf(undefined)).toBe('ironShort');
   });
 });
 

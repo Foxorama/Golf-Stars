@@ -38,6 +38,8 @@
  * "rubber band" read came from; a real check-back takes well over a second, so it gets one.
  */
 
+import { flightClassOf, type FlightClass } from '../sim/flight';
+
 /** Feel knobs for the run-out. All of these ride `_gsFeel` through `playView`'s existing merge, so
  *  they are tunable live without a new top-level hook. */
 export interface RunoutFeel {
@@ -87,6 +89,38 @@ export const DEFAULT_RUNOUT_FEEL: RunoutFeel = {
   backspinMinMs: 700,
 };
 
+/**
+ * How a club FAMILY bounces (GS-runout-club). Multipliers on the surface-derived numbers, so the
+ * landing still decides the base — a driver into a plugged bunker does not skip — and the club
+ * decides how much of that the strike had in it.
+ *
+ * The run itself is NOT here: that is the sim's, via `FLIGHT_PROFILES.carryFrac`, and it already
+ * differs per family. This is the shape of the landing.
+ */
+export interface RunoutClassProfile {
+  /** Scales the share of the run-out covered IN THE AIR. */
+  bounce: number;
+  /** Scales the restitution — how much speed survives a contact, i.e. how FAR each skip carries. */
+  restitution: number;
+  /** Scales the first hop's apex — how HIGH it skips. */
+  apex: number;
+}
+
+/**
+ * Driver skips long, low and often; a wood does nearly the same; a hybrid comes in steeper and
+ * bounces less but still releases; a long iron is the low runner; a short iron lands steep and
+ * checks; a wedge plops once and stops, which is where the backspin build takes over.
+ */
+export const RUNOUT_BY_CLASS: Record<FlightClass, RunoutClassProfile> = {
+  driver: { bounce: 1.3, restitution: 1.12, apex: 0.82 },
+  wood: { bounce: 1.18, restitution: 1.08, apex: 0.9 },
+  hybrid: { bounce: 0.95, restitution: 1.0, apex: 1.02 },
+  ironLong: { bounce: 1.1, restitution: 1.05, apex: 0.94 },
+  ironShort: { bounce: 0.78, restitution: 0.92, apex: 1.14 },
+  wedge: { bounce: 0.45, restitution: 0.78, apex: 1.25 },
+  putter: { bounce: 0.12, restitution: 0.7, apex: 1 },
+};
+
 /** One hop of the bounce phase: how far along the path it carries the ball, how long it takes, and
  *  how high it flies. */
 export interface Hop {
@@ -108,7 +142,7 @@ export interface RunoutPlan {
   totalDist: number;
   /** Backspin plan (absent on a forward run-out): the ball skids this far FORWARD first, then the
    *  spin bites and drags it back to rest. */
-  check?: { skid: number; skidMs: number; skidApex: number; backMs: number };
+  check?: { skid: number; skidMs: number; skidApex: number; backMs: number; skidV: number };
 }
 
 const clamp = (x: number, lo: number, hi: number): number => (x < lo ? lo : x > hi ? hi : x);
@@ -126,10 +160,14 @@ export function planRunout(
   v0: number,
   checking: boolean,
   feel: RunoutFeel = DEFAULT_RUNOUT_FEEL,
+  clubId?: string,
 ): RunoutPlan {
   const f = clamp(firm, 0, 1);
   const speed = Math.max(0.02, v0); // yd/ms; guard a degenerate zero-carry shot
   const D = Math.max(0, dist);
+  // How this club lands (GS-runout-club). Absent club ⇒ the neutral mid-bag row, so every existing
+  // caller keeps a sane landing.
+  const cls = RUNOUT_BY_CLASS[flightClassOf(clubId)];
 
   if (checking) {
     // Two beats: a forward skid carrying the flight's own speed, then the spin grabs and drags the
@@ -141,20 +179,25 @@ export function planRunout(
     const skidMs = clamp(skid / speed, 170, 420);
     const skidApex = Math.min(feel.hopApexMax * 0.5, skid * 0.22 + 0.4) * (0.35 + 0.75 * f);
     const backMs = Math.max(feel.backspinMinMs, (skid + D) * feel.backspinMsPerYd);
+    // The skid's own speed, handed to the drag phase so it can START at it (see `sampleRunout`).
+    const skidV = skidMs > 0 ? skid / skidMs : 0;
     return {
       hops: [],
       rollDist: 0,
       rollMs: 0,
       totalMs: skidMs + backMs,
       totalDist: D,
-      check: { skid, skidMs, skidApex, backMs },
+      check: { skid, skidMs, skidApex, backMs, skidV },
     };
   }
 
   // How much of the run is covered IN THE AIR: a firm fairway or slick ice skips most of the way, a
   // plugged bunker or deep tangle barely hops.
-  const share = lerp(feel.bounceShareSoft, feel.bounceShareFirm, f);
-  const k = lerp(feel.restitutionSoft, feel.restitutionFirm, f); // speed kept per contact
+  // …and how hard the CLUB hit it: a driver skips off a firm fairway, a wedge plops into the same
+  // fairway. The surface sets the base, the club scales it, and the restitution is clamped short of 1
+  // (a contact that loses nothing would never stop hopping).
+  const share = clamp(lerp(feel.bounceShareSoft, feel.bounceShareFirm, f) * cls.bounce, 0, 0.9);
+  const k = clamp(lerp(feel.restitutionSoft, feel.restitutionFirm, f) * cls.restitution, 0.05, 0.88);
   const Db = D * share;
   const Dr = D - Db;
 
@@ -163,13 +206,18 @@ export function planRunout(
   // k² too — hang time is proportional to √apex, which keeps the whole train self-consistent.
   const q = k * k;
   const hops: Hop[] = [];
-  const apex0 = Math.min(feel.hopApexMax, Db * feel.hopApexFrac + 0.35) * (0.25 + 0.85 * f);
+  const apex0 = Math.min(feel.hopApexMax, Db * feel.hopApexFrac + 0.35) * (0.25 + 0.85 * f) * cls.apex;
   // The ball leaves the FIRST contact having already lost a slice to the ground.
   let v = speed * k;
   let remaining = Db;
   for (let i = 0; i < feel.hopMax && remaining > feel.hopMinYd; i++) {
-    // Geometric share of what is left; the last hop takes the remainder so the train sums exactly.
-    const want = i === feel.hopMax - 1 ? remaining : Db * (1 - q) * Math.pow(q, i);
+    // A clean geometric share, every hop. The original version handed the REMAINDER to the last hop
+    // so the train summed exactly to Db — which, whenever the restitution is high enough that the
+    // train hasn't decayed away by `hopMax`, makes the FINAL hop the biggest of the tail: a driver off
+    // a firm fairway skipped 13yd on hop 4 after 7yd on hop 3. The ball visibly re-accelerated as it
+    // was supposed to be dying. There is nowhere for that remainder to go wrong anyway — whatever the
+    // hops don't cover already flows into the closing roll below.
+    const want = Db * (1 - q) * Math.pow(q, i);
     const d = Math.min(remaining, Math.max(0, want));
     if (d <= 1e-6) break;
     hops.push({ dist: d, ms: d / Math.max(0.01, v), apex: apex0 * Math.pow(q, i) });
@@ -193,7 +241,7 @@ export function planRunout(
 export function sampleRunout(plan: RunoutPlan, t: number): { s: number; h: number } {
   const tt = clamp(t, 0, 1);
   if (plan.check) {
-    const { skid, skidMs, skidApex, backMs } = plan.check;
+    const { skid, skidMs, skidApex, backMs, skidV } = plan.check;
     const total = skidMs + backMs;
     const ms = tt * total;
     if (ms <= skidMs) {
@@ -201,11 +249,23 @@ export function sampleRunout(plan: RunoutPlan, t: number): { s: number; h: numbe
       const u = skidMs > 0 ? ms / skidMs : 1;
       return { s: skid * u, h: skidApex * Math.sin(Math.PI * u) };
     }
-    // The spin bites. Smoothstep from the skid peak back to rest: it accelerates out of the grab and
-    // eases into the finish, instead of the old ease-in-out that yanked away from a dead stop.
+    // The spin bites. A CUBIC HERMITE whose start tangent is the skid's own velocity, so the ball
+    // carries its momentum THROUGH the grab: still going forward as the spin takes hold, then
+    // decelerating, reversing, and easing to rest.
+    //
+    // The first version of this used a smoothstep, whose derivative is ZERO at u = 0. That joins a
+    // constant-speed forward skid to a dead stop — a hard velocity step, mid-animation — and only
+    // then creeps backwards. It is exactly the reported "the ball now stops and then just slides",
+    // and the reason the suite went green over it is that it only ever tested continuity at
+    // TOUCHDOWN. Any piecewise run-out needs ds/dt checked across EVERY join.
     const u = backMs > 0 ? (ms - skidMs) / backMs : 1;
-    const e = u * u * (3 - 2 * u);
-    return { s: skid + (-plan.totalDist - skid) * e, h: 0 };
+    const p0 = skid;
+    const p1 = -plan.totalDist;
+    const m0 = (skidV ?? 0) * backMs; // the skid's velocity, in this phase's own time units
+    const h00 = 2 * u * u * u - 3 * u * u + 1;
+    const h10 = u * u * u - 2 * u * u + u;
+    const h01 = -2 * u * u * u + 3 * u * u;
+    return { s: p0 * h00 + m0 * h10 + p1 * h01, h: 0 };
   }
   const total = plan.hops.reduce((a, h) => a + h.ms, 0) + plan.rollMs;
   if (total <= 0) return { s: plan.totalDist, h: 0 };

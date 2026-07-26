@@ -325,7 +325,10 @@ export const sfx = {
         tone(200, 0.12, { type: 'triangle', gain: 0.15, sweepTo: 85 });
         tone(1000 + q * 450, 0.05, { type: 'sine', gain: 0.07 + q * 0.08 });
         break;
-      case 'iron':
+      // Both iron rows share the voice: GS-runout-club split the irons for FLIGHT (a 3-iron launches
+      // low and runs, a 9-iron climbs and sits), and they still sound like irons.
+      case 'ironLong':
+      case 'ironShort':
         // Crisp click: bright compact crack + a firm body knock + a whisper of turf after.
         noise(0.05, { gain: 0.3, type: 'bandpass', freq: 1800 + q * 1600, q: 0.9 });
         tone(300 + q * 160, 0.1, { type: 'triangle', gain: 0.12 + q * 0.1, sweepTo: 150 });

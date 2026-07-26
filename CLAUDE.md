@@ -395,6 +395,25 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     airborne while braking and sliding while grounded. Knobs are `RunoutFeel` spread into `_gsFeel` — a
     SUB-FIELD, so no test-hub wiring. Guarded by `tests/runout.test.ts`; contract 5 holds (the walk is by
     ARC LENGTH along the sim's own `rollPath`, ending exactly on the resolved rest point).
+  - **BOUNCE AND RUN READ PER CLUB, AND THEY COME FROM DIFFERENT PLACES** (GS-runout-club). The RUN is
+    the SIM's — `FLIGHT_PROFILES.carryFrac`, total-preserving — and the irons were ONE row at 0.9, so
+    every iron ran LESS than a hybrid and a 3-iron was indistinguishable from a 9-iron. `flightClassOf`
+    now splits them at the NUMBER (`ironLong` ≤5 / `ironShort`), still convention-based so a new `4i`
+    row needs no engine edit; the ladder is driver 25% ▸ wood 22% ▸ **long iron 19.8%** ▸ hybrid 17.6% ▸
+    short iron 6.4% ▸ wedge 0 (where the backspin build takes over). Splitting a class is COMPILE-FORCED
+    at every `Record<FlightClass,…>` — audio's strike voice and the shop's "irons" item are still ONE
+    thing to the player, so both rows share them. Measured on the death-spiral harness (2,880 holes):
+    toPar/hole **0.8958 → 0.8740**, floor-hits **9.48% → 8.65%** — both the safe direction, and the
+    blow-up fence is ratcheted to `< 0.09` to hold it. The BOUNCE is render-side (`RUNOUT_BY_CLASS`,
+    multipliers on the surface-derived share/restitution/apex): the landing sets the base, the club
+    scales it, so a driver skips off a firm fairway and a wedge plops into the same fairway.
+    Two bugs fixed in the same pass, both structural: **the backspin check joined a constant-speed skid
+    to a smoothstep** — derivative zero at u=0, i.e. full flight speed → dead stop → creep, the reported
+    *"stops and then just slides"* — now a cubic Hermite whose start tangent IS the skid velocity; and
+    the hop train **handed the REMAINDER to its last hop**, which made the final skip the biggest of the
+    tail (13yd after 7yd off a firm driver) — every hop is now a clean geometric share and the leftover
+    rolls. **A piecewise run-out must test `ds/dt` across EVERY phase join**: the old suite pinned
+    touchdown alone and shipped a hard stop mid-animation. Guarded by `tests/runout.test.ts`.
   - Greens layer 1–2 contour LOBES (`Hole.greenContour`, own side stream) over the plane; `greenSlopeAt` is
     the ONE field the resolver, preview, read AND arrows sample (`sim/contour.ts`). `rollOut` samples it per
     step and CURLS (roll is ARC length; straight-roll invariance holds only on lobe-less holes); the first
