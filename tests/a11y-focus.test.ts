@@ -1,5 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
-import { execSync } from 'node:child_process';
+import { describe, it, expect } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -17,10 +16,6 @@ import { resolve } from 'node:path';
  */
 
 const dist = resolve(__dirname, '../dist/index.html');
-
-beforeAll(() => {
-  execSync('npx vite build', { cwd: resolve(__dirname, '..'), stdio: 'ignore' });
-}, 180_000);
 
 function findChromium(): string | null {
   const bases = [

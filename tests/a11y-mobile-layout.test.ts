@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { execSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { effectiveViewport, isTightFit, TIGHT_H, TIGHT_W } from '../src/app/viewportFit';
@@ -30,10 +29,6 @@ import { UI_SCALES } from '../src/settings';
  */
 
 const dist = resolve(__dirname, '../dist/index.html');
-
-beforeAll(() => {
-  execSync('npx vite build', { cwd: resolve(__dirname, '..'), stdio: 'ignore' });
-}, 180_000);
 
 function findChromium(): string | null {
   const bases = [

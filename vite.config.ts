@@ -32,5 +32,9 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    // The browser tests drive dist/index.html. Build it ONCE here, in the main process, before any
+    // worker starts — a per-file `vite build` deletes dist out from under a sibling file's
+    // `page.goto` (emptyOutDir), which is a race that only fires sometimes. See tests/globalSetup.ts.
+    globalSetup: ['tests/globalSetup.ts'],
   },
 });

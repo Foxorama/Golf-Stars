@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -14,12 +13,26 @@ import { resolve } from 'node:path';
 const dist = resolve(__dirname, '../dist/index.html');
 let html = '';
 
+// `dist` is built ONCE by tests/globalSetup.ts — never here. A per-file `vite build` deletes it
+// out from under a sibling test file's `page.goto` (emptyOutDir); see globalSetup for the story.
 beforeAll(() => {
-  execSync('npx vite build', { cwd: resolve(__dirname, '..'), stdio: 'ignore' });
   html = readFileSync(dist, 'utf8');
-}, 120_000);
+});
 
 describe('build output (regression guards)', () => {
+  it('no test file builds dist itself — globalSetup owns it', () => {
+    // Vitest runs test files in parallel workers and the game build is `emptyOutDir: true`, so a
+    // per-file `vite build` DELETES dist out from under whichever sibling is mid-`page.goto`. The
+    // symptom is a bare `net::ERR_FILE_NOT_FOUND at file:///…/dist/index.html` on a different test
+    // each run — CI built the same commit twice and got one pass and one failure. Eleven test files
+    // read dist; exactly one process may write it, and that is tests/globalSetup.ts.
+    const offenders = readdirSync(__dirname)
+      .filter((f) => f.endsWith('.test.ts'))
+      // Match the CALL, not the prose — this very file explains the rule in a comment.
+      .filter((f) => /exec(?:Sync|FileSync)?\([^)]*vite build/.test(readFileSync(resolve(__dirname, f), 'utf8')));
+    expect(offenders, `test files building dist (use tests/globalSetup.ts): ${offenders.join(', ')}`).toEqual([]);
+  });
+
   it('is a single self-contained file — no external script/asset to 404', () => {
     // No <script src=...> or <link href=...assets...> — everything inlined.
     expect(/<script[^>]+src=/.test(html)).toBe(false);

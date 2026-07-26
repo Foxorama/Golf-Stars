@@ -1,5 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
-import { execSync } from 'node:child_process';
+import { describe, it, expect } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -65,9 +64,6 @@ describe('the listener does not stack', () => {
 
 // --- real browser: arrows actually move the aim and the power ---------------------
 const dist = resolve(root, 'dist/index.html');
-beforeAll(() => {
-  execSync('npx vite build', { cwd: root, stdio: 'ignore' });
-}, 180_000);
 
 function findChromium(): string | null {
   const bases = [

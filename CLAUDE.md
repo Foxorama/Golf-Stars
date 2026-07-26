@@ -692,6 +692,12 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
 
 ## Change, versioning & deploy
 - `main` is branch-protected. Each change: branch → edit → commit → push → PR → merge → sync.
+- **`dist/` IS BUILT ONCE, BY `tests/globalSetup.ts` — no test file may build it.** Eleven test files
+  drive the built artifact in a browser; the game build is `emptyOutDir:true`, so a per-file
+  `vite build` in a `beforeAll` DELETES `dist/` out from under whichever parallel worker is mid-
+  `page.goto`. The symptom is a bare `net::ERR_FILE_NOT_FOUND at …/dist/index.html` landing on a
+  different test each run — CI built one commit twice and got a pass AND a failure. Guarded by
+  `tests/build.test.ts`.
 - **Run `npm run check` before every push — NOT just `npm test`.** `check` = `typecheck && test &&
   build`, the exact CI gate in order. `npm test` (vitest) transpiles with esbuild and does NOT
   type-check, so a green suite says nothing about `tsc` (missing required args, unused vars, wrong
