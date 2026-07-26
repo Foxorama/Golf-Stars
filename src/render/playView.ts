@@ -47,6 +47,16 @@ import {
 } from './trajectory';
 import { flightApexT, flightProfileOf } from '../sim/flight';
 import { planRunout, sampleRunout, DEFAULT_RUNOUT_FEEL, type RunoutFeel, type RunoutPlan } from './runout';
+import {
+  advanceFlightSpin,
+  advanceRollPhase,
+  ballRadiusPx,
+  drawBall,
+  drawBallShadow,
+  ballSkinFor,
+  DEFAULT_BALL_FEEL,
+  type BallFeel,
+} from './ball';
 import { GOLFER_COLORS, lookFromColor, drawGolfer, type GolferLook } from './golferArt';
 import { canvasRatio } from './pixelRatio';
 import { reducedMotion } from '../settings';
@@ -55,7 +65,7 @@ import { reducedMotion } from '../settings';
 // (e.g. src/app/helpers.ts) keep resolving `GolferLook` from this module.
 export type { GolferLook } from './golferArt';
 
-interface PlayFeel extends FlightFeel, RunoutFeel {
+interface PlayFeel extends FlightFeel, RunoutFeel, BallFeel {
   /** Multiplies on-screen arc height (course px → visible loft). */
   heightExaggeration: number;
   /** Max screen-shake amplitude (px) at a full-power strike. */
@@ -104,6 +114,7 @@ const BASE_FEEL: PlayFeel = {
   trailLen: 18,
   gapMs: 170,
   ...DEFAULT_RUNOUT_FEEL,
+  ...DEFAULT_BALL_FEEL,
   restHoldMs: 480,
   golfer: true,
   golferPx: 40,
@@ -348,6 +359,35 @@ export function mountPlayView(
   let lastRollClearShot = -1; // shot whose trail has been reset at the flight→roll transition
   let runoutShot = -1; // shot whose land/bounce/run-out plan is cached below (GS-runout-feel)
   let runoutPlan: RunoutPlan | null = null;
+  // Ball ROLL (GS-ball-art). The phase advances off the ball's own SCREEN displacement, so it stops
+  // turning exactly when the ball stops and reverses on its own through a backspin check — no special
+  // case, and nothing for the two to disagree about. `ballDir` is the last non-trivial travel
+  // direction, kept so a ball sitting still doesn't collapse its rotation axis.
+  let ballPhase = 0;
+  let ballDir: Vec = [1, 0];
+  let ballPrev: Vec | null = null; // last COURSE position, not the last screen position
+  /**
+   * Roll the ball to a new COURSE position: advance the phase by how far it moved through the WORLD,
+   * measured in today's pixels. Taking the delta between two screen positions from DIFFERENT frames
+   * would be wrong — the follow-cam eases toward the ball at 0.2 a frame, so a rolling ball drifts
+   * toward the middle of the screen while the world scrolls past it, and its screen displacement is
+   * only a fraction of the distance it actually rolled. Projecting both endpoints under the CURRENT
+   * projection cancels the camera out and leaves the ball's real travel, in the px it is drawn at.
+   */
+  const rollBallTo = (at: Vec, project: (p: Vec) => [number, number], r: number): void => {
+    if (ballPrev) {
+      const [ax, ay] = project(ballPrev);
+      const [bx2, by2] = project(at);
+      const dx = bx2 - ax;
+      const dy = by2 - ay;
+      const d = Math.hypot(dx, dy);
+      if (d > 0.05) {
+        ballDir = [dx / d, dy / d];
+        ballPhase = advanceRollPhase(ballPhase, d, r, F);
+      }
+    }
+    ballPrev = at;
+  };
   let impactFiredShot = -1; // shot whose strike cue (onImpact) has fired
   let impactFiredPutt = -1; // putt whose strike cue has fired
   // Caddy-guard redirect (GS-caddy): the slow-mo interception. `redirectDraw` is the projectile to
@@ -394,6 +434,9 @@ export function mountPlayView(
     lastRollClearShot = -1;
     runoutShot = -1;
     runoutPlan = null;
+    ballPhase = 0;
+    ballDir = [1, 0];
+    ballPrev = null;
     redirectFiredShot = -1;
     sparksFiredShot = -1;
     impactFiredShot = -1;
@@ -771,22 +814,21 @@ export function mountPlayView(
       // Golfer size: nudged by zoom but clamped so it always reads next to the ball + flag; a
       // bigger-built golfer stands a touch taller.
       const golferH = Math.max(30, Math.min(60, F.golferPx * look.build * Math.max(0.85, Math.min(1.5, proj.scale / 2.4))));
+      // The BALL's cover (GS-ball-art). An equipped Story BALL already carries a palette + style for
+      // its flight tracer; the ball itself now wears the matching cover, so one cosmetic dresses both
+      // ends of the shot instead of the trail alone. No ball equipped ⇒ the plain white `classic`.
+      const ballSkin = ballSkinFor(look);
 
       if (flightElapsed < 0) {
         // --- Windup: ball at rest at the address point, golfer addresses → top → contact.
         lastGround = shot.from; // keep the follow-cam centred on the ball
         const [bx, by] = proj.project(shot.from);
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
-        ctx.beginPath();
-        ctx.ellipse(bx, by, 4, 2, 0, 0, Math.PI * 2);
-        ctx.fill();
+        const addrR = ballRadiusPx(proj.scale, 0, F);
+        drawBallShadow(ctx, bx, by, addrR, 0);
         if (F.golfer) drawGolfer(ctx, bx, by, golferH, clamp01((now - segStart) / lead), 0, 1, look, opts.lefty);
-        ctx.fillStyle = '#fff';
-        ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-        ctx.beginPath();
-        ctx.arc(bx, by, 3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+        // At address the ball is dead still — phase 0, so it sits with its mark up, like a teed ball.
+        drawBall(ctx, bx, by, addrR, { phase: 0, dirX: 1, dirY: 0, skin: ballSkin, feel: F });
+        ballPrev = shot.from;
         hudText = `${shot.club.name} · ${Math.round(carry)} yds`;
       } else {
         const elapsed = flightElapsed;
@@ -803,6 +845,9 @@ export function mountPlayView(
         }
         let ground: Vec;
         let height: number;
+        // Which spin regime the ball is in (GS-ball-art): airborne on its flight ⇒ steady backspin;
+        // running out ⇒ roll off its own screen displacement.
+        const rollPhase = elapsed >= flightDur;
         let zoomTarget = 1; // redirect zoom-to-impact target (1 = no zoom); eased into cineZoom below
         if (elapsed < flightDur) {
           const tg = elapsed / flightDur;
@@ -1023,11 +1068,14 @@ export function mountPlayView(
           drawGolfer(ctx, bx, by, golferH, 1, Math.max(0.001, fol), 1 - fol, look, opts.lefty);
         }
 
-        // Shadow (fades as the ball climbs).
-        ctx.fillStyle = `rgba(0,0,0,${0.35 * (1 - height / (peak + 1))})`;
-        ctx.beginPath();
-        ctx.ellipse(gx, gy, 4, 2, 0, 0, Math.PI * 2);
-        ctx.fill();
+        // The ball's own drawn size + its ground SHADOW (GS-ball-art). The old shadow was a fixed
+        // 4x2px ellipse faded by `height / peak` — with `peak` being the FLIGHT apex, a half-yard
+        // run-out hop moved that ratio by ~1%, so the shadow sat stone still and the hop it was
+        // supposed to sell was invisible. This one reads the ball's actual screen LIFT, which is the
+        // quantity a bounce changes.
+        const loft = clamp01(height / (peak + 1));
+        const ballR = ballRadiusPx(proj.scale, loft, F);
+        drawBallShadow(ctx, gx, gy, ballR, gy - ballY);
 
         // Trail.
         trail.push([gx, ballY]);
@@ -1075,23 +1123,21 @@ export function mountPlayView(
         }
         ctx.restore();
 
-        // Ball (a touch bigger when lofted). A glowing tracer ball wears a faint halo in its glow colour.
-        const ballR = 3 + (height / (peak + 1)) * 1.5;
-        if (tracer?.glow) {
-          ctx.save();
-          ctx.globalAlpha = 0.5;
-          ctx.fillStyle = tracer.glow;
-          ctx.beginPath();
-          ctx.arc(gx, ballY, ballR + 2.4, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
+        // The BALL. In the air on its flight it carries steady BACKSPIN (a struck ball does, and its
+        // screen displacement there is 40 rad a frame, which is neither true nor watchable); the
+        // moment it is running out it rolls off its own screen movement instead.
+        if (rollPhase) rollBallTo(ground, (q) => proj.project(q), ballR);
+        else {
+          ballPhase = advanceFlightSpin(ballPhase, dt, F);
+          ballPrev = ground;
         }
-        ctx.fillStyle = '#fff';
-        ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-        ctx.beginPath();
-        ctx.arc(gx, ballY, ballR, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+        drawBall(ctx, gx, ballY, ballR, {
+          phase: ballPhase,
+          dirX: ballDir[0],
+          dirY: ballDir[1],
+          skin: ballSkin,
+          feel: F,
+        });
 
         hudText = `${shot.club.name} · ${Math.round(carry)} yds${shot.holed ? ' · IN! 🎉' : ''}${shot.penalty ? ` · ${shot.penalty.toUpperCase()}!` : ''}`;
 
@@ -1164,12 +1210,18 @@ export function mountPlayView(
         ctx.lineTo(px, py);
       }
       ctx.stroke();
-      ctx.fillStyle = '#fff';
-      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-      ctx.beginPath();
-      ctx.arc(gx[0], gx[1], 3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+      // The putt is where the roll reads best: the chip/putt camera runs at ~6.6 px/yard, so the ball
+      // is at its biggest and every turn is legible — including the break, since the roll direction
+      // comes from the ball's own screen motion along the curved path.
+      const puttR = ballRadiusPx(proj.scale, 0, F);
+      rollBallTo(cur, (q) => proj.project(q), puttR);
+      drawBall(ctx, gx[0], gx[1], puttR, {
+        phase: ballPhase,
+        dirX: ballDir[0],
+        dirY: ballDir[1],
+        skin: ballSkinFor(opts.golferLook),
+        feel: F,
+      });
 
       hudText = `Putt ${puttIndex + 1}${putt.holed ? ' — in!' : ''}`;
 

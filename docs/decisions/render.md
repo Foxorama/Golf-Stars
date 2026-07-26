@@ -1646,3 +1646,117 @@ mid-flight would restart the shot.
 **Verified:** headless drive at 390×844. Ball in flight sits at y≈585 against a panel at 670 (85px clear,
 mid-band) and settles to exactly `panelTop − 28`. Before, the same shot flew at 709 behind a panel at 645.
 Full suite green (1879 tests + 12 in `tests/map-frame.test.ts`), typecheck clean.
+
+---
+
+## GS-ball-art — the ball is a golf ball, and you can see it roll (2026-07-26)
+
+**The report:** *"part of the problem is that there is no bounce and another part of the problem is
+that the ball is a pure white circle with no rolling animation. can we add dimples and a real looking
+roll to the ball?"*
+
+Both halves of that come from the same three lines. The ball was drawn at three sites in
+`playView.ts` — at address, in flight/run-out, and on a putt — and every one of them was:
+
+```js
+ctx.fillStyle = '#fff';
+ctx.arc(x, y, 3, 0, Math.PI * 2);
+ctx.fill(); ctx.stroke();
+```
+
+A **featureless disc cannot show rotation**. There is nothing on it to rotate. And a **3px disc
+cannot show height**: the shadow under it was a fixed `4×2px` ellipse whose alpha faded on
+`height / (peak + 1)` — with `peak` being the *flight* apex, a half-yard run-out hop moved that ratio
+by about 1%, so the shadow sat stone still. The bounce the run-out model was already drawing was
+invisible; "there is no bounce" was a rendering bug, not a physics one.
+
+### Size: the camera decides, within limits
+
+The ball was a fixed three screen pixels at every zoom. Zooming in — the whole point of the chip/putt
+camera — never showed you more ball.
+
+The reason it was fixed is real: a golf ball is **0.0467 yards** across, and the chip/putt camera runs
+at ~6.6 px/yard, so a scale model is **a third of a pixel**. A scale ball was never on the table. So
+`ballRadiusPx` scales `proj.scale` about a deliberately exaggerated `ballDrawYd`, floored at the old
+3px and capped at 9:
+
+| camera | px/yard | drawn radius |
+|---|---|---|
+| whole hole | 0.6 – 2.4 | **3.0** (the old fixed size — that view is unchanged) |
+| mid follow | 3.4 | 4.1 |
+| approach | 4.6 | 5.5 |
+| chip / putt | 6.6 | **7.9** (dimples, band and mark all legible) |
+| deep zoom | 9+ | 9.0 (capped) |
+
+### Rotation is the ONE thing measured in screen pixels
+
+Every other rule in this renderer says *measure in yards, never pixels* (GS-green-complex). Roll is
+the deliberate exception, and the arithmetic is why. Rolling without slipping is `dθ = ds / r`. Take
+those in course units with a real ball radius and 10 yards of run is **68 revolutions** — a grey
+strobe at any frame rate, and worse at the map camera than the putt camera. Take both **as drawn** —
+screen displacement over drawn radius — and the ball turns exactly as fast as it *looks* like it
+should, at every zoom, with no per-camera tuning. Measured over a 40-yard run-out at 60fps: 1.7 turns
+at the map camera, 7.6 at the chip camera. Both readable; the test pins the band at 0.5–12.
+
+Driving the phase off the ball's **own screen displacement** then buys the two properties that
+actually sell it, for free and with no special case:
+
+- the ball **stops turning exactly when it stops moving** (the thing that makes a run-out look like it
+  settled rather than faded out), and
+- a **backspin check turns it backwards** on the way home, because its displacement is backwards.
+
+In the air on its flight it is a different regime — a struck ball carries backspin, and its screen
+displacement there is tens of radians a frame *forwards*, i.e. topspin, which is both wrong and
+unwatchable. So flight spins on a clock (`flightSpinRate`), the ground rolls on displacement, and the
+switch is one boolean.
+
+The per-frame step is capped at 0.55 rad. Above ~0.6 a 26-dimple field aliases and the ball reads as
+turning the wrong way.
+
+### What is actually drawn
+
+A lit sphere (light from the upper-left, the same `LIGHT_UL` every carved feature in the scene uses —
+a ball lit from anywhere else reads as a sticker), then three layers of surface detail that each
+survive to a different size:
+
+- **26 dimples** on a golden-angle spiral, orthographically projected and back-face culled, above
+  `dimpleMinPx` (4.6px).
+- **An alignment band**, above 2.6px. This has to be a great circle **through the roll axis's poles**,
+  not around its equator: the equator of a rotation is *invariant* under that rotation and would sit
+  dead still while the ball spun underneath it. Getting that backwards is a silent bug — the band
+  still draws, it just never moves.
+- **A maker's mark**, one dot, above 3.4px — so there is always exactly one unambiguous feature to
+  track when the ball is too small for dimples.
+
+Plus the ground shadow, which now reads the ball's actual screen **lift** — the quantity a bounce
+changes. It spreads and fades as the ball climbs but never disappears: a faint mark under a ball in
+the air is the only thing telling you where over the ground it is.
+
+The dimple field is a fixed spiral, not sampled — the scene is camera-proof
+(`tests/camera-stability.test.ts`) and the ball is redrawn every frame from a rebuilt projection, so
+an rng dimple field would shimmer. A test greps for `Math.random`.
+
+### Cosmetics fall out of it
+
+`BALL_SKINS` is content-as-data: cover, shade, dimple tone, band, mark, optional aura. A new cosmetic
+ball is a **row**. Seven ship (`classic` is the plain white one — this feature is about making the
+ball read, not changing what the player has).
+
+The seam to the existing wardrobe is one function. An equipped Story BALL already declares a palette
+and a style for its **flight tracer** (`GolferLook.ballTracer`, GS-story-avatar); `ballSkinFor` maps
+that row onto a cover and re-tints the band and aura from it. So one cosmetic dresses **both ends of
+the shot** — the ball and its trail — instead of being a trail plus a second unrelated purchase, and
+a NEW tracer style needs no edit here (it falls back to the tour cover with its own colours).
+
+### Deliberately not done
+
+- **The static SVG map still draws a plain marker.** The aim screen is `renderHoleSVG`, a different
+  renderer with its own painters; a dimpled SVG ball is a `style/` module, not a shared call. Filed.
+- **Per-club bounce and run** — the other half of the report. That is a physics change (it splits the
+  `iron` flight class) and needs the death-spiral harness, so it is its own PR.
+
+**Guards:** `tests/ball.test.ts` (19 cases — size floor/cap, `dθ = ds/r`, the stops-with-the-ball
+property, the readable-turns band at both camera extremes, that the drawn surface actually MOVES with
+the phase and returns after a full turn, that the axis follows travel, shadow behaviour, no rng, and
+the skin table). Eyes-on: `node scripts/ball-preview.mjs` — every cover through a full turn, the size
+ladder, a hop with its shadow, and a decelerating roll.
