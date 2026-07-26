@@ -19,6 +19,10 @@
  * be asserted in vitest — verify by eyes-on play.
  */
 
+// Backing-store resolution only — a pure, guarded read of the root zoom, so this cinematic
+// stays as self-contained and as un-throwable as it was.
+import { canvasRatio } from './pixelRatio';
+
 interface IntroFeel {
   /** Phase durations (ms) at speed 1. */
   driveMs: number;
@@ -385,7 +389,7 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
 
   function resize(): void {
     if (!ctx) return;
-    dpr = Math.min(2, window.devicePixelRatio || 1);
+    dpr = canvasRatio();
     cssW = overlay.clientWidth || window.innerWidth;
     cssH = overlay.clientHeight || window.innerHeight;
     canvas.width = Math.max(1, Math.round(cssW * dpr));

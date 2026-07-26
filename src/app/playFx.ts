@@ -22,6 +22,7 @@ import { sfx } from '../render/audio';
 import { HAPTICS, haptic } from '../render/haptics';
 import { getSettings } from '../settings';
 import { type Hole, type Vec } from '../sim/course/contract';
+import { canvasRatio } from '../render/pixelRatio';
 
 /** Drive the ambient music layer (GS-audio-2) off the current screen: the stop's world theme
  *  while golf is on screen (playing/result — the hole under view picks the track, so a
@@ -118,7 +119,7 @@ export function mountWeatherOverlay(
   const cw = Math.round(el.clientWidth || dims.width);
   const ch = Math.round(el.clientHeight || dims.height);
   if (cw < 2 || ch < 2) return null;
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const dpr = canvasRatio();
   const cv = document.createElement('canvas');
   cv.width = cw * dpr;
   cv.height = ch * dpr;

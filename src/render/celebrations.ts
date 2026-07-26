@@ -2,6 +2,7 @@ import { sfx } from './audio';
 import { getSettings } from '../settings';
 import { ACE_CREDIT_BONUS } from '../sim/rpg/economy';
 import { HAPTICS, haptic } from './haptics';
+import { canvasRatio } from './pixelRatio';
 
 // Full-screen, cosmetic, assetless Canvas2D celebration overlays for the biggest hole-out beats: the
 // hole-in-one takeover (GS-ace) and the eagle/albatross fly-over (GS-bird). Pure side-effects (no
@@ -110,7 +111,7 @@ export function showAceCelebration(
 function runFireworks(canvas: HTMLCanvasElement, seed: number): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const dpr = canvasRatio();
   const resize = (): void => {
     canvas.width = Math.round((window.innerWidth || 400) * dpr);
     canvas.height = Math.round((window.innerHeight || 800) * dpr);
@@ -543,7 +544,7 @@ export function showBirdCelebration(
 function runBirdFlight(canvas: HTMLCanvasElement, kind: 'eagle' | 'albatross', seed: number): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const dpr = canvasRatio();
   canvas.width = Math.round((window.innerWidth || 400) * dpr);
   canvas.height = Math.round((window.innerHeight || 800) * dpr);
   const W = canvas.width;

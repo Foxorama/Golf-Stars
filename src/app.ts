@@ -58,7 +58,9 @@ import { mountStoryIntro } from './render/storyIntro';
 import { mountShopArrival } from './render/shopArrival';
 import { staticCourseSpec } from './sim/course/staticCourses';
 import { sfx, resumeAudio, landVoiceOf } from './render/audio';
-import { getSettings, setSetting, toggleSetting, type Settings } from './settings';
+import {
+  getSettings, setSetting, toggleSetting, applyReaderSettings, clampUiScale, type Settings,
+} from './settings';
 import { HAPTICS, haptic } from './render/haptics';
 import { showAceCelebration, showBirdCelebration, showEndlessMilestone, showSectorScan, showVoyageVictory } from './render/celebrations';
 import { characterScreen, ordinal, leaderboardHTML } from './render/golferCards';
@@ -151,6 +153,9 @@ function stage(s: string): void {
 function boot(): void {
   try {
     stage('boot:start');
+    // Reader type/scale go on <html> BEFORE the first paint (GS-a11y-readable-text) — applied
+    // after it, a large-text player watches the whole app re-lay itself out on every load.
+    applyReaderSettings();
     installDecorProbe(); // GS-decor-view-states: test-only `window.__gsDecorProbe` for the CI view-invariance check
     const save = loadSave();
     stage('loaded');
@@ -2554,7 +2559,23 @@ function wireSettingsSheet(root: ParentNode): void {
       resumeAudio();
       sfx.click();
       syncMusic();
+      // "Readable text" re-themes <html>, so push it before the sheet re-renders into it.
+      applyReaderSettings();
       refreshSettings();
+    });
+  });
+  // Text/UI size SEGMENTED control (GS-a11y-readable-text). Scaling the root re-lays the whole
+  // app out, so the play screen's cached camera bias (measured against the OLD panel heights)
+  // has to go — a full `render()` re-measures it, where `refreshSettings` alone would leave the
+  // camera framing the shot for a HUD that is no longer that size.
+  root.querySelectorAll<HTMLElement>('[data-selscale]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setSetting('uiScale', clampUiScale(Number(el.dataset.selscale)));
+      applyReaderSettings();
+      sfx.click();
+      haptic(HAPTICS.tap);
+      render();
     });
   });
   // Default aim-mode SEGMENTED control (GS-default-aim): three real buttons (no fiddly native <select> to

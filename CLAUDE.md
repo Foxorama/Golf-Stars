@@ -505,6 +505,24 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     one-line stats row measuring 49px, and a controls column squeezed into 240 of 390px by its flanking
     caddy/action columns, which wrapped every text row. Shorten the LINE (labels moved to the conditions
     sub-line, narrower flanks) before touching a font size. 41%/46% of the screen → 34%/39%.
+  - **THE PLAYER OWNS THEIR OWN TYPE** (`docs/decisions/accessibility.md`; GS-a11y-readable-text). Four
+    `:root` tokens are the ONLY way the app expresses a typeface or a UI size — `--gs-font` (family),
+    `--gs-uiscale` (whole-UI `zoom` on `<html>`), `--gs-track`/`--gs-wordspace`. **Nothing else may name a
+    font family**: every `font-family` AND every `font:` shorthand resolves the token, or the Readable-text
+    toggle can't reach it — which is exactly how the settings sheet shipped in **Times New Roman** (the
+    stack sat on `.gs-main`; overlays are SIBLINGS of `<main>`, so the family lives on `body`). Defaults are
+    inert (`0em`/`1`) ⇒ the untoggled game is byte-for-byte, and `gs_settings` merges over defaults ⇒ no save
+    bump. Two rules make the zoom safe, both machine-checked: **no raw `100vh`/`100dvh`** (use `--gs-vh`/
+    `--gs-dvh`, which divide by the scale — a viewport-locked box inside a zoomed root measures one screen of
+    ZOOMED units and put the Swing button 185px below the fold), and **no canvas computes its own
+    `devicePixelRatio`** (use `render/pixelRatio.ts canvasRatio()`, which folds the zoom in — sized off
+    layout px the play view rendered at 0.69× its display resolution, i.e. blurry, on the very setting meant
+    to make it legible). ONE scale lever fixes small text AND sub-44px targets together: at the top rung
+    every play control clears 44px with nothing off-screen. **We ship NO dyslexia font and that is
+    deliberate** — the letterform faces (OpenDyslexic/Dyslexie) repeatedly fail to beat plain Arial, and the
+    one positive result resolved to SPACING, not shapes; so the toggle buys tracking/word-spacing/leading,
+    kills italics and justification, and asks for legible faces already on the device. Guarded by
+    `tests/accessibility.test.ts`.
   - **CSS classes / DOM ids are GLOBAL and screens can't see each other's names** — new screen chrome gets
     its OWN prefix (bridge HUD `.gs-bhud`, resume `.gs-resume`, lore `.gs-lore`, star-tour content
     `.gs-sthud` — NEVER the play screen's `.gs-hud`, which the #353 map-blur regression proved). Grep the

@@ -9,6 +9,7 @@
  */
 
 import { MANUAL_IDEAL_PACE, MANUAL_PACE_MAX } from '../sim/round';
+import { canvasRatio } from './pixelRatio';
 
 export interface PuttMeterOptions {
   width?: number;
@@ -31,7 +32,7 @@ export function mountPuttMeter(container: HTMLElement, opts: PuttMeterOptions): 
   const width = opts.width ?? 300;
   const height = opts.height ?? 70;
   const period = opts.periodMs ?? 1250;
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const dpr = canvasRatio();
 
   const canvas = document.createElement('canvas');
   canvas.width = width * dpr;

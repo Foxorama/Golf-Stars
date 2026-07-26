@@ -22,6 +22,7 @@
  */
 
 import { paintSerpent } from './sigilCeremony';
+import { canvasRatio } from './pixelRatio';
 
 export type StoryEndingVariant = 'good-win' | 'good-lose' | 'cult-win' | 'cult-lose';
 
@@ -233,7 +234,7 @@ export function mountStoryEnding(opts: {
 
   function resize(): void {
     if (!ctx) return;
-    dpr = Math.min(2, window.devicePixelRatio || 1);
+    dpr = canvasRatio();
     cssW = overlay.clientWidth || window.innerWidth;
     cssH = overlay.clientHeight || window.innerHeight;
     canvas.width = Math.max(1, Math.round(cssW * dpr));
