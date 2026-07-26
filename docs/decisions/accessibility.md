@@ -351,11 +351,51 @@ death spiral; a power-up must *raise* mean per-stop Stableford to ship). An assi
 easier has to be measured against the death-spiral harness and decided as a design question, not
 slipped in under an accessibility banner. Flagged for the owner rather than done unilaterally.
 
+---
+
+## GS-a11y-keyboard — you can aim and swing without a pointer
+
+### The problem
+
+The pull gesture — drag down to load power, slide sideways to aim — was the **only** way to aim or
+modulate power, and it is pointer-only. A player on a keyboard, a switch, or any assistive pointer
+alternative could Tab to the Swing button and fire, but was locked to the seeded aim at the seeded
+power for the entire game. That is not a harder game; it is a different and worse one.
+
+### The fix
+
+Arrow keys mirror the drag axes exactly — **left/right aims, up/down powers**, Shift for a fine
+quarter-step — and go through the **same `setAimPower`** the drag now goes through. That refactor is
+the point: it is one shot mechanic driven by two devices, not two mechanics that can drift apart.
+`applyDrag` no longer derives the free target itself; both callers share the tail, and a test asserts
+that all four arrow directions land on `setAimPower` and that the drag no longer computes its own.
+
+Deliberately **no Enter/Space handler**. The Swing button is already tab-reachable and commits with
+the previewed `selPower`, so a global commit key would double-fire with the focused control.
+
+The handler stands down for browser shortcuts (Alt/Ctrl/Meta), text fields, and a raised modal — the
+last tested structurally rather than by flag, since `applyOverlayFocus` already inerts the page behind
+a sheet.
+
+### The bug this could easily have shipped with
+
+The listener is bound per render, and `render()` replaces the SVG. Bound naively, **every render
+stacks another live listener on `window`** and a single arrow press steps the aim N times. The
+cleanup therefore runs at the *top* of `wireShotGesture`, **before every early return** — because
+those early returns are exactly the cases where the decision screen went away (a putt, a shot popup,
+another screen entirely), and a listener left bound there would go on nudging an aim that is no
+longer on screen.
+
+Verified in a real browser: 6 × ArrowDown took power 100% → 70%; ArrowLeft swung the aim cone from
+x≈110 to x≈60 through the surgical overlay refresh (not a full re-render); and after six further
+renders one press still moved one step (10.4px vs 9.8px before), so nothing is stacking.
+
+Guarded by `tests/a11y-keyboard.test.ts`.
+
 ### Still open (next passes)
 
 Recorded here so the audit isn't lost:
 
-- **Power and free-aim are pointer-only.** A keyboard user gets default aim at default power.
 - **An assisted-putting option** — see above; needs a balance decision and a harness run.
 - **The golfer card is invalid HTML** — a `<button>` containing `<p>`, `<div>` and now a focusable
   `role="button"`. It works in every browser and is keyboard-operable, but the honest fix is to make
