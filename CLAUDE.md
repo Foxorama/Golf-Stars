@@ -518,7 +518,12 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     `devicePixelRatio`** (use `render/pixelRatio.ts canvasRatio()`, which folds the zoom in — sized off
     layout px the play view rendered at 0.69× its display resolution, i.e. blurry, on the very setting meant
     to make it legible). ONE scale lever fixes small text AND sub-44px targets together: at the top rung
-    every play control clears 44px with nothing off-screen. **We ship NO dyslexia font and that is
+    every play control clears 44px with nothing off-screen. **MEDIA QUERIES ARE BLIND TO THE SCALE** —
+    `zoom` shrinks the layout BOX but NOT the media-query viewport (`max-width:320px` is still false on a
+    375px phone at 1.45×), so a breakpoint can never answer "too cramped at large text"; make the content
+    cope intrinsically (`overflow-wrap:anywhere` / `min-width:0` / `flex-wrap` / `auto-fit`) — "Unending
+    Universe" clipped out of its `overflow:hidden` tile until it could break (GS-a11y-scale-wrap).
+    **We ship NO dyslexia font and that is
     deliberate** — the letterform faces (OpenDyslexic/Dyslexie) repeatedly fail to beat plain Arial, and the
     one positive result resolved to SPACING, not shapes; so the toggle buys tracking/word-spacing/leading,
     kills italics and justification, and asks for legible faces already on the device. Guarded by

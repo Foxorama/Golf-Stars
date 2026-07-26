@@ -94,6 +94,17 @@ describe('reader type tokens', () => {
   });
 });
 
+describe('content copes with the scale, because breakpoints cannot', () => {
+  it('tile text can break — a narrow tile must wrap, not clip', () => {
+    // Root `zoom` shrinks the layout BOX (a 3-up grid really does get ~69px columns at 1.45x) but
+    // does NOT move the media-query viewport — `matchMedia('(max-width:320px)')` is still false on a
+    // 375px phone at any scale. So a breakpoint can never answer "too cramped at large text"; the
+    // content has to cope. Without this, "Unending Universe" clipped out of an `overflow:hidden` tile.
+    expect(css).toMatch(/\.gs-navtile__title\s*{[^}]*overflow-wrap:\s*anywhere/);
+    expect(css).toMatch(/\.gs-navtile__sub\s*{[^}]*overflow-wrap:\s*anywhere/);
+  });
+});
+
 describe('UI scale ladder', () => {
   it('starts at 1 so the default UI is untouched', () => {
     expect(UI_SCALES[0]).toBe(1);

@@ -549,8 +549,13 @@
         display: flex; flex-direction: column; gap: 2px; padding: 28px 14px 12px;
         background: linear-gradient(180deg, transparent, rgba(8, 9, 14, .88) 62%);
       }
-      .gs-navtile__title { font: 700 18px/1.1 var(--gs-font); }
-      .gs-navtile__sub { font-size: 12px; opacity: .82; }
+      /* Long single words ("Unending", "Destination") must break rather than spill out of a tile
+         that is `overflow: hidden` (GS-a11y-scale-wrap). A tile can get genuinely narrow — the
+         3-up games row is pinned to three columns, and the UI-scale setting shrinks the LAYOUT
+         viewport, so at 1.45x on a 390px phone each tile is ~69 layout px and the title clipped.
+         `anywhere` (not `break-word`) so it also shrinks the box for the grid's min-content sizing. */
+      .gs-navtile__title { font: 700 18px/1.1 var(--gs-font); overflow-wrap: anywhere; }
+      .gs-navtile__sub { font-size: 12px; opacity: .82; overflow-wrap: anywhere; }
       /* ACCENT tiles (GS-title-2): the Voyage / Unending game doorways AND the Trade Market /
          Clubhouse between-run doorways share one component, distinguished only by the `--mc`
          accent on border + title (gold / violet / trade-teal / green). Game tiles set --mc inline. */
@@ -582,6 +587,12 @@
         .gs-navtiles--games .gs-navtile__sub { font-size: 10px; line-height: 1.15; }
         .gs-navtiles--games .gs-navtile__cap { padding: 16px 8px 9px; }
       }
+      /* ⚠ MEDIA QUERIES ARE BLIND TO `--gs-uiscale` (GS-a11y-scale-wrap). Root `zoom` shrinks the
+         layout BOX every element is laid out in — a 3-up grid really does get ~69px columns at 1.45x
+         — but it does NOT move the media-query viewport: `matchMedia('(max-width:320px)')` is still
+         false on a 375px phone at any scale. So a breakpoint can never be the answer to "this is too
+         cramped at large text"; the content itself has to cope. Hence `overflow-wrap: anywhere` on
+         the tile text above rather than a narrow-viewport rule that would never fire. */
 
       /* ── Continue Run button (GS-continue-button): the thematic, mode-aware resume card ──
          The character's cosmetic ship on the left, a mode-aware message (Voyage arc / Unending hole /
