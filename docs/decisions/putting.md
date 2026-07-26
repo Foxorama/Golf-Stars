@@ -1139,3 +1139,70 @@ monotonicity and coverage, the descent ladder, the per-club hop spec, apex-never
 putter exemption, the surface ladder, hazard-kills-the-train, variance (and its determinism), no rng,
 and the holed roll's residual pace. Plus the existing `ds/dt` continuity across every phase join, which
 is what caught `rollEntryFloor`. Eyes-on: `node scripts/landing-preview.mjs`.
+
+---
+
+## GS-landing-real round 2 — the bounce was 87 milliseconds long (2026-07-26)
+
+> "The run out on drivers, woods, hybrids and long irons doesn't look nearly long enough… I
+> specifically say roll because there is no bounce. the ball drops, touches ground and then rolls a
+> little bit."
+
+Measured frame by frame in the real game, a driver's landing plan was:
+
+```
+hops: 9.04yd/27ms · 4.97/20 · 2.73/15 · 1.5/11 · 0.83/8 · 0.45/6     roll: 28yd over 1022ms
+```
+
+**The entire six-hop train lasted 87 milliseconds** — 7.8% of the run-out — and the first, biggest hop
+was **27ms, under two frames at 60fps**. Max drawn lift over the whole run-out: **0.6 pixels**, zero
+perceptible peaks. The description was exact: the ball drops, touches ground, and rolls a little bit.
+
+### Why: the flight is not real time, and the bounce was chained to it
+
+The drawn flight is **~8× real time** — 750ms for a 250-yard drive that really takes about six seconds.
+GS-runout-feel's founding rule was "no velocity step from strike to rest", so hop durations came from
+`distance / arrival speed`. Correct arithmetic; it just inherits the 8×. A real first bounce carries
+~15 yards in ~0.6s; at 8× that is 75ms, and 75ms is nothing.
+
+GS-flight-pace made this *worse* by fixing the arrival speed (0.0067 → 0.28 yd/ms): the more honest the
+arrival speed became, the shorter the bounce got.
+
+So the run-out now owns a **slower time base than the flight** (`runoutTimeScale`), deliberately and by
+name. There is a discontinuity at touchdown and pretending otherwise is what produced an invisible
+bounce. Continuity is kept where it actually shows — **within** the run-out, hop to hop to roll — and
+the roll enters at the last hop's *actual* speed, since `hopMinMs` can stretch a hop below its chained
+one (that floor was quietly starting the roll faster than the hop that fed it; the join test caught it).
+
+### And the hops had to cover real distance
+
+Time base alone was not enough: slowing everything uniformly kept the bounce at 5% of the run-out,
+because the hops only covered 18% of the *distance*. `hopLenK` 0.085 → 0.16, with the roll guaranteed
+30% of the ground:
+
+| club | hops | air / roll (yd) | bounce share of time | first hop |
+|---|---|---|---|---|
+| D | 4 | 43.7 / 18.8 | **31%** | 683ms |
+| 3W | 6 | 33.6 / 18.0 | 31% | 523ms |
+| 3i | 5 | 15.1 / 15.9 | 21% | 258ms |
+| 4H | 4 | 10.8 / 19.7 | 14% | 214ms |
+| 7i | 3 | 4.9 / 3.6 | 35% | 130ms |
+| SW | 1 | 0.9 / 1.6 | 29% | 130ms |
+
+Confirmed in game: the driver's plan went from `87ms of hops` to `322/239/177/130ms covering
+17/9.4/5.1/1.7 yards`, and the tracked on-screen lift from 0.6px to 3.1px before the draw boost went to
+3×.
+
+### Three sizing corrections from the same report
+
+- **"the shadow is too large."** Spread 1.25 → 0.95 of the ball's radius, flatter, and the offset
+  trimmed. It peeks out from under the ball rather than sitting around it like a pool.
+- **"the ball zoom on wedges and chips is still too large… like a tennis ball."** Growth 0.5 → 0.3 and
+  cap 5.5 → 4.4px, so a putt camera draws 7.4–8.3px across instead of 8.4–10.
+- **"the skinned balls have a glow… they also look a lot bigger."** The aura was `r + 2.4` at half
+  opacity — better than a pixel of apparent radius all round, so a skinned ball read as a *bigger* ball
+  rather than a fancier one. Now `r + 1.1` at 0.34.
+
+**Guards:** the "first hop at nearly flight speed" test is replaced — it encoded the rule that caused
+the bug — by one asserting the run-out's own time base and a first hop long enough to watch (>150ms),
+plus a bounce-share-of-time floor per club. The hop→roll join test now catches the `hopMinMs` step.

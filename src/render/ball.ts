@@ -107,10 +107,10 @@ export interface BallFeel {
 }
 
 export const DEFAULT_BALL_FEEL: BallFeel = {
-  ballGrowth: 0.5,
+  ballGrowth: 0.3,
   ballGrowFrom: 1.8,
   ballMinPx: 3,
-  ballMaxPx: 5.5,
+  ballMaxPx: 4.4,
   ballLoftGrow: 0.5,
   spinMaxStep: 0.55,
   flightSpinRate: 9,
@@ -241,11 +241,13 @@ export function drawBall(
   const { ux, uy, vx, vy } = travelBasis(opts.dirX, opts.dirY);
 
   ctx.save();
+  // A legendary aura, kept TIGHT. At `r + 2.4` and half opacity it added better than a pixel of
+  // apparent radius all round, so a skinned ball read as a bigger ball rather than a fancier one.
   if (skin.glow) {
-    ctx.globalAlpha = 0.5;
+    ctx.globalAlpha = 0.34;
     ctx.fillStyle = skin.glow;
     ctx.beginPath();
-    ctx.arc(x, y, r + 2.4, 0, Math.PI * 2);
+    ctx.arc(x, y, r + 1.1, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
   }
@@ -340,19 +342,19 @@ export function drawBallShadow(
 ): void {
   const lift = Math.max(0, h);
   // Grows and softens with height, so the gap between ball and shadow is what reads as air.
-  const spread = 1.25 + Math.min(1.6, lift / Math.max(2, r * 5)) * 0.7;
+  const spread = 0.95 + Math.min(1.6, lift / Math.max(2, r * 5)) * 0.5;
   const alpha = 0.46 / (1 + Math.min(2.6, lift / Math.max(2, r * 5)));
   if (alpha < 0.04) return;
   // OFFSET down-right, away from the scene's upper-left light (`LIGHT_UL`). The first version drew
   // the shadow concentric with the ball at the same radius, so on the ground — which is most of a
   // run-out — the ball covered it completely and there was nothing to see. The report was simply
   // "I can't see any shadows at all"; they were being drawn the whole time, underneath the ball.
-  const off = r * 0.55;
+  const off = r * 0.5;
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.fillStyle = '#000';
   ctx.beginPath();
-  ctx.ellipse(gx + off, gy + off * 0.7, r * spread, r * spread * 0.44, 0, 0, Math.PI * 2);
+  ctx.ellipse(gx + off, gy + off * 0.7, r * spread, r * spread * 0.4, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }

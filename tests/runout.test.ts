@@ -23,13 +23,37 @@ import { flightClassOf, flightProfileOf, FLIGHT_PROFILES } from '../src/sim/flig
 const DRIVER_V = 0.3;
 
 describe('the run-out starts where the flight left off (no speed step)', () => {
-  it('the first hop travels at nearly flight speed, never a fresh slow start', () => {
+  it('the run-out has its OWN time base, and that is deliberate', () => {
+    // This used to demand the first hop travel at nearly flight speed, on the reasoning that a real
+    // ball leaves its first bounce having lost only one contact's worth. Right about real golf, wrong
+    // about this game: the drawn FLIGHT is ~8x real time (750ms for a 250-yard drive that really takes
+    // six seconds), so a bounce chained to the arrival speed inherits the 8x and becomes unwatchable.
+    // Measured in game under the old rule, a driver's six hops totalled 87ms and the first was 27ms —
+    // under two frames — which is exactly the reported "there is no bounce, the ball drops, touches
+    // ground and then rolls a little bit".
+    const p = planRunout({ dist: 30, firm: 0.85, v0: DRIVER_V, carry: 250, descentDeg: 36, vary: 0.5 });
+    const first = p.hops[0]!;
+    expect(first.dist / first.ms).toBeLessThan(DRIVER_V); // slower than the flight, on purpose
+    expect(first.ms, `first hop ${first.ms.toFixed(0)}ms`).toBeGreaterThan(150); // long enough to WATCH
+  });
+
+  it('the bounce is a real share of the run-out, not a blip before a long roll', () => {
+    for (const id of ['D', '3W', '7i']) {
+      const p = land(id, runOf(id));
+      const hopMs = p.hops.reduce((a, h) => a + h.ms, 0);
+      const share = hopMs / (hopMs + p.rollMs);
+      expect(share, `${id} spends ${(share * 100).toFixed(0)}% of its run-out bouncing`).toBeGreaterThan(0.1);
+    }
+  });
+
+  it('the first hop is still not a fresh slow start', () => {
     const plan = planRunout({ dist: 30, firm: 0.85, v0: DRIVER_V, carry: 250, descentDeg: 36, checking: false, vary: 0.5 });
     expect(plan.hops.length).toBeGreaterThan(1);
     const first = plan.hops[0]!;
     const hopSpeed = first.dist / first.ms;
-    // One contact's worth of loss, no more: the ball leaves the bounce at restitution × arrival.
-    expect(hopSpeed).toBeGreaterThan(DRIVER_V * 0.5);
+    // Slower than the arrival (the run-out's own time base) but still MOVING — the ball must never
+    // appear to stop dead and then trundle off.
+    expect(hopSpeed).toBeGreaterThan(0);
     expect(hopSpeed).toBeLessThanOrEqual(DRIVER_V);
   });
 
@@ -234,7 +258,12 @@ describe('bounce and run read per CLUB', () => {
     const firm = planRunout({ dist: 30, firm: 0.95, v0: 0.3, carry: 250, descentDeg: 36, checking: false, vary: 0.5, clubId: 'D' });
     const soft = planRunout({ dist: 30, firm: 0.05, v0: 0.3, carry: 250, descentDeg: 36, checking: false, vary: 0.5, clubId: 'D' });
     const air = (p: ReturnType<typeof planRunout>): number => p.hops.reduce((a, h) => a + h.dist, 0);
-    expect(air(soft)).toBeLessThan(air(firm) * 0.5);
+    // Like for like: the SAME run-out distance, so this measures firmness alone. In play the surface
+    // also collapses the sim's `dist`, which compounds it — see the surface ladder below.
+    expect(air(soft)).toBeLessThan(air(firm) * 0.75);
+    // Not the hop COUNT — a firm landing can spend its whole budget on one long skip while a soft one
+    // takes two short ones. The skip LENGTH is the honest signal.
+    expect(soft.hops[0]!.dist).toBeLessThan(firm.hops[0]!.dist);
   });
 
   it('no class can bounce for ever — restitution stays under 1 whatever the surface', () => {
