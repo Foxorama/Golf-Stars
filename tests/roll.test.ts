@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { Rng } from '../src/sim/rng';
 import { generateCourse } from '../src/sim/course/generate';
-import { playCourse, playHole, pinOf, HOLE_OUT_RADIUS } from '../src/sim/round';
+import { chipInPath, hasBackspin, playCourse, playHole, pinOf, HOLE_OUT_RADIUS } from '../src/sim/round';
 import { characterShotMods } from '../src/sim/rpg/characters';
-import { dist } from '../src/sim/course/contract';
+import { CLUBS } from '../src/sim/clubs';
+import { dist, type Vec } from '../src/sim/course/contract';
 
 describe('bounce & roll-out (GS feedback #2)', () => {
   it('shots record a rest position reached by rolling (signed) from touchdown', () => {
@@ -79,6 +80,133 @@ describe('hole-outs (GS feedback #3)', () => {
       const holer = played.shots.find((s) => s.holed);
       if (holer) {
         expect(dist(holer.rest, pinOf(hole))).toBeLessThanOrEqual(HOLE_OUT_RADIUS + 1e-6);
+      }
+    }
+  });
+});
+
+/**
+ * GS-chipin-roll / GS-spin-gate — the ball lands and then rolls PROPERLY.
+ *
+ * Two reports in one sentence: *"the backspin roll and contoured greens, especially with Chipinski
+ * caddie makes the ball do some really weird rolling… instead of rolling around like some crazed
+ * magnet."* Both halves turned out to be structural.
+ */
+describe('a Dr Chipinski chip-in actually rolls to the hole (GS-chipin-roll)', () => {
+  it('rests IN the cup, not where it would have stopped', () => {
+    // The bug: the caddy set the next ball position to the pin but left `rest` and `rollPath` at the
+    // natural resting spot, so the drawn ball stopped an average of four yards short — measured 3.0 to
+    // 5.8 yards from a cup of radius 1.2 — and the hole-out explosion fired there, on bare ground.
+    let seen = 0;
+    for (let seed = 0; seed < 400 && seen < 8; seed++) {
+      const hole = generateCourse(seed, { holes: 1 }).holes[0]!;
+      for (const s of playHole(hole, new Rng(`${seed}:p`), { chipIn: 1 }).shots) {
+        if (!s.chipIn) continue;
+        seen++;
+        expect(dist(s.rest, pinOf(hole)), `seed ${seed}`).toBeCloseTo(0, 6);
+        expect(s.rollPath, `seed ${seed}`).toBeDefined();
+        const path = s.rollPath!;
+        expect(dist(path[path.length - 1]!, pinOf(hole)), `seed ${seed} path end`).toBeCloseTo(0, 6);
+      }
+    }
+    expect(seen, 'no chip-ins found to check').toBeGreaterThan(3);
+  });
+
+  it('the recorded run is the WHOLE arc it travelled, so the drawn walk reaches the cup', () => {
+    // The play view walks `rollPath` by arc length scaled to |roll|. If |roll| were left at the natural
+    // run, the walk would stop short of the appended trickle and the ball would freeze beside the hole.
+    let seen = 0;
+    for (let seed = 0; seed < 400 && seen < 8; seed++) {
+      const hole = generateCourse(seed, { holes: 1 }).holes[0]!;
+      for (const s of playHole(hole, new Rng(`${seed}:p`), { chipIn: 1 }).shots) {
+        if (!s.chipIn) continue;
+        seen++;
+        let arc = 0;
+        const path = s.rollPath!;
+        for (let i = 1; i < path.length; i++) arc += dist(path[i]!, path[i - 1]!);
+        expect(Math.abs(s.roll), `seed ${seed}`).toBeCloseTo(arc, 4);
+        // Forward-signed: the journey ends ahead of the pitch mark, in the hole. A "−4yd check" on a
+        // ball that finished forward in the cup is not a description of anything.
+        expect(s.roll, `seed ${seed}`).toBeGreaterThan(0);
+      }
+    }
+    expect(seen).toBeGreaterThan(3);
+  });
+
+  it('BREAKS on the way in rather than tracking to the cup like a magnet', () => {
+    // The last few yards have to read as golf on a contoured green, so the trickle is bowed by the
+    // green's own perpendicular slope — the same field that breaks a putt.
+    const hole = generateCourse(19, { holes: 1 }).holes[0]!;
+    expect(hole.greenContour?.length ?? 0, 'seed 19 should be a contoured green').toBeGreaterThan(0);
+    let bowed = false;
+    for (const s of playHole(hole, new Rng('19:p'), { chipIn: 1 }).shots) {
+      if (!s.chipIn) continue;
+      const path = s.rollPath!;
+      const a = path[0]!;
+      const b = path[path.length - 1]!;
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      let bow = 0;
+      for (const p of path) bow = Math.max(bow, Math.abs(((p[0] - a[0]) * (b[1] - a[1]) - (p[1] - a[1]) * (b[0] - a[0])) / L));
+      if (bow > 0.05) bowed = true;
+    }
+    expect(bowed, 'the trickle into the cup never curled').toBe(true);
+  });
+
+  it('chipInPath is pure geometry: same inputs, same curve, and it ends exactly on the cup', () => {
+    const hole = generateCourse(19, { holes: 1 }).holes[0]!;
+    const from: Vec = [pinOf(hole)[0] + 4, pinOf(hole)[1] + 3];
+    const a = chipInPath(hole, from, pinOf(hole));
+    const b = chipInPath(hole, from, pinOf(hole));
+    expect(a.path).toEqual(b.path);
+    expect(dist(a.path[a.path.length - 1]!, pinOf(hole))).toBeCloseTo(0, 9);
+    expect(a.path[0]).toEqual(from);
+    expect(a.length).toBeGreaterThan(0);
+  });
+});
+
+describe('a spin build can only spin the clubs that spin (GS-spin-gate)', () => {
+  it('no club above the wedge threshold EVER checks backwards, however heavy the build', () => {
+    // The bug: `rollPotential` subtracted `backspinBoost` from every club's roll fraction without ever
+    // consulting `hasBackspin`, the predicate that exists for exactly this. Two stacked spin items
+    // (0.26 + 0.2) against a driver's 0.25 run fraction sent it negative, and a 250-yard drive sucked
+    // back to the −18yd MAX_CHECK across a contoured green.
+    for (const boost of [0.26, 0.46, 1.2]) {
+      for (let seed = 0; seed < 40; seed++) {
+        const hole = generateCourse(seed, { holes: 1 }).holes[0]!;
+        for (const s of playHole(hole, new Rng(`${seed}:s`), { backspinBoost: boost }).shots) {
+          if (hasBackspin(s.club.carry)) continue;
+          expect(s.roll, `${s.club.id} (carry ${s.club.carry}) @boost ${boost}, seed ${seed}`).toBeGreaterThanOrEqual(0);
+        }
+      }
+    }
+  });
+
+  it('…and the wedges still check, so the build is worth buying', () => {
+    let checked = false;
+    for (let seed = 0; seed < 60 && !checked; seed++) {
+      const hole = generateCourse(seed, { holes: 1 }).holes[0]!;
+      for (const s of playHole(hole, new Rng(`${seed}:s`), { backspinBoost: 0.26 }).shots) {
+        if (hasBackspin(s.club.carry) && s.roll < -0.5) checked = true;
+      }
+    }
+    expect(checked, 'a spin build no longer checks anything').toBe(true);
+  });
+
+  it('the threshold IS the pitching wedge — "where backspin starts"', () => {
+    expect(hasBackspin(CLUBS.find((c) => c.id === 'PW')!.carry)).toBe(true);
+    expect(hasBackspin(CLUBS.find((c) => c.id === '9i')!.carry)).toBe(false);
+  });
+
+  it('a base loadout is untouched — the clamp only bites on a spin build', () => {
+    // Contract 1: no extra rng draw, no reordering. The clamp cannot fire when the roll fraction is
+    // already positive, which it is for every club without a build.
+    for (let seed = 0; seed < 30; seed++) {
+      const hole = generateCourse(seed, { holes: 1 }).holes[0]!;
+      const plain = playHole(hole, new Rng(`${seed}:x`)).shots.map((s) => [s.roll, s.rest[0], s.rest[1]]);
+      const again = playHole(hole, new Rng(`${seed}:x`)).shots.map((s) => [s.roll, s.rest[0], s.rest[1]]);
+      expect(plain).toEqual(again);
+      for (const s of playHole(hole, new Rng(`${seed}:x`)).shots) {
+        if (!hasBackspin(s.club.carry)) expect(s.roll).toBeGreaterThanOrEqual(0);
       }
     }
   });

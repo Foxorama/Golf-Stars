@@ -873,3 +873,114 @@ the run ladder read off `FLIGHT_PROFILES`, that every iron in `CLUBS` lands on t
 split, that the long irons bore and the short irons climb, that a driver out-skips a wedge off the same
 landing while a wedge hops higher, that the surface still has the final say, and that no class can
 bounce for ever at any firmness.
+
+---
+
+## GS-chipin-roll / GS-spin-gate — the ball lands and then rolls properly (2026-07-26)
+
+> "the backspin roll and contoured greens, especially with Chipinski caddie makes the ball do some
+> really weird rolling. Need to actually calculate the landing spot, backspin and the contour roll so
+> that the ball lands and then rolls properly instead of rolling around like some crazed magnet or
+> something. With Chipinski caddie, needs to factor that in so it rolls properly from landing to the
+> hole while account for green contours"
+
+Two bugs, both structural, both reproduced and measured before anything was changed.
+
+### 1. A caddy-granted outcome still has to be travelled
+
+Dr Chipinski's chip-in does this:
+
+```js
+log.holed = true;
+log.chipIn = true;
+ballAfter = pin(hole);      // the NEXT ball position is the cup
+```
+
+…and leaves `log.rest` and `log.rollPath` at the ball's **natural resting spot**. The play view walks
+`rollPath`, so the drawn ball rolled to a halt near the hole, and then `spawnImpact` fired the hole-out
+explosion **there** — on ground with no hole in it. Measured over the first eight chip-ins the drawn
+finish was **3.0 to 5.8 yards from a cup of radius 1.2**:
+
+```
+seed  3 club=chip   | drawn END is 4.73yd from the CUP
+seed  5 club=putter | drawn END is 5.78yd from the CUP
+seed  7 club=64     | drawn END is 4.69yd from the CUP
+…
+```
+
+That is the magnet: the ball stops beside the flag and the game says it went in.
+
+The outcome was never in question — it is a caddy proc, already drawn from the rng. What was missing is
+the **travel**. `chipInPath` appends it: a quadratic Bézier from the natural rest to the cup whose
+control point is pushed off the chord by the green's own **perpendicular slope component** at the
+midpoint — `greenSlopeAt`, the same field that breaks a putt and curls a run-out. So the trickle bends
+the way the topo rings say the ground bends (measured bow 0.03–0.78yd across eight chip-ins) instead of
+tracking dead straight to the cup, which would have been its own kind of magnet.
+
+Three things had to move together, and each has a test:
+
+- `rest` **is** the cup, so the hole-out FX fires at the flag.
+- `rollPath` carries the appended curve, so the walk has geometry to follow.
+- `roll` is the **whole arc, positive**. The play view scales its walk by `|roll|`; leaving it at the
+  natural run would freeze the ball beside the hole with the trickle undrawn. Positive because the
+  journey now ends *ahead* of the pitch mark, in the cup — a wedge that checked back four yards and
+  trickled five in covered nine yards of ground, and a "−4yd check" on a ball that finished forward in
+  the hole describes nothing. The renderer's `isCheck` therefore excludes a chip-in: the skid-and-return
+  beat only makes sense for a path that is purely backwards.
+
+Zero rng — pure geometry after an already-decided outcome, so auto ≡ interactive and every seeded
+stream is untouched.
+
+### 2. A spin build was spinning clubs that cannot spin
+
+`hasBackspin(nominalCarry)` has always documented itself as *"clubs whose roll a spin build can turn
+into a real BACKSPIN check"* — PW and below. `rollPotential` never asked it:
+
+```js
+const frac = rollFractionFor(profile, nominalCarry) + rollFracDelta;   // rollFracDelta = −backspinBoost
+```
+
+The biggest single spin item is `+0.26`; a driver's run fraction is `0.25`. **One item is enough to take
+a driver negative**, and two put it well past. Measured with `backspinBoost: 0.46` (two stacked items),
+worst signed roll per club, before:
+
+```
+D   carry 250  →  −18.00     (MAX_CHECK)
+3W  carry 235  →  −18.00
+2H  carry 189  →  −18.00
+3i  carry 157  →  −18.00
+7i  carry 134  →  −18.00
+```
+
+A 250-yard drive that lands and sucks 18 yards backwards across a contoured green. That is the crazed
+magnet, and it is reachable from the shop.
+
+Now, same measurement:
+
+```
+D … 9i        →   0.00      (the spin took the run off; it cannot reverse them)
+PW  carry 106  →  −18.00
+SW  carry  74  →  −18.00
+64  carry  40  →  −18.00
+```
+
+Above the wedge threshold the spin bottoms out at a **dead stop** — which is the honest trade: you
+bought spin, you gave up your run. Below it, nothing changes. The threshold is `BACKSPIN_CARRY` = 106 =
+the pitching wedge's carry, so this lands exactly on *"pitching wedge is where backspin starts"*.
+
+The rng draw is consumed whether or not the clamp bites (`carry * frac * rng.range(…)` evaluates the
+draw regardless), so a loadout without a spin build is **byte-for-byte** — contract 1 holds, and the
+full suite confirms it.
+
+### Deliberately NOT changed, and flagged instead
+
+With a heavy build a **64° wedge still checks back the full 18-yard `MAX_CHECK` from a 40-yard carry** —
+nearly half the shot. One spin item alone checks it back ~10 yards. That is the designed extreme of a
+spin build rather than a broken code path, and clipping it is a balance decision about the item economy,
+not a bug fix, so it is left alone and raised with the numbers instead.
+
+**Guards:** `tests/roll.test.ts` — a chip-in rests in the cup and its path ends there; `|roll|` equals
+the whole arc and is positive; the trickle actually curls on a contoured green; `chipInPath` is
+deterministic and ends exactly on the cup; no club above the threshold ever checks at any boost (0.26 /
+0.46 / 1.2); the wedges still check, so the build is worth buying; the threshold is the PW; and a base
+loadout is unchanged.

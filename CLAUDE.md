@@ -375,6 +375,20 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     byte-for-byte. **The one fairness coupling: the carry-aware AI keys off FLIGHT reach**
     (`maxFlightReachOf`), never total — a forced carry must clear in the AIR. REACH decisions (green/
     position) still key off total.
+  - **A CADDY-GRANTED OUTCOME STILL HAS TO BE TRAVELLED** (GS-chipin-roll). Dr Chipinski's chip-in set
+    `ballAfter = pin(hole)` and left `rest`/`rollPath` at the natural resting spot, so the drawn ball
+    stopped **3.0–5.8yd from a cup of radius 1.2** and the hole-out FX fired on bare ground. The branch
+    now appends a `chipInPath` trickle — a quadratic Bézier BOWED by the green's own perpendicular slope
+    (`greenSlopeAt`, the field that breaks a putt), so it curls instead of tracking like a magnet — and
+    sets `rest` = cup with `roll` = the WHOLE arc, positive (the journey ends forward, in the hole, so a
+    chip-in is walked forward and never as a check). Zero rng: geometry after the decided outcome.
+  - **A SPIN BUILD CAN ONLY SPIN THE CLUBS THAT SPIN** (GS-spin-gate). `rollPotential` subtracted
+    `backspinBoost` from EVERY club's roll fraction and never asked `hasBackspin` — the predicate that
+    exists for precisely this. Two stacked spin items (0.26 + 0.2 vs a driver's 0.25 run) sent it negative
+    and a 250yd drive sucked back to the `−MAX_CHECK` 18yd. Above the PW threshold the spin now bottoms
+    out at a DEAD STOP (you bought spin, you gave up your run); PW and below still check, which is exactly
+    "the pitching wedge is where backspin starts". The rng draw is consumed either way ⇒ base loadouts are
+    byte-for-byte. Both guarded by `tests/roll.test.ts`.
   - The roll/check helper line (GS-runout-line etc.) is the full-shot twin of the putt read, interactive/
     render-only (`backspinRoll` is PURE — the mean roll through the same `rollOut`, so the drawn run IS the
     physics, contract 5). Read range is shoppable gear (`spinReadBonus`/`spinReadFull`, each paired with a
