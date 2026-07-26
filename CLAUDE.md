@@ -104,6 +104,18 @@ These are the rules every change is measured against. They are *why* the codebas
    `< 1.15`) with `< 5%` blow-ups, measured on **mean per-stop Stableford** (NOT full-run distance —
    distance is chaotic). Re-run the no-death-spiral harness after any shot/dispersion/generator/
    hazard tuning. A power-up must *raise* mean per-stop Stableford to ship.
+   **THE HARNESS MEASURES THE AUTO AI. IT IS A REGRESSION FENCE, NOT A DESIGN AUTHORITY OVER PHYSICS**
+   (GS-carry-roll-real). `playCourse` is the headless sim playing itself, and it is *much* weaker than
+   a real player — it stalls around hole 40 of the Unending Universe where humans reach 350+. So a
+   harness number moving the wrong way is evidence about the AI, never proof that the physics is wrong.
+   When honest physics and the fence disagree: **set the physics from the real world, MOVE THE FENCE,
+   and record both numbers in the commit.** Degrading the ball flight to flatter a weak AI makes a worse
+   game for the humans who actually play it. (The case that settled it: the carry/roll split had a
+   driver releasing 25% of its carry — 62 yards — because that was what the AI had been tuned around.
+   Setting it from real reference numbers *improved* the harness from 0.8740 to **0.5215** toPar/hole
+   and 8.65% to **5.56%** floor-hits, because the AI had been under-CARRYING the whole time. The bar it
+   was defending was partly an artefact of the unrealistic split it was gating. Fixing the AI is its own
+   job — see `GS-auto-ai-weak` in IDEAS.)
 5. **The graphic IS the physics.** `flight.ts` and `shot.ts`'s `SprayShape` are the single shared
    source the sim samples AND the renderer draws — a ball drawn clearing a tree is one the sim let
    through; the spray cone reads exactly the sampled distribution. Never fork them. Ball flight is

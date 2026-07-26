@@ -1206,3 +1206,56 @@ Confirmed in game: the driver's plan went from `87ms of hops` to `322/239/177/13
 **Guards:** the "first hop at nearly flight speed" test is replaced — it encoded the rule that caused
 the bug — by one asserting the run-out's own time base and a first hop long enough to watch (>150ms),
 plus a bounce-share-of-time floor per club. The hop→roll join test now catches the `hopMinMs` step.
+
+---
+
+## GS-carry-roll-real — the carry/roll split comes from golf, not from the AI (2026-07-26)
+
+> "do the carryFrac fix next, on its own, with harness numbers, ignore or change the death spiral
+> harness. we can fix the AI later if we need to, but hurting the graphics and physics because the auto
+> AI is bad makes for a crappy game for human players. Like the AI can't even get to hole 40 in the
+> unending universe but human players can get to 350+"
+
+Reference roll-out on a standard fairway/green, taken at its midpoint against the club's carry — our
+club number is the TOTAL, so `carryFrac = carry / (carry + roll)`:
+
+| club | roll before | roll now | reference |
+|---|---|---|---|
+| Driver | 62yd | **19.5** | 15–30 |
+| Woods | 47–52 | **11.9–12.9** | 10–15 |
+| Hybrids | 29–33 | **9.1–10.4** | 10–15 |
+| Long/mid irons | 31 | **5.8–6.4** | 5–10 |
+| Short irons | 8.6 | **2.8–3.2** | 2–5 |
+| Wedges | 0–5 | 0–5 | 0–3 |
+
+The iron split moved to **4-6 / 7-9** to match (a 6-iron releases, a 7-iron checks). Wedges stay on
+`carryFrac 1.0`, which keeps the backspin-opt-in path byte-for-byte.
+
+### The harness got better, not worse
+
+| | toPar/hole | floor-hits |
+|---|---|---|
+| before | 0.8740 | 8.65% |
+| **after** | **0.5215** | **5.56%** |
+
+No fence needed moving. The reason is worth keeping: **the split is total-preserving, so over-rolling
+meant under-CARRYING.** A 250-yard driver was flying 200 and releasing 62; it now flies 231 and releases
+19.5. The auto AI had been playing a bag whose clubs did not reach, and the bar the harness was
+defending was partly an artefact of the unrealistic split it was gating.
+
+That is the general lesson, now written into contract 4: the harness measures the AUTO AI, which is far
+weaker than a human. A harness number is evidence about the AI, never proof that the physics is wrong.
+
+### One coupling this exposed
+
+Hop lengths had been tuned an hour earlier against a 62-yard release. Against a 21-yard one, a single
+skip ate the whole run-out. `hopLenK` 0.16 → 0.05 restores the ladder: a driver now hops
+7.1/3.9/2.1/1.2/0.5yd (38% of the run-out in the air), and every club still bounces at least once and
+still finishes with a visible roll.
+
+### Not finished
+
+Three tests are red — `default-aim`, `spray-blocking`, `ui` (ace-ship) — all genuine behavioural shifts
+from the physics rather than stale constants. See `GS-carry-roll-real` in IDEAS for what each one is
+saying. The most interesting is `default-aim`: `autoAimClub` and `aiClub` use different reach models
+(flight vs total) and raising `carryFrac` pulled them apart.

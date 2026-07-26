@@ -46,6 +46,32 @@ absolute; inset: 0`) and the lore portrait a real sibling `<button>` above it in
 because character select is viewport-locked to one mobile screen (GS-select-onescreen) and the
 restructure deserves its own pass + a layout smoke test rather than riding along with an a11y sweep.
 
+**GS-carry-roll-real — FINISH IT: three behavioural tests still red** *(IN FLIGHT — the work is
+committed and pushed on `claude/mobile-accessibility-layout-4ahe9f`, stacked on #613. Do NOT restart it
+from scratch and do NOT revert it on harness grounds — read contract 4's note first.)*
+What landed: `FLIGHT_PROFILES.carryFrac` set from real reference roll-outs (driver 19.5yd, woods/hybrids
+9–13, long-mid irons 6, short irons 3, wedges 0–5), the iron split moved to 4-6 / 7-9, and `hopLenK`
+retuned 0.16 → 0.05 because a 21-yard release cannot carry hop lengths tuned for a 62-yard one.
+**Measured: death-spiral harness 0.8740 → 0.5215 toPar/hole, 8.65% → 5.56% floor-hits — it got BETTER,
+by a lot.** Everything else in `npm run check` is green.
+Three tests remain red, all genuine behavioural shifts rather than stale numbers:
+- `tests/default-aim.test.ts` "never clubs DOWN off the tee" — `autoAimClub` now picks a 173yd club
+  where `aiClub` picks 217. The two use DIFFERENT reach models (flight reach vs total reach) and raising
+  `carryFrac` pulled them apart. **Start here** — it is telling us something real about the two models,
+  not asking for a bumped constant.
+- `tests/spray-blocking.test.ts` sub-threshold gap merge — seeded geometry; the spray depends on carry,
+  so the blocked-run shape moved. Probably a fixture update, but confirm it is not hiding a real change
+  in what the cone reports as blocked.
+- `tests/ui.test.ts` GS-ace-ship — a seeded flow that no longer aces. It PASSED on one isolated run, so
+  check for order-dependence before rewriting it.
+
+**GS-auto-ai-weak — the headless auto sim is far weaker than a human, and it gates everything**
+The auto sim stalls around hole 40 of the Unending Universe; human players reach 350+. Every balance
+harness in the suite measures THAT player, so the fences are calibrated to a weak one and have twice now
+been mistaken for statements about the physics (see contract 4). Worth its own pass — richer reach-AI,
+play-back-to-fairway recovery, better club selection — after which the fences can be re-derived and
+tightened honestly. Until then: fences move, physics doesn't.
+
 **GS-flight-arc-tail — the drawn flight drops its last yards almost vertically** *(found while fixing
 GS-flight-pace; a BALANCE change, so deliberately left out of that PR)*
 The height is `arcHeight`, a two-piece sine in the Bézier's PARAMETER, while the ground advances as
