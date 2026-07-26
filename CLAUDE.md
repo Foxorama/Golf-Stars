@@ -523,6 +523,21 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     one positive result resolved to SPACING, not shapes; so the toggle buys tracking/word-spacing/leading,
     kills italics and justification, and asks for legible faces already on the device. Guarded by
     `tests/accessibility.test.ts`.
+  - **AN OVERLAY IS A DIALOG, AND EVERY CONTROL IS OPERABLE BY KEYBOARD** (GS-a11y-focus,
+    `app/focus.ts`). ONE pass at the END of `render()` — never a patched overlay builder — so a NEW
+    overlay gets the behaviour by existing: `role="dialog"`/`aria-modal`/a name off its own heading,
+    focus moved IN on open and handed back to the opener on close, and the rest of the app sealed with
+    **`inert`** (not a hand-rolled Tab trap: one attribute covers tab order + a11y tree + hit-testing, and
+    6 buttons behind the settings backdrop used to stay tab-reachable). Three rules: focus is restored by
+    **SELECTOR, not element reference** (`captureFocusOrigin()` runs immediately BEFORE the innerHTML
+    assignment — after it the node is detached and `activeElement` is already `<body>`); focus moves in only
+    on the OPEN transition, and a surgical re-render wraps in `preservingFocus()` (else flipping a switch
+    throws the player to the top of the sheet); and only a DIRECT child of the app root is treated as an
+    overlay (inerting `<main>` around a nested one would inert the overlay itself and freeze the app). Every
+    non-native `role="button"` gets a tab stop + Enter/Space via `wireRoleButtonKeys`, which synthesises a
+    **click** so there is no second activation path to keep in step. A bare `:focus-visible` ring is a
+    specificity FLOOR (0,1,0), so bespoke rings still win — but a rule that sets `outline:none` must restore
+    one. Guarded by `tests/a11y-focus.test.ts`.
   - **CSS classes / DOM ids are GLOBAL and screens can't see each other's names** — new screen chrome gets
     its OWN prefix (bridge HUD `.gs-bhud`, resume `.gs-resume`, lore `.gs-lore`, star-tour content
     `.gs-sthud` — NEVER the play screen's `.gs-hud`, which the #353 map-blur regression proved). Grep the

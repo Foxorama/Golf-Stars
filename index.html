@@ -106,6 +106,14 @@
       .gs-main h1, .gs-main h2, .gs-main h3 { letter-spacing: calc(var(--gs-track) + .2px); }
       ::selection { background: #5fd45a44; }
 
+      /* ── Focus ring, by DEFAULT (GS-a11y-focus) ──────────────────────────────────────────
+         A bare `:focus-visible` is specificity (0,1,0) — lower than every `.gs-thing:focus-visible`
+         rule below it — so this is a FLOOR, not an override: components keep their bespoke rings and
+         everything else stops being invisible to a keyboard. It covers the set that had no ring at
+         all (.gs-setchip, .gs-seg, .gs-mapbtn, .gs-roundbtn, .gs-setrow, .gs-clickcard, .gs-traits-bar,
+         .si-card …) and, more usefully, every control written from here on. */
+      :focus-visible { outline: 2px solid var(--gs-info); outline-offset: 2px; }
+
       /* ── Reader-friendly type (GS-a11y-readable-text) ────────────────────────────────
          Set on <html> by the "Readable text" toggle. The full reasoning, with citations,
          is in docs/decisions/accessibility.md. The short version, because it drives what
@@ -1709,6 +1717,9 @@
         border-color: color-mix(in srgb, var(--cc) 70%, transparent);
         box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--cc) 60%, transparent);
       }
+      /* GS-a11y-focus: the portrait sits INSIDE the card button, so its focus ring is the only cue
+         that Tab has moved from "pick this golfer" to "read their story" — a 2px lift isn't enough. */
+      .gs-charcard-port:focus-visible { outline: 2px solid var(--gs-info); outline-offset: 2px; }
       .gs-charcard-lore {
         position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%);
         font-size: 8.5px; font-weight: 800; letter-spacing: .03em; white-space: nowrap;

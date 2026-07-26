@@ -139,6 +139,8 @@ function loungeStyle(): string {
     .gs-lounge-golfer:hover,.gs-lounge-golfer:focus-visible,
     .gs-port-ship:hover,.gs-port-ship:focus-visible{
       filter:drop-shadow(0 10px 8px #000a) brightness(1.1);outline:none;translate:0 -3px;}
+    /* GS-a11y-focus: restore the keyboard ring outline:none above suppressed (hover styling kept). */
+    .gs-lounge-golfer:focus-visible,.gs-port-ship:focus-visible{outline:2px solid var(--gs-info);outline-offset:3px;}
     .gs-lounge-golfer:hover .gs-manage-hint,.gs-lounge-golfer:focus-visible .gs-manage-hint,
     .gs-port-ship:hover .gs-manage-hint,.gs-port-ship:focus-visible .gs-manage-hint{opacity:1;}
     .gs-manage-hint{position:absolute;top:-1.8cqw;left:50%;transform:translateX(-50%);

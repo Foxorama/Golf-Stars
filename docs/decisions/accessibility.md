@@ -156,19 +156,94 @@ Guarded by `tests/accessibility.test.ts`.
 - WCAG 2.2 SC 1.4.8 Visual Presentation — https://www.w3.org/WAI/WCAG22/Understanding/visual-presentation.html
 - SIL Open Font License — https://openfontlicense.org/
 
+---
+
+## GS-a11y-focus — overlays are dialogs, and everything is reachable by keyboard
+
+### The problem
+
+The app has one render model: `app.innerHTML = …` rebuilds the whole screen, and overlays are
+rendered as **siblings of `<main>`** inside that same string. Fine for a mouse; broken otherwise.
+Measured before the change, on the settings sheet:
+
+| | Before | After |
+|---|---|---|
+| `role` / `aria-modal` | none | `dialog` / `true` |
+| Accessible name | none | from its own heading |
+| `document.activeElement` on open | `<body>` | first control in the sheet |
+| Focusable controls still reachable behind the backdrop | **6** | **0** |
+| Focus on close | dropped on the floor | back on the settings cog |
+| Focus after flipping a switch | thrown to the sheet's first button | stays on the switch |
+
+### The shape of the fix
+
+**One pass at the end of `render()`, not six patched overlay builders.** `app/focus.ts` runs after
+every render, so a *new* overlay gets the behaviour by existing. There are four parts:
+
+1. **Backgrounding uses `inert`**, not a hand-rolled Tab trap — one attribute removes a subtree from
+   the tab order, the accessibility tree and hit-testing at once, with no keydown handler to fall out
+   of sync. Where `inert` is unsupported, it falls back to `aria-hidden` + a tabindex sweep, so the
+   announcement fix still lands even if the tab-order fix cannot.
+2. **Focus moves in only on the OPEN transition.** The settings sheet re-renders its own innerHTML on
+   every toggle (GS-settings-flicker); re-focusing there would yank the player to the top of the
+   sheet each time they flipped a switch. `preservingFocus()` wraps that surgical update and puts
+   focus back on the same control.
+3. **Focus is restored by SELECTOR, not by element reference.** `render()` replaces the DOM before the
+   focus pass runs, so by then the focused node is detached and `activeElement` has already fallen
+   back to `<body>` — an element reference would restore focus to a node that is no longer in the
+   document. `captureFocusOrigin()` is called immediately *before* the innerHTML assignment, which is
+   the last moment the information exists.
+4. **Keyboard activation for every non-native `role="button"`.** Activation synthesises a `click`, so
+   whatever handler the element already had is the one that runs — there is no second code path to
+   keep in step.
+
+### What that last one fixed
+
+The app had three flavours of fake button: `<div>`/`<span>` cards carrying `data-action`
+(`.gs-clickcard` ×6, `.gs-yard-card`, `.gs-sshop-card`), SVG `<g>` nodes on the journey and Star Tour
+charts, and — the worst one — the golfer-card lore portrait, a `<span role="button">` with **no
+`tabindex` and no key handler**, so it announced itself as a button and did nothing. Several of these
+already *declared* `role="button" tabindex="0"` and bound only a `click`, which is arguably worse than
+not claiming the role at all. All of them are now focusable and fire on Enter/Space; verified
+end-to-end that Enter on the portrait opens the dossier **and does not also activate the enclosing
+card** (which would have started a run).
+
+### Focus rings
+
+A bare `:focus-visible` rule now supplies a default ring. It is specificity (0,1,0) — *lower* than
+every `.gs-thing:focus-visible` rule — so it is a **floor, not an override**: components keep their
+bespoke rings, and the set that had none (`.gs-setchip`, `.gs-seg`, `.gs-mapbtn`, `.gs-roundbtn`,
+`.gs-setrow`, `.gs-clickcard`, `.gs-traits-bar`, `.si-card`) stops being invisible to a keyboard.
+
+Nine rules across five files folded `:hover` and `:focus-visible` together as
+`{ outline: none; transform: … }`, so a keyboard user's only cue was a 2px lift *and* the
+`outline:none` outranked the floor. Each now has a companion rule restoring a real ring; the hover
+styling is untouched. `.gs-czone` is the sanctioned exception — it draws its ring on a `::before`
+instead, which is a genuine indicator.
+
+### One hardening worth recording
+
+Backgrounding works by inerting every *other* direct child of the app root. An overlay nested inside
+a screen body would live under `<main>` — inerting `<main>` would then inert **the overlay itself**
+and freeze the whole app. Every sheet today is a top-level sibling; the pass now ignores a nested one
+rather than locking the player out.
+
+Guarded by `tests/a11y-focus.test.ts` (real-browser assertions on `inert`, `activeElement` and
+Enter-activation, plus a source guard that no `:focus-visible` rule leaves a control with no ring).
+
 ### Still open (next passes)
 
 Recorded here so the audit isn't lost:
 
 - **No `aria-live` anywhere.** Shot results, score changes, penalties and shard totals are silent.
-- **No focus management.** Every render replaces `#app.innerHTML`; modals don't move, trap or restore
-  focus, and 6 buttons behind the settings backdrop stay tab-reachable. The sheet has no
-  `role="dialog"`/`aria-modal`.
 - **Power and free-aim are pointer-only.** A keyboard user gets default aim at default power. The
   putt is a 1250ms sweeping canvas meter with no alternative.
 - **The hole map SVG has no accessible name** and leaks loose `<text>` yardages.
 - **Screen shake, the putt meter and the star-map rAF ignore reduced motion**, and four cinematic
   gates read `matchMedia` directly instead of the in-app `reducedMotion` setting.
-- **Some `:focus-visible` rules set `outline: none`** and substitute only a transform.
-- **`.gs-clickcard` / `.gs-yard-card` / `.gs-sshop-card` are clickable `div`s** — also flagged in
-  `reports/game-review-playstore-2026-07-03.md` (H5).
+- **The golfer card is invalid HTML** — a `<button>` containing `<p>`, `<div>` and now a focusable
+  `role="button"`. It works in every browser and is keyboard-operable, but the honest fix is to make
+  the card a container with a stretched select-button behind its contents. Deferred because character
+  select is viewport-locked (GS-select-onescreen) and the restructure deserves its own pass.
+- **Momentum pips are colour-only** (`playHud.ts`) and the wrapper is `aria-hidden`, so per-hole
+  scores are unavailable to AT.

@@ -565,6 +565,8 @@ const TOURN_STYLE = `
       background:#0e1420;border:1px solid #283040;cursor:pointer;color:inherit;font:inherit;
       transition:transform .14s ease,border-color .14s ease,box-shadow .14s ease;}
     .gs-tourn-pp:hover,.gs-tourn-pp:focus-visible{outline:none;transform:translateY(-2px);border-color:#4a5566;box-shadow:0 6px 14px #0007;}
+    /* GS-a11y-focus: restore the keyboard ring outline:none above suppressed (hover styling kept). */
+    .gs-tourn-pp:focus-visible{outline:2px solid var(--gs-info);outline-offset:2px;}
     .gs-tourn-pp--on{border-color:#2f6a44;background:#122018;box-shadow:inset 0 0 0 1px #2f6a4488,0 0 12px #2f6a4433;}
     .gs-tourn-ppfig{width:56px;height:auto;filter:drop-shadow(0 4px 5px #0009);}
     .gs-tourn-ppfig svg{width:100%;height:auto;display:block;}
