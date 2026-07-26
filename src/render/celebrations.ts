@@ -58,9 +58,11 @@ export function showAceCelebration(
   const rewardLine = (icon: string, label: string, detail: string): string =>
     `<div class="gs-ace-reward"><span>${icon}</span><div><b>${label}</b><i>${detail}</i></div></div>`;
   const rewardLines = [
+    // The named achievement (GS-ace-hole) leads the stack and absorbs the lifetime tally, so the
+    // badge gets a name without the card growing a fifth cramped row on a phone.
+    rewardLine('🏆', 'ACHIEVEMENT — Ace Hole', `Lifetime ace #${info.aceNo} · a permanent record`),
     rewardLine('💰', `+${ACE_CREDIT_BONUS} credits`, 'spend them at the next Pro Shop'),
     rewardLine('🎯', "Ace's Touch", '+8% precision for the rest of the run · stacks'),
-    rewardLine('⛳', `Lifetime ace #${info.aceNo}`, 'a permanent record'),
     // The secret ace ship (GS-ace-ship): a one-time reveal the first ace you make while you don't own it.
     ...(info.shipUnlocked
       ? [rewardLine('🛸', 'SECRET UNLOCKED — the Comet Rider', 'Fly it on any golfer from the Clubhouse')]
@@ -71,7 +73,7 @@ export function showAceCelebration(
     <canvas class="gs-ace-fx" aria-hidden="true"></canvas>
     <div class="gs-ace-card">
       <div class="gs-ace-emoji" aria-hidden="true">⛳</div>
-      <div class="gs-ace-kicker">HOLE ${info.holeNo} · PAR ${info.par}</div>
+      <div class="gs-ace-kicker">HOLE ${info.holeNo} · PAR ${info.par} · ACE HOLE</div>
       <h1 class="gs-ace-title">HOLE IN ONE!</h1>
       <div class="gs-ace-sub">Aced it${info.club ? ` with the ${info.club}` : ''} 🎉</div>
       <div class="gs-ace-rewards">${rewardLines}</div>

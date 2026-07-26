@@ -70,7 +70,7 @@ import { ascensionClubReward, type ClubUnlockReward } from '../sim/rpg/club-unlo
 import { canBuyShip, shipById, aceShipUnlock, DEFAULT_SHIP_ID } from '../sim/rpg/ships';
 import { apparelById, canBuyApparel } from '../sim/rpg/apparel';
 import { getCharacter, characterShotMods } from '../sim/rpg/characters';
-import { shopItem, ownedCount, itemCap } from '../sim/rpg/economy';
+import { shopItem, ownedCount, itemCap, aceCount } from '../sim/rpg/economy';
 import { playHole } from '../sim/round';
 import {
   autoDecision,
@@ -883,6 +883,14 @@ export function reduce(state: UiState, action: Action): UiState {
       const stopPlayed = [...(state.stopPlayed ?? []), teamHole];
       const nextIdx = idx + 1;
       const total = state.course.holes.length;
+      // The secret Comet Rider (GS-ace-ship) lands the MOMENT the ace is scored, not at stop
+      // scoring. The ace takeover fires per-hole and tells the player to go fly it from the
+      // Clubhouse — so ownership has to be true right then (it wasn't: the grant used to wait
+      // for the whole stop to score, leaving the promise false for the rest of the stop), and a
+      // second ace before the stop ends must not re-announce the reveal. `aceUpdates` at the
+      // stop-scoring sites below stays as the auto-play path's grant and an idempotent backstop.
+      const aceOwned = aceShipUnlock(state.ownedShips, aceCount([teamHole]));
+      const aceShip = aceOwned !== state.ownedShips ? { ownedShips: aceOwned } : {};
 
       // Matchplay (GS-100): score the just-finished hole against the boss's pre-played ball, and FINISH
       // the stop the moment the match is decided (a "3 & 2"), not only after all holes.
@@ -893,7 +901,7 @@ export function reduce(state: UiState, action: Action): UiState {
         const ms = matchState(duels, total);
         const match: MatchUi = { ...state.match, duels, holesUp: ms.holesUp, decided: ms.decided, finished: ms.finished, partnerHoles };
         if (!ms.finished) {
-          return { ...state, stopPlayed, match, play: beginHole(state.course.holes[nextIdx]!, nextIdx) };
+          return { ...state, ...aceShip, stopPlayed, match, play: beginHole(state.course.holes[nextIdx]!, nextIdx) };
         }
         const { run, result } = finishStop(state.run, state.course, stopPlayed, { matchWon: ms.playerAdvances });
         const ended = run.status !== 'active';
@@ -921,7 +929,7 @@ export function reduce(state: UiState, action: Action): UiState {
       // (it breaks its hole loop at the same failure), so auto ≡ interactive holds.
       const gateFailed = holeGateArmed(state.run) && !endlessHolePassed(state.run, idx, teamHole);
       if (nextIdx < total && !gateFailed) {
-        return { ...state, stopPlayed, play: beginHole(state.course.holes[nextIdx]!, nextIdx) };
+        return { ...state, ...aceShip, stopPlayed, play: beginHole(state.course.holes[nextIdx]!, nextIdx) };
       }
       // Stop complete (or survival bar missed) — score it exactly as the auto path does.
       const { run, result } = finishStop(state.run, state.course, stopPlayed);

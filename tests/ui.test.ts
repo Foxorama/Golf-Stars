@@ -468,6 +468,30 @@ describe('ui reducer', () => {
     }
     expect(sawAce).toBe(true); // fixture guard: the pinned seed really does ace within the window
   });
+
+  it('the ace ship lands the MOMENT the ace is scored, mid-stop (GS-ace-ship)', () => {
+    // Regression: the grant used to wait for the whole stop to score, but the ace takeover fires
+    // per-hole and tells the player to "fly it from the Clubhouse" — so mid-stop the promise was
+    // false (the ship wasn't there), and every further ace before the stop ended re-announced the
+    // reveal. Force an ace on hole 1 of a multi-hole voyage stop and assert ownership is immediate.
+    const forceAce = (s: UiState): UiState => ({
+      ...s,
+      play: { ...s.play!, done: true, holed: true, pickedUp: false, strokes: 1, putts: 0 },
+    });
+    let s = reduce(started(471, 'voyage'), { type: 'playInteractive' });
+    expect(s.course.holes.length).toBeGreaterThan(1); // a multi-hole stop, so "mid-stop" is real
+    expect(s.play!.holeIndex).toBe(0);
+    expect(s.ownedShips).not.toContain('comet-rider');
+
+    s = reduce(forceAce(s), { type: 'holeComplete' });
+    expect(s.screen).toBe('playing'); // still mid-stop — the stop has NOT scored yet
+    expect(s.ownedShips).toContain('comet-rider'); // …but the ship is already owned
+
+    // A second ace in the same stop must NOT re-announce: the app reads
+    // `!state.ownedShips.includes(ACE_SHIP_ID)` to decide whether to reveal.
+    s = reduce(forceAce(s), { type: 'holeComplete' });
+    expect(s.ownedShips.filter((id) => id === 'comet-rider')).toHaveLength(1); // granted once, no dupe
+  });
 });
 
 describe('StarMart + tent reactions (GS-tent-interactions)', () => {

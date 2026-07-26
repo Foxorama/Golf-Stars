@@ -286,9 +286,12 @@ export const APPAREL: readonly Apparel[] = [
   },
 
   // ===== THE EVERGREEN SET (GS-unending) ==============================================
-  // Earned, never bought: the Unending Universe's survival trophies. Deep championship green
-  // with gold thread throughout, capped by the mythic Green Jacket. Kept AFTER the shard-bought
+  // Earned, never bought: the Unending Universe's survival trophies. Deep evergreen with gold
+  // thread throughout, capped by the mythic Evergreen Blazer. Kept AFTER the shard-bought
   // catalogue so the market's per-slot `.find(mythic)` ordering (tests) is undisturbed.
+  // NB (GS-tm-names): the display names here are deliberately generic — an earlier pass used
+  // "The Green Jacket" and "Baggy Green Cap", which read as Augusta National and Cricket
+  // Australia marks. The `id`s keep their original slugs so saves migrate untouched.
   {
     id: 'bag-evergreen',
     name: 'Evergreen Tour Bag',
@@ -302,11 +305,11 @@ export const APPAREL: readonly Apparel[] = [
   },
   {
     id: 'cap-baggy-green',
-    name: 'Baggy Green Cap',
+    name: 'Evergreen Soft Cap',
     slot: 'hat',
     set: 'Evergreen',
     rarity: 'legendary',
-    blurb: 'The fabled soft-crowned baggy green, gold-embroidered. Survive 60 holes of the Unending Universe.',
+    blurb: 'A soft-crowned cap in deep evergreen, gold-embroidered. Survive 60 holes of the Unending Universe.',
     cost: APPAREL_COST.legendary,
     unlockHoles: 60,
     look: { shape: 'baggy', color: '#0e4d2c', accent: '#d9b74a', glow: '#7fe0a8' },
@@ -324,11 +327,11 @@ export const APPAREL: readonly Apparel[] = [
   },
   {
     id: 'jacket-green',
-    name: 'The Green Jacket',
+    name: 'The Evergreen Blazer',
     slot: 'shirt',
     set: 'Evergreen',
     rarity: 'mythic',
-    blurb: 'THE jacket — tailored championship green, gold buttons, a crest over the heart. Survive 100 holes.',
+    blurb: 'The set\'s crowning tailor-work — deep evergreen, gold thread, a star at the breast. Survive 100 holes.',
     cost: APPAREL_COST.mythic,
     unlockHoles: 100,
     look: { shape: 'blazer', color: '#0f5132', accent: '#f2d06b', glow: '#4fe08a' },

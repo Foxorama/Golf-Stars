@@ -508,7 +508,7 @@ export interface PlayHoleOptions {
   lefty?: boolean;
   /** Reduced weather impact (GS-proshop-2, Wind-Cheater balls), 0..1. Undefined/0 = full wind. */
   windResist?: number;
-  /** Increased backspin (GS-proshop-2, Spin-Milled), 0..1: more check / less run. Undefined/0 = base. */
+  /** Increased backspin (GS-proshop-2, Fresh-Groove wedges), 0..1: more check / less run. Undefined/0 = base. */
   backspinBoost?: number;
   /** Hazard-skip balls (GS-proshop-2): penalty kinds the ball skims across with no stroke. Absent = base. */
   hazardImmune?: readonly string[];

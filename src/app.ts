@@ -2055,8 +2055,11 @@ function render(): void {
                   par: play.hole.par,
                   club: lastShot?.club.name,
                   aceNo: state.lifetimeAces + 1, // this ace (counted into the save at stop scoring)
-                  // The secret Comet Rider (GS-ace-ship) is granted at stop scoring on any ace you don't
-                  // yet own it; not owning it now = this ace earns it, so reveal it in the takeover.
+                  // The secret Comet Rider (GS-ace-ship) is granted the moment this hole is COMPLETED
+                  // (the `holeComplete` reducer), which is the tap right after this takeover — so not
+                  // owning it now means this ace earns it, and the "fly it from the Clubhouse" line is
+                  // true by the time the player can act on it. (It used to wait for the whole stop to
+                  // score, which left the promise false all stop and re-revealed on a second ace.)
                   shipUnlocked: !state.ownedShips.includes(ACE_SHIP_ID),
                 },
                 () => render(),

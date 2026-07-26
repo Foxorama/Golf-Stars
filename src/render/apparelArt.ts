@@ -147,8 +147,8 @@ function shirtDetail(look: ApparelLook, cx: number, cy: number, s = 1): string {
         <path d="M-9,2 Q0,-3 9,5" fill="none" stroke="${accent}" stroke-width="1.4" opacity="0.8"/>`;
       break;
     case 'blazer':
-      // The tailored jacket (GS-unending's Green Jacket): notched gold-trimmed lapels down to a
-      // single button, a breast-pocket crest, and a hint of shirt in the open V.
+      // The tailored jacket (GS-unending's Evergreen Blazer): notched gold-trimmed lapels down to
+      // a single button, a STAR badge at the breast, and a hint of shirt in the open V.
       detail = `<path d="M-5,-9.5 L0,-4 L5,-9.5 L2.4,4 L-2.4,4 Z" fill="#f4f6f2" opacity="0.9"/>
         <path d="M-6,-10 L-1,-4.5 L-2.6,5 L-5.4,-1" fill="none" stroke="${accent}" stroke-width="1.3"/>
         <path d="M6,-10 L1,-4.5 L2.6,5 L5.4,-1" fill="none" stroke="${accent}" stroke-width="1.3"/>
