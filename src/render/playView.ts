@@ -46,13 +46,14 @@ import {
   type FlightFeel,
 } from './trajectory';
 import { flightApexT, flightProfileOf } from '../sim/flight';
+import { planRunout, sampleRunout, DEFAULT_RUNOUT_FEEL, type RunoutFeel, type RunoutPlan } from './runout';
 import { GOLFER_COLORS, lookFromColor, drawGolfer, type GolferLook } from './golferArt';
 
 // The on-course golfer's look now lives in golferArt.ts; re-export it so existing importers
 // (e.g. src/app/helpers.ts) keep resolving `GolferLook` from this module.
 export type { GolferLook } from './golferArt';
 
-interface PlayFeel extends FlightFeel {
+interface PlayFeel extends FlightFeel, RunoutFeel {
   /** Multiplies on-screen arc height (course px → visible loft). */
   heightExaggeration: number;
   /** Max screen-shake amplitude (px) at a full-power strike. */
@@ -61,23 +62,9 @@ interface PlayFeel extends FlightFeel {
   trailLen: number;
   /** Pause between shots (ms). */
   gapMs: number;
-  /** Bounce hop height (course yards) at a full-energy run-out (scaled down for short rolls). */
-  bounceAmp: number;
-  /** Max number of decaying bounces during a long, firm run-out (short rolls get fewer). */
-  bounces: number;
-  /** Run-out animation ms per course-yard of roll (so a long run genuinely takes longer to settle). */
-  rollMsPerYard: number;
-  /** Clamp on the run-out animation duration (ms). */
-  rollMinMs: number;
-  rollMaxMs: number;
-  /** Roll distance (course yards) at which the bounce reaches full amplitude / hop count. */
-  bounceRefRun: number;
-  /** Backspin run-out: forward skid on the bounce as a fraction of the eventual check-back distance. */
-  backspinSkidFrac: number;
-  /** Backspin run-out: cap (course yards) on that forward skid. */
-  backspinSkidMax: number;
-  /** Backspin run-out: fraction of the run-out spent skidding forward before the spin grabs & zips back. */
-  backspinSkidPortion: number;
+  // The LAND → BOUNCE → RUN-OUT model (GS-runout-feel) — every knob lives in `render/runout.ts`'s
+  // `RunoutFeel` and is spread in here, so the whole run-out is tunable through the existing `_gsFeel`
+  // escape hatch without a new top-level `_gs*` flag (and without a test-hub wiring obligation).
   /** Pause (ms) the ball sits at rest so you can read where it finished. */
   restHoldMs: number;
   /** Draw the little golfer who addresses + swings before each full shot. */
@@ -114,15 +101,7 @@ const BASE_FEEL: PlayFeel = {
   shakeAmp: 7,
   trailLen: 18,
   gapMs: 170,
-  bounceAmp: 5,
-  bounces: 4,
-  rollMsPerYard: 20,
-  rollMinMs: 150,
-  rollMaxMs: 900,
-  bounceRefRun: 32,
-  backspinSkidFrac: 0.55,
-  backspinSkidMax: 7,
-  backspinSkidPortion: 0.32,
+  ...DEFAULT_RUNOUT_FEEL,
   restHoldMs: 480,
   golfer: true,
   golferPx: 40,
@@ -362,6 +341,8 @@ export function mountPlayView(
   let done = false;
   let lastImpactShot = -1; // shot whose landing impact/hold has already been triggered
   let lastRollClearShot = -1; // shot whose trail has been reset at the flight→roll transition
+  let runoutShot = -1; // shot whose land/bounce/run-out plan is cached below (GS-runout-feel)
+  let runoutPlan: RunoutPlan | null = null;
   let impactFiredShot = -1; // shot whose strike cue (onImpact) has fired
   let impactFiredPutt = -1; // putt whose strike cue has fired
   // Caddy-guard redirect (GS-caddy): the slow-mo interception. `redirectDraw` is the projectile to
@@ -406,6 +387,8 @@ export function mountPlayView(
     done = false;
     lastImpactShot = -1;
     lastRollClearShot = -1;
+    runoutShot = -1;
+    runoutPlan = null;
     redirectFiredShot = -1;
     sparksFiredShot = -1;
     impactFiredShot = -1;
@@ -740,14 +723,31 @@ export function mountPlayView(
       const flightDur = flightDurationMs(carry);
       const [tdx, tdy] = proj.project(touchdown);
       const [rsx, rsy] = proj.project(rest);
-      // Run-out duration scales with the actual COURSE-YARD roll (zoom-independent), so a long run
-      // genuinely takes longer to settle than a short check — the "landing & run match the distance"
-      // ask. (The old screen-px scaling ran a 20yd roll at wildly different speeds at different zoom.)
+      // The LAND → BOUNCE → RUN-OUT plan (GS-runout-feel). The sim already decided the roll distance
+      // and (on a contoured green) the curved path; this decides WHEN the ball is where and how high
+      // it is off the ground, from the surface it landed on and the speed it arrived at.
+      //
+      // `v0` is the ball's ACTUAL horizontal speed as the flight ends, measured off the same flight
+      // geometry it was just drawn flying — so the first hop leaves at (very nearly) the speed the
+      // ball arrived and there is no velocity step anywhere from strike to rest. The old run-out
+      // started from a duration (`20ms × yards`, floored at 150ms) that had nothing to do with the
+      // flight, which is half of why a short check read as a teleport.
       const rollYds = Math.abs(shot.roll ?? 0);
-      const rollDur = rollYds > 0.3 ? Math.max(F.rollMinMs, Math.min(F.rollMaxMs, rollYds * F.rollMsPerYard)) : 0;
-      // How energetic the run-out is, 0..~1.4: a long run bounces bigger and more often than a short
-      // plop. Combined with surface firmness below.
-      const runScale = clamp01(rollYds / F.bounceRefRun) * 1.4;
+      const landFirm = surfaceFirmness(shot.landLie ?? shot.lieTo);
+      if (runoutShot !== shotIndex) {
+        runoutShot = shotIndex;
+        const VEPS = 0.02;
+        const endAt = (t: number): Vec =>
+          shot.flightPath && shot.flightPath.length > 1
+            ? samplePolylineFlight(shot.flightPath, t, peak, apexT).ground
+            : sampleCurvedFlight(shot.from, touchdown, bearing, t, peak, apexT).ground;
+        const a = endAt(1 - VEPS);
+        const b = endAt(1);
+        const v0 = Math.hypot(b[0] - a[0], b[1] - a[1]) / Math.max(1, VEPS * flightDur);
+        runoutPlan = planRunout(rollYds, landFirm, v0, (shot.roll ?? 0) < -0.3, F);
+      }
+      const plan = runoutPlan ?? planRunout(rollYds, landFirm, 0.2, (shot.roll ?? 0) < -0.3, F);
+      const rollDur = plan.totalMs;
       // A swing windup leads each full shot: the ball rests at address while the golfer winds
       // up and swings, and the actual flight clock starts at CONTACT (lead ms in).
       const lead = F.golfer ? F.swingLeadMs : 0;
@@ -961,56 +961,44 @@ export function mountPlayView(
             opts.onWallBounce?.(shot.wallHit.bounces);
           }
           const rt = rollDur > 0 ? Math.min(1, (elapsed - flightDur) / rollDur) : 1;
-          if ((shot.roll ?? 0) < -0.3) {
-            // Backspin is a TWO-BEAT run-out, not a smooth slide back to rest. The old monotonic
-            // ease yanked the ball straight backward the instant it touched down — it read as a
-            // "rubber band" snap, not spin. Real backspin: the ball SKIDS forward on the bounce
-            // (carrying its forward momentum), THEN the spin grabs and zips it back past touchdown
-            // to rest. Render-only feel — the sim already resolved `rest` (behind touchdown).
-            const br = (bearing * Math.PI) / 180;
-            const fwd: Vec = [Math.sin(br), Math.cos(br)]; // forward unit (flight.ts bearing convention)
-            const checkDist = Math.hypot(rest[0] - touchdown[0], rest[1] - touchdown[1]);
-            const skid = Math.min(checkDist * F.backspinSkidFrac, F.backspinSkidMax);
-            const peakPt: Vec = [touchdown[0] + fwd[0] * skid, touchdown[1] + fwd[1] * skid];
-            const p = F.backspinSkidPortion;
-            if (rt < p) {
-              const e1 = easeOutCubic(rt / p); // forward skid, decelerating as the spin bites
-              ground = [touchdown[0] + (peakPt[0] - touchdown[0]) * e1, touchdown[1] + (peakPt[1] - touchdown[1]) * e1];
-            } else {
-              const e2 = easeInOut((rt - p) / (1 - p)); // spin grabs → accelerates back, eases into rest
-              ground = [peakPt[0] + (rest[0] - peakPt[0]) * e2, peakPt[1] + (rest[1] - peakPt[1]) * e2];
-            }
-          } else if (shot.rollPath && shot.rollPath.length > 1) {
-            // GS-green-contour-2 round 2: the sim's run-out CURLED along the green's local fall
-            // line — walk its actual path by arc length (the putt-path treatment) so the ball
-            // visibly breaks off the flank instead of gliding a straight chord to rest.
-            const rp = shot.rollPath;
-            let total = 0;
-            for (let i = 1; i < rp.length; i++) total += Math.hypot(rp[i]![0] - rp[i - 1]![0], rp[i]![1] - rp[i - 1]![1]);
-            let want = easeOutCubic(rt) * total;
-            ground = rp[rp.length - 1]!;
-            for (let i = 1; i < rp.length; i++) {
-              const seg = Math.hypot(rp[i]![0] - rp[i - 1]![0], rp[i]![1] - rp[i - 1]![1]);
-              if (want <= seg || i === rp.length - 1) {
-                const f = seg > 1e-9 ? Math.min(1, want / seg) : 1;
-                ground = [rp[i - 1]![0] + (rp[i]![0] - rp[i - 1]![0]) * f, rp[i - 1]![1] + (rp[i]![1] - rp[i - 1]![1]) * f];
-                break;
-              }
-              want -= seg;
-            }
-          } else {
-            const e = easeOutCubic(rt);
-            ground = [touchdown[0] + (rest[0] - touchdown[0]) * e, touchdown[1] + (rest[1] - touchdown[1]) * e];
+          // Walk the SIM's own travel — the curled `rollPath` on a contoured green (GS-green-contour-2),
+          // the straight touchdown→rest chord everywhere else — by ARC LENGTH. Contract 5: the drawn
+          // run-out is the physics; only its TIMING and its hop heights are feel.
+          const rollPath: Vec[] = shot.rollPath && shot.rollPath.length > 1 ? shot.rollPath : [touchdown, rest];
+          let rollLen = 0;
+          for (let i = 1; i < rollPath.length; i++) {
+            rollLen += Math.hypot(rollPath[i]![0] - rollPath[i - 1]![0], rollPath[i]![1] - rollPath[i - 1]![1]);
           }
-          const firm = surfaceFirmness(shot.landLie ?? shot.lieTo);
-          // Bounce reads BOTH the landing surface's firmness AND how far the ball runs: a long firm
-          // run skips tall and hops several times; a short soft check plops once and dies. Hop count
-          // and amplitude both scale with the run, and the (1−rt) envelope makes the FIRST hop the
-          // biggest so it visibly decays into the roll (not a static, uniform jitter).
-          const hops = Math.max(1, Math.round(1 + runScale * F.bounces * (0.45 + 0.7 * firm)));
-          const amp = F.bounceAmp * (0.28 + 1.1 * firm) * (0.3 + 0.85 * runScale);
-          const damp = Math.pow(1 - rt, 1.5 - 0.7 * firm); // soft decays faster (a dead plop)
-          height = amp * Math.abs(Math.sin(rt * Math.PI * hops)) * damp;
+          const alongRoll = (want: number): Vec => {
+            let left = Math.max(0, want);
+            for (let i = 1; i < rollPath.length; i++) {
+              const seg = Math.hypot(rollPath[i]![0] - rollPath[i - 1]![0], rollPath[i]![1] - rollPath[i - 1]![1]);
+              if (left <= seg || i === rollPath.length - 1) {
+                const f = seg > 1e-9 ? Math.min(1, left / seg) : 1;
+                return [
+                  rollPath[i - 1]![0] + (rollPath[i]![0] - rollPath[i - 1]![0]) * f,
+                  rollPath[i - 1]![1] + (rollPath[i]![1] - rollPath[i - 1]![1]) * f,
+                ];
+              }
+              left -= seg;
+            }
+            return rollPath[rollPath.length - 1]!;
+          };
+          // The ballistic sample: `s` is signed travel in yards (negative only inside a backspin
+          // drag-back, which really does travel back past the pitch mark), `h` the height off the deck.
+          const rs = sampleRunout(plan, rt);
+          if (rs.s >= 0 && plan.check) {
+            // Backspin beat one — the ball is still in the air, carrying its flight momentum FORWARD
+            // down the shot bearing. (The sim's roll path runs the other way, so it can't be walked.)
+            const br = (bearing * Math.PI) / 180;
+            ground = [touchdown[0] + Math.sin(br) * rs.s, touchdown[1] + Math.cos(br) * rs.s];
+          } else {
+            // Beat two of a check, or an ordinary forward run: both walk the sim's own path, scaled so
+            // the far end of the walk lands exactly on the resolved rest point.
+            const frac = plan.totalDist > 1e-6 ? Math.abs(rs.s) / plan.totalDist : 1;
+            ground = alongRoll(frac * rollLen);
+          }
+          height = rs.h;
         }
 
         lastGround = ground; // feed the follow-cam

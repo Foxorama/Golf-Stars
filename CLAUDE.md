@@ -379,6 +379,22 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     render-only (`backspinRoll` is PURE — the mean roll through the same `rollOut`, so the drawn run IS the
     physics, contract 5). Read range is shoppable gear (`spinReadBonus`/`spinReadFull`, each paired with a
     small `backspinBoost` so auto still gains).
+  - **LAND → BOUNCE → RUN-OUT is a BALLISTIC model, not an ease curve** (GS-runout-feel,
+    `render/runout.ts` — pure, node-testable, render-only). The sim owns WHERE the ball finishes and the
+    curved path it takes; this owns WHEN it is where and how high off the ground. The run-out splits into a
+    BOUNCE phase and a ROLL phase by landing `surfaceFirmness`; within a hop the ball flies at CONSTANT
+    horizontal speed and loses a slice at each CONTACT, so hop distance/duration/apex all decay off one
+    restitution; the roll is constant deceleration. **The chain starts at the flight's own final ground
+    speed** (measured off the same `sampleCurvedFlight`/`samplePolylineFlight` the ball was just drawn
+    flying), so there is no velocity step from strike to rest. The BACKSPIN check is two beats — an airborne
+    forward SKID carrying flight momentum, then the spin bites and drags the ball back, accelerating out of
+    the grab and easing to rest. Three things caused the "the ball landed and then teleported away" report
+    and all three are structural, not tuning: a 150ms floor tuned at MAP zoom and played at the ~6.6×
+    chip/putt zoom; `easeOutCubic`, which is at max speed at t=0 and braking immediately (a real ball leaves
+    its first bounce at nearly flight speed); and a `|sin|` hop train on its OWN clock, so the ball was
+    airborne while braking and sliding while grounded. Knobs are `RunoutFeel` spread into `_gsFeel` — a
+    SUB-FIELD, so no test-hub wiring. Guarded by `tests/runout.test.ts`; contract 5 holds (the walk is by
+    ARC LENGTH along the sim's own `rollPath`, ending exactly on the resolved rest point).
   - Greens layer 1–2 contour LOBES (`Hole.greenContour`, own side stream) over the plane; `greenSlopeAt` is
     the ONE field the resolver, preview, read AND arrows sample (`sim/contour.ts`). `rollOut` samples it per
     step and CURLS (roll is ARC length; straight-roll invariance holds only on lobe-less holes); the first
