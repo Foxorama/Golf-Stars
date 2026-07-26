@@ -205,7 +205,19 @@ describe('the painter', () => {
     expect(key(across)).not.toBe(key(down));
   });
 
-  it('the shadow tightens as the ball comes down and fades as it climbs', () => {
+  it('the shadow is OFFSET so it is not hidden under the ball', () => {
+    // The first version drew it concentric with the ball at the same radius, so on the ground — which
+    // is most of a run-out — the ball covered it completely. The report was "I can't see any shadows
+    // at all"; they were being drawn the whole time, underneath the ball.
+    const on = recordingCtx();
+    drawBallShadow(on.ctx, 50, 50, 6, 0);
+    expect(on.arcs.length).toBe(1);
+    const sh = on.arcs[0]!;
+    expect(Math.hypot(sh.x - 50, sh.y - 50), 'shadow sits exactly under the ball').toBeGreaterThan(1);
+    expect(sh.r, 'shadow is wider than the ball, or it never peeks out').toBeGreaterThan(6);
+  });
+
+  it('the shadow spreads as the ball climbs and fades with it', () => {
     const low = recordingCtx();
     const high = recordingCtx();
     drawBallShadow(low.ctx, 50, 50, 6, 0);
@@ -216,7 +228,7 @@ describe('the painter', () => {
     // thing telling you WHERE over the ground it is. It just stops competing with the ball.
     const apex = recordingCtx();
     drawBallShadow(apex.ctx, 50, 50, 6, 100_000);
-    expect(apex.fillAlphas[0]!).toBeLessThan(0.12);
+    expect(apex.fillAlphas[0]!).toBeLessThan(0.2);
     expect(apex.fillAlphas[0]!).toBeGreaterThan(0);
   });
 

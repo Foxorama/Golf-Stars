@@ -23,6 +23,10 @@ export interface FlightFeel {
   /** Arc peak clamp (yards). */
   peakMin: number;
   peakMax: number;
+  /** Ground speed at the LANDING as a fraction of the flight's average (GS-flight-pace). A real
+   *  drive sheds roughly a third of its horizontal speed to drag between launch and landing; the
+   *  drawn arc used to shed ALL of it (see `flightT`). 1 = perfectly constant ground speed. */
+  flightDragTaper: number;
 }
 
 export const DEFAULT_FLIGHT_FEEL: FlightFeel = {
@@ -32,6 +36,7 @@ export const DEFAULT_FLIGHT_FEEL: FlightFeel = {
   peakFrac: 0.13,
   peakMin: 4,
   peakMax: 60,
+  flightDragTaper: 0.72,
 };
 
 /** Arc peak height (yards) for a given carry. */
@@ -42,6 +47,44 @@ export function arcPeak(carry: number, feel: FlightFeel = DEFAULT_FLIGHT_FEEL): 
 /** Flight animation duration (ms) for a given carry. */
 export function flightDurationMs(carry: number, feel: FlightFeel = DEFAULT_FLIGHT_FEEL): number {
   return Math.max(feel.minMs, Math.min(feel.maxMs, Math.abs(carry) * feel.msPerYard));
+}
+
+/**
+ * Animation progress → the flight curve's Bézier PARAMETER (GS-flight-pace).
+ *
+ * The drawn flight is a quadratic Bézier, and `flightControl` puts the control point at the landing's
+ * projection onto the shot bearing — so for a shot that finishes ON its line (the overwhelming
+ * majority) the control point sits exactly ON the landing and the curve degenerates to
+ *
+ *     P(t) = from + (2t − t²)·(landing − from)
+ *
+ * whose ground speed is `2(1 − t)`: **twice the average at the strike and exactly ZERO at the
+ * landing**. Measured on the drawn arc, the ball covers 75% of its ground in the first HALF of the
+ * animation, 99% by t = 0.9, and then hangs almost stationary in the air for the final tenth before
+ * touching down at 2% of its average speed. It rockets off the club and floats down — the opposite of
+ * a struck golf ball, and the biggest single reason the shot did not feel like one.
+ *
+ * It also poisoned everything downstream: the run-out chain starts from the ball's measured arrival
+ * speed (GS-runout-feel's "no velocity step from strike to rest"), and that speed was being measured
+ * at the bottom of this collapse. The chain was faithfully continuous from a broken number.
+ *
+ * This maps animation time to the parameter so the GROUND advances at a near-constant rate, tapering
+ * only as far as drag would take it (`flightDragTaper` — a real drive loses roughly a third of its
+ * horizontal speed between launch and landing, not all of it). The drawn PATH is untouched: the same
+ * `t` still feeds both the ground and `arcHeight`, so every (ground, height) pair the sim's knockdown
+ * walk tests is a pair the renderer still draws — contract 5 holds exactly. Only the pacing changes.
+ *
+ * `samplePolylineFlight` (the derelict's pinball flight) deliberately does NOT go through this: it
+ * already walks its path by ARC LENGTH, which is to say it was already right.
+ */
+export function flightT(u: number, feel: FlightFeel = DEFAULT_FLIGHT_FEEL): number {
+  const uu = u < 0 ? 0 : u > 1 ? 1 : u;
+  const taper = Math.max(0.05, Math.min(1, feel.flightDragTaper));
+  // Ground fraction under a linear speed ramp from 1 to `taper`, normalised to unit mean.
+  const c = 1 / (1 - (1 - taper) / 2);
+  const g = Math.min(1, c * (uu - ((1 - taper) * uu * uu) / 2));
+  // …and invert the Bézier's own ground fraction, 2t − t², to reach it.
+  return 1 - Math.sqrt(Math.max(0, 1 - g));
 }
 
 export interface FlightSample {

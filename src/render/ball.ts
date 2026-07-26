@@ -339,15 +339,20 @@ export function drawBallShadow(
   h: number,
 ): void {
   const lift = Math.max(0, h);
-  // Spread ~40% wider at a full ball-height of air, fading as it goes.
-  const spread = 1 + Math.min(1.4, lift / Math.max(2, r * 6)) * 0.55;
-  const alpha = 0.34 / (1 + Math.min(3, lift / Math.max(2, r * 4)));
-  if (alpha < 0.03) return;
+  // Grows and softens with height, so the gap between ball and shadow is what reads as air.
+  const spread = 1.25 + Math.min(1.6, lift / Math.max(2, r * 5)) * 0.7;
+  const alpha = 0.46 / (1 + Math.min(2.6, lift / Math.max(2, r * 5)));
+  if (alpha < 0.04) return;
+  // OFFSET down-right, away from the scene's upper-left light (`LIGHT_UL`). The first version drew
+  // the shadow concentric with the ball at the same radius, so on the ground — which is most of a
+  // run-out — the ball covered it completely and there was nothing to see. The report was simply
+  // "I can't see any shadows at all"; they were being drawn the whole time, underneath the ball.
+  const off = r * 0.55;
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.fillStyle = '#000';
   ctx.beginPath();
-  ctx.ellipse(gx, gy, r * spread, r * spread * 0.45, 0, 0, Math.PI * 2);
+  ctx.ellipse(gx + off, gy + off * 0.7, r * spread, r * spread * 0.44, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }

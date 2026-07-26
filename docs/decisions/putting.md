@@ -984,3 +984,158 @@ the whole arc and is positive; the trickle actually curls on a contoured green; 
 deterministic and ends exactly on the cup; no club above the threshold ever checks at any boost (0.26 /
 0.46 / 1.2); the wedges still check, so the build is worth buying; the threshold is the PW; and a base
 loadout is unchanged.
+
+---
+
+## GS-flight-pace / GS-landing-real — the shot arrives, and then it lands (2026-07-26)
+
+> "still doesn't feel as good as it did before. ball now feels a bit more like a roll, but it doesn't
+> feel like you are hitting a golf shot. go slowly, carefully, deeply and get it feeling right."
+
+Six reports in one message. Five were symptoms; one turned out to be the cause of most of the rest.
+
+### The cause: the drawn ball stops dead in the air before it lands
+
+`flightControl` returns the landing's projection onto the shot bearing — so for any shot that finishes
+**on its line**, which is most of them, the control point sits exactly ON the landing and the quadratic
+Bézier degenerates:
+
+```
+P(t) = from + (2t − t²)·(landing − from)      ground speed = 2(1 − t)
+```
+
+Twice the average speed at the strike, and **exactly zero at the landing**. Measured on the drawn arc:
+
+| animation progress | ground covered | ground speed |
+|---|---|---|
+| 0.00 | 0% | **2.00×** average |
+| 0.50 | **75%** | 1.00× |
+| 0.90 | **99%** | 0.20× |
+| 1.00 | 100% | **0.00×** |
+
+The ball rockets off the club, and then hangs almost stationary in the air for the final tenth of every
+shot before touching down at **2% of its average speed**. That is the whole of "it doesn't feel like
+you are hitting a golf shot", and it had been true since the arc was written.
+
+It also poisoned everything downstream. GS-runout-feel chains the entire run-out off the ball's
+measured arrival speed, precisely so there is no velocity step at touchdown — and that speed was being
+measured at the bottom of this collapse. The chain was faithfully continuous from a broken number.
+Measured arrival speed, driver: **0.0067 → 0.28 yd/ms**, a factor of 42.
+
+`flightT(u)` maps animation time to the curve parameter so the ground advances at a near-constant rate,
+tapering only as far as drag would take it (`flightDragTaper` 0.72 — a real drive sheds about a third of
+its horizontal speed between launch and landing, not all of it).
+
+**The drawn path is untouched.** The same `t` still feeds both the ground and `arcHeight`, so every
+(ground, height) pair the sim's knockdown walk tests is a pair the renderer still draws — contract 5
+holds exactly, and no tree that used to be cleared is now hit. Only the pacing moves.
+`samplePolylineFlight` (the derelict's pinball flight) is deliberately exempt: it already walked its
+path by **arc length**, which is to say it was already right.
+
+### The landing is built from the flight
+
+The brief was specific:
+
+> "driver needs to land, bounce a few times and then roll a bit. woods and hybrids similar, but bounce
+> and run is slightly less. irons still need to land and bounce at least once even if they check up.
+> wedges still need to bounce at least once and then spin/roll… The land, bounce and roll should be
+> affected by the apex height of the shot and the total distance travelled in the flight path… the
+> lower the apex, the more bounce and run… If it's the same bounce and run on every drive it doesn't
+> feel real."
+
+The old model took the run-out distance and the landing firmness and nothing else, so a wedge landed
+like a short drive. `planRunout` now takes a `Landing` — the shot itself. A hop's **length** scales with
+`carry · cos²(descent)` and its **apex** with `carry · sin²(descent)`: how far it flew and how steeply
+it fell. Descent is measured off the drawn arc over the closing **tenth** of the ground, not the last
+percent (where the arc has a near-vertical tangent — see *Known and not fixed* below).
+
+Measured descent per club, and the landing that follows on a firm fairway:
+
+| club | descent | hops | hop lengths (yd) | roll |
+|---|---|---|---|---|
+| D | 35° | **6** | 12.1 / 6.6 / 3.6 / 2.0 / 1.1 / 0.6 | 36 |
+| 3W | 41° | 5 | 8.9 / 4.5 / 2.3 / 1.2 / 0.6 | 34 |
+| 3i | 49° | 4 | 4.3 / 2.1 / 1.0 / 0.5 | 23 |
+| 4H | 53° | 3 | 3.4 / 1.5 / 0.6 | 25 |
+| 7i | 56° | 2 | 2.5 / 0.9 | 5 |
+| SW | 62° | **1** | 0.9 | 2 |
+| putter | — | 0 | — | 2.5 |
+
+Three rules hold whatever the numbers say:
+
+- **Every airborne shot bounces at least once.** Wedges planned *zero* hops before — their run-out is
+  shorter than the old length floor — which is exactly the "irons and wedges never bounce" report. The
+  floor is a safety net (`hopFirstMinShare`, capped at `hopFloorMax`), never a second model: a club
+  whose own bounce is bigger keeps it.
+- **The hop train can never outrun the sim.** It is capped so a closing roll always remains, and since
+  the sim's own `dist` already collapses on soft ground, the surface kills the bounce *through the
+  physics* rather than through a second opinion about it.
+- **Speed is chained.** The first hop leaves at the arrival speed times the restitution.
+
+### Hazards were acting; nothing said so
+
+> "hazards should be affecting the ball as well and I'm not sure that they are."
+
+They were, in the sim — measured mean run by landing lie over 120 seeds: fairway 17.2% of carry, rough
+8.7%, trees 7.9%, deep rough 5.6%, bunker 3.2%, pot 2.4%. What was missing is that **the drawn landing
+looked identical** whatever it landed in. Now the same driver:
+
+| landing | hops | first hop | roll |
+|---|---|---|---|
+| ice | 6 | 13.2 | 54 |
+| fairway | 6 | 12.1 | 36 |
+| rough | 3 | 7.7 | 10 |
+| bunker | **1** | 4.4 | **0.6** |
+
+And a hop samples the ground it lands ON (`firmAt`), so a drive that *skips into* a bunker twenty yards
+down loses the rest of its train there — six hops become four — rather than skipping merrily across it.
+
+### Variation, without touching rng
+
+Per-shot variance is a **hash of the shot's own geometry**. The render path may not use `Math.random`
+(it would shimmer on every re-render and break replays) and a sim draw would move every seeded stream
+(contract 1). Same shot, same landing, every replay; different shots, different landings; zero draws.
+First hop across the range: 9.7 → 14.3 yd.
+
+### The height exaggeration has to be small
+
+A real driver's first bounce peaks around two yards over a fifteen-yard skip: four pixels at the shot
+camera, under a ball drawn at three. So the height is exaggerated — but **height is exaggerated and
+length is not**, which means the boost multiplies the drawn height-to-length ratio directly. The first
+attempt used 4×, which turned a 1:5.5 skip into 1:1.4 and the ball appeared to bounce vertically off the
+turf. 1.8× lifts the first hop about eight pixels clear of its shadow and keeps a skip looking like one.
+`apexOverLen` caps a hop's apex against its own length for the same reason.
+
+`rollEntryFloor` is retired to 0. It floored the speed the ball entered its closing roll at, to stop a
+long tail crawling — but flooring an entry speed **is** a velocity step, and whenever it bit, the ball
+visibly picked up as it settled. The crawl it guarded against is handled by `runoutMaxMs`, which
+compresses the whole run-out proportionally and so cannot introduce a join. The new hop-join test
+caught this immediately.
+
+### Three smaller ones
+
+- **"ball now disappears when it stops and the screen changes."** Once every shot and putt had played,
+  the play view's final branch drew *nothing* — the canvas keeps painting until the app swaps screens,
+  so the ball blinked out and you watched an empty fairway. It is now drawn at rest until unmount, and
+  cleared on a hole-out (it went in; it should not sit on the lip).
+- **"I also can't see any shadows at all."** They were drawn every frame — concentric with the ball, at
+  the same radius, so the ball covered them completely. Now offset down-right off the scene's `LIGHT_UL`
+  and wider than the ball.
+- **"dr Chipinski… the you rang needs to show when you hit the ball."** It fired as the ball dropped in,
+  which reads as a verdict handed down after the fact. It fires at the STRIKE now and you watch the shot
+  make good on it — and a holed run-out no longer eases to a dead stop at the lip (`rollEndFrac`), so
+  the ball is still moving as it drops.
+
+### Known and not fixed
+
+The arc has a **near-vertical tangent at touchdown**: the height is a sine in the Bézier's parameter,
+so expressed in ground it falls as `√(1−G)` and the ball drops its last several yards almost straight
+down. Measured: at 98% of the ground a driver is still 8.8 yards up. Fixing it means re-mapping height
+against ground, which changes the (ground, height) pairs the sim's knockdown walk tests — a **balance
+change** that needs the death-spiral harness and its own decision. Filed rather than smuggled in here.
+
+**Guards:** `tests/runout.test.ts` — arrival speed as a fraction of the flight's average, the pacing's
+monotonicity and coverage, the descent ladder, the per-club hop spec, apex-never-exceeds-length, the
+putter exemption, the surface ladder, hazard-kills-the-train, variance (and its determinism), no rng,
+and the holed roll's residual pace. Plus the existing `ds/dt` continuity across every phase join, which
+is what caught `rollEntryFloor`. Eyes-on: `node scripts/landing-preview.mjs`.
