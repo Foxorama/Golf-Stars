@@ -8,6 +8,7 @@
 
 import { scoreName, playTotals, stablefordPoints } from './sim/score';
 import { mountPlayView, type PlayViewHandle } from './render/playView';
+import { ballSkinFor } from './render/ball';
 import { installDecorProbe } from './render/decorProbe';
 import { applyViewportFit, watchViewportFit } from './app/viewportFit';
 import { renderHoleSVG, renderPuttOverlaySVG, PUTT_OVERLAY_ID, renderShotOverlaySVG, SHOT_OVERLAY_ID } from './render/holeView';
@@ -1612,6 +1613,9 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
       width: puttFrame.width,
       height: puttFrame.height,
       ball: play.ball,
+      // The equipped cosmetic BALL's cover (GS-ball-art) — the resting ball on the map wears the
+      // same skin the flying one does, resolved from the golfer's look like every other cosmetic.
+      ballSkin: ballSkinFor(golferLook()),
       // Zoom in on the ball↔cup span (midpoint-centred) so both ends frame with even margin. A lower
       // floor lets a SHORT putt actually zoom in (the old flat 9-yd floor left a tap-in tiny in a big
       // view); the +3 keeps a little green around the cup so the break/hole read has context.
@@ -1805,6 +1809,7 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
     meteorScorch: scorchActive(),
       groundPatch: patchActive(),
     ball: play.ball,
+    ballSkin: ballSkinFor(golferLook()),
     spray,
     spinPath: spinPreview?.path,
     spinReadFrac: spinPreview?.readFrac,

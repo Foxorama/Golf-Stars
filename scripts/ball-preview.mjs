@@ -37,8 +37,8 @@ const html = `<!doctype html><meta charset="utf8">
 
   // ── ROW SET A: every skin, one full turn, at the chip/putt camera size ──────────────────
   const ids = Object.keys(BALL_SKINS);
-  label('Every cover, one full turn (putt camera, r = ballRadiusPx(6.6))', 20, 26, 15);
-  const rBig = ballRadiusPx(6.6);
+  label('Every cover, one full turn (putt camera 17.1 px/yd)', 20, 26, 15);
+  const rBig = ballRadiusPx(17.1);
   ids.forEach((id, row) => {
     const y = 60 + row * 62;
     label(id + '  r=' + rBig.toFixed(1), 20, y + 4, 12);
@@ -52,8 +52,9 @@ const html = `<!doctype html><meta charset="utf8">
 
   // ── ROW SET B: the size ladder — what each camera actually draws ────────────────────────
   const yB = 60 + ids.length * 62 + 24;
-  label('Size ladder: px-per-yard the projector hands over (floor 3px = the old fixed dot)', 20, yB, 15);
-  const scales = [0.6, 1, 1.6, 2.4, 3.4, 4.6, 6.6, 9, 14];
+  label('Size ladder at the REAL cameras (0.5-5.7 shots, 7.6-35 putts). Floor 3px = the old fixed dot.', 20, yB, 15);
+  // The cameras the game actually uses, measured by playing a hole out at 390x844.
+  const scales = [0.53, 1.83, 2.56, 3.41, 5.7, 7.56, 10.95, 17.1, 35];
   scales.forEach((s, i) => {
     const r = ballRadiusPx(s);
     const x = 90 + i * 122;
@@ -67,7 +68,7 @@ const html = `<!doctype html><meta charset="utf8">
   // ── ROW SET C: the hop — the shadow is what makes height read ───────────────────────────
   const yC = yB + 140;
   label('A hop: ball + its ground shadow (the cue the old fixed 4x2px ellipse never gave)', 20, yC, 15);
-  const r = ballRadiusPx(6.6);
+  const r = ballRadiusPx(17.1);
   for (let i = 0; i <= 15; i++) {
     const t = i / 15;
     const lift = Math.sin(Math.PI * t) * 34;

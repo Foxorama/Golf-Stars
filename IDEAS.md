@@ -46,13 +46,6 @@ absolute; inset: 0`) and the lore portrait a real sibling `<button>` above it in
 because character select is viewport-locked to one mobile screen (GS-select-onescreen) and the
 restructure deserves its own pass + a layout smoke test rather than riding along with an a11y sweep.
 
-**GS-ball-svg — the aim screen's ball is still a plain marker** *(small, follow-on from GS-ball-art)*
-The animated play view now draws a dimpled, rolling, shadow-casting ball; the AIM screen — where the
-player actually spends their time looking at it — is `renderHoleSVG`, a different renderer, and still
-draws a plain circle. It doesn't need the roll (nothing is moving) but it should match the cover: the
-same `BALL_SKINS` row as an SVG `<circle>` + dimple dots + the alignment line, as a `style/` painter.
-Wants the gallery re-shot.
-
 **GS-green-surface-bite — non-penalty hazards eat the putting surface** *(found while building
 GS-green-backstop; real, measured, deliberately left out of that PR)*
 `lieAt` gives HAZARDS precedence over FEATURES, so any hazard blob overlapping the green polygon turns

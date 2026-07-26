@@ -451,9 +451,12 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     FIXED 3px whatever the camera did — so it could never look like it was ROLLING (a featureless disc
     can't) and the run-out's hops were INVISIBLE (a 3px disc rising 1.5px off a static shadow is not a
     bounce; the model had been hopping the whole time). Three rules: the drawn ball SCALES with
-    `proj.scale` about an exaggerated `ballDrawYd` — floored at the old 3px so the whole-hole map is
-    unchanged, capped so a deep zoom isn't a beachball (a real ball is 0.047yd = a THIRD OF A PIXEL at
-    the putt camera, so a scale model was never on the table); **roll is the ONE thing measured in
+    `proj.scale` **sub-linearly** (`sqrt`) — floored at the old 3px so the whole-hole map is unchanged,
+    capped at 5.5 against the scene's own fixed markers (the tee dot is r5, the flagstick 14 units), and
+    sub-linear because LINEAR growth pinned every putt to the cap: an 18px ball, and flat, so a tap-in
+    looked like a 20-footer. The measured cameras are 0.5–5.7 px/yd for shots and **7.6–35 for putts** —
+    guess them and you tune the wrong end (a real ball is 0.047yd = a THIRD OF A PIXEL at the putt
+    camera, so a scale model was never on the table); **roll is the ONE thing measured in
     SCREEN px, not yards** (`dθ = ds/r` with BOTH taken as drawn — real yards and a real radius give 68
     turns per 10 yards, a grey strobe — so the ball turns as fast as it LOOKS like it should at every
     zoom, capped per frame against aliasing); and the phase rides the ball's OWN screen displacement,
@@ -461,7 +464,11 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     and a backspin check turns it backwards with no special case. In the AIR on its flight it carries
     steady BACKspin off the clock instead. Ball skins are a ROW (`BALL_SKINS`); an equipped Story BALL
     dresses the cover from the SAME `ballTracer` row that colours its trail, so one cosmetic is one
-    item. Guarded by `tests/ball.test.ts`; eyes-on `scripts/ball-preview.mjs`.
+    item. **The RESTING ball wears it too** — the aim/putt SVG map (`holeView.ts`) had kept a bare white
+    `<circle>`, so the player lined up with a dot, watched a dimpled ball fly and got the dot back; both
+    emitters share ONE `surfaceProjector`/`DIMPLES`/`bandPoint`, so the pattern can't change at the
+    moment the swing starts, and `ballSVG` emits **no ids** (they are document-global — see
+    `holeIdPrefix`). Guarded by `tests/ball.test.ts`; eyes-on `scripts/ball-preview.mjs`.
   - Merges: platforms + hazard families through `render/merge.ts` — platforms `dilateUnion(…,14)` (never a
     mitred outset), sand/liquid families `unionClose` bridging near pairs with a slim neck (GS-hazard-merge,
     render-only, sim penalty polys unchanged). Lost-rough cliffs extrude from the REAL lower silhouette

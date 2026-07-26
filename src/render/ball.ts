@@ -74,12 +74,23 @@ export const DEFAULT_BALL_SKIN = BALL_SKINS.classic;
 
 /** Feel knobs, spread into `_gsFeel` by the play view like `RunoutFeel` — no new top-level hook. */
 export interface BallFeel {
-  /** Exaggerated ball diameter in course yards. A real ball is 0.047yd — at the chip/putt camera
-   *  (~6.6 px/yd) that is a THIRD OF A PIXEL, so a scale model is not on the table; this is a
-   *  readable stand-in, sized so that camera draws a ball you can see turning (~8px radius) while the
-   *  whole-hole map stays on the 3px floor and is unchanged. */
-  ballDrawYd: number;
-  /** Screen-radius floor (the pre-GS-ball-art constant, so the whole-hole map is unchanged) and cap. */
+  /**
+   * How fast the drawn ball grows with the camera, as a coefficient on `sqrt(px per yard)`.
+   *
+   * Growth is SUB-LINEAR on purpose. A real ball is 0.047yd, so every camera in the game draws it
+   * oversized and the only question is by how much. Linear growth (the first cut) put the ball on its
+   * cap for EVERY putt — the measured putt cameras run 7.6–35 px/yd — which was both too big (18px
+   * across, taller than the whole flagstick marker) and flat, so zooming from a 20-yarder to a tap-in
+   * showed no change. A sqrt curve keeps giving a size cue all the way in while the EXAGGERATION
+   * shrinks as you zoom, which is the right direction: you zoom in to see closer to the truth.
+   */
+  ballGrowth: number;
+  /** px-per-yard below which the ball stays on its floor — the whole-hole map, unchanged. */
+  ballGrowFrom: number;
+  /** Screen-radius floor (the pre-GS-ball-art constant, so the whole-hole map is unchanged) and cap.
+   *  The cap is measured against the fixed-size scene markers the ball sits among: the tee dot is r5
+   *  and the flagstick is 14 units tall, so a ball bigger than ~r5.5 stops reading as a ball on a
+   *  green and starts reading as a prop. */
   ballMinPx: number;
   ballMaxPx: number;
   /** Extra radius at the flight apex, as a fraction — the ball reads as nearer the camera up there. */
@@ -96,24 +107,30 @@ export interface BallFeel {
 }
 
 export const DEFAULT_BALL_FEEL: BallFeel = {
-  ballDrawYd: 2.4,
+  ballGrowth: 0.5,
+  ballGrowFrom: 1.8,
   ballMinPx: 3,
-  ballMaxPx: 9,
+  ballMaxPx: 5.5,
   ballLoftGrow: 0.5,
   spinMaxStep: 0.55,
   flightSpinRate: 9,
-  dimpleMinPx: 4.6,
+  dimpleMinPx: 3.8,
 };
 
 const clamp = (x: number, lo: number, hi: number): number => (x < lo ? lo : x > hi ? hi : x);
 
 /**
  * Drawn ball radius (px). `pxPerYard` is the projector's scale; `loft` is 0 on the deck and 1 at the
- * flight apex. Floored at the old fixed size so the whole-hole map is byte-for-byte, and capped so a
- * deep chip/putt zoom stays a golf ball.
+ * flight apex.
+ *
+ * Measured cameras, for reference (390x844, one full hole played out): the shot views run 0.5–5.7
+ * px/yd and the putt views 7.6–17.1, with a tap-in reaching ~35. Sub-linear growth means the ball is
+ * still visibly bigger on a tap-in than on a 20-footer, without ever getting near the size where it
+ * swamps the cup it is rolling at.
  */
 export function ballRadiusPx(pxPerYard: number, loft = 0, feel: BallFeel = DEFAULT_BALL_FEEL): number {
-  const base = clamp(pxPerYard * feel.ballDrawYd * 0.5, feel.ballMinPx, feel.ballMaxPx);
+  const grown = feel.ballMinPx + feel.ballGrowth * Math.sqrt(Math.max(0, pxPerYard - feel.ballGrowFrom));
+  const base = clamp(grown, feel.ballMinPx, feel.ballMaxPx);
   return base * (1 + clamp(loft, 0, 1) * feel.ballLoftGrow);
 }
 
@@ -154,6 +171,50 @@ const DIMPLES: ReadonlyArray<readonly [number, number, number]> = (() => {
 })();
 
 /**
+ * The ONE description of where a point on the ball's surface lands on screen — shared by the canvas
+ * painter and the SVG one, so the animated ball and the resting ball on the aim map cannot drift
+ * apart. A plain orthographic sphere spin: surface points turn about the screen-perpendicular axis,
+ * and `z > 0` is the near hemisphere.
+ */
+function surfaceProjector(
+  x: number,
+  y: number,
+  r: number,
+  phase: number,
+  ux: number,
+  uy: number,
+  vx: number,
+  vy: number,
+): (p: readonly [number, number, number]) => { sx: number; sy: number; z: number } {
+  const cos = Math.cos(phase);
+  const sin = Math.sin(phase);
+  return (p) => {
+    const a = p[0] * cos + p[2] * sin; // along travel
+    const z = -p[0] * sin + p[2] * cos; // toward the viewer
+    const b = p[1]; // across travel
+    return { sx: x + r * (a * ux + b * vx), sy: y + r * (a * uy + b * vy), z };
+  };
+}
+
+/** Unit travel/perp basis from a (possibly absent or degenerate) screen direction. */
+function travelBasis(dirX = 1, dirY = 0): { ux: number; uy: number; vx: number; vy: number } {
+  const m = Math.hypot(dirX, dirY) || 1;
+  const ux = dirX / m;
+  const uy = dirY / m;
+  return { ux, uy, vx: -uy, vy: ux };
+}
+
+/** Where the alignment band's great circle passes — a circle THROUGH the roll axis's poles (see the
+ *  note in `drawBall`: the rotation's own equator is invariant and would sit dead still). */
+export const BAND_STEPS = 28;
+export function bandPoint(i: number): readonly [number, number, number] {
+  const t = (i / BAND_STEPS) * Math.PI * 2;
+  return [Math.cos(t), Math.sin(t), 0];
+}
+/** Where the maker's mark sits on the cover. */
+export const MARK_POINT: readonly [number, number, number] = [0.72, 0.3, 0.62];
+
+/**
  * Draw the ball at `(x, y)` with radius `r`, rolled to `phase` about an axis perpendicular to
  * `(dirX, dirY)` — the direction it is travelling on screen. The rotation is a plain orthographic
  * sphere spin: surface points turn about the screen-perpendicular axis and the back hemisphere is
@@ -177,13 +238,7 @@ export function drawBall(
   const phase = opts.phase ?? 0;
   // Screen basis: u along travel, v perpendicular. A resting ball has no direction — keep the last
   // sensible default (rightwards) rather than collapsing the sphere.
-  let ux = opts.dirX ?? 1;
-  let uy = opts.dirY ?? 0;
-  const m = Math.hypot(ux, uy) || 1;
-  ux /= m;
-  uy /= m;
-  const vx = -uy;
-  const vy = ux;
+  const { ux, uy, vx, vy } = travelBasis(opts.dirX, opts.dirY);
 
   ctx.save();
   if (skin.glow) {
@@ -205,15 +260,7 @@ export function drawBall(
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
 
-  const cos = Math.cos(phase);
-  const sin = Math.sin(phase);
-  /** Rotate a unit-sphere point about the screen-vertical axis and project it. */
-  const project = (p: readonly [number, number, number]): { sx: number; sy: number; z: number } => {
-    const a = p[0] * cos + p[2] * sin; // along travel
-    const z = -p[0] * sin + p[2] * cos; // toward the viewer
-    const b = p[1]; // across travel
-    return { sx: x + r * (a * ux + b * vx), sy: y + r * (a * uy + b * vy), z };
-  };
+  const project = surfaceProjector(x, y, r, phase, ux, uy, vx, vy);
 
   // The alignment BAND. It has to be a great circle THROUGH the roll axis's poles, not around its
   // equator: the equator of the rotation is invariant under that rotation and would sit dead still
@@ -225,9 +272,8 @@ export function drawBall(
     ctx.lineCap = 'butt';
     ctx.beginPath();
     let started = false;
-    for (let i = 0; i <= 28; i++) {
-      const t = (i / 28) * Math.PI * 2;
-      const p = project([Math.cos(t), Math.sin(t), 0] as const);
+    for (let i = 0; i <= BAND_STEPS; i++) {
+      const p = project(bandPoint(i));
       if (p.z < -0.05) {
         started = false;
         continue;
@@ -242,7 +288,7 @@ export function drawBall(
 
   if (r >= feel.dimpleMinPx) {
     ctx.fillStyle = skin.dimple;
-    const dr = Math.max(0.5, r * 0.13);
+    const dr = Math.max(0.55, r * 0.16);
     for (const p of DIMPLES) {
       const q = project(p);
       if (q.z <= 0.12) continue; // back hemisphere + the grazing rim, where a dimple is a smudge
@@ -257,7 +303,7 @@ export function drawBall(
   // The maker's mark — one dot, so there is always exactly one unambiguous feature to track. It is
   // what tells you the ball is turning when it is too small for dimples.
   if (skin.mark && r >= 3.4) {
-    const q = project([0.72, 0.3, 0.62] as const);
+    const q = project(MARK_POINT);
     if (q.z > 0.05) {
       ctx.globalAlpha = Math.min(1, 0.35 + q.z);
       ctx.fillStyle = skin.mark;
@@ -326,4 +372,64 @@ export function ballSkinFor(look?: { ballTracer?: { shape: string; color: string
     : t.shape === 'spark' ? BALL_SKINS.void
     : BALL_SKINS.tour;
   return { ...base, band: t.color, mark: t.accent ?? base.mark, glow: t.glow ?? base.glow };
+}
+
+/**
+ * The ball as an SVG fragment — the RESTING ball on the static aim / putt map (`renderHoleSVG`).
+ *
+ * That map is where the player actually spends their time looking at the ball, and it was still a
+ * bare `<circle r="4" fill="#fff">`: you lined up a shot with a plain white dot, watched a dimpled
+ * ball fly, and got the dot back at rest. The cover has to be the same in both places or the
+ * cosmetic doesn't exist as far as the player is concerned.
+ *
+ * It shares `surfaceProjector`, `DIMPLES`, `bandPoint` and `MARK_POINT` with the canvas painter, so
+ * there is ONE description of where a point on the cover lands and the two renderers cannot drift.
+ * A resting ball has no travel direction, so it takes the same phase-0 pose the tee shot starts in.
+ */
+export function ballSVG(
+  x: number,
+  y: number,
+  r: number,
+  skin: BallSkin = DEFAULT_BALL_SKIN,
+  feel: BallFeel = DEFAULT_BALL_FEEL,
+): string {
+  const { ux, uy, vx, vy } = travelBasis(1, 0);
+  const project = surfaceProjector(x, y, r, 0, ux, uy, vx, vy);
+  const n = (v: number): string => v.toFixed(2);
+  const out: string[] = [];
+  if (skin.glow) {
+    out.push(`<circle cx="${n(x)}" cy="${n(y)}" r="${n(r + 2.2)}" fill="${skin.glow}" opacity="0.45" />`);
+  }
+  // The lit sphere. An SVG radial gradient needs an id, and ids are DOCUMENT-global — several hole
+  // SVGs share one document in the gallery and the test hub (see `holeIdPrefix`). Two overlaid
+  // circles give the same read with nothing to collide.
+  out.push(`<circle cx="${n(x)}" cy="${n(y)}" r="${n(r)}" fill="${skin.shade}" />`);
+  out.push(`<circle cx="${n(x - r * 0.16)}" cy="${n(y - r * 0.18)}" r="${n(r * 0.86)}" fill="${skin.cover}" />`);
+  if (r >= feel.dimpleMinPx) {
+    for (const p of DIMPLES) {
+      const q = project(p);
+      if (q.z <= 0.12) continue;
+      const dr = Math.max(0.4, r * 0.15) * (0.55 + 0.45 * q.z);
+      out.push(`<circle cx="${n(q.sx)}" cy="${n(q.sy)}" r="${n(dr)}" fill="${skin.dimple}" opacity="${(0.3 + 0.45 * q.z).toFixed(2)}" />`);
+    }
+  }
+  if (skin.band && r >= 2.6) {
+    const pts: string[] = [];
+    for (let i = 0; i <= BAND_STEPS; i++) {
+      const p = project(bandPoint(i));
+      if (p.z < -0.05) continue;
+      pts.push(`${n(p.sx)},${n(p.sy)}`);
+    }
+    if (pts.length > 1) {
+      out.push(`<polyline points="${pts.join(' ')}" fill="none" stroke="${skin.band}" stroke-width="${n(Math.max(0.6, r * 0.13))}" />`);
+    }
+  }
+  if (skin.mark && r >= 3.4) {
+    const q = project(MARK_POINT);
+    if (q.z > 0.05) {
+      out.push(`<circle cx="${n(q.sx)}" cy="${n(q.sy)}" r="${n(Math.max(0.5, r * 0.17))}" fill="${skin.mark}" />`);
+    }
+  }
+  out.push(`<circle cx="${n(x)}" cy="${n(y)}" r="${n(r)}" fill="none" stroke="rgba(0,0,0,0.45)" stroke-width="1" />`);
+  return out.join('');
 }
