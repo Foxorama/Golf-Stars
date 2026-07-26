@@ -11,6 +11,32 @@ under the new format). Avenue (1), a full top-down RPG shell, stays deferred unt
 
 ## Now / next
 
+**GS-a11y-putt-assist — the pace meter has no alternative** *(surfaced by the 2026-07-26 accessibility
+sweep; deliberately NOT done there, because it is a balance change wearing an accessibility hat)*
+Putting is a 1250ms sweeping canvas meter you must stop at the right moment (`render/puttMeter.ts`,
+`period = 1250`). There is no slower mode, no wider band, no alternative input — so it is a hard timing
+gate on every hole for anyone with a motor or cognitive impairment, and the one part of the game the
+keyboard/aim work (GS-a11y-keyboard) could not open up.
+The machinery for a fix already exists: `takePutt(…, control?)` takes an auto-resolved control, which is
+how the **Penelope Putter** caddy plays. So the shapes are (a) an accessibility setting that routes to
+that path, (b) a slower `period`, or (c) a wider make band.
+**Why it is not done:** every one of those makes putting easier, i.e. it is a difficulty change, and this
+repo measures those (contract 4: no death spiral; a power-up must *raise* mean per-stop Stableford to
+ship). It needs a death-spiral harness run and a call on whether an assist should also cost something
+(shards? a Stableford asterisk? nothing?) — a design decision, not a mechanical one. Do NOT let it in
+under an accessibility banner without the harness.
+
+**GS-a11y-charcard-nesting — the golfer card is invalid interactive HTML** *(small, but touches a
+viewport-locked screen)*
+`.gs-charcard` is a `<button>` containing `<p>`, `<div>`, and — since GS-a11y-focus — a focusable
+`role="button"` portrait. Nested interactive content is invalid, and `<button>` may only hold phrasing
+content. It works in every current browser and is now keyboard-operable, so this is correctness and
+future-proofing, not a live bug.
+Fix shape: make the card a container with a stretched select-`<button>` behind its contents (`position:
+absolute; inset: 0`) and the lore portrait a real sibling `<button>` above it in z-order. Deferred
+because character select is viewport-locked to one mobile screen (GS-select-onescreen) and the
+restructure deserves its own pass + a layout smoke test rather than riding along with an a11y sweep.
+
 **GS-green-surface-bite — non-penalty hazards eat the putting surface** *(found while building
 GS-green-backstop; real, measured, deliberately left out of that PR)*
 `lieAt` gives HAZARDS precedence over FEATURES, so any hazard blob overlapping the green polygon turns
@@ -423,6 +449,17 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-a11y-readable-text / -focus / -announce / -motion / -keyboard / -scale-wrap** — the accessibility
+  sweep (#600–#605, `docs/decisions/accessibility.md`). Reader type + a UI scale that fixes small text and
+  sub-44px targets with one lever; overlays became real modal dialogs with focus management and `inert`
+  backgrounding; live-region narration so a screen-reader player is told what the ball did; the
+  reduced-motion toggle finally reduces motion (four gates were asking the OS, not the setting); arrow-key
+  aim and power, so the shot is no longer pointer-only. **We ship no dyslexia font, deliberately** — the
+  letterform faces fail to beat plain Arial in every trial, and the one positive result resolved to
+  spacing; so the toggle buys tracking/word-spacing/leading instead, at zero bytes. Bugs found on the way:
+  the settings sheet had been rendering in **Times New Roman**, six buttons behind the settings backdrop
+  stayed tab-reachable, and the golfer-card lore portrait announced itself as a button and did nothing.
+  Left open on purpose: `GS-a11y-putt-assist`, `GS-a11y-charcard-nesting` (both above).
 - **GS-ship-corridor-fold / GS-ship-wall-phantom / GS-ship-breach-restore** — the derelict's walls stop
   lying (7th pass). A mitred ribbon self-intersects at a bend and even-odd `pointInPoly` reads the fold as
   a phantom VOID mid-deck (13% of walled holes, up to 15 yd) — spliced out, and the deck + the bulkhead
