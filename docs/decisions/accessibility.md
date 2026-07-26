@@ -130,6 +130,20 @@ At the top rung every control clears the 44px guidance, and nothing leaves the s
    `render/pixelRatio.ts canvasRatio()`, which folds the root zoom in (verified: backing store
    751×1624 for a 375×812 display, ratio 2.00).
 
+### ⚠ Media queries are blind to the UI scale
+
+Found by testing at 1.45× (GS-a11y-scale-wrap): root `zoom` shrinks the **layout box** every element
+is laid out in — the pinned 3-up games row really does get ~69px columns — but it does **not** move
+the media-query viewport. `matchMedia('(max-width: 320px)')` is still `false` on a 375px phone at any
+scale.
+
+So **a breakpoint can never be the answer to "this is too cramped at large text."** The content
+itself has to cope. Concretely: `"Unending Universe"` clipped out of its `overflow: hidden` tile at
+1.45×, and the fix is `overflow-wrap: anywhere` on the tile text, not a narrow-viewport rule that
+would never fire. When adding layout that must survive the scale, make it wrap/reflow intrinsically
+(`overflow-wrap`, `min-width: 0`, `flex-wrap`, `auto-fit` tracks) rather than reaching for a
+breakpoint.
+
 ### Invariants
 
 - **Nothing names a font family except `--gs-font`.** Both `font-family` and every `font:` shorthand
