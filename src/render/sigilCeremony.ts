@@ -17,6 +17,10 @@
  * the cinematic scatter only), no save, no reducer impact.
  */
 
+// Backing-store resolution only — a pure, guarded read of the root zoom, so this cinematic
+// stays as self-contained and as un-throwable as it was.
+import { canvasRatio } from './pixelRatio';
+
 export interface SigilCeremonyHandle {
   destroy(): void;
 }
@@ -924,7 +928,7 @@ export function mountSigilCeremony(opts: {
 
   function resize(): void {
     if (!ctx) return;
-    dpr = Math.min(2, window.devicePixelRatio || 1);
+    dpr = canvasRatio();
     cssW = overlay.clientWidth || window.innerWidth;
     cssH = overlay.clientHeight || window.innerHeight;
     canvas.width = Math.max(1, Math.round(cssW * dpr));

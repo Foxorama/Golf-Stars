@@ -22,7 +22,7 @@ import { renderHoleSVG } from '../render/holeView';
 import { shotCardHTML } from '../render/cards';
 import { pinOf } from '../sim/round';
 import { dist } from '../sim/course/contract';
-import { getSettings, type Settings } from '../settings';
+import { getSettings, clampUiScale, type Settings } from '../settings';
 import { describeBackup, type Backup } from '../save/backup';
 
 /**
@@ -102,6 +102,17 @@ const TOGGLE_CHIPS: readonly { key: keyof Settings; icon: string; label: string;
   { key: 'fastShots', icon: '⚡', label: 'Fast shots', desc: 'Skip the tap after each shot — roll straight on' },
   { key: 'leftHanded', icon: '🤚', label: 'Left-handed', desc: 'Swing and aim mirrored for lefties' },
   { key: 'reducedMotion', icon: '🌙', label: 'Reduced motion', desc: 'Calmer effects & celebrations' },
+  { key: 'readableFont', icon: '🔤', label: 'Readable text', desc: 'A clearer typeface with roomier letter and word spacing' },
+];
+
+/** UI scale, as the same SEGMENTED control the aim modes use (GS-a11y-readable-text). A discrete
+ *  ladder rather than a slider: each rung is checked to keep the play screen's commit row on
+ *  screen, and it scales the 38px map buttons up past a 44px touch target on the way. */
+const SCALE_OPTS: readonly { v: number; label: string; desc: string }[] = [
+  { v: 1, label: 'Normal', desc: 'The ship default.' },
+  { v: 1.15, label: 'Large', desc: 'Everything 15% bigger — text and buttons together.' },
+  { v: 1.3, label: 'Larger', desc: '30% bigger. Roomy targets, less of the map.' },
+  { v: 1.45, label: 'Largest', desc: '45% bigger. Maximum legibility; the map gets tight.' },
 ];
 
 /**
@@ -133,6 +144,13 @@ export function settingsSheetInner(): string {
       </button>`,
   ).join('');
   const activeAim = AIM_OPTS.find((o) => o.id === s.aimMode) ?? AIM_OPTS[0]!;
+  const scale = clampUiScale(s.uiScale);
+  const scaleBtns = SCALE_OPTS.map(
+    (o) => `<button class="gs-seg${scale === o.v ? ' gs-seg--on' : ''}" data-selscale="${o.v}" role="radio" aria-checked="${scale === o.v}">
+        <span class="gs-seg-i" aria-hidden="true" style="font-size:${Math.round(11 * o.v)}px;line-height:20px;">A</span><span class="gs-seg-t">${o.label}</span>
+      </button>`,
+  ).join('');
+  const activeScale = SCALE_OPTS.find((o) => o.v === scale) ?? SCALE_OPTS[0]!;
   const midRun = state.run.status === 'active' && !!state.run.loadout.characterId;
   const homeFoot =
     state.screen === 'title'
@@ -151,7 +169,13 @@ export function settingsSheetInner(): string {
         <div class="gs-chipgrid">${chips(['sound', 'music'])}</div>
 
         <div class="gs-setsec">Feel</div>
-        <div class="gs-chipgrid">${chips(['haptics', 'fastShots', 'leftHanded', 'reducedMotion'])}</div>
+        <div class="gs-chipgrid">${chips(['haptics', 'fastShots', 'leftHanded'])}</div>
+
+        <div class="gs-setsec">♿ Accessibility</div>
+        <div class="gs-chipgrid">${chips(['reducedMotion', 'readableFont'])}</div>
+        <div class="gs-setnote">Text size — scales the buttons with it, so targets stay easy to hit.</div>
+        <div class="gs-segctl" role="radiogroup" aria-label="Text and interface size">${scaleBtns}</div>
+        <div class="gs-seghint">${activeScale.desc}</div>
 
         <div class="gs-setsec">🎯 Aim assist</div>
         <div class="gs-setnote">How every shot is pre-aimed. Change it mid-round with the ◎ button too.</div>

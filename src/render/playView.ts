@@ -48,6 +48,7 @@ import {
 import { flightApexT, flightProfileOf } from '../sim/flight';
 import { planRunout, sampleRunout, DEFAULT_RUNOUT_FEEL, type RunoutFeel, type RunoutPlan } from './runout';
 import { GOLFER_COLORS, lookFromColor, drawGolfer, type GolferLook } from './golferArt';
+import { canvasRatio } from './pixelRatio';
 
 // The on-course golfer's look now lives in golferArt.ts; re-export it so existing importers
 // (e.g. src/app/helpers.ts) keep resolving `GolferLook` from this module.
@@ -287,7 +288,7 @@ export function mountPlayView(
   const F = feel();
   const width = opts.width ?? 360;
   const height = opts.height ?? 640;
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const dpr = canvasRatio();
 
   const canvas = document.createElement('canvas');
   canvas.width = width * dpr;

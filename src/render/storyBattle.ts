@@ -37,6 +37,7 @@
 import { paintSerpent, type SerpentAnchors } from './sigilCeremony';
 import { paintWardenArk, arkBatteryPos } from './wardenArk';
 import { shipSVG } from './shipArt';
+import { canvasRatio } from './pixelRatio';
 import {
   FINALE_SERPENT_HP,
   FINALE_PHASES,
@@ -264,7 +265,7 @@ export function mountStoryBattle(opts: {
 
   function resize(): void {
     if (!ctx) return;
-    dpr = Math.min(2, window.devicePixelRatio || 1);
+    dpr = canvasRatio();
     cssW = overlay.clientWidth || window.innerWidth;
     cssH = overlay.clientHeight || window.innerHeight;
     canvas.width = Math.max(1, Math.round(cssW * dpr));

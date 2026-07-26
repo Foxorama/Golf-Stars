@@ -46,14 +46,45 @@
         --gs-r-lg: 14px;           /* card radius */
         --gs-shadow: 0 2px 10px rgba(0, 0, 0, .45);
         color-scheme: dark;
+
+        /* ── Reader controls (GS-a11y-readable-text) ────────────────────────────
+           The player owns their own type. These four tokens are the ONLY way the
+           app expresses a typeface or a UI size, so a settings toggle re-themes
+           every screen at once — including the 660-odd hard-px sizes we are never
+           going to hand-convert to rem.
+             --gs-font    the family stack (swapped by .gs-readable)
+             --gs-uiscale a whole-UI zoom: scales text AND touch targets together
+             --gs-track   letter-spacing; --gs-wordspace word-spacing
+           The spacing pair defaults to 0 so the normal theme is byte-for-byte the
+           old rendering. See docs/decisions/accessibility.md. */
+        --gs-font: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        --gs-uiscale: 1;
+        --gs-track: 0em;
+        --gs-wordspace: 0em;
+        /* One screen height, expressed in the LAYOUT units a zoomed root lays out in.
+           Every viewport-locked box uses these instead of raw 100vh/100dvh. */
+        --gs-vh: calc(100vh / var(--gs-uiscale));
+        --gs-dvh: calc(100dvh / var(--gs-uiscale));
       }
 
       * { box-sizing: border-box; }
-      html { -webkit-text-size-adjust: 100%; }
+      /* `zoom` (not a transform) so the whole layout re-flows at the new size rather than
+         being scaled as a picture — text stays crisp and buttons get genuinely bigger hit
+         boxes. Every viewport-locked height below divides by the same token, because a
+         `100dvh` box inside a zoomed root would otherwise measure 1 screen of ZOOMED units
+         and hang off the bottom (it put the Swing button 185px below the fold at 1.25). */
+      html { -webkit-text-size-adjust: 100%; zoom: var(--gs-uiscale); }
       body {
         margin: 0;
         background: var(--gs-bg);
         color: var(--gs-ink);
+        /* The family lives HERE, not on .gs-main. Overlays (settings sheet, price notice,
+           exit confirm, intro popovers) are rendered as SIBLINGS of <main> — with the stack
+           on .gs-main they inherited the UA default and the entire settings sheet shipped in
+           Times New Roman. Anything that is not inside <main> is still a reader's text. */
+        font-family: var(--gs-font);
+        letter-spacing: var(--gs-track);
+        word-spacing: var(--gs-wordspace);
         /* A faint cosmic vignette so flat panels sit on a living sky, not a slab. */
         background-image:
           radial-gradient(1100px 620px at 78% -8%, #18203044 0%, transparent 60%),
@@ -61,7 +92,7 @@
         background-attachment: fixed;
       }
       .gs-main {
-        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        font-family: var(--gs-font);
         max-width: 820px; margin: 0 auto;
         /* Respect the notch / home-indicator on installed PWAs (viewport-fit=cover). The
            top/bottom insets are mirrored in .gs-shot's height math below so the fixed play
@@ -69,14 +100,64 @@
         padding:
           calc(18px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
           calc(28px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
-        color: var(--gs-ink); min-height: 100vh;
+        color: var(--gs-ink); min-height: var(--gs-vh);
       }
-      .gs-main h1, .gs-main h2, .gs-main h3 { letter-spacing: .2px; }
+      /* Headings keep their extra tracking ON TOP of the reader's, never instead of it. */
+      .gs-main h1, .gs-main h2, .gs-main h3 { letter-spacing: calc(var(--gs-track) + .2px); }
       ::selection { background: #5fd45a44; }
+
+      /* ── Reader-friendly type (GS-a11y-readable-text) ────────────────────────────────
+         Set on <html> by the "Readable text" toggle. The full reasoning, with citations,
+         is in docs/decisions/accessibility.md. The short version, because it drives what
+         this rule does and does NOT do:
+
+         WE DO NOT SHIP A DYSLEXIA FONT, and that is a considered decision, not a corner cut.
+         The letterform-based faces (OpenDyslexic, Dyslexie) have been tested repeatedly and
+         do not deliver a reading-speed or accuracy benefit — Rello & Baeza-Yates 2013 put
+         OpenDyslexic BEHIND plain Arial and found readers preferred Verdana to it; Wery &
+         Diliberto 2017 and Kuster et al. 2018 both found no gain. The two positive-looking
+         results in the literature (Marinus 2016) resolved to the font's wider SPACING, not
+         its shapes, and Galliussi et al. 2020 separated the two factorially and found only
+         spacing mattered. OpenDyslexic is also ~113KB — in a build that inlines everything
+         into one index.html and otherwise ships zero third-party binary assets.
+
+         So this toggle buys the levers that DO replicate, all of which cost zero bytes:
+           · letter spacing — Zorzi et al. 2012 (PNAS): extra tracking alone, with no
+             training, gave ~20% faster reading and half the errors in dyslexic children.
+             Dyslexic readers are unusually hurt by crowding; this is the big one.
+           · word spacing — the BDA asks for ≥3.5× the letter spacing, which is what the
+             ratio below is.
+           · line spacing — BDA asks 1.5.
+           · NO ITALICS — the most robust negative finding in the font literature (Rello &
+             Baeza-Yates 2013: significantly worse on reading time AND fixation duration).
+           · NO JUSTIFICATION — WCAG 1.4.8; uneven word gaps make "rivers".
+         Values sit at/above WCAG 1.4.12's user-override bar (.12em letter, .16em word) but
+         short of the BDA's most aggressive tracking, because this is a dense game HUD and
+         over-spacing re-wraps the very rows GS-play-hud-space just un-wrapped.
+
+         The FAMILY is a bonus, not the mechanism: we ask for the most legible faces already
+         installed on the device (a reader who has OpenDyslexic or Atkinson Hyperlegible on
+         their OS gets it for free), falling back to Verdana/Tahoma — tall x-height, wide
+         sidebearings, open apertures, and the BDA's own named recommendations.
+
+         Line-height is a FLOOR, not an override: every component that sets its own (most of
+         the HUD, via the `font:` shorthand) keeps its tight line box, so the play screen
+         does not reflow. */
+      .gs-readable {
+        --gs-font: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", Andika, OpenDyslexic,
+                   Lexend, Verdana, Tahoma, "Trebuchet MS", "Segoe UI", Roboto, system-ui, sans-serif;
+        --gs-track: .06em;
+        --gs-wordspace: .21em;
+      }
+      .gs-readable body { line-height: 1.5; }
+      /* Italics are the one letterform effect with solid evidence — and it is negative. Bold
+         instead, which is what the BDA style guide asks for. */
+      .gs-readable i, .gs-readable em, .gs-readable [style*="italic"] { font-style: normal; font-weight: 700; }
+      .gs-readable [style*="text-align:justify"], .gs-readable [align="justify"] { text-align: left !important; }
 
       /* ── Buttons ─────────────────────────────────────────────────────────── */
       .gs-btn {
-        font: 600 14px/1.15 system-ui, sans-serif;
+        font: 600 14px/1.15 var(--gs-font);
         padding: 9px 14px;
         border-radius: var(--gs-r);
         border: 1px solid var(--btn-border, var(--gs-line));
@@ -257,7 +338,7 @@
       .gs-selpill-l { font-size: 11px; font-weight: 800; letter-spacing: .04em; color: var(--cc, var(--gs-gold)); white-space: nowrap; }
       .gs-selpill-sel {
         appearance: none; -webkit-appearance: none; background: transparent; border: 0; outline: none;
-        color: var(--gs-ink); font: 800 13px/1 system-ui, sans-serif; padding: 3px 17px 3px 2px; cursor: pointer;
+        color: var(--gs-ink); font: 800 13px/1 var(--gs-font); padding: 3px 17px 3px 2px; cursor: pointer;
         -webkit-tap-highlight-color: transparent;
       }
       .gs-selpill-sel option { color: #111; background: #fff; }
@@ -431,7 +512,7 @@
         display: flex; flex-direction: column; gap: 2px; padding: 28px 14px 12px;
         background: linear-gradient(180deg, transparent, rgba(8, 9, 14, .88) 62%);
       }
-      .gs-navtile__title { font: 700 18px/1.1 system-ui, sans-serif; }
+      .gs-navtile__title { font: 700 18px/1.1 var(--gs-font); }
       .gs-navtile__sub { font-size: 12px; opacity: .82; }
       /* ACCENT tiles (GS-title-2): the Voyage / Unending game doorways AND the Trade Market /
          Clubhouse between-run doorways share one component, distinguished only by the `--mc`
@@ -488,7 +569,7 @@
       .gs-resume__ship svg { display: block; width: 100%; height: 100%; }
       .gs-resume__body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
       .gs-resume__kicker { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: #7fe0b0; opacity: .9; }
-      .gs-resume__head { font: 800 20px/1.15 system-ui, sans-serif; color: var(--gs-ink); }
+      .gs-resume__head { font: 800 20px/1.15 var(--gs-font); color: var(--gs-ink); }
       .gs-resume__sub { font-size: 12px; color: var(--gs-dim); }
       .gs-resume__go { flex: 0 0 auto; font-size: 20px; color: #46e0a0; padding-right: 4px; }
       @media (max-width: 460px) {
@@ -673,14 +754,14 @@
         background: rgba(30,44,60,.9); border: 1px solid rgba(84,200,255,.3); color: #bfeaff; cursor: pointer; font-size: 15px;
       }
       .gs-st-sheet__head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; padding-right: 34px; }
-      .gs-st-sheet__title { font: 800 20px/1.1 system-ui; margin: 0; color: #eaf4ff; }
+      .gs-st-sheet__title { font: 800 20px/1.1 var(--gs-font); margin: 0; color: #eaf4ff; }
       .gs-st-tier {
-        font: 700 11px/1 system-ui; letter-spacing: .08em; text-transform: uppercase; color: var(--tc, #7fe0ff);
+        font: 700 11px/1 var(--gs-font); letter-spacing: .08em; text-transform: uppercase; color: var(--tc, #7fe0ff);
         border: 1px solid var(--tc, #7fe0ff); border-radius: 6px; padding: 3px 8px; flex: 0 0 auto;
       }
       .gs-st-sheet__blurb { font-size: 13px; color: #b9c6d8; margin: 4px 0 10px; line-height: 1.4; }
       .gs-st-rec { display: block; font-size: 13px; color: #cdd8e6; margin-bottom: 10px; }
-      .gs-st-sheet__wxlabel { font: 700 10.5px/1 system-ui; letter-spacing: .12em; text-transform: uppercase; color: #6f92b0; margin-bottom: 7px; }
+      .gs-st-sheet__wxlabel { font: 700 10.5px/1 var(--gs-font); letter-spacing: .12em; text-transform: uppercase; color: #6f92b0; margin-bottom: 7px; }
       .gs-st-wxrow { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 14px; }
       .gs-st-wx {
         background: rgba(24,36,52,.85); border: 1px solid rgba(84,200,255,.22); color: #cdd8e6;
@@ -690,7 +771,7 @@
       .gs-st-wx--on { background: rgba(84,200,255,.18); border-color: #54c8ff; color: #eaf4ff; font-weight: 700; }
       .gs-st-play {
         display: block; width: 100%; padding: 13px; border-radius: 12px; cursor: pointer;
-        font: 800 15px/1 system-ui; color: #04121c;
+        font: 800 15px/1 var(--gs-font); color: #04121c;
         background: linear-gradient(180deg, #7fe0ff, #35a8e0); border: none;
         box-shadow: 0 4px 16px rgba(84,200,255,.35);
       }
@@ -721,7 +802,7 @@
       .gs-st-realm__name { flex: 1; min-width: 0; color: #eaf4ff; font-size: 14px; }
       .gs-st-realm--open .gs-st-realm__name { color: #ffe6a8; }
       .gs-st-realm__badge {
-        font: 700 10px/1 system-ui; letter-spacing: .08em; text-transform: uppercase;
+        font: 700 10px/1 var(--gs-font); letter-spacing: .08em; text-transform: uppercase;
         color: #ffd97a; border: 1px solid rgba(255,217,122,.5); border-radius: 6px; padding: 3px 7px;
       }
       .gs-st-realm__badge--soon { color: #7f93a8; border-color: rgba(127,147,168,.4); }
@@ -730,18 +811,18 @@
       .gs-st-introcard { margin-top: 10px; }
       .gs-st-introcard__row { display: flex; align-items: baseline; justify-content: space-between; }
       .gs-st-introcard__label { font-size: 12px; color: #8aa0b8; }
-      .gs-st-introcard__score { font: 800 22px/1 system-ui; font-variant-numeric: tabular-nums; }
+      .gs-st-introcard__score { font: 800 22px/1 var(--gs-font); font-variant-numeric: tabular-nums; }
 
       /* ── Star Tour round recap (strokeResult) ─────────────────────────────────── */
       .gs-strres { max-width: 460px; margin: 0 auto; padding: 6px 2px 20px; }
       .gs-strres__hero { text-align: center; padding: 16px 0 10px; }
       .gs-strres__course { font-size: 14px; color: #bcd0e6; margin-bottom: 4px; }
       .gs-strres__wx { font-size: 12px; opacity: .8; margin-left: 4px; }
-      .gs-strres__score { font: 900 58px/1 system-ui; font-variant-numeric: tabular-nums; text-shadow: 0 0 24px currentColor; }
+      .gs-strres__score { font: 900 58px/1 var(--gs-font); font-variant-numeric: tabular-nums; text-shadow: 0 0 24px currentColor; }
       .gs-strres__sub { font-size: 13px; color: #90a2b8; margin-top: 4px; }
       .gs-strres__record {
         display: inline-block; margin-top: 10px; padding: 6px 16px; border-radius: 999px;
-        font: 800 14px/1 system-ui; color: #04121c; background: linear-gradient(180deg, #ffdd7a, #ffb838);
+        font: 800 14px/1 var(--gs-font); color: #04121c; background: linear-gradient(180deg, #ffdd7a, #ffb838);
         box-shadow: 0 0 20px rgba(255,206,84,.5); animation: gs-st-rise .3s ease;
       }
       .gs-strres__prev { margin-top: 8px; font-size: 13px; color: #a8b8cc; }
@@ -753,10 +834,10 @@
         border-radius: 7px; background: rgba(18,28,42,.7); border: 1px solid var(--gs-line);
       }
       .gs-str-cell__n { font-size: 9px; color: #6f8298; }
-      .gs-str-cell__s { font: 800 15px/1 system-ui; font-variant-numeric: tabular-nums; }
+      .gs-str-cell__s { font: 800 15px/1 var(--gs-font); font-variant-numeric: tabular-nums; }
       .gs-str-cell__p { font-size: 9px; color: #6f8298; }
       .gs-strres__board { margin: 16px 0; }
-      .gs-strres__boardtitle { font: 700 10.5px/1 system-ui; letter-spacing: .12em; text-transform: uppercase; color: #6f92b0; margin-bottom: 8px; }
+      .gs-strres__boardtitle { font: 700 10.5px/1 var(--gs-font); letter-spacing: .12em; text-transform: uppercase; color: #6f92b0; margin-bottom: 8px; }
       .gs-strres__actions { display: flex; gap: 10px; margin-top: 18px; }
       .gs-strres__actions .gs-btn { flex: 1; }
 
@@ -811,14 +892,14 @@
       .gs-czone__chip {
         position: relative; z-index: 4; display: inline-flex; align-items: center; gap: 5px;
         max-width: 47%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-        font: 700 11.5px/1 system-ui, sans-serif; color: var(--gs-ink);
+        font: 700 11.5px/1 var(--gs-font); color: var(--gs-ink);
         padding: 5px 9px; border-radius: 999px;
         background: rgba(10, 12, 18, .84); border: 1px solid var(--gs-line); box-shadow: var(--gs-shadow);
       }
       .gs-czone--active .gs-czone__chip { border-color: var(--gs-warn); color: var(--gs-warn); }
       .gs-czone__pen { opacity: .55; font-weight: 400; }
       .gs-clubset {
-        text-align: center; margin: 2px 0 8px; font: 700 12px/1 system-ui, sans-serif; color: #ff4fd8;
+        text-align: center; margin: 2px 0 8px; font: 700 12px/1 var(--gs-font); color: #ff4fd8;
       }
       .gs-clubhint { text-align: center; font-size: 12.5px; opacity: .6; margin: 8px 0 4px; }
 
@@ -841,10 +922,10 @@
         justify-content: space-between; gap: 8px; padding: 26px 12px 11px;
         background: linear-gradient(180deg, transparent, rgba(8, 9, 14, .9) 66%);
       }
-      .gs-garage__name { display: block; font: 700 15px/1.15 system-ui, sans-serif; }
+      .gs-garage__name { display: block; font: 700 15px/1.15 var(--gs-font); }
       .gs-garage__sub { display: block; font-size: 11.5px; opacity: .78; text-transform: capitalize; }
       .gs-garage__edit {
-        flex: none; align-self: flex-end; font: 700 11px/1 system-ui, sans-serif; color: var(--gs-warn);
+        flex: none; align-self: flex-end; font: 700 11px/1 var(--gs-font); color: var(--gs-warn);
         padding: 5px 9px; border: 1px solid var(--gs-warn); border-radius: 999px; background: rgba(10, 12, 18, .72);
         white-space: nowrap;
       }
@@ -857,9 +938,9 @@
       }
       @keyframes gsPickIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: none; } }
       .gs-cpick__head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-      .gs-cpick__title { font: 700 15px/1 system-ui, sans-serif; }
+      .gs-cpick__title { font: 700 15px/1 var(--gs-font); }
       .gs-cpick__done {
-        margin-left: auto; font: 700 12px/1 system-ui, sans-serif; color: var(--gs-dim);
+        margin-left: auto; font: 700 12px/1 var(--gs-font); color: var(--gs-dim);
         background: transparent; border: 1px solid var(--gs-line); border-radius: 999px; padding: 5px 11px; cursor: pointer;
         -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: color .16s ease, border-color .16s ease;
       }
@@ -905,8 +986,8 @@
            screen without scrolling down to reach them. The 46px is .gs-main's vertical
            padding (18+28); the safe-area insets are subtracted too since .gs-main now adds
            them to its padding, so the math stays exact on notched phones. */
-        height: calc(100vh - 46px);
-        height: calc(100dvh - 46px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+        height: calc(var(--gs-vh) - 46px);
+        height: calc(var(--gs-dvh) - 46px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
         overflow: hidden;
       }
       .gs-topbar {
@@ -956,7 +1037,7 @@
       }
       .gs-mapbtn {
         width: 38px; height: 38px; padding: 0; margin: 0;
-        font: 600 17px/1 system-ui, sans-serif;
+        font: 600 17px/1 var(--gs-font);
         display: flex; align-items: center; justify-content: center;
         border-radius: 9px; border: 1px solid var(--gs-line);
         background: rgba(17, 20, 27, .82); color: var(--gs-ink);
@@ -981,7 +1062,7 @@
         border-radius: var(--gs-r); overflow: hidden; background: #14171f;
       }
       .gs-segbtn {
-        flex: 1; padding: 11px 6px; font: 600 14px/1 system-ui, sans-serif;
+        flex: 1; padding: 11px 6px; font: 600 14px/1 var(--gs-font);
         background: transparent; color: var(--gs-dim); border: none;
         border-left: 1px solid var(--gs-line); cursor: pointer;
         -webkit-tap-highlight-color: transparent; touch-action: manipulation; user-select: none;
@@ -1024,11 +1105,11 @@
          flex column of exactly one screen height, so the roster grid inside fills the space under the
          header and the whole roster fits with no scroll. Desktop keeps the natural scrolling frame. */
       @media (max-width: 999px) {
-        .gs-main--fit { height: 100vh; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+        .gs-main--fit { height: var(--gs-vh); height: var(--gs-dvh); overflow: hidden; display: flex; flex-direction: column; }
       }
       .gs-shot--full {
         position: relative; width: 100%;
-        height: 100vh; height: 100dvh; overflow: hidden;
+        height: var(--gs-vh); height: var(--gs-dvh); overflow: hidden;
         display: block; gap: 0;
       }
       .gs-shot--full .gs-bigmap {
@@ -1769,8 +1850,8 @@
       .gs-travel {
         display: flex; flex-direction: column; gap: 8px;
         /* 46px = .gs-main's vertical padding (18+28); insets mirror .gs-main so the math stays exact. */
-        height: calc(100vh - 46px);
-        height: calc(100dvh - 46px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+        height: calc(var(--gs-vh) - 46px);
+        height: calc(var(--gs-dvh) - 46px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
         overflow: hidden;
       }
       /* The map viewport fills all remaining height; the chart pans INSIDE it, chrome floats OVER it. */
@@ -2457,7 +2538,7 @@
          the play HUD's .gs-hud — see the CLAUDE.md global-CSS warning. */
       .gs-lore {
         --acc: var(--gs-lore-acc, #ffd97a);
-        min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+        min-height: var(--gs-dvh); display: flex; align-items: center; justify-content: center;
         overflow-y: auto;
         padding:
           calc(20px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
