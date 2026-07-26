@@ -52,6 +52,10 @@ const LAVA_RIVER_MIN_WILDNESS = 0.26; // below: a calm ember stop has no river
 const FROZEN_POND_MIN_WILDNESS = 0.26; // below: a calm frost stop has no pond crossing
 const WATER_CREEK_MIN_WILDNESS = 0.26; // below: a calm parkland stop has no creek crossing
 const DEEP_ROUGH_MIN_WILDNESS = 0.3; // below (incl. the stop-0 ceiling): doglegs stay cuttable — the forgiving opener
+/** Half-angle (radians) of the BACK ARC a behind-green backstop may occupy (GS-green-backstop) —
+ *  ±~63° of straight-on-long. Wide enough to frame the back of the green, narrow enough that nothing
+ *  ever creeps round the sides into the shot you were supposed to hit. */
+const BACKSTOP_ARC = 1.1;
 // GS-rough-gradient: below this the off-corridor rough fill is UNIFORM (a wide, forgiving heavy-rough
 // buffer, trees pushed far out); at/above it each hole rolls a CHARACTER (tight tree chute / heavy-rough
 // gauntlet / mixed) so the wilder stops read "a lot more random".
@@ -1996,6 +2000,107 @@ function generateHole(
           hazards.push({ kind, poly: blobPoly(c2, r2, 10, 0.3, rng) });
         }
       }
+    }
+  }
+
+  // BEHIND-GREEN DEFENCE (GS-green-backstop). Playtest: "some biomes have water and bunkers behind the
+  // greens, but there's virtually no trees or other hazards to punish going long on a green."
+  //
+  // A census of 2,250 generated holes across ten worlds agreed exactly: the ground BEYOND the green
+  // averaged ~1.2 hazard blobs — all of them incidental (a greenside pot or ring blob that happened to
+  // draw an angle past the pin) — and TREES behind a green averaged 0.00–0.12 PER HOLE, i.e. never. So
+  // every approach had a free backstop: fly the green and you finished on open ground with a simple
+  // chip back. That is the one miss the hole should punish hardest, because it is the one the player
+  // controls — long is a club choice, not a swing error.
+  //
+  // This pass defends the back arc deliberately: a TREE STAND standing over the back of the green on a
+  // world that grows anything (the canopy also blocks the recovery, and it frames the green — a putting
+  // surface with a treeline behind it reads like golf), a BACK BUNKER on the straight-long line, and a
+  // patch of the world's DEEP ROUGH for the worlds that grow nothing (desert, links, void, the ship).
+  //
+  // Three rules keep it fair, and all three are machine-checked (`tests/green-backstop.test.ts`):
+  //  • EVERYTHING HERE IS NON-PENALTY. Long must cost you a stroke, never a lost card — a penalty
+  //    backstop is a difficulty cliff and the fastest way to breach the no-death-spiral bar.
+  //  • It sits in the BACK ARC ONLY (±`BACKSTOP_ARC` of straight-on-long) and clears the green surface,
+  //    the pin, the approach lane and the corridor — so the shot you're supposed to hit is untouched.
+  //    `validateFairness` ignores non-penalty blobs, so this is the pass's own responsibility.
+  //  • It draws from its OWN dedicated side stream (`:backstop:`), so it perturbs ZERO main-`rng` draws
+  //    — every earlier hazard, every later hole and every other world stay byte-identical (contract 1).
+  // Skipped on lost-rough holes (an island green floats in the abyss; behind it is already the void).
+  if (!lostRough) {
+    const bkRng = new Rng(`${rng.seed}:backstop:${holeIndex}`);
+    // Straight-on-long: the direction the approach is travelling as it reaches the green.
+    const appFrom = centrePoint(centreline, 0.86);
+    let bdx = green[0] - appFrom[0];
+    let bdy = green[1] - appFrom[1];
+    const bl = Math.hypot(bdx, bdy) || 1;
+    bdx /= bl;
+    bdy /= bl;
+    const longAng = Math.atan2(bdy, bdx);
+    // Everything the backstop must stay clear of on the PLAYING side. Note the corridor test is against
+    // the fairway POLYGONS, not `polylineDist(centreline)`: the centreline terminates AT the green, so a
+    // distance-to-polyline test reads every point behind the green as "near the corridor" and rejected
+    // essentially the whole pass (the first census after writing it moved the tree count by 0.09/hole).
+    // Behind the green there is no corridor — only, sometimes, the run-off flare, which a bunker or a
+    // rough patch may legitimately sit in (that IS the collection area) but a treeline may not.
+    const fairwayPolys = features.filter((f) => f.kind === 'fairway').map((f) => f.poly);
+    /** Is this blob a legal backstop? Off the green, off the approach lane, and — for cover you have to
+     *  play around — off the mown surface. A backstop punishes the shot that went past, never the one
+     *  that was on line. */
+    const backstopOk = (c: Vec, r: number, offFairway = false): boolean => {
+      // Clear of the putting surface, tested at the blob's JITTERED bound plus a margin — `blobPoly`
+      // swells a vertex by up to ~30%, so a nominal-radius test lets the fat side of a lumpy blob poke
+      // onto the green. Tested against the green POLYGON, not a max-radius circle: a star green's long
+      // lobe would make a circular test reject most of the back arc outright.
+      if (polysOverlap(blobPoly(c, r * 1.35 + 2, 12, 0, bkRng), greenPolygon)) return false;
+      if (segDist(c, appFrom, green) < greenR * 0.9 + r) return false; // the approach lane stays open
+      if (polylineDist(c, centreline) < fairwayHalfWidth * 0.5 + r) return false; // never back across the corridor
+      if (offFairway && fairwayPolys.some((p) => pointInPoly(c, p))) return false;
+      return true;
+    };
+    /** A point in the back arc at `d` yards past the green's real edge along a drawn bearing. */
+    const backPoint = (spread: number, gap: number, r: number): { c: Vec; r: number } => {
+      const ang = longAng + bkRng.range(-spread, spread);
+      const dir: Vec = [Math.cos(ang), Math.sin(ang)];
+      const d = rayPolyDist(green, dir, greenPolygon) + r + gap;
+      return { c: [green[0] + dir[0] * d, green[1] + dir[1] * d], r };
+    };
+    // (1) The BACKSTOP STAND — tall cover standing over the back of the green on any world that grows
+    //     something. Non-penalty (a punch-out), and a big blob means a TALL canopy (`canopyHeight`), so
+    //     the recovery has to come out low and running rather than being flighted straight at the pin.
+    // Scaled by the world's OWN tree density, so the sparse-scrub worlds get the odd snag over the back
+    // and the parkland/jungle worlds get a proper wall of it — never a uniform grove on every world.
+    const grows = (biome.treeDensity ?? 0) > 0;
+    if (grows && bkRng.bool(Math.min(0.8, (biome.treeDensity ?? 0) * 0.15 + wildness * 0.2))) {
+      const lead = backPoint(BACKSTOP_ARC, bkRng.range(4, 13), bkRng.range(5, 8));
+      if (backstopOk(lead.c, lead.r, true)) {
+        hazards.push({ kind: 'trees', poly: blobPoly(lead.c, lead.r, 9, 0.3, bkRng) });
+        // Companions so the back reads as a STAND, not one token tree standing on its own.
+        const companions = bkRng.int(1, 3);
+        for (let k = 0; k < companions; k++) {
+          const a = bkRng.range(0, Math.PI * 2);
+          const dd = bkRng.range(7, 15);
+          const r2 = bkRng.range(3.5, 6.5);
+          const c2: Vec = [lead.c[0] + Math.cos(a) * dd, lead.c[1] + Math.sin(a) * dd];
+          if (backstopOk(c2, r2, true)) hazards.push({ kind: 'trees', poly: blobPoly(c2, r2, 8, 0.3, bkRng) });
+        }
+      }
+    }
+    // (2) The BACK BUNKER — the classic "long is dead" trap on the straight-long line, playing back
+    //     toward a green running away from you. Sand class ⇒ non-penalty, so it may sit tight behind.
+    if (bkRng.bool(0.45 + wildness * 0.3)) {
+      const kind = (biome.potBunkers ?? 0) > 0 && bkRng.bool(0.4) ? 'pot' : 'bunker';
+      const b = backPoint(BACKSTOP_ARC * 0.7, bkRng.range(2, 7), bkRng.range(4.5, 7.5));
+      if (backstopOk(b.c, b.r)) hazards.push({ kind, poly: blobPoly(b.c, b.r, 9, 0.22, bkRng) });
+    }
+    // (3) A patch of the world's own DEEP ROUGH over the back — the defence for a world that grows no
+    //     cover at all (the desert, the links, the scrap belt), and an extra tax everywhere else. Falls
+    //     back to fescue so every world has SOMETHING long, which is the whole complaint.
+    const backRough = biome.deepRough && !lieInfo(biome.deepRough).penalty ? biome.deepRough : 'fescue';
+    const roughN = 1 + (bkRng.bool(0.35 + wildness * 0.35) ? 1 : 0);
+    for (let i = 0; i < roughN; i++) {
+      const p = backPoint(BACKSTOP_ARC, bkRng.range(1, 9), bkRng.range(5, 9));
+      if (backstopOk(p.c, p.r, true)) hazards.push({ kind: backRough, poly: blobPoly(p.c, p.r, 10, 0.32, bkRng) });
     }
   }
 

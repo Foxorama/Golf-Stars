@@ -11,6 +11,22 @@ under the new format). Avenue (1), a full top-down RPG shell, stays deferred unt
 
 ## Now / next
 
+**GS-green-surface-bite — non-penalty hazards eat the putting surface** *(found while building
+GS-green-backstop; real, measured, deliberately left out of that PR)*
+`lieAt` gives HAZARDS precedence over FEATURES, so any hazard blob overlapping the green polygon turns
+that slice of the putting surface into its own lie. `clearGreenOfPenalty` only drops **penalty** blobs
+(GS-green-clear, the ice/lava-on-the-green fix) — nothing stops a bunker, pot, deep-rough, fescue or tree
+blob from biting a piece of the green. Measured across 1,080 generated holes (10 worlds × 12 seeds ×
+9 holes, wildness 0.6): **21.9% of holes carry at least one non-penalty blob poking the putting surface**
+— `deeprough` 73, `pot` 59, `bunker` 64, `fescue` 57, `trees` 46, `waste` 4. A tree lie ON the green is
+the worst of them. The pin and green centre are still clean (`tests/lie.test.ts` guards those), so this
+reads as an edge bite rather than an unplayable hole — which is why it has gone unnoticed.
+Fix shape: extend `clearGreenOfPenalty` into a general `clearGreenSurface` post-filter (still pure,
+zero-rng, still DROP-only — dropping can only raise Stableford, per the same argument the existing filter
+makes). The open question is the drop RULE: dropping a whole greenside bunker because a sliver overlaps
+would delete a lot of legitimate greenside sand, so it likely wants an overlap-AREA or vertex-fraction
+threshold, or a trim rather than a drop. Wants its own PR + a balance re-measure.
+
 **GS-hud-frame-2 — the frame's remaining polish** *(follow-on from the shipped frame, small)*
 The persistent frame landed (see Done). Left on the table, all cosmetic and none blocking:
 - The controls panel's TOP edge still rises on the putt state (a pace meter is genuinely taller than a

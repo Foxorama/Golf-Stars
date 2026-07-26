@@ -1974,3 +1974,84 @@ RENDER junction blend is a separate render-only pass (GS-green-blend). Re-shoot
     `EARTH_POS`, and `earthGlyph` (not a generic constellation planet) carries the selection ring + record
     + play flow. Guarded by `tests/startour-flow.test.ts`. Pure render/data + a static row — no `_gs*`/URL
     hook, no test-hub wiring.
+
+---
+
+## GS-green-backstop — going long is punished (2026-07-26)
+
+**The ask** (playtest): "some biomes have water and bunkers behind the greens, but there's virtually no
+trees or other hazards to punish going long on a green."
+
+### The census agreed, and it was worse than "virtually"
+
+Before writing anything, 2,250 generated holes (10 worlds × 25 seeds × 9 holes, wildness 0.6) were
+measured for hazard material in the arc BEYOND the green (within 45 yards, on the far side of the pin):
+
+| world | holes with something long | avg blobs | **avg TREES** |
+|---|---|---|---|
+| verdant-station | 76% | 1.36 | **0.08** |
+| dust-belt | 70% | 1.10 | **0.00** |
+| ice-ring | 72% | 1.20 | **0.04** |
+| spore-jungle | 68% | 1.11 | **0.11** |
+| earth-links | 71% | 1.17 | **0.00** |
+
+Every one of those blobs is *incidental* — a greenside pot or ring blob that happened to draw an angle
+past the pin. No pass in the generator had ever placed anything behind a green on purpose. Trees behind a
+green were effectively **zero**, on every world, including the two densest forests in the rotation.
+
+That matters more than it sounds, because **long is the one miss the player fully controls.** A lateral
+miss is a swing error; flying the green is a club choice. Leaving the back of the green undefended means
+the game never charges for the decision it most wants the player to sweat, and it makes every approach a
+free swing: aim at the flag, and if you catch it you're fine anyway.
+
+### The pass
+
+A dedicated back-arc pass (±~63° of straight-on-long, `BACKSTOP_ARC`), placing three things:
+
+1. **A backstop STAND** on any world that grows cover — a lead blob plus 1–3 companions, so the back
+   reads as a stand rather than one token tree. Big blobs mean tall canopies (`canopyHeight` scales with
+   blob radius), so the recovery has to come out low and running instead of being flighted at the pin.
+   Frequency scales with the world's own `treeDensity`, so the desert gets the odd snag and the spore
+   jungle gets a wall — never a uniform grove pasted on every world.
+2. **A back BUNKER** on the straight-long line — "long is dead", playing back to a green running away.
+3. **A patch of the world's own DEEP ROUGH.** This is what defends a world that grows nothing: St
+   Annette's is `treeDensity: 0` by design, and so are the void and the derelict. Falls back to `fescue`
+   when a world's `deepRough` is itself a penalty kind (the tidal world's is `water`).
+
+### Fairness — a backstop is the hazard class that sits closest to the target
+
+- **Everything it places is NON-PENALTY.** Long costs a stroke, never a lost card. A penalty backstop is
+  a difficulty cliff and the fastest route through the no-death-spiral bar.
+- **It clears the green, the approach lane and the corridor.** Two details cost a debugging round each:
+  the blob is tested at its **jittered bound** (`blobPoly` swells a vertex by up to 30%, so a
+  nominal-radius test lets the fat side poke onto the putting surface), and the green test runs against
+  the **polygon**, not a max-radius circle — a star green's long lobe makes a circular test reject almost
+  the whole back arc. The first version also rejected on `polylineDist(centreline)`: the centreline
+  *terminates at the green*, so every point behind the green read as "near the corridor" and the entire
+  pass silently placed almost nothing (the census after writing it moved trees by 0.09/hole). Behind the
+  green there is no corridor — only, sometimes, the run-off flare, which sand and rough may sit in (that
+  IS the collection area) but a treeline may not.
+- **Its own side stream** (`:backstop:`), so it perturbs zero main-`rng` draws: every earlier hazard,
+  every later hole and every other world stay byte-identical (contract 1). The whole seeded suite passing
+  unchanged is that guard.
+
+### Balance: measured neutral, and that is the right answer
+
+| | toPar/hole | blow-ups |
+|---|---|---|
+| before | 0.8962 | 9.44% |
+| after | 0.8958 | 9.51% |
+
+Effectively no movement, because the auto AI clubs to *reach* the green and rarely flies it — its misses
+are lateral. So the backstop is a punish for the **human** miss, which is exactly what was asked for. It
+is worth being explicit that this means the auto bars do not validate the feature's difficulty; the
+census (79–95% of holes now defended long, ~0.8 tree blobs per hole on a parkland world, 0.00 on the
+links) is the evidence that it landed, and eyes-on play is the evidence that it feels right.
+
+### Found on the way, NOT fixed here
+
+`lieAt` gives hazards precedence over features, and `clearGreenOfPenalty` only drops **penalty** blobs —
+so a bunker/pot/deep-rough/fescue/tree blob overlapping the green turns that slice of the putting surface
+into its own lie. Measured at **21.9% of holes** carrying at least one such blob (pre-existing, from other
+passes; the backstop provably adds none). Logged as `GS-green-surface-bite` in IDEAS.md with the fix shape
+and the open design question. It wants its own PR and its own balance re-measure.

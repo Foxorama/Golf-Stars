@@ -163,9 +163,25 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
   - **Added hazards ride SIDE streams** so they perturb zero main draws: rough gradient
     (GS-rough-gradient, `:rough:`), approach defence — front + cross bunkers, non-penalty
     (GS-approach-hazards, `:approach:`), in-fairway water / split fairways that keep the centreline dry
-    (GS-fairway-water, `:fwwater:`, `validateInFairwayWater` throws). Death-spiral fences relaxed to the
+    (GS-fairway-water, `:fwwater:`, `validateInFairwayWater` throws), and **behind-green defence**
+    (GS-green-backstop, `:backstop:`). Death-spiral fences relaxed to the
     interim reality with `TODO(GS-rough-gradient)` — re-tighten in the rebalance, never by softening the
     rough. The STRUCTURAL fairness contracts (`validateFairness`/`Crossings`/`Course`) are never relaxed.
+  - **GOING LONG IS PUNISHED** (GS-green-backstop). The back of the green used to be free ground: a census
+    of 2,250 holes found trees behind a green averaging **0.00–0.12 per hole**, so airmailing an approach —
+    the one miss the player fully controls, since long is a club choice — cost nothing but a chip back. A
+    dedicated back-arc pass now stands a TREE STAND (scaled by the world's `treeDensity`, so the sparse
+    worlds get a snag and the jungle a wall), a BACK BUNKER on the straight-long line, and a patch of the
+    world's own DEEP ROUGH — the last of which is what defends a treeless world (links/desert/void/ship).
+    Three rules, machine-checked: **everything back there is NON-PENALTY** (long costs a stroke, never a
+    lost card — a penalty backstop is a difficulty cliff), it clears the green / approach lane / corridor
+    (blob tested at its JITTERED bound, and against the green POLYGON — a max-radius circle rejects most
+    of the back arc on a star green), and it draws from its OWN side stream. Measured death-spiral
+    neutral (toPar/hole 0.8962 → 0.8958) because the AUTO sim rarely flies a green — this is a punish for
+    the HUMAN miss, which is exactly the intent. Guarded by `tests/green-backstop.test.ts`.
+    ⚠️ Do NOT test a behind-green rule against ALL hazards in the back arc: penalty blobs legitimately
+    sit there from the older sanctioned greenside RING, and ~22% of holes already carry a non-penalty
+    blob poking the putting surface from other passes (see IDEAS `GS-green-surface-bite`).
   - **The derelict ship** (void/cetus/derelict are `BALANCE_EXEMPT_BIOMES`) — the big subsystem;
     everything is gated on `biome.walls` so **every other world is byte-identical**. The lesson worth
     carrying: **the DRAWN playable surface IS the physics boundary** (in flight AND at rest), never a
