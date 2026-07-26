@@ -11,7 +11,9 @@
  * sim said the ball rests, however the time is parameterised.
  */
 import { describe, it, expect } from 'vitest';
-import { planRunout, sampleRunout, DEFAULT_RUNOUT_FEEL } from '../src/render/runout';
+import { planRunout, sampleRunout, DEFAULT_RUNOUT_FEEL, RUNOUT_BY_CLASS } from '../src/render/runout';
+import { CLUBS } from '../src/sim/clubs';
+import { flightClassOf, flightProfileOf, FLIGHT_PROFILES } from '../src/sim/flight';
 
 /** A firm fairway landing off a driver: ~180yd carry in ~600ms ⇒ 0.3 yd/ms. */
 const DRIVER_V = 0.3;
@@ -116,5 +118,136 @@ describe('a run-out is long enough to READ (the teleport report)', () => {
 
   it('a ball that does not move gets no run-out at all', () => {
     expect(planRunout(0, 0.65, 0.2, false).totalMs).toBe(0);
+  });
+});
+
+/**
+ * GS-runout-club — bounce and run READ per club, and the backspin check no longer stops dead.
+ *
+ * The report on the first attempt was blunt: *"it changed the driver and wood bounce and roll which
+ * was pretty good, it didn't actually solve the contour green and backspin issue. The ball now stops
+ * and then just slides."* The last sentence is a velocity discontinuity, and the reason it shipped
+ * green is that the suite above only ever tested continuity at TOUCHDOWN. So the first thing here is
+ * a check across EVERY phase join.
+ */
+
+/** Numerically differentiate the drawn travel: yards of signed travel per millisecond. */
+function speedAt(plan: ReturnType<typeof planRunout>, ms: number): number {
+  const h = 0.5;
+  const total = Math.max(1, plan.totalMs);
+  const a = sampleRunout(plan, Math.max(0, (ms - h) / total)).s;
+  const b = sampleRunout(plan, Math.min(1, (ms + h) / total)).s;
+  return (b - a) / (2 * h);
+}
+
+describe('velocity is continuous across EVERY phase join, not just touchdown', () => {
+  it('a backspin check carries its skid momentum THROUGH the grab', () => {
+    // The bug: a constant-speed forward skid handed over to a smoothstep, whose derivative is zero at
+    // u = 0. Full flight speed → dead stop → slow creep backwards. "Stops and then just slides."
+    const plan = planRunout(12, 0.5, 0.28, true);
+    const join = plan.check!.skidMs;
+    const before = speedAt(plan, join - 6);
+    const after = speedAt(plan, join + 6);
+    expect(before).toBeGreaterThan(0); // still going forward into the join
+    // The step across the join is a fraction of the speed, not a wipe-out to zero.
+    expect(Math.abs(after - before)).toBeLessThan(Math.abs(before) * 0.35);
+    // …and it is still travelling forward just after the grab, not stopped.
+    expect(after).toBeGreaterThan(0);
+  });
+
+  it('…and then genuinely reverses and eases to rest at the sim\'s point', () => {
+    const plan = planRunout(12, 0.5, 0.28, true);
+    const mid = plan.check!.skidMs + plan.check!.backMs * 0.55;
+    expect(speedAt(plan, mid)).toBeLessThan(0); // dragged back
+    expect(Math.abs(speedAt(plan, plan.totalMs - 2))).toBeLessThan(0.02); // settles, not slams
+    expect(sampleRunout(plan, 1).s).toBeCloseTo(-12, 6); // ends exactly where the sim said
+  });
+
+  it('a forward run-out has no step at ANY hop→hop or hop→roll join either', () => {
+    const plan = planRunout(34, 0.85, 0.3, false, DEFAULT_RUNOUT_FEEL, 'D');
+    let at = 0;
+    for (const hop of plan.hops) {
+      at += hop.ms;
+      if (at >= plan.totalMs - 2) break;
+      const before = speedAt(plan, at - 4);
+      const after = speedAt(plan, at + 4);
+      // A CONTACT legitimately sheds speed — that is the whole model — but it may never gain any,
+      // and it may never drop to a stop mid-run-out.
+      expect(after).toBeLessThanOrEqual(before + 1e-6);
+      expect(after).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('bounce and run read per CLUB', () => {
+  it('the RUN ladder is the one the bag implies: driver > wood > long iron > hybrid > short iron > wedge', () => {
+    // The run itself is the SIM's (`FLIGHT_PROFILES.carryFrac`), not this module's — a club's number
+    // is its TOTAL, and the family decides how much of it is carried and how much released.
+    const run = (id: string): number => {
+      const p = flightProfileOf(id);
+      return p.carryFrac >= 1 ? 0 : (1 - p.carryFrac) / p.carryFrac;
+    };
+    expect(run('D')).toBeGreaterThan(run('3W'));
+    expect(run('3W')).toBeGreaterThan(run('3i'));
+    // A driving iron launches low with little spin and outruns the rescue club it replaced.
+    expect(run('3i')).toBeGreaterThan(run('4H'));
+    expect(run('4H')).toBeGreaterThan(run('7i'));
+    // …and the wedges hold, which is where the backspin build takes over (GS-backspin-optin).
+    expect(run('7i')).toBeGreaterThan(run('PW'));
+    expect(run('PW')).toBe(0);
+  });
+
+  it('every iron in the bag lands on one side of the split, and 3-5 are the long ones', () => {
+    const irons = CLUBS.filter((c) => /^\d+i$/.test(c.id));
+    expect(irons.length).toBeGreaterThan(2);
+    for (const c of irons) {
+      const n = Number(/^(\d+)i$/.exec(c.id)![1]);
+      expect(flightClassOf(c.id), c.id).toBe(n <= 5 ? 'ironLong' : 'ironShort');
+    }
+  });
+
+  it('the long irons BORE and the short irons CLIMB', () => {
+    expect(FLIGHT_PROFILES.ironLong.peakMult).toBeLessThan(FLIGHT_PROFILES.ironShort.peakMult);
+    expect(FLIGHT_PROFILES.ironLong.apexAt).toBeLessThan(FLIGHT_PROFILES.ironShort.apexAt);
+  });
+
+  it('a driver skips further off the same landing than a wedge, which plops', () => {
+    const D = planRunout(30, 0.85, 0.3, false, DEFAULT_RUNOUT_FEEL, 'D');
+    const W = planRunout(30, 0.85, 0.3, false, DEFAULT_RUNOUT_FEEL, 'SW');
+    const air = (p: ReturnType<typeof planRunout>): number => p.hops.reduce((a, h) => a + h.dist, 0);
+    expect(air(D)).toBeGreaterThan(air(W) * 1.5);
+    expect(D.hops[0]!.dist).toBeGreaterThan(W.hops[0]!.dist);
+  });
+
+  it('a wedge hops HIGHER but shorter — steep in, dead stop', () => {
+    const D = planRunout(30, 0.85, 0.3, false, DEFAULT_RUNOUT_FEEL, 'D');
+    const W = planRunout(30, 0.85, 0.3, false, DEFAULT_RUNOUT_FEEL, 'SW');
+    expect(RUNOUT_BY_CLASS.wedge.apex).toBeGreaterThan(RUNOUT_BY_CLASS.driver.apex);
+    expect(W.hops[0]!.dist).toBeLessThan(D.hops[0]!.dist);
+  });
+
+  it('the SURFACE still has the final say — a plugged bunker kills a driver skip', () => {
+    const firm = planRunout(30, 0.95, 0.3, false, DEFAULT_RUNOUT_FEEL, 'D');
+    const soft = planRunout(30, 0.05, 0.3, false, DEFAULT_RUNOUT_FEEL, 'D');
+    const air = (p: ReturnType<typeof planRunout>): number => p.hops.reduce((a, h) => a + h.dist, 0);
+    expect(air(soft)).toBeLessThan(air(firm) * 0.5);
+  });
+
+  it('no class can bounce for ever — restitution stays under 1 whatever the surface', () => {
+    for (const id of Object.keys(RUNOUT_BY_CLASS)) {
+      for (const firm of [0, 0.5, 1]) {
+        const p = planRunout(60, firm, 0.35, false, DEFAULT_RUNOUT_FEEL, id === 'driver' ? 'D' : '7i');
+        for (let i = 1; i < p.hops.length; i++) {
+          expect(p.hops[i]!.dist, `${id} @${firm}`).toBeLessThan(p.hops[i - 1]!.dist);
+        }
+      }
+    }
+  });
+
+  it('an unknown club still plans a sane landing (the neutral mid-bag row)', () => {
+    const p = planRunout(20, 0.6, 0.25, false);
+    expect(p.totalMs).toBeGreaterThan(0);
+    expect(p.hops.length).toBeGreaterThan(0);
+    expect(sampleRunout(p, 1).s).toBeCloseTo(20, 6);
   });
 });

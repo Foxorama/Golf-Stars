@@ -54,7 +54,12 @@ describe('per-family flight profiles (GS-flight-3)', () => {
     expect(flightClassOf('D')).toBe('driver');
     expect(flightClassOf('3W')).toBe('wood');
     expect(flightClassOf('4H')).toBe('hybrid');
-    expect(flightClassOf('7i')).toBe('iron');
+    // GS-runout-club splits the irons for FLIGHT at the number: 3-5 launch low and run, 6+ climb
+    // and stop. The strike voice and the shop's "irons" are still one thing.
+    expect(flightClassOf('3i')).toBe('ironLong');
+    expect(flightClassOf('5i')).toBe('ironLong');
+    expect(flightClassOf('6i')).toBe('ironShort');
+    expect(flightClassOf('7i')).toBe('ironShort');
     expect(flightClassOf('PW')).toBe('wedge'); // ends in W but is a wedge, not a wood
     expect(flightClassOf('SW')).toBe('wedge');
     expect(flightClassOf('putter')).toBe('putter');

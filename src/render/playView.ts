@@ -795,9 +795,9 @@ export function mountPlayView(
         const a = endAt(1 - VEPS);
         const b = endAt(1);
         const v0 = Math.hypot(b[0] - a[0], b[1] - a[1]) / Math.max(1, VEPS * flightDur);
-        runoutPlan = planRunout(rollYds, landFirm, v0, (shot.roll ?? 0) < -0.3, F);
+        runoutPlan = planRunout(rollYds, landFirm, v0, (shot.roll ?? 0) < -0.3, F, shot.club.id);
       }
-      const plan = runoutPlan ?? planRunout(rollYds, landFirm, 0.2, (shot.roll ?? 0) < -0.3, F);
+      const plan = runoutPlan ?? planRunout(rollYds, landFirm, 0.2, (shot.roll ?? 0) < -0.3, F, shot.club.id);
       const rollDur = plan.totalMs;
       // A swing windup leads each full shot: the ball rests at address while the golfer winds
       // up and swings, and the actual flight clock starts at CONTACT (lead ms in).

@@ -768,3 +768,108 @@ new top-level `_gs*` flag and no test-hub wiring obligation.
 three properties whose absence caused the report — no speed step at touchdown, fastest-first with
 deceleration on contact, and a run-out long enough to read — plus the contract-5 endpoint property and
 monotonic progress. Render-only: zero sim rng, zero save change, auto ≡ interactive untouched.
+
+---
+
+## GS-runout-club — bounce and run read per club (2026-07-26)
+
+**The ask**, after GS-ball-art made the landing visible enough to judge:
+
+> "add an amount of bounce and run based on club type? Driver has the most bounce and run, woods have
+> slightly less bounce and run, hybrids less bounce but a bit of run. then irons have a lot of run
+> from 3-5 and then far less run down to pitching wedge which is where backspin starts."
+
+### The run and the bounce come from different places
+
+Worth separating before touching either, because the repo already models one of them.
+
+**RUN is the sim's.** GS-carry-rollout-split made a club's number its TOTAL: the ball flies a family
+`carryFrac` of it and releases the rest, total-preserving. So the ladder already existed — and the
+top of it already matched the ask:
+
+| | before | after |
+|---|---|---|
+| driver | 25.0% | 25.0% |
+| woods | 22.0% | 22.0% |
+| hybrids | 17.6% | 17.6% |
+| **3–5 iron** | **11.1%** | **19.8%** |
+| **6–9 iron** | **11.1%** | **6.4%** |
+| wedges | 0 | 0 |
+
+The irons were **one row**. Every iron in the bag ran *less than a hybrid*, and a 3-iron was
+indistinguishable from a 9-iron. `flightClassOf` now splits them at the number — `ironLong` (≤5) and
+`ironShort` — still convention-based off the club id, so a new `4i` row picks up the long-iron flight
+with zero engine edits (contract 5). The long irons also **bore** (`peakMult` 0.92, apex earlier) and
+the short irons **climb** (1.06, apex later), which is the other half of what makes them read
+differently in the air.
+
+A driving iron outrunning the rescue club it replaced is the real-golf behaviour and it is what the
+brief asks for — "hybrids… *a bit* of run, then irons have *a lot* of run from 3-5".
+
+**BOUNCE is render-side.** `runout.ts` derived its hop train from landing firmness alone, with nothing
+per club: a wedge and a driver bounced identically out of the same fairway. `RUNOUT_BY_CLASS` is a row
+of multipliers on the surface-derived share / restitution / apex, so **the landing still sets the base
+and the club scales it** — a driver into a plugged bunker still does not skip.
+
+### Splitting a flight class is compile-forced, and that is the point
+
+`FlightClass` keys several `Record<>`s, so adding a member failed the typecheck in four places
+immediately. Each one is a real decision rather than a mechanical fix:
+
+- **The strike voice** (`render/audio.ts`) — both rows share it. The split is a *flight* distinction;
+  a 3-iron and a 9-iron still sound like irons.
+- **The Pro Shop's "distance irons" and the Story tour irons** — "irons" is one thing to the player, so
+  the item lifts **both** rows or it half-works on half your bag.
+- The tests that named the class.
+
+### Two structural bugs found in the same pass
+
+**1. The backspin check stopped dead.** This is the one the playtest reported as *"the ball now stops
+and then just slides"*. `sampleRunout` ran the forward skid at constant speed and handed over to a
+smoothstep — **whose derivative is zero at u = 0**. So: full flight speed, hard step to a dead stop,
+then a slow creep backwards. The code comment claimed it "accelerates out of the grab", which is true
+of the backward leg in isolation and false at the join.
+
+It is now a **cubic Hermite whose start tangent is the skid's own velocity**, so the ball carries its
+momentum *through* the grab — still going forward as the spin takes hold, then decelerating, reversing,
+and easing to rest at the sim's point.
+
+The reason this shipped green is worth writing down: the suite tested velocity continuity **at
+touchdown** and nowhere else. A piecewise run-out has a join at every phase boundary and needs
+`ds/dt` sampled across all of them. The new tests do.
+
+**2. The last hop was the biggest of the tail.** The hop train handed the *remainder* to its final hop
+so the train "summed exactly" to the bounce distance:
+
+```js
+const want = i === feel.hopMax - 1 ? remaining : Db * (1 - q) * Math.pow(q, i);
+```
+
+Whenever the restitution is high enough that the geometric train hasn't decayed away within `hopMax`,
+that makes the last hop *larger than the one before it* — a driver off a firm fairway skipped **13
+yards on hop 4 after 7 yards on hop 3**, visibly re-accelerating as it was supposed to be dying. There
+was never anywhere for the remainder to go wrong: whatever the hops don't cover already flows into the
+closing roll. Every hop is now a clean geometric share. Caught by the new per-club test, not by eye.
+
+### Balance
+
+Measured on the death-spiral harness exactly as `tests/biomes.test.ts` runs it — 10 non-exempt worlds
+× 80 seeds × 3 holes = **2,880 holes at max wildness**:
+
+| | toPar/hole | floor-hits |
+|---|---|---|
+| before | 0.8958 | 9.48% |
+| after | **0.8740** | **8.65%** |
+
+Both moved the safe way, and both for the same reason: short irons now fly closer to their number
+(0.90 → 0.94 carry fraction) so approaches finish nearer the pin, while long irons release like the
+driving irons they are. The blow-up fence is ratcheted `0.10 → 0.09` to hold the gain — the same
+precedent as GS-fairway-width-2's `0.12 → 0.10`. Still a regression fence, not the design target.
+
+### Guards
+
+`tests/runout.test.ts` — `ds/dt` across every phase join (skid→drag, and each hop→hop and hop→roll),
+the run ladder read off `FLIGHT_PROFILES`, that every iron in `CLUBS` lands on the right side of the
+split, that the long irons bore and the short irons climb, that a driver out-skips a wedge off the same
+landing while a wedge hops higher, that the surface still has the final say, and that no class can
+bounce for ever at any firmness.

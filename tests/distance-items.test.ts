@@ -48,7 +48,7 @@ describe('GS-proshop-distance-items — the four items resolve and fold their fi
     expect(loadoutFromPerks(['distance-driver']).minCarryBoostByClass).toEqual({ driver: 0.18 });
     expect(loadoutFromPerks(['distance-woods']).minCarryBoostByClass).toEqual({ wood: 0.13 });
     expect(loadoutFromPerks(['distance-hybrids']).minCarryBoostByClass).toEqual({ hybrid: 0.13 });
-    expect(loadoutFromPerks(['distance-irons']).minCarryBoostByClass).toEqual({ iron: 0.16 });
+    expect(loadoutFromPerks(['distance-irons']).minCarryBoostByClass).toEqual({ ironLong: 0.16, ironShort: 0.16 });
   });
 
   it('only the Driver item carries the power-floor trade-off', () => {
@@ -69,7 +69,9 @@ describe('GS-proshop-distance-items — the four items resolve and fold their fi
 
   it('the four fold together onto one loadout without clobbering each other', () => {
     const all = loadoutFromPerks(ITEMS).minCarryBoostByClass!;
-    expect(all).toEqual({ driver: 0.18, wood: 0.13, hybrid: 0.13, iron: 0.16 });
+    // "Irons" is one item and one thing to the player; GS-runout-club's flight split into long/short
+    // irons is invisible to the shop, so the set lifts BOTH rows.
+    expect(all).toEqual({ driver: 0.18, wood: 0.13, hybrid: 0.13, ironLong: 0.16, ironShort: 0.16 });
   });
 });
 

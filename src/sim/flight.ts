@@ -58,16 +58,23 @@ const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
  *  (`CLUBS` taxonomy: 'D' the driver, `*W` woods, `*H` hybrids, `*i` irons, the putter itself;
  *  everything else — PW/GW/SW/60/64/chip — is wedge-family). Convention-based on purpose: a NEW
  *  club row picks up a sensible flight (and strike voice) with zero engine edits. */
-export type FlightClass = 'driver' | 'wood' | 'hybrid' | 'iron' | 'wedge' | 'putter';
+export type FlightClass = 'driver' | 'wood' | 'hybrid' | 'ironLong' | 'ironShort' | 'wedge' | 'putter';
+
+/** Irons split at this NUMBER: 3-5 are the low-launch, long-running driving irons; 6 and up climb
+ *  and stop (GS-runout-club). Convention-based like the rest of `flightClassOf`, so a new `4i` row
+ *  picks up the long-iron flight with zero engine edits. */
+export const LONG_IRON_MAX = 5;
 
 export function flightClassOf(clubId?: string): FlightClass {
-  if (!clubId) return 'iron'; // the neutral mid-bag flight when no club is known
+  // The neutral mid-bag flight when no club is known — a 7-iron, i.e. the SHORT-iron row.
+  if (!clubId) return 'ironShort';
   if (clubId === 'D') return 'driver';
   if (clubId === 'putter') return 'putter';
   // Digit-prefixed families only: PW/GW/SW also end in 'W' but are wedges, not woods.
   if (/^\d+W$/.test(clubId)) return 'wood';
   if (/^\d+H$/.test(clubId)) return 'hybrid';
-  if (/^\d+i$/.test(clubId)) return 'iron';
+  const iron = /^(\d+)i$/.exec(clubId);
+  if (iron) return Number(iron[1]) <= LONG_IRON_MAX ? 'ironLong' : 'ironShort';
   return 'wedge';
 }
 
@@ -103,7 +110,11 @@ export const FLIGHT_PROFILES: Record<FlightClass, FlightProfile> = {
   driver: { apexAt: 0.6, peakMult: 0.85, carryFrac: 0.8 },
   wood: { apexAt: 0.61, peakMult: 0.95, carryFrac: 0.82 },
   hybrid: { apexAt: 0.64, peakMult: 1.12, carryFrac: 0.85 },
-  iron: { apexAt: 0.66, peakMult: 1.0, carryFrac: 0.9 },
+  // GS-runout-club: the irons used to be ONE row at 0.9, which put every iron in the bag BELOW the
+  // hybrid for run and made a 3-iron indistinguishable from a 9-iron. A driving iron launches low
+  // with little spin and runs further than the rescue club it replaced; a 9-iron climbs and sits.
+  ironLong: { apexAt: 0.63, peakMult: 0.92, carryFrac: 0.835 },
+  ironShort: { apexAt: 0.68, peakMult: 1.06, carryFrac: 0.94 },
   wedge: { apexAt: 0.7, peakMult: 1.12, carryFrac: 1.0 },
   putter: { apexAt: 0.75, peakMult: 1.0, carryFrac: 1.0 },
 };

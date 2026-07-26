@@ -46,31 +46,6 @@ absolute; inset: 0`) and the lore portrait a real sibling `<button>` above it in
 because character select is viewport-locked to one mobile screen (GS-select-onescreen) and the
 restructure deserves its own pass + a layout smoke test rather than riding along with an a11y sweep.
 
-**GS-runout-club — bounce and run read per CLUB** *(the live ask; the other half of the GS-ball-art
-report, split off because it is a physics change and needs the harness)*
-Wanted, in the player's words: *"Driver has the most bounce and run, woods have slightly less bounce
-and run, hybrids less bounce but a bit of run. then irons have a lot of run from 3-5 and then far less
-run down to pitching wedge which is where backspin starts."*
-Where it stands today: the SIM already splits carry from run per FAMILY (`FLIGHT_PROFILES.carryFrac`,
-GS-carry-rollout-split) — driver runs 25% of its carry, wood 22%, hybrid 17.6%, **every iron 11.1%**,
-wedge ~0. So the top of the ladder already matches the ask and the irons do not: they are one row, they
-run LESS than a hybrid, and nothing distinguishes a 3-iron from a 9-iron. The fix is to split `iron`
-into `ironLong` (3-5) and `ironShort` (6-9) on the digit in `flightClassOf`, which keeps contract 5's
-"a new club row picks up its flight with zero engine edits". Long irons should run more than a hybrid
-(a driving iron does); short irons much less. Both directions move where the ball LANDS — not where it
-ends, the split is total-preserving — so they change which hazard a given shot finds: **re-run the
-death-spiral harness** (contract 4).
-The BOUNCE half is render-side and cheap: `runout.ts` derives its hop train from landing firmness
-alone, with nothing per club. Add a `RUNOUT_BY_CLASS` row (bounce share / restitution / apex
-multipliers) so a driver skips long and low and a wedge plops once. GS-ball-art has already made bounce
-VISIBLE (a real ball shadow + a drawn hop train), which is what this now needs to be judged against.
-And while in there: **#595's backspin branch has a velocity discontinuity.** `sampleRunout` runs the
-forward skid at constant speed and hands over to a smoothstep, whose derivative is zero at u=0 — so the
-ball travels at full flight speed, stops dead, and only then creeps backwards. That is exactly the
-reported *"the ball now stops and then just slides"*. The fix is a cubic Hermite whose start tangent IS
-the skid velocity, and the test must sample `ds/dt` across **every** phase join, not just touchdown —
-the existing suite pinned touchdown and went green over a hard stop mid-animation.
-
 **GS-ball-svg — the aim screen's ball is still a plain marker** *(small, follow-on from GS-ball-art)*
 The animated play view now draws a dimpled, rolling, shadow-casting ball; the AIM screen — where the
 player actually spends their time looking at it — is `renderHoleSVG`, a different renderer, and still
@@ -490,6 +465,22 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-a11y-sheet-scroll / GS-a11y-tight-fit** — the accessibility settings survive a phone (#607,
+  `docs/decisions/accessibility.md`). Every `position:fixed` overlay caps to the viewport and scrolls
+  (the settings sheet was 1515px on an 844px screen — and already −326px at the SHIP scale); the raw
+  viewport-unit guard widened to any multiple, in TS style strings too; grids stopped blowing out on
+  `1fr`'s min-content floor; the play HUD's flanks float at a tight fit (chrome 83% → 61%, clear band
+  17% → 39%); the boot cinematic seals `#app`.
+- **GS-ball-art** — the ball is a golf ball (#608, `docs/decisions/render.md`). Dimples, an alignment
+  band and a maker's mark on a lit sphere that scales with the camera; roll driven by the ball's own
+  world displacement, so it stops turning when the ball stops and reverses through a check; a shadow
+  that finally makes the hop train visible. `BALL_SKINS` is a row, dressed from the same cosmetic that
+  colours the flight tracer.
+- **GS-runout-club** — bounce and run read per club (`docs/decisions/putting.md`). The iron flight class
+  split at the number so a 3-iron runs and a 9-iron stops; `RUNOUT_BY_CLASS` gives the landing shape to
+  the club and the base to the surface. Fixed the backspin skid→drag velocity step (the reported "stops
+  and then just slides") and a hop train whose LAST hop was the biggest of the tail. Death-spiral bar
+  0.8958 → 0.8740, floor-hits 9.48% → 8.65%.
 - **GS-a11y-readable-text / -focus / -announce / -motion / -keyboard / -scale-wrap** — the accessibility
   sweep (#600–#605, `docs/decisions/accessibility.md`). Reader type + a UI scale that fixes small text and
   sub-44px targets with one lever; overlays became real modal dialogs with focus management and `inert`
