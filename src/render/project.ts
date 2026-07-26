@@ -62,6 +62,31 @@ export function fitFrame(cw: number, ch: number, dw = 360, dh = 640): { width: n
   return { width: Math.max(dw, Math.round(cw / s)), height: Math.max(dh, Math.round(ch / s)) };
 }
 
+/**
+ * Where the ball should sit vertically in the frame (0=top..1=bottom) so it stays `clearance` px clear
+ * of a HUD panel whose top edge is `panelTop` px down a `containerH`-tall container (GS-play-hud-space).
+ *
+ * The play screen's controls FLOAT over a full-bleed map, and the camera used to ignore them: a flat
+ * 0.84 bias put the ball at y≈709 on a 390×844 phone against a panel starting at y≈645, so the ball —
+ * and the shot the player had just hit — spent the flight behind the controls. Bias as LOW as the panel
+ * allows (a low ball is what fills the frame with the shot AHEAD), and no lower.
+ *
+ * Clamped both ways: never past `maxBias`, which is as deep as the framing was ever tuned to go, and
+ * never above the middle, where the view would fill with ground BEHIND the shot.
+ */
+export function clearOfPanelBias(panelTop: number, containerH: number, clearance: number, maxBias: number): number {
+  if (!Number.isFinite(panelTop) || !Number.isFinite(containerH) || containerH <= 0) return maxBias;
+  return Math.max(0.5, Math.min(maxBias, (panelTop - clearance) / containerH));
+}
+
+/** The vertical centre of the map's CLEAR band as a fraction of the frame — what a midpoint-framed
+ *  view (the putt's ball↔cup span) should centre on, rather than the centre of the whole frame, which
+ *  on the tall-panelled putt screen sat low and crowded the controls. */
+export function bandCentreBias(bandTop: number, bandBottom: number, containerH: number): number {
+  if (!(containerH > 0) || !(bandBottom > bandTop)) return 0.5;
+  return Math.max(0.3, Math.min(0.7, (bandTop + bandBottom) / 2 / containerH));
+}
+
 export interface Projector {
   width: number;
   height: number;

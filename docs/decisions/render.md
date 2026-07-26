@@ -1573,3 +1573,76 @@ non-looping: a `MutationObserver` on the play screen counted **0 re-renders idle
 putt. Before: `viewBox 0 0 360 640`, bands 75/75, whole-hole bottom band `NONE×5`. After:
 `viewBox 0 0 360 779`, bands **0/0**, geometry hit at every probe point along the bottom edge, and
 `scale` unchanged at 1.0833 — proving nothing shrank. Full suite green (1879 tests), typecheck clean.
+
+## GS-play-hud-space — the HUD stops eating the screen, and the camera frames the golf between the panels (2026-07-26)
+
+**The report:** "the top info section and the bottom shot section look much better but take up an awful
+lot of screen space" and "the ball flight is not screen centered and keeps getting obscured by the
+bottom shot window."
+
+### What was measured
+
+Driving the real app at 390×844 and measuring every HUD row:
+
+| | before | |
+|---|---|---|
+| top info chip | 129px | of which `.gs-stats` alone was **49px** |
+| bottom panel (aim) | 191px | controls column only **240px wide** of 390 |
+| bottom panel (putt) | 238px | |
+| HUD total | **41% aim / 46% putt** | clear band 508px / 461px |
+
+### The fat was WRAPPING, not type size
+
+This matters, because the previous pass (GS-hud-frame) deliberately *raised* these font sizes on a
+play-test verdict that the numbers were too small to parse at a glance. Shrinking them back would have
+undone a tested decision to buy space that was being wasted anyway:
+
+- `.gs-stats` measured **49px to carry one line's worth of content** — the hole/par/distance triplet was
+  being pushed onto a second line by the hole's shape/width labels ("Drivable", "Tight approach").
+- The controls panel had **240 of 390px**: a 78px caddy slot (a dashed *placeholder* when no caddy is
+  hired) plus a 40px button column plus gaps took a THIRD of the width, which wrapped the power read and
+  the spray legend onto second lines. Vertical height spent to buy horizontal emptiness.
+
+So: move the shape/width labels down to the CONDITIONS sub-line where they belong anyway (they are facts
+about the hole, exactly like the lie and the wind), narrow the flanking columns (caddy 78→66 with the
+badge keeping its frame/glow/sheen, round button 40→36, gaps 8→6), tighten padding and gaps, and replace
+the power hint's "pull DOWN to power" with "pull ↓ to power" — one glyph instead of four words, and
+arguably a clearer direction cue.
+
+| | before | after |
+|---|---|---|
+| top chip | 129px | **95px** |
+| bottom (aim) | 191px | **166px** |
+| bottom (putt) | 238px | **212px** |
+| HUD total | 41% / 46% | **34% / 39%** |
+| clear band | 508 / 461px | **567 / 521px** |
+
+No font size was reduced and no information was removed.
+
+### The camera now reads the HUD it has to see around
+
+Both panels float over a full-bleed map, and the camera ignored them entirely: `DMAP_BIAS` put the ball
+at 0.84 of the frame — y≈709 on an 844px screen, against a panel whose top edge was y≈645. The ball, and
+the shot the player had just hit, spent the entire flight roughly 60px INSIDE the controls. That is the
+whole of the "obscured by the bottom shot window" report, and the "not screen centered" one with it.
+
+`clearOfPanelBias(panelTop, containerH, clearance, maxBias)` (pure, in `project.ts`) biases the ball as
+LOW as the panel allows and no lower — a low ball is what fills the frame with the shot AHEAD, so the
+fix must not simply centre it. Clamped both ways: never past the classic 0.84, never above the middle
+(where the view would fill with ground BEHIND the shot). `bandCentreBias` does the putt's equivalent,
+centring the ball↔cup span in the clear band rather than the frame — the putt screen carries the tallest
+panel of any state, so a frame-centred read sat low and crowded the controls.
+
+**Two things make this safe.** First, the band is measured **per play mode** (`playBandByMode`), not off
+whatever HUD happens to be in the DOM: a body is built while the PREVIOUS state's HUD is still mounted,
+and the panel's height legitimately differs between states (a pace meter is taller than a power bar).
+Each mode self-corrects once, on its first visit, behind a 6px threshold so content jitter (a match row,
+a longer club name) cannot cause a re-render loop. Second, the resolved bias is STORED — `decisionBias`
+and `puttViewBias`, exactly like the existing `decisionRadius`/`puttViewRadius` — and the watch camera
+reuses the stored value rather than re-deriving it. Re-deriving would read the *watch* state's panel and
+pop the camera on every single swing. `'watch'` is measured but never re-rendered for; a remount
+mid-flight would restart the shot.
+
+**Verified:** headless drive at 390×844. Ball in flight sits at y≈585 against a panel at 670 (85px clear,
+mid-band) and settles to exactly `panelTop − 28`. Before, the same shot flew at 709 behind a panel at 645.
+Full suite green (1879 tests + 12 in `tests/map-frame.test.ts`), typecheck clean.

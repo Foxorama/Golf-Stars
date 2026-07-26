@@ -491,6 +491,20 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     PERMANENT (hired ⇒ badge · no read here ⇒ dimmed · none ⇒ reserved placeholder), so the badge — not a
     canvas corner figure — is the caddy everywhere; `playView` takes a measured `caddyAnchor` (`{muzzle,head}`)
     and skips its own figure, absent ⇒ the classic corner figure (replay screen, unchanged).
+  - **THE HUD FLOATS OVER THE GOLF, SO THE CAMERA MUST FRAME AROUND IT** (GS-play-hud-space). The camera
+    biases the ball as LOW as the control panel allows and no lower (`project.ts clearOfPanelBias`; a low
+    ball is what fills the frame with the shot AHEAD, so "just centre it" is the wrong fix), and the putt
+    centres its ball↔cup span in the CLEAR BAND, not the frame (`bandCentreBias`). A flat constant put the
+    ball ~60px INSIDE the panel for the whole flight. Two rules: the band is measured **per play mode**
+    (`playBandByMode`) — a body is built while the PREVIOUS state's HUD is mounted and panel heights differ
+    per state — and the resolved bias is **STORED** (`decisionBias`/`puttViewBias`, the twins of
+    `decisionRadius`/`puttViewRadius`) for the watch camera to REUSE, since re-deriving it at release reads
+    the watch panel and pops the camera on every swing. Guarded by `tests/map-frame.test.ts`.
+  - **HUD height is bought back from WRAPPING, never from type size** (GS-play-hud-space). The readouts were
+    sized on a play-test verdict that they were too small; the space was going to wrapped rows instead — a
+    one-line stats row measuring 49px, and a controls column squeezed into 240 of 390px by its flanking
+    caddy/action columns, which wrapped every text row. Shorten the LINE (labels moved to the conditions
+    sub-line, narrower flanks) before touching a font size. 41%/46% of the screen → 34%/39%.
   - **CSS classes / DOM ids are GLOBAL and screens can't see each other's names** — new screen chrome gets
     its OWN prefix (bridge HUD `.gs-bhud`, resume `.gs-resume`, lore `.gs-lore`, star-tour content
     `.gs-sthud` — NEVER the play screen's `.gs-hud`, which the #353 map-blur regression proved). Grep the

@@ -193,6 +193,21 @@ function widthLabel(widthId?: string): string {
   return '';
 }
 
+/**
+ * The hole's shape + width archetype labels, for the CONDITIONS sub-line (GS-play-hud-space).
+ *
+ * They used to trail the hole/par/distance stats row, where — on a par 4 with any label at all — they
+ * pushed the live yardage onto a second line: a wrapped stats row measured 49px to carry one line's
+ * worth of content, the biggest single waste in the chip. They belong here anyway; "Drivable" and
+ * "Tight approach" are facts about the hole in front of you, exactly like the lie and the wind.
+ */
+function shapeWidthLabels(hole: Hole): string {
+  return [shapeLabel(hole.shapeId), widthLabel(hole.widthId)]
+    .filter(Boolean)
+    .map((l) => ` <span style="color:var(--gs-info);">${l}</span>`)
+    .join('');
+}
+
 /** The floating top-left info chip for the full-bleed hole screen (GS-fullmap): hole #/total, par +
  *  length, the live distance, the running zone score on line 1; a thin lie · wind sub-line + the
  *  momentum pips below. Conditions are pared to what matters (an armed lost-rough warning + scramble);
@@ -236,15 +251,13 @@ export function mapTopInfo(
       <div class="gs-stats">
         <span>⛳ <b>${play.holeIndex + 1}/${state.course.holes.length}</b></span>
         <span>Par <b>${play.hole.par}</b>·${len}y</span>
-        ${shapeLabel(play.hole.shapeId) ? `<span style="color:var(--gs-info);">${shapeLabel(play.hole.shapeId)}</span>` : ''}
-        ${widthLabel(play.hole.widthId) ? `<span style="color:var(--gs-info);">${widthLabel(play.hole.widthId)}</span>` : ''}
         <span class="gs-hud-dist">${opts.distLabel}</span>
       </div>
       <div class="gs-stats gs-stats--score">
         ${zoneScoreChip()}
         ${liveLeaderChip()}
       </div>
-      <div class="gs-sub">${lieChip(opts.lie ?? v.lie)} ${windDescription(play.hole)}${lostRough}</div>
+      <div class="gs-sub">${lieChip(opts.lie ?? v.lie)} ${windDescription(play.hole)}${lostRough}${shapeWidthLabels(play.hole)}</div>
       ${scrambleLine}
       ${state.match ? `<div style="margin-top:5px;">${matchHud()}</div>` : ''}
       ${!state.match && (state.run.storyTournament || state.run.storyQualifier) ? (() => { const chip = storySigilMatchChip(); return chip ? `<div style="margin-top:5px;">${chip}</div>` : ''; })() : ''}
