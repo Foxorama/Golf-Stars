@@ -13,7 +13,7 @@
  * a Canvas2D layer (`playView`); both share the pure projector so they agree exactly.
  */
 
-import type { Hole, Vec } from '../sim/course/contract';
+import { dist, type Hole, type Vec } from '../sim/course/contract';
 import type { PatchKind } from '../sim/patches';
 import type { ShotLog, ShotSpread } from '../sim/round';
 import { playBoundsCorners, sprayBlocking } from '../sim/round';
@@ -511,7 +511,12 @@ export function renderHoleSVG(hole: Hole, opts: RenderOptions = {}): string {
   // cell-shaded trees, OB boundary, centreline, tee + flag — is built ONCE by the shared
   // scene builder (so the SVG map and the Canvas play view look identical) and serialised.
   const parts: string[] = [
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">`,
+    // GS-a11y-announce: the map is a PICTURE, and its contents are already narrated in words by the
+    // live region (the situation preamble + each shot's report). Marking it `img` with a name stops a
+    // screen reader walking into it and reading the loose `<text>` yardage labels inside as a string
+    // of orphaned numbers, while still announcing that a hole diagram is here.
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}"` +
+      ` role="img" aria-label="Hole map: par ${hole.par}, ${Math.round(dist(hole.tee, hole.green))} yards. The shot is described in words as you play.">`,
     scenePrimsToSvg(
       buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, art: opts.art, rainbow: opts.rainbow, tradeTents: opts.tradeTents, meteorScorch: opts.meteorScorch, groundPatch: opts.groundPatch }),
       holeIdPrefix(hole), // ids are document-global — a per-hole prefix keeps co-mounted hole SVGs from cross-clipping

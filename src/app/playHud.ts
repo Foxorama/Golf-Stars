@@ -72,16 +72,26 @@ export function puttAimRow(breakYd: number, aim: number, reads: boolean, dbl = f
     </div>`;
 }
 
-/** Plain-language wind read relative to the hole's play direction (up = toward the green). */
-function windDescription(hole: Hole): string {
+/**
+ * The wind, read relative to the hole's play direction (up = toward the green), as DATA. The visible
+ * chip and the screen-reader narration (GS-a11y-announce) both build their words from this, so the
+ * spoken wind and the drawn wind can never disagree. `spd: 0` means calm.
+ */
+export function windRead(hole: Hole): { spd: number; kind: string; delta: number } {
   const w = hole.wind;
-  if (!w || w.spd < 1) return '🍃 Calm';
+  if (!w || w.spd < 1) return { spd: 0, kind: 'calm', delta: 0 };
   const holeBearing = bearing(hole.tee, hole.green);
   const delta = ((w.dir - holeBearing + 540) % 360) - 180; // −180..180; 0 = tailwind (toward green)
   const along = Math.cos((delta * Math.PI) / 180);
-  const kind = along > 0.4 ? 'tailwind' : along < -0.4 ? 'headwind' : 'crosswind';
-  const arrow = `<span style="display:inline-block;transform:rotate(${delta.toFixed(0)}deg);">⬆</span>`;
-  return `🌬 ${Math.round(w.spd)} mph ${kind} ${arrow}`;
+  return { spd: w.spd, kind: along > 0.4 ? 'tailwind' : along < -0.4 ? 'headwind' : 'crosswind', delta };
+}
+
+/** Plain-language wind read relative to the hole's play direction (up = toward the green). */
+function windDescription(hole: Hole): string {
+  const r = windRead(hole);
+  if (!r.spd) return '🍃 Calm';
+  const arrow = `<span style="display:inline-block;transform:rotate(${r.delta.toFixed(0)}deg);">⬆</span>`;
+  return `🌬 ${Math.round(r.spd)} mph ${r.kind} ${arrow}`;
 }
 
 /** The current lie as a prominent, colour-coded chip with its effect on the NEXT shot — so the
@@ -132,7 +142,14 @@ function holePips(): string {
     }
     return `<span class="gs-pip${i === cur ? ' gs-pip--cur' : ''}"></span>`;
   }).join('');
-  return `<div class="gs-pips" aria-hidden="true">${pips}</div>`;
+  // The rail encodes each hole's score in COLOUR ALONE, and the wrapper is aria-hidden — so the whole
+  // card so far was unavailable to a screen reader (GS-a11y-announce). Keep the pips decorative (they
+  // are a glanceable shape, not a table) and carry the same facts as text beside them.
+  const spoken = done.length
+    ? `Through ${done.length} of ${total}: ` +
+      done.map((h, i) => `hole ${i + 1}, ${h.record.strokes} on a par ${h.record.par}`).join('; ') + '.'
+    : `Hole 1 of ${total}, nothing played yet.`;
+  return `<div class="gs-pips" aria-hidden="true">${pips}</div><span class="gs-sr-only">${spoken}</span>`;
 }
 
 /** Running stop score vs the cut-to-beat, coloured by how the run is tracking:

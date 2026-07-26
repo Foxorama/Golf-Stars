@@ -231,11 +231,76 @@ rather than locking the player out.
 Guarded by `tests/a11y-focus.test.ts` (real-browser assertions on `inert`, `activeElement` and
 Enter-activation, plus a source guard that no `:focus-visible` rule leaves a control with no ring).
 
+---
+
+## GS-a11y-announce — the game says what it is doing
+
+### The problem
+
+Everything that actually happens in this game happens on a canvas. The ball flies, lands, kicks,
+runs out and finishes on a surface, and the only report of it is a picture. There was **no
+`aria-live` region anywhere in the app** — a player using a screen reader got silence for an entire
+round: no shot result, no penalty, no score, no idea where the ball was.
+
+### The shape of the fix
+
+**Pure builders + a guarded writer.** The builders turn sim state into a sentence and read the *same*
+`ShotLog` fields the visible shot card reads, so the spoken report and the drawn report cannot drift
+— the card is the picture of the sentence. Being pure, the exact wording is node-testable.
+
+Three things are load-bearing:
+
+1. **The live region lives OUTSIDE `#app`.** `render()` replaces `app.innerHTML` wholesale, and a
+   live region that is destroyed and rebuilt on every render is not reliably announced by any screen
+   reader — the element has to *persist* for its content change to register as a change.
+2. **`polite`, never `assertive`.** A golf shot resolving is news, not an alert; interrupting whatever
+   the player is reading to say "7 iron, 148 yards" would be worse than useless.
+3. **Hidden by clipping, not by `display:none`.** Both `display:none` and `visibility:hidden` remove
+   the node from the accessibility tree, which is exactly what a live region must not be.
+
+### What gets said, and when
+
+- **The situation, once per hole** — "Hole 3 of 18, par 4, 410 yards. Ball on the fairway, 155 yards
+  to the pin. Wind 12 miles per hour headwind." This is what a sighted player takes off the map in one
+  glance. Per *hole*, not per render or per shot: each shot's own report ends with the distance left,
+  so repeating the preamble every stroke would be noise. Keyed on the **course seed**, which changes
+  exactly when the stop does — including a replayed stop, which should narrate again.
+- **Each shot, the moment the ball is down** — fired alongside the sfx, not with the visible card,
+  because the card may be several hundred ms away or skipped entirely under Fast Shots. The lateral
+  miss is measured off the **aim ray**, exactly as the card measures it, so "20 yards right" means
+  right of where you aimed.
+- **A penalty leads**, because it changes the score and not just the position.
+
+Consecutive identical messages blank the region and re-set it on the next frame — a live region is
+announced on *change*, so two pars in a row would otherwise be silent the second time.
+
+### Also in this pass
+
+- **The hole map SVG is now `role="img"` with a name.** It had none, and a screen reader walked into
+  it and read the loose `<text>` yardage labels inside as a string of orphaned numbers.
+- **The momentum pips are readable.** They encoded each hole's score in **colour alone** and the
+  wrapper was `aria-hidden`, so the card so far was simply unavailable. The pips stay decorative (they
+  are a glanceable shape, not a table) and the same facts now sit beside them as `.gs-sr-only` text.
+- **Decorative canvases are hidden** — the weather overlay and the caddy portrait were unlabelled and
+  exposed. The weather that *matters* is the wind, which the preamble speaks.
+- `windRead()` was factored out of the HUD's wind chip so the drawn wind and the spoken wind come
+  from one source.
+
+### What was verified, and what wasn't
+
+The live region, its placement outside `#app`, and the **situation** announcement were verified in a
+real browser. The **shot-result** announcement could not be exercised end-to-end here: the ball-flight
+animation is `requestAnimationFrame`-driven and the automated browser pane does not composite frames,
+so the shot never settles. The wording is unit-tested and the call sits immediately beside the
+`sfx.holeOut()` / `sfx.penalty()` calls on the same settle callback, but **it deserves eyes-on
+confirmation with a real screen reader.**
+
+Guarded by `tests/a11y-announce.test.ts`.
+
 ### Still open (next passes)
 
 Recorded here so the audit isn't lost:
 
-- **No `aria-live` anywhere.** Shot results, score changes, penalties and shard totals are silent.
 - **Power and free-aim are pointer-only.** A keyboard user gets default aim at default power. The
   putt is a 1250ms sweeping canvas meter with no alternative.
 - **The hole map SVG has no accessible name** and leaks loose `<text>` yardages.
