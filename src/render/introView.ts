@@ -272,6 +272,19 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
   overlay.appendChild(skip);
 
   document.body.appendChild(overlay);
+  // The cinematic is a <body>-level takeover ABOVE #app, so the overlay focus pass (which only sees
+  // #app's own children) never backgrounded the title screen underneath: a keyboard player could Tab
+  // straight into buttons they could not see, and a screen reader read out a title screen the player
+  // had not reached yet. Seal it for as long as the overlay is up — `finish()` is the single exit and
+  // every path (skip tap, key, click, the end of the sequence, a frame throwing) goes through it.
+  const app = document.getElementById('app');
+  if (app) app.inert = true;
+  // …and Skip is the only thing on screen, so it should be where Tab already is.
+  try {
+    skip.focus({ preventScroll: true });
+  } catch {
+    /* focus is an enhancement */
+  }
   const ctx = canvas.getContext('2d');
 
   // A pre-rendered soft warm-white glow sprite. Stamping this with drawImage is cheap and
@@ -417,6 +430,7 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
     window.removeEventListener('resize', resize);
     window.removeEventListener('keydown', onKey);
     overlay.remove();
+    if (app) app.inert = false; // hand the app back BEFORE onDone, which may render + move focus
     opts.onDone?.();
   }
 

@@ -417,3 +417,164 @@ Recorded here so the audit isn't lost:
   select is viewport-locked (GS-select-onescreen) and the restructure deserves its own pass.
 - **Momentum pips are colour-only** (`playHud.ts`) and the wrapper is `aria-hidden`, so per-hole
   scores are unavailable to AT.
+
+---
+
+## GS-a11y-sheet-scroll / GS-a11y-tight-fit — the settings have to survive a phone (2026-07-26)
+
+The scale ladder shipped having verified exactly one property: *the play screen's commit row stays
+on-screen at every rung*. It does. Almost nothing else did, and the play-test report was blunt:
+
+> "settings in particular breaks with larger fonts, you can't scroll and so if you change the font
+> size you can no longer see settings above it… actually the settings are just basically borked
+> everywhere, the larger fonts size and readable text option just makes it more noticeable."
+
+Plus: the golfer dossier's hero image above the top of the display, golfer names cut off mid-word,
+the golfer card's preview text not fitting, the Voyage scout board opening off the top of the screen,
+and on the play screen — "you can't see the golfer or ball flight or really anything as the screen is
+obscured by the content boxes."
+
+Every one of those is one of **two** bugs.
+
+### Bug 1 — a `position: fixed` box bigger than the viewport is unreachable content
+
+The settings sheet is `position: fixed`, bottom-anchored, and had no height cap. At the top rung it
+measures **1515px against an 844px phone**: everything from the title down to "Save data" sat above
+y = 0, and *the page cannot scroll a fixed element* — that is what fixed means. The only reason this
+was not a hard soft-lock is that the size control happened to land in the visible third, so the
+player could set the scale back down and recover the rest of the sheet.
+
+Measured at 390×844, `.gs-settings`:
+
+| | top | scrolls |
+|---|---|---|
+| before, scale 1 | **−326px** | no |
+| before, scale 1.45 + readable | **−671px** | no |
+| after, either | 12px | yes |
+
+Note the first row: **this was already broken at the ship scale**, with default text, on a 390px
+phone. The scale ladder did not cause it; it made it impossible to ignore.
+
+The fix is the obvious one — cap to `var(--gs-dvh)`, scroll internally, `overscroll-behavior:
+contain` so a flick at the end of the list doesn't scroll the page behind the backdrop — applied to
+every fixed overlay in the app: the shared `.gs-sheet` (settings · scout board · price notice · exit
+confirm), the golfer dossier, the lore card, and the three celebration takeovers. Two details are
+load-bearing:
+
+- **`align-items: safe center` / `safe flex-end`, not `center` / `flex-end`.** A centred flex item
+  taller than its scroll container overflows in *both* directions and the browser cannot scroll to
+  the top of it — the classic centred-overflow trap. `safe` degrades to start alignment exactly when
+  the item overflows, which is the only time it matters.
+- **The sheet head is `position: sticky`.** Once the body scrolls, the ✕ is the only affordance
+  saying the sheet is dismissible; it must not scroll away.
+
+#### The guard was looking for the wrong string
+
+`tests/accessibility.test.ts` already banned raw viewport heights. It banned `100vh` and `100dvh`
+*literally*, in `index.html` only. So `max-height: 92vh` on the dossier walked straight past it, and
+so did nine other rules — `88vh`, `82vh`, `56vh`, `44vh`, `4vh`, three `60vh`s in TypeScript style
+strings, and the shop-arrival cinematic's `58vh`/`40vh`. The guard now matches **any** multiple of
+`vh`/`dvh`/`svh`/`lvh`, and walks `src/**/*.ts` as well as the stylesheet, because half this app's
+CSS lives in inline `<style>` blocks inside render modules. (`src/test/**` is exempt — the test hub
+is a separate page with no `--gs-uiscale` on it.) Both halves were verified to fail on a
+reintroduced regression before being committed.
+
+### Bug 2 — a media query cannot see the UI scale
+
+This is GS-a11y-scale-wrap's lesson, and it has a second half. Root `zoom` shrinks the layout box but
+leaves the media-query viewport at its physical size, so no breakpoint can answer "is this cramped at
+large text?". The first answer — make the content cope **intrinsically** — is still the right one
+and covers most cases:
+
+- **`overflow-wrap: anywhere` on the golfer name.** Not `break-word`: at 1.45× "Longshot" is wider
+  than half a 390px phone on its own, and only `anywhere` breaks a word with no break opportunity.
+- **`repeat(auto-fit, minmax(min(N px, 100%), 1fr))` instead of `1fr 1fr`.** A bare `1fr` is
+  `minmax(auto, 1fr)` and keeps a **min-content floor**, so a track whose content cannot shrink any
+  further pushes the whole grid wider than its container. That is why "Music", "Fast shots" and
+  "Readable text" hung off the right edge of the settings sheet, why the travel console's fuel gauge
+  slid under the centre command dial, and why the shop's "Travel onward" hero clipped to "Trave /
+  onwa". `auto-fit` also drops to one column on its own, which no breakpoint could decide.
+- **The character roster scrolls.** `.gs-charwrap` was `overflow: hidden` with `grid-auto-rows: 1fr`,
+  so when the cards genuinely needed more room than the phone had, the rows squeezed until the stats
+  and trait lines clipped and the bottom row vanished. Rows now keep a `min-content` floor and the
+  roster scrolls. **One screen is a goal, not a cage** — GS-select-onescreen's fit still wins
+  whenever it can be had, which is every phone at the ship scale.
+- **Tracking is held out of SVG `<text>`.** `letter-spacing`/`word-spacing` are inherited, so the
+  reader pair set on `body` reached every hole map, star chart and card illustration. Those labels
+  are placed at coordinates and cannot reflow: widening them ran the travel map's three lane captions
+  into each other and off the edge of the chart. The legible **family** still applies — that is the
+  part that survives on a fixed-position label.
+
+But a few layouts are a genuine **either/or** that no amount of wrapping resolves, and for those
+there is now one attribute: `data-gs-fit="tight"`, stamped on `<html>` by `app/viewportFit.ts` from
+`innerHeight / uiScale`. Nothing else in the app may compute a scaled viewport itself — the same rule
+`render/pixelRatio.ts` holds for DPR. Thresholds are 660 × 330 layout units, which reads *roomy* for
+a phone at the two lower rungs (so the game the player already knows is untouched) and *tight* at 1.3
+and 1.45 — and, correctly, on a 320×568 phone at the ship scale, where the same squeeze always
+applied.
+
+### The play HUD: 83% of the screen was chrome
+
+GS-play-hud-space already diagnosed this exact bug and named it — *"the flanking caddy/action columns
+cost the controls panel a THIRD of the screen width, which is what wrapped the power read and the
+spray legend onto second lines — vertical height spent to buy horizontal emptiness."* At the top rung
+it stops being a third. The phone lays out in 269 units; caddy 66 + action 40 + four gaps leave the
+panel **135**, and the control stack answers by growing from 265 units tall to 380.
+
+Measured at 390×844 (fraction of the viewport):
+
+| | info bar | controls bar | clear band |
+|---|---|---|---|
+| scale 1 | 13.4% | 21.6% | 65% |
+| 1.45 + readable, before | **38.4%** | **45.0%** | **16.6%** |
+| 1.45 + readable, after | 30.2% | 31.0% | **38.8%** |
+
+Two changes, both gated on `data-gs-fit`:
+
+1. **The flanking blocks stop being columns and become badges floating just above the panel**, over
+   the map. Nothing is removed and nothing moves between play states — GS-hud-frame's rule holds; the
+   caddy is still bottom-left, the auto-finish still bottom-right, both at the same size. The panel
+   gets the whole width, and its content stops wrapping.
+2. **The hole's shape/width descriptors come off the conditions line.** They are BRIEFING, not live
+   state: constant for the whole hole, and already read on the tee card. At the top rung that line
+   was four wrapped rows — 136 of the info chip's 325 units, more than the hole/par/score rows put
+   together. The lie, the wind and the yardage are the live ones and they win that argument.
+
+What was deliberately *not* done: shrinking type on the play screen. The player asked for bigger
+text. When the room runs out the answer is **fewer things at the same size**, never the same things
+smaller — that is the whole point of the setting.
+
+### The boot cinematic was never sealed
+
+Found while fixing the above, because it made a focus test fail deterministically instead of
+flakily. `mountIntro` appends its overlay to `<body>`, not to `#app`, and `applyOverlayFocus` only
+walks `#app`'s own children (deliberately — see GS-a11y-focus). So for the whole cinematic, Tab
+walked into a title screen the player could not see and had not reached, and a screen reader read it
+out. The overlay now marks `#app` `inert` while it is up and focuses its own Skip button; `finish()`
+is the single exit and every path — skip tap, key, click, end of sequence, a frame throwing — goes
+through it, so the app is always handed back.
+
+The three browser tests that were clicking into the app *during* the cinematic now pass `?intro=0`,
+which is what they always meant.
+
+### Guards
+
+`tests/a11y-mobile-layout.test.ts` — pure cases for the effective-viewport maths, then Chromium at
+390×844 on the top rung asserting the *properties*, not the pixels: the settings sheet's top and head
+are on screen **and it scrolls** (not merely short), the scout board opens below y = 0, no golfer
+name overflows its box, the dossier keeps its hero, the play screen's clear band is > 33% of the
+viewport with the controls panel > 90% of the bar's width — and, the other half of the contract, that
+at the ship scale `data-gs-fit` reads `roomy`, the caddy still sits *beside* the panel, and the
+descriptors are still on the conditions line. Plus the intro seal and its release.
+
+`scripts/a11y-scale-preview.mjs <screen> [scale] [readable]` is the eyes-on rig. Its `scrollAnc`
+column is the one to read: content hanging off the screen is only a bug when it says `none`.
+
+### Still open
+
+- The travel bridge's id pod still ellipsises the golfer's name to nothing at the top rung — the
+  fixed-width "Hole n" pill beside it wins the space. Letting the pair wrap breaks the pod's pill
+  shape; it wants a real layout pass, not a tweak.
+- The console's fuel gauge drops its cell bar at a tight fit and shows `⛽ n` alone, because twelve
+  cells in the width that is left works out at 8px total, which communicates nothing. The
+  `aria-label` still carries "Fuel n of m".

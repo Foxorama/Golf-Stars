@@ -113,14 +113,14 @@ function ensureArrivalStyle(): void {
       radial-gradient(1.1px 1.1px at 85% 50%, #fff6, transparent),
       radial-gradient(1.3px 1.3px at 55% 80%, #fff7, transparent),
       radial-gradient(1px 1px at 10% 75%, #fff6, transparent);}
-    .gs-arr__planet{position:absolute;left:50%;bottom:-58vh;width:150vw;max-width:1400px;aspect-ratio:1;
+    .gs-arr__planet{position:absolute;left:50%;bottom:calc(var(--gs-dvh) * -.58);width:150vw;max-width:1400px;aspect-ratio:1;
       transform:translateX(-50%);border-radius:50%;
       background:radial-gradient(circle at 42% 32%, color-mix(in srgb, var(--arr-ground2) 60%, #fff 10%),
         var(--arr-ground) 55%, color-mix(in srgb, var(--arr-ground) 70%, #000) 100%);
       box-shadow:0 -20px 90px -20px var(--arr-edge), inset 0 20px 60px #0006;
       animation:gs-arr-planet 2s cubic-bezier(.2,.7,.2,1) both;}
     @keyframes gs-arr-planet{from{transform:translateX(-50%) translateY(80px) scale(.9);}to{transform:translateX(-50%) translateY(0) scale(1);}}
-    .gs-arr__beam{position:absolute;left:50%;top:20%;width:26vw;max-width:220px;height:40vh;transform:translateX(-50%);
+    .gs-arr__beam{position:absolute;left:50%;top:20%;width:26vw;max-width:220px;height:calc(var(--gs-dvh) * .4);transform:translateX(-50%);
       background:linear-gradient(180deg, color-mix(in srgb, var(--arr-edge) 80%, #fff) , transparent 88%);
       clip-path:polygon(38% 0,62% 0,100% 100%,0 100%);opacity:0;
       animation:gs-arr-beam 2s ease both;animation-delay:.35s;}

@@ -16,7 +16,7 @@ import type { LoreLine } from '../sim/rpg/lore';
 export function storyMidBeatScreen(): string {
   const omen = state.pendingMidBeat;
   if (!omen) {
-    return `<div style="min-height:60vh;display:flex;align-items:center;justify-content:center;padding:24px;">${btn(
+    return `<div style="min-height:calc(var(--gs-dvh) * .6);display:flex;align-items:center;justify-content:center;padding:24px;">${btn(
       'Play on →',
       { type: 'storyMidBeatContinue' },
       { variant: 'primary' },
@@ -41,7 +41,7 @@ export function storyMidBeatScreen(): string {
 export function storyQuestBeatScreen(): string {
   const beat = state.pendingQuestBeat;
   if (!beat) {
-    return `<div style="min-height:60vh;display:flex;align-items:center;justify-content:center;padding:24px;">${btn(
+    return `<div style="min-height:calc(var(--gs-dvh) * .6);display:flex;align-items:center;justify-content:center;padding:24px;">${btn(
       'Play on →',
       { type: 'storyQuestBeatContinue' },
       { variant: 'primary' },
@@ -65,7 +65,7 @@ export function storyQuestBeatScreen(): string {
 export function storyQuestOfferScreen(): string {
   const beat = state.pendingQuestOffer;
   if (!beat) {
-    return `<div style="min-height:60vh;display:flex;align-items:center;justify-content:center;padding:24px;">${btn(
+    return `<div style="min-height:calc(var(--gs-dvh) * .6);display:flex;align-items:center;justify-content:center;padding:24px;">${btn(
       'Fly out together →',
       { type: 'storyQuestOfferContinue' },
       { variant: 'primary' },

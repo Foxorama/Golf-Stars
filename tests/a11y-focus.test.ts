@@ -52,7 +52,10 @@ describe('overlay focus + dialog semantics (real browser)', () => {
       const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
       try {
         const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-        await page.goto('file://' + dist, { waitUntil: 'load' });
+        // `?intro=0`: the boot cinematic is a <body>-level takeover that now (correctly) marks
+        // #app `inert` while it plays, so a test that clicks into the app has to skip it — and a
+        // test that DOESN'T skip it is silently racing the animation either way.
+        await page.goto('file://' + dist + '?intro=0', { waitUntil: 'load' });
         await page.waitForFunction(
           () => document.getElementById('app')?.getAttribute('data-booted') === '1',
           { timeout: 8000 },
@@ -123,7 +126,10 @@ describe('overlay focus + dialog semantics (real browser)', () => {
       const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
       try {
         const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-        await page.goto('file://' + dist, { waitUntil: 'load' });
+        // `?intro=0`: the boot cinematic is a <body>-level takeover that now (correctly) marks
+        // #app `inert` while it plays, so a test that clicks into the app has to skip it — and a
+        // test that DOESN'T skip it is silently racing the animation either way.
+        await page.goto('file://' + dist + '?intro=0', { waitUntil: 'load' });
         await page.waitForFunction(
           () => document.getElementById('app')?.getAttribute('data-booted') === '1',
           { timeout: 8000 },

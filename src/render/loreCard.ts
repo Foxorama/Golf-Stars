@@ -55,13 +55,13 @@ export function loreCardHTML(o: LoreCardOptions): string {
     </div>
   </div>
   <style>
-    .gs-lorecard-ov{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center;
+    .gs-lorecard-ov{position:fixed;inset:0;z-index:70;display:flex;align-items:safe flex-end;justify-content:center;
       background:rgba(5,7,12,0.7);backdrop-filter:blur(3px);animation:gs-lorecard-fade .16s ease both;}
     .gs-lorecard{position:relative;width:100%;max-width:460px;margin:0 8px;
       background:linear-gradient(180deg,#141926,#0e121b);border:1px solid #2b3346;border-radius:18px 18px 0 0;
       box-shadow:0 -10px 34px #000b;padding:18px 16px 20px;animation:gs-lorecard-rise .22s cubic-bezier(.2,.8,.2,1) both;
-      max-height:88vh;display:flex;flex-direction:column;}
-    @media(min-width:560px){.gs-lorecard-ov{align-items:center;}.gs-lorecard{border-radius:18px;}}
+      max-height:calc(var(--gs-dvh) * .88);display:flex;flex-direction:column;}
+    @media(min-width:560px){.gs-lorecard-ov{align-items:safe center;}.gs-lorecard{border-radius:18px;}}
     .gs-lorecard-x{position:absolute;top:8px;right:8px;width:34px;height:34px;border-radius:50%;
       border:1px solid #333c50;background:#0d1119;color:#9fb0c8;font-size:15px;cursor:pointer;line-height:1;}
     .gs-lorecard-x:hover{background:#161c28;color:#e6eefc;}

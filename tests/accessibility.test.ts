@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { UI_SCALES, clampUiScale } from '../src/settings';
 
@@ -62,9 +62,39 @@ describe('reader type tokens', () => {
     expect(css).toContain('--gs-dvh: calc(100dvh / var(--gs-uiscale))');
     // …and no rule may use a raw viewport height any more: an uncorrected `100dvh` box inside a
     // zoomed root measures one screen of ZOOMED units and overhangs the display.
+    //
+    // ANY multiple, not just 100 (GS-a11y-sheet-scroll). The original guard looked for `100vh`
+    // exactly and the golfer-dossier card slipped straight past it with `max-height: 92vh` — at the
+    // top rung that is 1.33 screens, and being bottom-anchored the card lost its whole hero image off
+    // the top of the display, with no way to scroll a `position: fixed` box back into view. Nine more
+    // rules were carrying the same bug.
     const afterTokens = css.slice(css.indexOf('* { box-sizing'));
-    expect(afterTokens).not.toMatch(/[^-]\b100dvh\b/);
-    expect(afterTokens).not.toMatch(/[^-]\b100vh\b/);
+    const raw = afterTokens.match(/(?<![-\w.])\d*\.?\d+(?:vh|dvh|svh|lvh)\b/g) ?? [];
+    expect(raw, `raw viewport heights (use var(--gs-vh) / calc(var(--gs-dvh) * n)): ${raw.join(', ')}`).toEqual([]);
+  });
+
+  it('no TypeScript-side style string uses a raw viewport height either', () => {
+    // Half the app's CSS is inline `<style>` blocks and `style="…"` attributes inside src/*.ts — the
+    // dossier card, the lore card, the shop-arrival cinematic, the story beat screens. The guard has
+    // to reach them or it only protects the half of the stylesheet that happens to live in
+    // index.html. `src/test/**` is the test hub, a separate page with no `--gs-uiscale` on it.
+    const offenders: string[] = [];
+    const walk = (dir: string): void => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const full = resolve(dir, e.name);
+        if (e.isDirectory()) {
+          if (e.name !== 'test') walk(full);
+          continue;
+        }
+        if (!e.name.endsWith('.ts')) continue;
+        const src = readFileSync(full, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+        for (const m of src.match(/(?<![-\w.])\d*\.?\d+(?:vh|dvh|svh|lvh)\b/g) ?? []) {
+          offenders.push(`${full.slice(full.indexOf('src/'))}: ${m}`);
+        }
+      }
+    };
+    walk(resolve(__dirname, '../src'));
+    expect(offenders, `raw viewport heights in TS style strings:\n${offenders.join('\n')}`).toEqual([]);
   });
 
   it('ships NO font file and NO @font-face — the readable mode is spacing + system faces', () => {

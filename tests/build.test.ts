@@ -93,7 +93,10 @@ describe('build output (real browser)', () => {
         const page = await browser.newPage();
         const errors: string[] = [];
         page.on('pageerror', (e) => errors.push(e.message));
-        await page.goto('file://' + dist, { waitUntil: 'load' });
+        // `?intro=0`: the boot cinematic is a <body>-level takeover that now (correctly) marks
+        // #app `inert` while it plays, so a test that clicks into the app has to skip it — and a
+        // test that DOESN'T skip it is silently racing the animation either way.
+        await page.goto('file://' + dist + '?intro=0', { waitUntil: 'load' });
         await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', { timeout: 8000 });
         const text = (await page.textContent('#app')) || '';
         expect(errors).toEqual([]);

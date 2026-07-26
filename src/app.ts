@@ -9,6 +9,7 @@
 import { scoreName, playTotals, stablefordPoints } from './sim/score';
 import { mountPlayView, type PlayViewHandle } from './render/playView';
 import { installDecorProbe } from './render/decorProbe';
+import { applyViewportFit, watchViewportFit } from './app/viewportFit';
 import { renderHoleSVG, renderPuttOverlaySVG, PUTT_OVERLAY_ID, renderShotOverlaySVG, SHOT_OVERLAY_ID } from './render/holeView';
 import { bandCentreBias, clearOfPanelBias, fitFrame, type ProjectOptions } from './render/project';
 import { shotView, previewShot, previewBackspin, resolveAimTarget, awaitingPutt, canPuttFringe, type AimMode } from './sim/rpg/play';
@@ -158,6 +159,9 @@ function boot(): void {
     // Reader type/scale go on <html> BEFORE the first paint (GS-a11y-readable-text) — applied
     // after it, a large-text player watches the whole app re-lay itself out on every load.
     applyReaderSettings();
+    // …and the scale-aware fit class alongside it (GS-a11y-tight-fit): a media query can't see the
+    // root zoom, so the play HUD's either/or reflow reads this attribute instead.
+    watchViewportFit();
     installDecorProbe(); // GS-decor-view-states: test-only `window.__gsDecorProbe` for the CI view-invariance check
     const save = loadSave();
     stage('loaded');
@@ -572,7 +576,7 @@ function recover(err: unknown): void {
     const app = document.getElementById('app');
     if (app) {
       app.innerHTML =
-        '<main style="font-family:system-ui;color:#e8e8ea;background:#0b0d12;padding:24px;min-height:100vh;">⛳ Something went wrong and the save was reset. Refresh to start fresh.</main>';
+        '<main style="font-family:system-ui;color:#e8e8ea;background:#0b0d12;padding:24px;min-height:var(--gs-vh);">⛳ Something went wrong and the save was reset. Refresh to start fresh.</main>';
     }
   }
 }
@@ -2643,6 +2647,7 @@ function wireSettingsSheet(root: ParentNode): void {
       e.stopPropagation();
       setSetting('uiScale', clampUiScale(Number(el.dataset.selscale)));
       applyReaderSettings();
+      applyViewportFit(); // the scale IS one of the two inputs to "is this tight?"
       sfx.click();
       haptic(HAPTICS.tap);
       render();

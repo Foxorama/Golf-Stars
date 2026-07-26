@@ -528,6 +528,41 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     one positive result resolved to SPACING, not shapes; so the toggle buys tracking/word-spacing/leading,
     kills italics and justification, and asks for legible faces already on the device. Guarded by
     `tests/accessibility.test.ts`.
+  - **A `position:fixed` BOX BIGGER THAN THE VIEWPORT IS UNREACHABLE CONTENT** (GS-a11y-sheet-scroll) —
+    the page cannot scroll it, that is what fixed MEANS. Every overlay caps itself to `var(--gs-dvh)` and
+    scrolls INSIDE (`overscroll-behavior:contain`), and centres with **`align-items:safe center`**, never
+    `center` — a centred item taller than its scroller overflows BOTH ways and its top can't be reached.
+    The settings sheet measured **1515px on an 844px phone** at the top rung with everything above "Save
+    data" gone for good (and was already −326px at the SHIP scale, default text); the sheet head is
+    `sticky` so the ✕ survives the scroll. **NO RAW VIEWPORT UNIT ANYWHERE** — any multiple, not just
+    `100vh`: the old guard matched the literal `100vh`/`100dvh` in `index.html` and ten rules walked past
+    it (`92vh` on the golfer dossier, three `60vh`s in TS style strings). The guard now bans
+    `\d+(vh|dvh|svh|lvh)` in the stylesheet AND in `src/**/*.ts` (`src/test/**` exempt — separate page,
+    no `--gs-uiscale`).
+  - **`1fr` IS `minmax(auto, 1fr)` AND `auto` IS A MIN-CONTENT FLOOR** — a track whose item can't shrink
+    further pushes the whole grid past its container. That one default is why the settings chips hung off
+    the sheet, the travel console's fuel gauge slid under the command dial, and the shop's hero CTA
+    clipped to "Trave/onwa". Use `repeat(auto-fit, minmax(min(Npx, 100%), 1fr))`: it can't blow out AND it
+    drops a column on its own, which no breakpoint could decide.
+  - **WHEN WRAPPING CAN'T RESOLVE IT, BRANCH ON `data-gs-fit`, NEVER A BREAKPOINT** (GS-a11y-tight-fit,
+    `app/viewportFit.ts` — the ONLY module that may compute a scaled viewport, like `pixelRatio.ts` for
+    DPR). Intrinsic sizing is still the first answer; `data-gs-fit="tight"` (`innerHeight/uiScale < 660`
+    or width `< 330`) is for the genuine either/ors. Today that is the play HUD: the caddy badge + `»`
+    stop FLANKING the controls panel (66+40+gaps of 269 units left it **135** to lay out in, so the stack
+    grew 265→380) and float over the map just above it — nothing removed, nothing moved between states —
+    and the hole's shape/width descriptors leave the conditions line, because they are BRIEFING (constant
+    for the hole, already on the tee card) not live state. **83% chrome → 61%, clear band 17%→39%.**
+    Never buy HUD room back by shrinking type on the very setting that asked for bigger type: at a tight
+    fit show FEWER things at the SAME size.
+  - **TRACKING IS HELD OUT OF SVG `<text>`** — `letter-spacing`/`word-spacing` inherit, and an SVG label
+    is GEOMETRY placed at coordinates: it can't wrap, so widening it ran the travel map's lane captions
+    off the chart. The legible FAMILY still applies.
+  - **ONE SCREEN IS A GOAL, NOT A CAGE** — a viewport-locked screen that `overflow:hidden`s content it
+    genuinely can't fit has hidden it for good. `.gs-charwrap` squeezed `grid-auto-rows:1fr` until the
+    cards clipped mid-word; rows now keep a `min-content` floor and the roster SCROLLS.
+    GS-select-onescreen's fit still wins wherever it can be had (every phone at the ship scale). Guarded
+    by `tests/a11y-mobile-layout.test.ts`; eyes-on rig `scripts/a11y-scale-preview.mjs` (read its
+    `scrollAnc` column — off-screen is only a BUG when it says `none`).
   - **AN OVERLAY IS A DIALOG, AND EVERY CONTROL IS OPERABLE BY KEYBOARD** (GS-a11y-focus,
     `app/focus.ts`). ONE pass at the END of `render()` — never a patched overlay builder — so a NEW
     overlay gets the behaviour by existing: `role="dialog"`/`aria-modal`/a name off its own heading,
@@ -540,7 +575,10 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     throws the player to the top of the sheet); and only a DIRECT child of the app root is treated as an
     overlay (inerting `<main>` around a nested one would inert the overlay itself and freeze the app). Every
     non-native `role="button"` gets a tab stop + Enter/Space via `wireRoleButtonKeys`, which synthesises a
-    **click** so there is no second activation path to keep in step. A bare `:focus-visible` ring is a
+    **click** so there is no second activation path to keep in step. A `<body>`-LEVEL takeover is NOT
+    covered by this pass (it only walks `#app`'s children) and must seal the app itself — the boot
+    cinematic sets `#app.inert` while it plays and releases it in its single `finish()`; before that, Tab
+    walked into a title screen the player couldn't see. A bare `:focus-visible` ring is a
     specificity FLOOR (0,1,0), so bespoke rings still win — but a rule that sets `outline:none` must restore
     one. Guarded by `tests/a11y-focus.test.ts`.
   - **THE GAME SAYS WHAT IT IS DOING** (GS-a11y-announce, `app/announce.ts`). Everything that happens

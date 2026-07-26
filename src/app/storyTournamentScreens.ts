@@ -609,7 +609,7 @@ const TOURN_STYLE = `
 export function storyTournamentAftermathScreen(): string {
   const beat = state.pendingAftermath;
   if (!beat) {
-    return `<div style="min-height:60vh;display:flex;align-items:center;justify-content:center;padding:24px;">${btn(
+    return `<div style="min-height:calc(var(--gs-dvh) * .6);display:flex;align-items:center;justify-content:center;padding:24px;">${btn(
       'Continue →',
       { type: 'storyAftermathContinue' },
       { variant: 'primary' },
