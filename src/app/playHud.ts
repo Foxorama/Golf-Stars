@@ -16,7 +16,7 @@ import { caddyReadsGreen } from '../sim/rpg/storyCaddies';
 import { heraldShortName } from '../sim/rpg/storyHeraldCrew';
 import { storySigilMatchChip } from './storySigilHud';
 import { bearing, dist, type Hole } from '../sim/course/contract';
-import { lieInfo, roughLieOf } from '../sim/shot';
+import { lieInfo, reliedLie, roughLieOf, windResistFactor } from '../sim/shot';
 import { playTotals } from '../sim/score';
 import { currentBoss, effectiveCut, holeGateArmed } from '../sim/rpg/run';
 import { endlessSetGateOverPar, endlessSetLabel, endlessSetToPar, formatToPar, toParColour } from '../sim/rpg/endless';
@@ -108,13 +108,27 @@ export function puttAimRow(breakYd: number, aim: number, reads: boolean, dbl = f
  * (`shot.ts playWind` reads head/tail/cross off the SHOT bearing, never the hole's) — so the needle
  * agrees with the physics AND with the picture. Absent ⇒ byte-for-byte the old read.
  */
-export function windRead(hole: Hole, upBearing?: number): { spd: number; kind: string; delta: number } {
+export function windRead(
+  hole: Hole,
+  upBearing?: number,
+  windResist?: number,
+): { spd: number; rawSpd: number; cut: boolean; kind: string; delta: number } {
   const w = hole.wind;
-  if (!w || w.spd < 1) return { spd: 0, kind: 'calm', delta: 0 };
+  if (!w || w.spd < 1) return { spd: 0, rawSpd: 0, cut: false, kind: 'calm', delta: 0 };
   const up = upBearing ?? bearing(hole.tee, hole.green);
   const delta = ((w.dir - up + 540) % 360) - 180; // −180..180; 0 = tailwind (the way you are playing)
   const along = Math.cos((delta * Math.PI) / 180);
-  return { spd: w.spd, kind: along > 0.4 ? 'tailwind' : along < -0.4 ? 'headwind' : 'crosswind', delta };
+  // `spd` is what the BALL feels, not what the sky is doing (GS-hud-gear-reads): wind-cheating gear
+  // scales the along-shot carry effect AND the crosswind drift by the same factor, off the sim's own
+  // `windResistFactor`, so a 45%-resist ball can never be shown a 20 mph gale it will fly through at 11.
+  const f = windResistFactor(windResist);
+  return {
+    spd: w.spd * f,
+    rawSpd: w.spd,
+    cut: f < 0.999,
+    kind: along > 0.4 ? 'tailwind' : along < -0.4 ? 'headwind' : 'crosswind',
+    delta,
+  };
 }
 
 /**
@@ -123,12 +137,14 @@ export function windRead(hole: Hole, upBearing?: number): { spd: number; kind: s
  * its tooltip carries the label so "why is the air like this" is one long-press away.
  */
 function windCompass(hole: Hole, upBearing?: number): string {
-  const r = windRead(hole, upBearing);
+  const r = windRead(hole, upBearing, state.run.loadout.windResist);
   const eff = currentEffect();
   const info = eff && eff !== 'none' ? COURSE_EFFECTS[eff as CourseEffectId] : undefined;
-  const title = r.spd ? `${Math.round(r.spd)} mph ${r.kind}` : 'Calm air';
+  const title = r.spd
+    ? `${Math.round(r.spd)} mph ${r.kind}${r.cut ? ` — your gear cuts the sky's ${Math.round(r.rawSpd)} mph` : ''}`
+    : 'Calm air';
   return `<div class="gs-hudx__compass" title="${title}${info ? ` · ${info.label}` : ''}">
-      ${windCompassSVG(r)}
+      ${windCompassSVG({ spd: r.spd, kind: r.kind, delta: r.delta, cut: r.cut })}
       ${info ? `<span class="gs-hudx__sky" aria-hidden="true">${info.icon}</span>` : ''}
       <span class="gs-sr-only">${title}${info ? `, ${info.label}` : ''}.</span>
     </div>`;
@@ -138,20 +154,33 @@ function windCompass(hole: Hole, upBearing?: number): string {
  *  player always knows what they're playing from and how it bites (carry penalty + spray), shown
  *  right where the shot decision is made. This is the lie-awareness the per-shot popup used to
  *  carry, moved to the moment it actually matters. */
-function lieChip(lie: string): string {
+export function lieChip(lie: string, relief?: number): string {
   const info = lieInfo(lie);
+  // What this lie costs YOU, not what it costs a bare bag (GS-hud-gear-reads). An escape-specialist
+  // caddy and a pile of story gear grant `lieRelief`, which eases a penalising lie back toward
+  // neutral — and the chip was reading the raw table, so a bunker announced "−50% carry · wild" to a
+  // player whose gear had already halved that, while the aim cone beside it drew the eased shot. This
+  // is the sim's OWN `reliedLie`, the function `resolveShot` and `shotSpread` both call, so the words
+  // and the physics cannot drift.
+  const eased = reliedLie(info, relief);
   const label = info.label ?? lie;
   const carryPen =
-    info.carryMult < 0.99 ? `−${Math.round((1 - info.carryMult) * 100)}% carry`
-    : info.carryMult > 1.01 ? `+${Math.round((info.carryMult - 1) * 100)}% carry` // hot/fast lies fly long
+    eased.carryMult < 0.99 ? `−${Math.round((1 - eased.carryMult) * 100)}% carry`
+    : eased.carryMult > 1.01 ? `+${Math.round((eased.carryMult - 1) * 100)}% carry` // hot/fast lies fly long
     : '';
-  const spray = info.dispersionMult >= 1.55 ? 'very wild' : info.dispersionMult >= 1.25 ? 'wild' : info.dispersionMult > 1.05 ? 'loose' : '';
-  const eff = [carryPen, spray].filter(Boolean).join(' · ');
-  const trouble = !!info.penalty || info.carryMult <= 0.6 || info.dispersionMult >= 1.55;
-  const caution = info.carryMult < 0.95 || info.dispersionMult > 1.15;
+  const spray = eased.dispersionMult >= 1.55 ? 'very wild' : eased.dispersionMult >= 1.25 ? 'wild' : eased.dispersionMult > 1.05 ? 'loose' : '';
+  const effTxt = [carryPen, spray].filter(Boolean).join(' · ');
+  const trouble = !!info.penalty || eased.carryMult <= 0.6 || eased.dispersionMult >= 1.55;
+  const caution = eased.carryMult < 0.95 || eased.dispersionMult > 1.15;
   const col = trouble ? '#ff6b6b' : caution ? '#ffc454' : '#5fd45a';
   const dot = trouble ? '🔴' : caution ? '🟠' : '🟢';
-  return `<span class="gs-liechip" style="border-color:${col};color:${col};">${dot} <b style="color:var(--gs-ink);">${label}</b>${eff ? ` <span style="opacity:.85;">${eff}</span>` : ''}</span>`;
+  // The relief only SHOWS as a softer number, so the tooltip says where the softening came from —
+  // otherwise a good bag quietly looks like an easy course.
+  const helped = !!relief && (info.carryMult < 1 || info.dispersionMult > 1);
+  const title = helped
+    ? `${label} — eased by your gear (a bare bag plays it at −${Math.round((1 - info.carryMult) * 100)}% carry)`
+    : label;
+  return `<span class="gs-liechip" title="${title}" style="border-color:${col};color:${col};">${dot} <b style="color:var(--gs-ink);">${label}</b>${effTxt ? ` <span style="opacity:.85;">${effTxt}</span>` : ''}${helped ? ` <span style="color:#7fd8ff;" title="your gear is easing this lie">🛡</span>` : ''}</span>`;
 }
 
 /** Friendly name for a penalty surface in Sam's hazard read (the carry-to-clear callout). */
@@ -315,7 +344,7 @@ export function mapTopInfo(
           ${pod(opts.dist.big, opts.dist.cap, { hero: true })}
           ${zoneScoreChip()}
         </div>
-        <div class="gs-hudx__lie">${lieChip(opts.lie ?? v.lie)}${lostRough}${place ? ` <span class="gs-hudx__place">${place}</span>` : ''}</div>
+        <div class="gs-hudx__lie">${lieChip(opts.lie ?? v.lie, state.run.loadout.lieRelief)}${lostRough}${place ? ` <span class="gs-hudx__place">${place}</span>` : ''}</div>
       </div>
       ${scrambleLine}
       ${state.match ? `<div style="margin-top:5px;">${matchHud()}</div>` : ''}

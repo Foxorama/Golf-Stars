@@ -767,6 +767,19 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     ＋/－ are retired in favour of pinch. The Stableford pod colours by PACE (`cut × holesPlayed / holes`), never
     the raw gap — the old test opened every stop on a red zero. Guarded by `tests/hud-topbar.test.ts`
     (bar 112→88px, band 50%→80%).
+  - **A READOUT ANSWERS FOR THE PLAYER'S BAG, NOT A BARE ONE** (GS-hud-gear-reads). The lie chip printed
+    `lieInfo(lie)` and the wind read printed `hole.wind.spd` — the raw TABLE and the raw SKY — so a bunker
+    said "−50% carry · wild" to a player whose escape caddy/story gear had already halved it, and a
+    45%-resist ball was shown the 20mph gale it flies through at 11. The aim cone beside them was already
+    honest (`previewShot` gets the whole loadout), so the TEXT was the only liar. Both now fold the sim's
+    OWN function — `reliedLie` for the lie, `windResistFactor` for the wind (ONE clamp, used by
+    `resolveShot`/`shotSpread`/`aimWithWind` and the dial; story clubs add `windResist` uncapped, so a
+    display that clamped differently would print a negative wind). **A perk needs a TELL**: the eased lie
+    wears a 🛡 and the cut dial rings itself cyan, or good gear just makes the world look easy. The
+    once-per-hole a11y narration passes the same `windResist` — spoken and drawn are one read. Guarded by
+    `tests/hud-gear-reads.test.ts` (expectations derived from the sim's functions, never hard-coded).
+    ⚠️ When adding a HUD number, ask which loadout field the sim applies to it — `lieChip` is pure
+    (`lie`, `relief`) precisely so the answer is visible in its signature.
   - **THE HUD FLOATS OVER THE GOLF, SO THE CAMERA MUST FRAME AROUND IT** (GS-play-hud-space). The camera
     biases the ball as LOW as the control panel allows and no lower (`project.ts clearOfPanelBias`; a low
     ball is what fills the frame with the shot AHEAD, so "just centre it" is the wrong fix), and the putt

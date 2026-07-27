@@ -25,6 +25,7 @@ import {
   sprayBands,
   SPRAY_GEOM,
   TUNABLES,
+  windResistFactor,
   type CaddyGuard,
   type ShapeMod,
   type ShotResult,
@@ -1553,7 +1554,7 @@ export function shotSpread(
   const mods = opts.shotMods ? opts.shotMods(nominal) : NEUTRAL_SHOT_MODS;
   const dispMult = relief.dispersionMult * (opts.dispersionMult ?? 1) * mods.dispMult;
   const prof = dispersionProfile(nominal);
-  const along = w.along * TUNABLES.windCarryPerMph * (1 - Math.max(0, Math.min(1, opts.windResist ?? 0)));
+  const along = w.along * TUNABLES.windCarryPerMph * windResistFactor(opts.windResist);
   // Carry window mirrors resolveShot's clamp (distance-control / wedge-window), so the preview's
   // min/max carry read exactly what the shot will do.
   const cw = carryControlFor(club.id, nominal, opts);
@@ -2966,7 +2967,7 @@ function aimWithWind(
   const { cross } = playWind(wind, shotBearingDeg);
   // Reduced weather impact (GS-proshop-2): the ball drifts LESS in wind, so the upwind compensation
   // shrinks by the SAME factor resolveShot scales the actual push — keeping aim consistent. 0 = full.
-  const wr = 1 - Math.max(0, Math.min(1, windResist));
+  const wr = windResistFactor(windResist);
   const drift = cross * TUNABLES.windLateralPerMph * wr; // +drift pushes to the shot's right
   if (drift === 0) return target;
   // Right-perpendicular of the shot bearing (matches resolveShot's lateral convention).

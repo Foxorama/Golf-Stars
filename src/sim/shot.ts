@@ -476,6 +476,20 @@ export function reliedLie(li: LieInfo, relief?: number): { carryMult: number; di
   };
 }
 
+/**
+ * How much of the wind a shot actually FEELS, as a 0..1 factor (GS-hud-gear-reads).
+ *
+ * Wind-cheating gear (`windResist` — the Wind-Cheater ball, a handful of story gear and clubs) scales
+ * BOTH the along-shot carry effect and the crosswind drift by the same factor, and the sources stack
+ * uncapped before the sim clamps them. That clamp used to be written out twice, and the HUD's wind
+ * read did not do it at all — so a player with a 45%-resist ball was shown the world's raw 20 mph
+ * gale while the ball flew as if in 11. One function, used by the physics AND by the dial that
+ * reports it, so the number on screen is the number the ball plays into.
+ */
+export function windResistFactor(windResist?: number): number {
+  return 1 - Math.max(0, Math.min(1, windResist ?? 0));
+}
+
 // --- Penalty model (PEN_INFO analogue) --------------------------------------
 export interface PenaltyInfo {
   /** Penalty strokes added. */
@@ -755,7 +769,7 @@ export function resolveShot(input: ShotInput): ShotResult {
   // headwind carry loss (carryMean below) and the crosswind push (windLat below) read off this `w`, so
   // they shrink TOGETHER — and `aimWithWind` scales its upwind compensation by the same factor, so the
   // aim stays consistent. windResist 0/undefined ⇒ `wr === 1` ⇒ byte-for-byte unchanged.
-  const wr = 1 - clamp01(input.windResist ?? 0);
+  const wr = windResistFactor(input.windResist);
   const wRaw = wind ? playWind(wind, shotBearing) : { along: 0, cross: 0 };
   const w = wr === 1 ? wRaw : { along: wRaw.along * wr, cross: wRaw.cross * wr };
 

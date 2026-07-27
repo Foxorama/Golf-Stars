@@ -510,6 +510,13 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-hud-gear-reads** — the HUD stopped quoting a bare bag (`docs/decisions/ui-intro.md`). The lie chip
+  printed the raw LIE TABLE and the wind read printed the raw SKY, so a bunker said "−50% carry · wild" to
+  a player whose escape caddy had halved it and a 45%-resist ball was shown the 20mph gale it flies through
+  at 11 — while the aim cone beside them was already honest, because `previewShot` gets the whole loadout.
+  Both now fold the sim's OWN function (`reliedLie`; a new single-source `windResistFactor`, since story
+  clubs add `windResist` uncapped and a differently-clamped display would print a negative wind), and a perk
+  that only shows as a softer number now carries a TELL — a 🛡 on the chip, a cyan shield ring on the dial.
 - **GS-hud-compass** — the top bar became an instrument cluster (`docs/decisions/ui-intro.md`). Six
   independently-wrapping rows of overlapping readouts (hole/total · par+length · live yardage · points ·
   placing · lie · a wind SENTENCE · two hole descriptors) collapsed into one row of PODS — big value over

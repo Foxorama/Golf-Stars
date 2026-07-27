@@ -687,6 +687,68 @@ and watching, which is the assertion that would have caught the reflow.
 
 ---
 
+## GS-hud-gear-reads: the HUD stops quoting a bare bag (2026-07-27)
+
+Straight off the back of the cluster, and reported the moment the numbers got bigger: *"does the lie
+chip account for caddie and item upgrades? As far as I can tell it doesn't — bunkers always read as
+50% shot reduced regardless of your gear. Same with wind."*
+
+Both true. Both the same shape of mistake, and it is worth naming because it will happen again:
+
+| readout | what it printed | what the sim does |
+| --- | --- | --- |
+| lie chip | `lieInfo(lie)` — the raw TABLE | `reliedLie(li, loadout.lieRelief)` — an escape-specialist caddy and ~10 story gear rows ease a penalising lie toward neutral |
+| wind | `hole.wind.spd` — the raw SKY | `windResist` (the Wind-Cheater ball, story gear, clubs, a Herald agent) scales the along-shot carry effect AND the crosswind drift by the same factor |
+
+The tell that this was a text bug and not a physics bug: **the aim cone drawn right next to them was
+already correct**, because `previewShot` is handed the whole loadout. So the player was looking at two
+descriptions of one shot that disagreed by exactly the value of their bag.
+
+### The fix, and the rule it leaves behind
+
+Each readout now folds *the sim's own function* — not a re-derivation:
+
+- the chip calls `reliedLie`, the same function `resolveShot` and `shotSpread` call;
+- the wind read calls `windResistFactor`, which is **new, and is the point**: the clamp
+  (`1 − clamp01(resist)`) had been written out three times across `shot.ts` and `round.ts` and a
+  fourth copy in the HUD would have been the obvious way to "fix" this. Story clubs add `windResist`
+  *uncapped* (`(m.windResist ?? 0) + 0.15`, no `Math.min`), so a stacked bag can exceed 1 and a display
+  that clamped differently would print a negative wind. One function, four callers.
+
+**A perk needs a TELL.** The first pass just showed the softer number, which is honest and invisible:
+a well-equipped player would have concluded the courses had got easier. So the eased lie chip wears a
+🛡 and the cut dial rings itself in shield cyan with a cyan `MPH`, and both tooltips say what the bare
+bag would have played (`"Bunker — eased by your gear (a bare bag plays it at −50% carry)"`).
+
+`lieChip` was made PURE for this — `(lie, relief?)` rather than reaching into `state` — so which
+loadout field it accounts for is visible in its signature, and the guard can assert it against
+`reliedLie` without a booted run.
+
+Two smaller things that fell out:
+
+- the narration passes the same `windResist`, because a sighted player now reads the gear-adjusted
+  number off the dial and the spoken line has to be the same read (GS-a11y-announce's "spoken and
+  drawn can't drift" applies across features, not just within one);
+- the dial reads `CALM` below 0.5 mph rather than `0`, which is now reachable through gear alone.
+
+### What was checked and found already honest
+
+The club picker's per-club carry: distance items rewrite the BAG rows themselves
+(`boostDistanceClubs` returns `{...c, carry: c.carry + add}`), so the number on the card is the
+upgraded one. Sam's green-depth and forced-carry reads are geometry, not gear.
+
+### Guards
+
+`tests/hud-gear-reads.test.ts` — pure, and every expectation is **derived from the sim's function**
+rather than hard-coded, because the property that matters is that the two cannot drift, not that a
+bunker is 50%. Plus: relief never improves an already-clean lie (a relieved fairway chip is
+byte-for-byte the bare one), the wildness WORD eases too and not just the carry, the stacked-resist
+clamp matches, and the shield tell appears only when something is actually being cut. One trap worth
+keeping in the helper: the tooltip quotes the bare-bag number, so a regex over the raw markup reads
+the attribute and passes on a chip that never changed — strip the tags first.
+
+---
+
 ## Migrated from CLAUDE.md — System-index bullets (2026-07-23 refactor)
 
 > These are the verbatim terse System-index bullets moved out of `CLAUDE.md` when it was

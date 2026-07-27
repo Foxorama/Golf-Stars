@@ -4055,7 +4055,10 @@ function render(): void {
     const key = `${state.course.seed}:${p.holeIndex}`;
     if (key !== announcedHoleKey) {
       announcedHoleKey = key;
-      const w = windRead(p.hole);
+      // The same gear-adjusted read the compass draws (GS-hud-gear-reads): a sighted player now sees
+      // the wind the BALL feels on the dial, so the narration must speak that number too, or the two
+      // descriptions of the same fact disagree by however much the player's gear is worth.
+      const w = windRead(p.hole, undefined, state.run.loadout.windResist);
       announce(
         situationSentence({
           holeNumber: p.holeIndex + 1,
