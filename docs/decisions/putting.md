@@ -1331,3 +1331,82 @@ GS-landing-real put it (868ms / 31%). At the old **0.16** the driver collapses t
 skip**: the "every airborne shot bounces at least once" floor is still met, but the skipping read is gone.
 That is the coupling to remember — hop length scales with CARRY and is capped by the sim's roll, so
 shrinking the release without retuning `hopLenK` silently swallows the whole train in one hop.
+
+## GS-runout-visible / GS-roll-hairpin — the bounce was smaller than the ball, and the creep was a magnet (2026-07-27)
+
+Two reports in one sentence: *"for backspin and green contours the ball is doing the weird path roll
+instead of a curve from last bounce to final lie and it just looks buggy as heck. with all clubs as well,
+it looks like it's not correctly doing the land and bounce as an adjusted % on total shot distance, but
+instead calculating it from max distance… Or it might be something where the bounces are going way too
+fast and are not visible."*
+
+Both halves were real. Neither had the cause the report guessed, and the two turned out to be unrelated.
+
+### The bounce: right symptom, wrong mechanism
+
+The proposed cause — a bounce sized off MAX distance rather than the shot's own — is not what the code
+does. `playView` passes `shot.result.carry`, the actual carry; hop length scales with it and the roll
+scales with it, so a half-power shot gets half the hop and half the roll, proportionally.
+
+What was actually wrong is that `apexOverLen` — the ceiling on a hop's apex as a fraction of its own
+length — was a flat **0.3** for every club. A hop's length is bounded by the sim's ROLL (`airBudget = D ×
+0.7`), and a checking short iron's roll is deliberately tiny. So the cap crushed the apex to nothing, and
+in doing so threw away the steep-descent physics `hopApex` had already computed one line above (it scales
+with `sin²(descent)` precisely so a wedge pops).
+
+Measured with `scripts/runout-frames.ts`, which rebuilds the DRAWN run-out through the shipped
+`planRunout`/`sampleRunout` at the camera scales the game actually uses: **18 of 40 club/power
+combinations drew a peak bounce of 0.7–2.6px, under a ball drawn at 3px.** The bounce was not too fast to
+see. It was smaller than the ball. Every short iron and every wedge, at every power.
+
+The ratio is not a tuning question. A projectile launched at θ travels `v²·sin2θ/g` and peaks at
+`v²·sin²θ/2g`, so **apex / length = tan(θ) / 4**: 0.18 for a driver arriving at 35°, 0.47 for a wedge
+dropping in at 62°. The flat 0.3 was too generous for one and far too stingy for the other.
+
+Deriving it dropped the driver from 0.3 → 0.18, which is what bought the headroom to raise `hopDrawBoost`
+3 → 5. That number matters because height is exaggerated and length is not, so the boost multiplies the
+DRAWN height-to-length ratio directly and a big value turns a skip into a pop-up. The driver's drawn ratio
+is now `0.18 × 0.55 × 5 = 0.48`, within a whisker of the shipped `0.3 × 0.55 × 3 = 0.495` — its skip is
+unchanged — while every steep club lifts.
+
+**18/40 → 4/40**, on firm fairway and soft green alike. The four are dinked 30–56 yard partials with about
+a yard of roll: a plop, which correctly has no bounce.
+
+### The path: it was the gravity creep, and the curl was innocent
+
+The first suspect was the curling integrator overshooting the fall line — an explicit rotation of
+`ROLL_CURL_K · adv · perp` per step, which on a steep sculpt could plausibly swing past the fall line and
+oscillate. A clamp was written for it (never turn past the fall line, `tan(angle to downhill)`) and
+measured: **it never fired once across 556 real rolls.** The clamp was deleted rather than shipped. The
+curl is exonerated; do not "fix" it.
+
+The real cause was the gravity CREEP. Once the roll's energy is spent, a ball resting on a steep piece of
+sculpt trickles on down the fall line — re-read per step, and in a direction that owes nothing to the way
+the ball was travelling. So it can double back on the roll by up to 180°. Measured over 368 real curved
+rolls (no caddy): a creep fired on **23%** of them, and **63 of those reversed by more than 40° at the
+join**, worst case a full reversal.
+
+That reversal is legitimate physics — a ball runs up a flank, stops, and comes back down. The bug was that
+it was drawn as the *tail of the roll*, inheriting the run-out's single decelerating sweep, so the ball
+glided through the reversal at rolling speed and never appeared to stop. That is what reads as a magnet
+rather than as gravity taking a ball at rest.
+
+So the sim now says where the roll ended (`ShotLog.creepFrom`) and the renderer draws the creep as what it
+is: the run-out plan is built on the roll ALONE, then a `creepPauseMs` beat of stillness so the stop is
+read, then a smoothstep trickle at `creepMsPerYd` — deliberately slower per yard than the roll that fed
+it. **Non-chip-in hairpins 63 → 0.** No `creepFrom` ⇒ one undivided walk, byte-for-byte as before.
+
+The join is declared once, by the sim, and read by the renderer. Every derelict bug in this repo has been
+a second description sneaking in downstream, and a renderer sniffing for "where does this path double
+back" would have been exactly that.
+
+The one hairpin left is a holed Chipinski chip-in, where the appended trickle to the cup meets the natural
+roll at an angle — all 27 remaining kinks are `chipIn && holed`. GS-chipin-roll deliberately walks that
+straight through; filed as `GS-chipin-trickle-phase` rather than quietly reversed.
+
+### Verified
+
+`creepFrom` is additive reporting, so the death-spiral harness is byte-identical: **0.5139 toPar/hole,
+5.66% floor-hits**, unchanged. Full gate green, 2,054 tests. Frame-by-frame in the real game across seeds
+42/7/101 (`scripts/shot-frames.mjs`): no page errors, ball on screen every frame inside its 3–5.5px band,
+opens on the windup, no freeze between contact and rest, still drawn at rest at the end.

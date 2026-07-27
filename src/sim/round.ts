@@ -92,6 +92,12 @@ export interface ShotLog {
    *  integrator steered it along the local fall line). The play view walks it by arc length so the
    *  ball visibly breaks off a flank; absent ⇒ the classic straight run-out lerp. */
   rollPath?: Vec[];
+  /** Travelled distance (yards along `rollPath`) at which the ball came to REST and gravity CREEP took
+   *  over (GS-roll-hairpin) — the sculpt pulling a stopped ball on down the fall line. Present only
+   *  when a creep actually happened. The creep ignores the travel direction, so it can double back on
+   *  the roll; the play view draws it as its own slow trickle AFTER the ball stops, which is what it
+   *  is. Absent ⇒ the whole path is one roll and it is walked exactly as before. */
+  creepFrom?: number;
   /** True if this shot holed the ball (chip-in / hole-in-one). */
   holed: boolean;
   /** True when a wedge caddy (Dr Chipinski) dropped this approach for a chip-in. Render flavour. */
@@ -196,6 +202,7 @@ const LAND_KICK_K = 0.55; // roll-energy multiplier per unit of downhill-along-t
 const LAND_KICK_MIN = 0.45; // an upslope face can kill at most this much of the skip
 const LAND_KICK_MAX = 1.6; // a downslope flank can kick on at most this much
 const LAND_DEFLECT_K = 0.5; // how hard the bounce redirects toward the fall line's perp component
+
 /** Gravity CREEP (GS-green-contour-3): the ball cannot REST on a steep piece of the SCULPT — once
  *  the roll energy is spent it trickles on down the LOBE field (the mound/hollow relief; the plane
  *  is the green's uniform tilt, which a ball rests on exactly as before) until the sculpt flattens
@@ -315,7 +322,7 @@ export function rollOut(
   immune?: ReadonlySet<string>,
   tents?: readonly TradeTent[],
   walls?: readonly ShipWall[],
-): { roll: number; rest: Vec; path?: Vec[] } {
+): { roll: number; rest: Vec; path?: Vec[]; creepFrom?: number } {
   const sign = K < 0 ? -1 : 1;
   const cap = sign < 0 ? MAX_CHECK : ROLL_ENERGY_CAP;
   const STEP = 1.5; // yards per integration step
@@ -515,6 +522,13 @@ export function rollOut(
   // re-reading the fall line each step so it curls into hollows and off flanks, until the sculpt
   // flattens, the green's edge catches it, or the small creep budget runs out. The creep is part of
   // the travel: it extends `path` and counts into the arc length. Deterministic, zero rng.
+  // Where the ROLL ended and the creep begins, as travelled distance. THE SIM IS THE ONE PLACE THAT
+  // KNOWS THIS, so it says so rather than letting the renderer guess (GS-roll-hairpin): the creep runs
+  // down the SCULPT's fall line with no regard for the direction the ball was travelling, so a ball that
+  // ran up a flank, stopped, and trickled back reverses by up to 180°. Drawn as one continuous
+  // decelerating sweep that reversal reads as a magnet yanking the ball; drawn as what it is — the ball
+  // comes to REST, then gravity takes it — it reads as golf. `creepFrom` is the join.
+  let creepFrom: number | undefined;
   if (!blocked && lieAt(hole, [px, py]) === 'green') {
     let creep = 0;
     let guard2 = 0;
@@ -527,6 +541,7 @@ export function rollOut(
       const ny = py + (s[1] / m) * step;
       if (lieAt(hole, [nx, ny]) !== 'green') break; // the collar catches it — never creeps off the green
       if (hitsNewTent([nx, ny])) break;
+      if (creepFrom === undefined) creepFrom = dist; // the ball had come to rest HERE
       px = nx;
       py = ny;
       dist += step;
@@ -536,7 +551,7 @@ export function rollOut(
     }
   }
   const roll = sign * Math.min(dist, cap);
-  return { roll, rest: [px, py], path: bent ? path : undefined };
+  return { roll, rest: [px, py], path: bent ? path : undefined, creepFrom };
 }
 
 /**
@@ -1260,6 +1275,7 @@ export function executeShot(
   let rest: Vec = touchdown;
   let roll = 0;
   let rollPath: Vec[] | undefined;
+  let creepFrom: number | undefined;
   // Roll out unless it plugged in a non-immune penalty. An immune-hazard touchdown still rolls — it
   // skims across toward dry ground (rollOut treats the immune surface as a fast skim).
   if (!tdPen || (immune && immune.has(tdPen))) {
@@ -1295,6 +1311,7 @@ export function executeShot(
       roll = out.roll;
       rest = out.rest;
       rollPath = out.path;
+      creepFrom = out.creepFrom;
     }
   }
 
@@ -1348,6 +1365,7 @@ export function executeShot(
   const li = lieInfo(restLie);
   const log: ShotLog = { from, result, lieFrom: lie, lieTo: restLie, club, rest, roll, holed: false, knockedDown, landLie: tdLie };
   if (rollPath) log.rollPath = rollPath;
+  if (creepFrom !== undefined) log.creepFrom = creepFrom;
   // Surface the tent CENTRE + effect (not just the ball's roof-contact point) so the renderer can anchor
   // the speech bubble ON the tent (GS-tent-interactions) and the interactive driver can fire the effect.
   if (tentHit) log.tentHit = { at: tentHit.point, c: tentHit.tent.c, effect: tentHit.tent.effect, dir: tentHit.dir };

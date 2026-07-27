@@ -11,7 +11,7 @@
  * sim said the ball rests, however the time is parameterised.
  */
 import { describe, it, expect } from 'vitest';
-import { planRunout, sampleRunout, DEFAULT_RUNOUT_FEEL, RUNOUT_BY_CLASS, type Landing, type RunoutPlan } from '../src/render/runout';
+import { planRunout, sampleRunout, apexOverLenFor, DEFAULT_RUNOUT_FEEL, RUNOUT_BY_CLASS, type Landing, type RunoutPlan } from '../src/render/runout';
 import { arcApex, ARC_FEEL, flightApexT } from '../src/sim/flight';
 import { sampleCurvedFlight, flightDurationMs, flightT } from '../src/render/trajectory';
 import { readFileSync } from 'node:fs';
@@ -464,5 +464,49 @@ describe('a run-out that finishes IN THE CUP keeps its pace', () => {
       return Math.abs(b - a);
     };
     expect(speedNear(holed)).toBeGreaterThan(speedNear(normal) * 1.5);
+  });
+});
+
+/**
+ * GS-runout-visible / GS-roll-hairpin — two reports in one sentence: *"for backspin and green contours
+ * the ball is doing the weird path roll instead of a curve from last bounce to final lie… with all
+ * clubs as well, it looks like… it just lands and stops or lands and does a flat roll. Or it might be
+ * something where the bounces are going way too fast and are not visible."*
+ *
+ * The second half was right about the symptom and wrong about the cause — nothing was computed off max
+ * distance (`carry` is the shot's actual carry) — and the first half turned out to be the gravity CREEP.
+ */
+describe('the bounce is VISIBLE at the cameras the game uses (GS-runout-visible)', () => {
+  it("a hop's apex/length ratio is the projectile one, tan(descent)/4, not a flat constant", () => {
+    // Launch at angle θ: length = v²·sin2θ/g, apex = v²·sin²θ/2g ⇒ apex/length = tan(θ)/4. Nothing to
+    // tune. The old flat 0.3 was both too generous for a driver's shallow skip and — the bug — far too
+    // stingy for a steep wedge, whose hop length is bounded by a deliberately tiny roll.
+    // Exact inside the unclamped band — tan(θ)/4 ∈ [0.12, 0.55] ⇒ θ ∈ ~[25.6°, 65.6°], which is every
+    // arrival angle the bag actually produces (driver ~35°, wedge ~62°).
+    for (const deg of [30, 35, 45, 56, 62]) {
+      expect(apexOverLenFor(deg), `${deg}deg`).toBeCloseTo(Math.tan((deg * Math.PI) / 180) / 4, 6);
+    }
+    // A driver skips flat; a wedge pops. That ORDERING is the whole point of deriving it.
+    expect(apexOverLenFor(35)).toBeLessThan(apexOverLenFor(62));
+    // …and it stays inside the safety rails at both extremes (a scuff / a vertical bounce).
+    expect(apexOverLenFor(2)).toBeGreaterThanOrEqual(DEFAULT_RUNOUT_FEEL.apexOverLenMin);
+    expect(apexOverLenFor(89)).toBeLessThanOrEqual(DEFAULT_RUNOUT_FEEL.apexOverLenMax);
+  });
+
+  it('a steep short-iron landing draws a hop that clears the ball, at the camera it is watched from', () => {
+    // The failure this pins: measured across 40 club/power combinations, 18 drew a peak bounce of
+    // 0.7–2.6px under a ball drawn at 3px — the ball never cleared itself, so the bounce was not
+    // "too fast to see", it was smaller than the ball. A 7-iron is watched from ~3px/yd.
+    const PX_PER_YD = 3;
+    const drawnPx = (p: RunoutPlan): number =>
+      Math.max(0, ...p.hops.map((h) => h.apex * PX_PER_YD * 0.55 * DEFAULT_RUNOUT_FEEL.hopDrawBoost));
+    const shortIron = planRunout({ dist: 3.5, firm: 0.85, v0: 0.25, carry: 141, descentDeg: 56, clubId: '7i', vary: 0.5 });
+    expect(shortIron.hops.length).toBeGreaterThan(0);
+    expect(drawnPx(shortIron), 'a 7-iron hop must clear the drawn ball').toBeGreaterThan(3);
+    // A driver's skip must NOT become a pop-up in the process: its DRAWN height-to-length ratio is what
+    // reads as skipping-along vs bouncing-vertically, and it stays under half.
+    const driver = planRunout({ dist: 23, firm: 0.85, v0: 0.3, carry: 272, descentDeg: 35, clubId: 'D', vary: 0.5 });
+    const first = driver.hops[0]!;
+    expect((first.apex * 0.55 * DEFAULT_RUNOUT_FEEL.hopDrawBoost) / first.dist).toBeLessThan(0.55);
   });
 });
