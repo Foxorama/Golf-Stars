@@ -17,8 +17,8 @@ export interface FlightFeel {
   /** Min/max flight animation duration (ms). */
   minMs: number;
   maxMs: number;
-  /** Animation ms per yard of carry (between the min/max clamps). */
-  msPerYard: number;
+  /** Animation ms per √yard of APEX — the hang-time constant (see `flightDurationMs`). */
+  msPerApexRoot: number;
   /** Arc peak height as a fraction of carry. */
   peakFrac: number;
   /** Arc peak clamp (yards). */
@@ -33,7 +33,7 @@ export interface FlightFeel {
 export const DEFAULT_FLIGHT_FEEL: FlightFeel = {
   minMs: 380,
   maxMs: 1100,
-  msPerYard: 3,
+  msPerApexRoot: 146,
   peakFrac: 0.13,
   peakMin: 4,
   peakMax: 60,
@@ -45,9 +45,25 @@ export function arcPeak(carry: number, feel: FlightFeel = DEFAULT_FLIGHT_FEEL): 
   return Math.max(feel.peakMin, Math.min(feel.peakMax, Math.abs(carry) * feel.peakFrac));
 }
 
-/** Flight animation duration (ms) for a given carry. */
-export function flightDurationMs(carry: number, feel: FlightFeel = DEFAULT_FLIGHT_FEEL): number {
-  return Math.max(feel.minMs, Math.min(feel.maxMs, Math.abs(carry) * feel.msPerYard));
+/**
+ * Flight animation duration — HANG TIME, and hang time is a function of the APEX, not the carry
+ * (GS-flight-hang).
+ *
+ * A ball launched with vertical speed `v` peaks at `v²/2g` and stays up for `2v/g`, so
+ * `t = 2·√(2·apex/g)`: **the time comes from the height, and the carry never enters it.** Keying the
+ * animation off the carry instead made the whole short end of the bag fly at a speed nothing in golf
+ * moves at. Since GS-flight-shape the apex is tour-flat across the bag (31yd down to 21), so real hang
+ * times are nearly flat too — a driver hangs 4.8s and a sand wedge 3.9s, a ratio of 1.2. The drawn
+ * ratio was **2.15**, and measured at the cameras the game actually uses that came out as a 9-iron
+ * crossing the screen at 1.58 px/ms against a driver's 0.53 — three times faster, which is the report
+ * *"irons, hybrids and wedges fly too fast in the air"*.
+ *
+ * It is also most of the tail complaint: the closing tenth of the ground was spent in 44ms on a
+ * 9-iron against 95ms on a drive, so the steepest part of the steepest arcs was also the most rushed.
+ * The clamps stay — a chip still has a floor and a monster drive a ceiling.
+ */
+export function flightDurationMs(apex: number, feel: FlightFeel = DEFAULT_FLIGHT_FEEL): number {
+  return Math.max(feel.minMs, Math.min(feel.maxMs, feel.msPerApexRoot * Math.sqrt(Math.abs(apex))));
 }
 
 /**
@@ -59,18 +75,19 @@ export function flightDurationMs(carry: number, feel: FlightFeel = DEFAULT_FLIGH
  * 75% of its ground in the first HALF of the animation, 99% by t = 0.9, and touches down at 2% of
  * its average speed. It rockets off the club and hangs, which is the opposite of a struck golf ball.
  *
- * This spends the animation clock so the ground advances under a linear speed ramp, tapering only as
- * far as drag would take it (`flightDragTaper` — a drive loses roughly a third of its horizontal
- * speed between launch and landing, not all of it). Pure pacing: the PATH is untouched, and both the
+ * This spends the animation clock so the ground advances under a linear speed ramp, tapering as far as
+ * drag would take it (`flightDragTaper`, overridden per family by `FlightProfile.dragTaper` — a drive
+ * sheds roughly a third of its horizontal speed between launch and landing, and a lofted club, flying
+ * slower and steeper into more of it, sheds appreciably more). Pure pacing: the PATH is untouched, and both the
  * height and the ground position are read off the ground fraction this returns, so every (ground,
  * height) pair the sim's knockdown walk tests is one the renderer draws — contract 5 holds exactly.
  *
  * `samplePolylineFlight` (the derelict's pinball flight) deliberately does NOT go through this: it
  * already walks its path by ARC LENGTH, which is to say it was already right.
  */
-export function flightGroundAt(u: number, feel: FlightFeel = DEFAULT_FLIGHT_FEEL): number {
+export function flightGroundAt(u: number, feel: FlightFeel = DEFAULT_FLIGHT_FEEL, taperOverride?: number): number {
   const uu = u < 0 ? 0 : u > 1 ? 1 : u;
-  const taper = Math.max(0.05, Math.min(1, feel.flightDragTaper));
+  const taper = Math.max(0.05, Math.min(1, taperOverride ?? feel.flightDragTaper));
   // Ground fraction under a linear speed ramp from 1 to `taper`, normalised to unit mean.
   const c = 1 / (1 - (1 - taper) / 2);
   return Math.min(1, c * (uu - ((1 - taper) * uu * uu) / 2));
@@ -79,8 +96,8 @@ export function flightGroundAt(u: number, feel: FlightFeel = DEFAULT_FLIGHT_FEEL
 /** Animation progress → the flight curve's Bézier PARAMETER: `flightGroundAt` put through the
  *  ground↔parameter conversion. Only the curve evaluation wants this; everything else works in
  *  ground fraction. */
-export function flightT(u: number, feel: FlightFeel = DEFAULT_FLIGHT_FEEL): number {
-  return flightParamAt(flightGroundAt(u, feel));
+export function flightT(u: number, feel: FlightFeel = DEFAULT_FLIGHT_FEEL, taperOverride?: number): number {
+  return flightParamAt(flightGroundAt(u, feel, taperOverride));
 }
 
 export interface FlightSample {

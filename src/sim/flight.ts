@@ -149,6 +149,13 @@ export interface FlightProfile {
   /** Family trim (degrees) on the global loft ramp's launch angle — the rescue-club identity
    *  (a hybrid launches higher than the wood it replaces) and the wedge's extra loft. */
   launchTrimDeg: number;
+  /** How much of its horizontal speed the ball still has at TOUCHDOWN, as a fraction of the flight's
+   *  average (GS-flight-hang). Pure animation pacing — the drawn PATH is untouched — but it decides
+   *  how the tail of the flight READS: a ball that arrives at the same speed it launched drops onto
+   *  the turf, and one that has bled its forward speed settles onto it. A lofted club flies slower
+   *  and steeper through more air than a driver, so it sheds proportionally more. Absent ⇒ the render
+   *  feel's global `flightDragTaper`. */
+  dragTaper?: number;
   /**
    * The RUN the club releases, as a fraction of the carry it just flew (GS-runout-ladder).
    *
@@ -206,13 +213,13 @@ export const FLIGHT_PROFILES: Record<FlightClass, FlightProfile> = {
   // club's carry, since a club's number here is its TOTAL. The old numbers had a driver releasing 25%
   // of its carry (62 yards) and a long iron 20% (31), which is not golf; and because the split is
   // total-preserving, over-rolling meant under-CARRYING — a 250yd driver flew 200.
-  driver: { apexAt: 0.66, dropRatio: 4.0, launchTrimDeg: 0, carryFrac: 0.922, runFrac: 0.14 },
-  wood: { apexAt: 0.65, dropRatio: 4.2, launchTrimDeg: -0.4, carryFrac: 0.945, runFrac: 0.105 },
-  hybrid: { apexAt: 0.62, dropRatio: 3.9, launchTrimDeg: 1, carryFrac: 0.945, runFrac: 0.075 },
-  ironLong: { apexAt: 0.63, dropRatio: 3.9, launchTrimDeg: 0, carryFrac: 0.959, runFrac: 0.065 },
-  ironShort: { apexAt: 0.6, dropRatio: 3.7, launchTrimDeg: 0.5, carryFrac: 0.976, runFrac: 0.055 },
-  wedge: { apexAt: 0.56, dropRatio: 3.2, launchTrimDeg: 2.5, carryFrac: 1.0 },
-  putter: { apexAt: 0.55, dropRatio: 3.2, launchTrimDeg: 2.5, carryFrac: 1.0 },
+  driver: { apexAt: 0.66, dropRatio: 4.0, launchTrimDeg: 0, dragTaper: 0.72, carryFrac: 0.922, runFrac: 0.14 },
+  wood: { apexAt: 0.65, dropRatio: 4.2, launchTrimDeg: -0.4, dragTaper: 0.68, carryFrac: 0.945, runFrac: 0.105 },
+  hybrid: { apexAt: 0.62, dropRatio: 3.9, launchTrimDeg: 1, dragTaper: 0.6, carryFrac: 0.945, runFrac: 0.075 },
+  ironLong: { apexAt: 0.63, dropRatio: 3.9, launchTrimDeg: 0, dragTaper: 0.58, carryFrac: 0.959, runFrac: 0.065 },
+  ironShort: { apexAt: 0.6, dropRatio: 3.7, launchTrimDeg: 0.5, dragTaper: 0.52, carryFrac: 0.976, runFrac: 0.055 },
+  wedge: { apexAt: 0.56, dropRatio: 3.2, launchTrimDeg: 2.5, dragTaper: 0.46, carryFrac: 1.0 },
+  putter: { apexAt: 0.55, dropRatio: 3.2, launchTrimDeg: 2.5, dragTaper: 0.46, carryFrac: 1.0 },
 };
 
 /** The flight profile a club id flies with — the ONE lookup every consumer (sim resolve, knockdown

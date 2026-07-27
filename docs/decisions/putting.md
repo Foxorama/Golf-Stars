@@ -1653,3 +1653,71 @@ path with a two-point line when the roll had been straight enough to carry no pa
 drawn walk was 8 yards SHORT of the roll the card reported. It now keeps the resting point
 (`touchdown → rest → deck`). Only reachable once a roll is long enough to run off the deck, which is
 why it surfaced here; guarded by `tests/roll.test.ts`.
+
+## GS-flight-hang — the short clubs stopped flying like darts (2026-07-27)
+
+> *"drivers and woods are much better, irons, hybrids and wedges fly too fast in the air and still
+> suffer from the 'drop out of the air' too fast in the tail end of the carry"*
+
+Two complaints, one root cause, and it is a units error of the same family as GS-flight-shape's.
+
+### Flight time was keyed on the CARRY
+
+A ball launched with vertical speed `v` peaks at `v²/2g` and stays up for `2v/g`, so
+
+    hang time = 2·√(2·apex/g)
+
+**The time comes from the height. The carry never enters it.** `flightDurationMs` was
+`carry × 3ms`, clamped — and since GS-flight-shape made the apex tour-flat across the bag (31yd for a
+driver down to 21 for a sand wedge), that was exactly backwards. Real hang times are nearly flat:
+
+| club | apex | real hang | drawn (before) | drawn (after) |
+|---|---|---|---|---|
+| D | 31yd | 4.8s | 816ms | 814ms |
+| 4H | 29 | 4.7 | 545 | 786 |
+| 7i | 26 | 4.4 | 422 | 749 |
+| 9i | 25 | 4.3 | **380** | 725 |
+| SW | 21 | 3.9 | **380** | 666 |
+
+Real drive:wedge ratio **1.2**; drawn ratio **2.15**, and the short end was piled onto the 380ms
+floor. Measured at the cameras the game actually uses, a 9-iron crossed the screen at **1.58 px/ms
+against a driver's 0.53** — three times faster.
+
+### …which was also most of the tail complaint
+
+The closing tenth of the ground was being spent in **44ms** on a 9-iron against **95ms** on a drive.
+The steepest arcs in the bag were also the most rushed, so the same geometry that reads as a proper
+descent on a driver read as a plummet on a wedge. Measured as a drop rate at the drawn camera, the
+tail fell at **0.782 px/ms on a 9-iron against 0.158 on a driver** — five times faster.
+
+### The per-family drag taper
+
+Hang time alone flattens the tail to 95–103ms, but the wedges still arrive at the pace they launched
+at, which is not what a lofted shot does. `flightDragTaper` (how much of its horizontal speed the
+ball still has at touchdown, as a fraction of the flight's average) becomes a per-family
+`FlightProfile.dragTaper`: driver 0.72 · wood 0.68 · hybrid 0.60 · long iron 0.58 · short iron 0.52 ·
+wedge 0.46. A lofted club flies slower and steeper through more air, so it sheds proportionally more
+forward speed — and a ball that has bled its pace **settles** onto the turf where one arriving at
+launch speed drops onto it. The driver keeps 0.72 exactly, because drivers and woods were reported
+good.
+
+### Result
+
+| | before | after |
+|---|---|---|
+| drawn hang-time spread (drive:wedge) | 2.15× | **1.22×** |
+| screen speed spread | 3.0× | **1.6×** |
+| closing-tenth TIME, across the whole bag | 44–95ms | **95–108ms** |
+| closing-tenth drop rate spread | 4.9× | **2.3×** |
+
+The residual drop-rate difference is correct and deliberate: a wedge genuinely descends at 57° where
+a driver descends at 38°, and it is drawn at a bigger camera scale because it is a shorter shot.
+
+### Verified
+
+PURE render pacing — the drawn PATH is untouched, and no sim module reads `dragTaper`. The
+death-spiral harness is **byte-identical: toPar/hole 0.6406, floor-hits 8.02%**, both fences unmoved.
+Full `npm run check` green (179 files, 2,074 tests). Run-out quality held: invisible bounces stay
+3/40, and run-out durations grew in step with the slower arrivals (a full 7-iron 1017 → 1192ms),
+which is the chain staying continuous rather than a regression. A real shot end to end in the real
+game (`scripts/shot-frames.mjs`, seed 42) passes every check.

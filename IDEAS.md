@@ -510,6 +510,11 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-flight-hang** — the short clubs stopped flying like darts (`docs/decisions/putting.md`). Flight
+  time was keyed on the CARRY, but hang time is `2·√(2·apex/g)` — a function of the HEIGHT, and the apex
+  is tour-flat across the bag. A 9-iron crossed the screen 3× faster than a driver and spent 44ms on its
+  closing tenth against a drive's 95. Keyed on apex plus a per-family `dragTaper` (driver 0.72 → wedge
+  0.46), the closing tenth is now 95–108ms for every club. Pure render pacing; harness byte-identical.
 - **GS-runout-ladder** — the landing got its ground back (`docs/decisions/putting.md`). The run stopped
   being the flight's leftover: `carryFrac` is now purely the FLIGHT scale (unchanged, so zero carries
   moved) and `runFrac` is its own lever, because buying a driver's run out of its carry dropped its apex

@@ -49,9 +49,9 @@ const html = `<!doctype html><meta charset="utf8">
     const apex = arcApex(club.carry, club.carry, ARC_FEEL, pr);
     const shape = arcShapeOf(club.id);
     const from=[0,0], land=[0,club.carry];
-    const dur = flightDurationMs(club.carry);
-    const a = sampleCurvedFlight(from,land,0,flightGroundAt(1-0.02),apex,shape).ground;
-    const b = sampleCurvedFlight(from,land,0,flightGroundAt(1),apex,shape).ground;
+    const dur = flightDurationMs(apex);
+    const a = sampleCurvedFlight(from,land,0,flightGroundAt(1-0.02, undefined, pr.dragTaper),apex,shape).ground;
+    const b = sampleCurvedFlight(from,land,0,flightGroundAt(1, undefined, pr.dragTaper),apex,shape).ground;
     const v0 = Math.hypot(b[0]-a[0],b[1]-a[1]) / Math.max(1, 0.02*dur);
     return { v0, descentDeg: arrivalAngleDeg(apex, club.carry, shape), carry: club.carry };
   }
