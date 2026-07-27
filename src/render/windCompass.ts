@@ -18,9 +18,13 @@
 /** What the dial draws: speed in mph, the head/tail/cross word, and the wind's bearing in degrees
  *  clockwise from up-screen (0 = blowing the way you are playing). Exactly `playHud.windRead`. */
 export interface WindDial {
+  /** The speed the BALL feels — already through the gear (GS-hud-gear-reads), not the sky's raw mph. */
   spd: number;
   kind: string;
   delta: number;
+  /** Wind-cheating gear is taking a bite out of it. Drawn as a shield ring so a player can SEE the
+   *  perk working; without a tell, good gear just makes the world look calm. */
+  cut?: boolean;
 }
 
 /** Colour by what the wind is DOING to the shot: helping (green), hurting (red), pushing (amber). */
@@ -47,7 +51,10 @@ const pt = (r: number, a: number): string => polar(r, a).map((n) => n.toFixed(1)
  */
 export function windCompassSVG(w: WindDial): string {
   const col = windKindColour(w.kind);
-  const calm = !w.spd;
+  // Under half a mph there is nothing left to point at — say so rather than drawing a needle on a
+  // dial that reads "0". (Reachable through gear alone: a 45%-resist ball in a 1 mph breeze.)
+  const calm = w.spd < 0.5;
+  const shield = '#7fd8ff';
   // Eight faint ticks, so the ring reads as an instrument rather than a plain circle.
   // Ticks every 45°, with the one at 12 o'clock drawn LONG and green: that is the direction you are
   // playing, so the dial says which way "up" is without a second marker competing with the needle.
@@ -76,9 +83,9 @@ export function windCompassSVG(w: WindDial): string {
   const readout = calm
     ? `<text x="${C}" y="${C + 3}" text-anchor="middle" font-size="8.5" font-weight="800" fill="#9fb0c8" letter-spacing="0.5">CALM</text>`
     : `<text x="${C}" y="${C + 3}" text-anchor="middle" font-size="16" font-weight="800" fill="#eef3fb">${Math.round(w.spd)}</text>
-       <text x="${C}" y="${C + 11}" text-anchor="middle" font-size="6.5" font-weight="700" fill="#9fb0c8" letter-spacing="0.6">MPH</text>`;
+       <text x="${C}" y="${C + 11}" text-anchor="middle" font-size="6.5" font-weight="700" fill="${w.cut ? shield : '#9fb0c8'}" letter-spacing="0.6">MPH</text>`;
   return `<svg viewBox="0 0 52 52" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false" style="display:block;">
-    <circle cx="${C}" cy="${C}" r="21" fill="rgba(7,10,15,.55)" stroke="rgba(255,255,255,.14)" stroke-width="1.4"/>
+    <circle cx="${C}" cy="${C}" r="21" fill="rgba(7,10,15,.55)" stroke="${w.cut ? shield : 'rgba(255,255,255,.14)'}" stroke-width="1.4" ${w.cut ? 'stroke-opacity="0.75"' : ''}/>
     ${ticks}
     ${up}
     ${needle}
