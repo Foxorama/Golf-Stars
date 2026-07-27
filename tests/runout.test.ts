@@ -18,7 +18,7 @@ import { flightGroundFrac, flightParamAt } from '../src/sim/flight';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { CLUBS } from '../src/sim/clubs';
-import { flightClassOf, flightProfileOf, FLIGHT_PROFILES } from '../src/sim/flight';
+import { flightClassOf, flightProfileOf, FLIGHT_PROFILES, rollFractionFor, legacyRollFraction } from '../src/sim/flight';
 
 /** A firm fairway landing off a driver: ~180yd carry in ~600ms ⇒ 0.3 yd/ms. */
 const DRIVER_V = 0.3;
@@ -210,22 +210,24 @@ describe('velocity is continuous across EVERY phase join, not just touchdown', (
 
 describe('bounce and run read per CLUB', () => {
   it('the RUN ladder is the one the bag implies: driver > wood > long iron > hybrid > short iron > wedge', () => {
-    // The run itself is the SIM's (`FLIGHT_PROFILES.carryFrac`), not this module's — a club's number
-    // is its TOTAL, and the family decides how much of it is carried and how much released.
+    // The run itself is the SIM's (`FLIGHT_PROFILES.runFrac`), not this module's — the family decides
+    // how far the ball runs once it has carried what it carries.
     const run = (id: string): number => {
-      const p = flightProfileOf(id);
-      return p.carryFrac >= 1 ? 0 : (1 - p.carryFrac) / p.carryFrac;
+      const c = CLUBS.find((x) => x.id === id)!;
+      return rollFractionFor(flightProfileOf(id), c.carry);
     };
     expect(run('D')).toBeGreaterThan(run('3W'));
-    // Woods and hybrids sit together, and both release more than a long iron (GS-carry-roll-real:
-    // woods/hybrids 10-15yd, long/mid irons 5-10). The earlier "driving iron outruns the hybrid"
-    // reading came from tuning, not from the reference numbers.
-    expect(run('3W')).toBeCloseTo(run('4H'), 3);
+    // GS-runout-ladder separated the woods from the hybrids: a 3-wood off the deck is a running club
+    // and a rescue is built to land soft, so they no longer share a row.
+    expect(run('3W')).toBeGreaterThan(run('4H'));
     expect(run('4H')).toBeGreaterThan(run('3i'));
     expect(run('3i')).toBeGreaterThan(run('7i'));
-    // …and the wedges hold, which is where the backspin build takes over (GS-backspin-optin).
+    // …and the wedges hold, which is where the backspin build takes over (GS-backspin-optin). They opt
+    // out of `runFrac` entirely and keep the legacy taper (PW +5% → 0 at the shortest), so the ladder
+    // has to END above it — a pitching wedge that outran a 7-iron was the old table's one inversion.
     expect(run('7i')).toBeGreaterThan(run('PW'));
-    expect(run('PW')).toBe(0);
+    expect(run('PW')).toBe(legacyRollFraction(CLUBS.find((c) => c.id === 'PW')!.carry));
+    expect(run('64')).toBeLessThan(run('PW')); // the lob wedge checks to a stop
   });
 
   it('every iron in the bag lands on one side of the split, and 4-6 are the long ones', () => {
@@ -322,7 +324,8 @@ function land(clubId: string, dist: number, firm = 0.85, extra: Partial<Landing>
 function runOf(clubId: string): number {
   const club = CLUBS.find((c) => c.id === clubId)!;
   const pr = flightProfileOf(clubId);
-  return pr.carryFrac >= 1 ? 2.5 : club.carry * ((1 - pr.carryFrac) / pr.carryFrac);
+  const frac = rollFractionFor(pr, club.carry);
+  return pr.runFrac === undefined && pr.carryFrac >= 1 ? 2.5 : club.carry * frac;
 }
 
 describe('the ball ARRIVES at speed (GS-flight-pace)', () => {
@@ -429,9 +432,11 @@ describe('the SURFACE decides how the landing dies', () => {
   it('a ball that SKIPS INTO a hazard loses the rest of its train there', () => {
     // "if it lands or bounces into a hazard the remaining bounce and roll should be reduced by the
     // hazard's effect" — the run-out samples the ground each hop lands on, not just the touchdown.
-    // A driver's realistic release is ~21yd (GS-carry-roll-real), so the hazard sits 8 yards in.
-    const clean = land('D', 21, 0.85);
-    const into = land('D', 21, 0.85, { firmAt: (a) => (a > 8 ? 0.12 : 0.85) });
+    // The hazard sits a third of the way into the driver's own release, so the first skip clears it
+    // and the rest of the train dies in it.
+    const D_RUN = runOf('D');
+    const clean = land('D', D_RUN, 0.85);
+    const into = land('D', D_RUN, 0.85, { firmAt: (a) => (a > D_RUN / 3 ? 0.12 : 0.85) });
     expect(into.hops.length).toBeLessThan(clean.hops.length);
     const air = (p: RunoutPlan): number => p.hops.reduce((a, h) => a + h.dist, 0);
     expect(air(into)).toBeLessThan(air(clean));
@@ -440,11 +445,11 @@ describe('the SURFACE decides how the landing dies', () => {
 
 describe('no two shots land alike', () => {
   it('the same club on the same surface varies, and varies deterministically', () => {
-    const plans = [0.05, 0.3, 0.55, 0.8, 0.98].map((v) => land('D', 21, 0.85, { vary: v }));
+    const plans = [0.05, 0.3, 0.55, 0.8, 0.98].map((v) => land('D', runOf('D'), 0.85, { vary: v }));
     const firsts = plans.map((p) => p.hops[0]!.dist);
     expect(Math.max(...firsts) / Math.min(...firsts), 'every drive bounced identically').toBeGreaterThan(1.2);
     // …and the SAME variation always gives the same landing (it is a hash, not a draw).
-    expect(land('D', 21, 0.85, { vary: 0.42 })).toEqual(land('D', 21, 0.85, { vary: 0.42 }));
+    expect(land('D', runOf('D'), 0.85, { vary: 0.42 })).toEqual(land('D', runOf('D'), 0.85, { vary: 0.42 }));
   });
 
   it('the run-out module reaches for no randomness of its own', () => {

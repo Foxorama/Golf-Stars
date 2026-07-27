@@ -150,6 +150,24 @@ export interface FlightProfile {
    *  (a hybrid launches higher than the wood it replaces) and the wedge's extra loft. */
   launchTrimDeg: number;
   /**
+   * The RUN the club releases, as a fraction of the carry it just flew (GS-runout-ladder).
+   *
+   * SEPARATE FROM `carryFrac` ON PURPOSE. The two used to be one number — the run was whatever was
+   * left over from the flight, `(1−carryFrac)/carryFrac` — which meant the only way to give a club a
+   * bigger run was to take the distance out of its CARRY. That is not a free trade: carry is
+   * load-bearing in a way run is not. It decides whether a forced carry is clearable in the air,
+   * whether a grove knocks the ball down, and (through `arcApex`) how high the ball flies. Buying a
+   * driver's 30-yard run out of its carry dropped its flight to 257yd, put its apex UNDER a
+   * 2-hybrid's, and left holes whose tee carry no club in the bag could fly.
+   *
+   * So the run is its own lever now: the club carries exactly what it always carried, and this says
+   * how far it then runs. The club's TOTAL grows by the difference, which is the honest reading — a
+   * driver that carries 272 and runs 38 on firm turf finishes at 310, and real firm-fairway driving
+   * is 265–270 of carry plus 30–40 of run. Absent ⇒ the legacy leftover, so a row that does not opt
+   * in is byte-for-byte.
+   */
+  runFrac?: number;
+  /**
    * CARRY as a fraction of the club's TOTAL distance (GS-carry-rollout-split). A club's nominal
    * number is its TOTAL (carry + roll): the ball FLIES this fraction of it and RUNS the rest, so a
    * driver (0.80) lands ~80% of the way and releases the last ~20%, a hybrid 0.85, an iron 0.90.
@@ -188,11 +206,11 @@ export const FLIGHT_PROFILES: Record<FlightClass, FlightProfile> = {
   // club's carry, since a club's number here is its TOTAL. The old numbers had a driver releasing 25%
   // of its carry (62 yards) and a long iron 20% (31), which is not golf; and because the split is
   // total-preserving, over-rolling meant under-CARRYING — a 250yd driver flew 200.
-  driver: { apexAt: 0.66, dropRatio: 4.0, launchTrimDeg: 0, carryFrac: 0.922 },
-  wood: { apexAt: 0.65, dropRatio: 4.2, launchTrimDeg: -0.4, carryFrac: 0.945 },
-  hybrid: { apexAt: 0.62, dropRatio: 3.9, launchTrimDeg: 1, carryFrac: 0.945 },
-  ironLong: { apexAt: 0.63, dropRatio: 3.9, launchTrimDeg: 0, carryFrac: 0.959 },
-  ironShort: { apexAt: 0.6, dropRatio: 3.7, launchTrimDeg: 0.5, carryFrac: 0.976 },
+  driver: { apexAt: 0.66, dropRatio: 4.0, launchTrimDeg: 0, carryFrac: 0.922, runFrac: 0.14 },
+  wood: { apexAt: 0.65, dropRatio: 4.2, launchTrimDeg: -0.4, carryFrac: 0.945, runFrac: 0.105 },
+  hybrid: { apexAt: 0.62, dropRatio: 3.9, launchTrimDeg: 1, carryFrac: 0.945, runFrac: 0.075 },
+  ironLong: { apexAt: 0.63, dropRatio: 3.9, launchTrimDeg: 0, carryFrac: 0.959, runFrac: 0.065 },
+  ironShort: { apexAt: 0.6, dropRatio: 3.7, launchTrimDeg: 0.5, carryFrac: 0.976, runFrac: 0.055 },
   wedge: { apexAt: 0.56, dropRatio: 3.2, launchTrimDeg: 2.5, carryFrac: 1.0 },
   putter: { apexAt: 0.55, dropRatio: 3.2, launchTrimDeg: 2.5, carryFrac: 1.0 },
 };
@@ -248,6 +266,7 @@ export function flightCarryScale(clubId: string | undefined, nominalCarry: numbe
  * flight = 0.20 of total; hybrid 0.176 ≈ 0.15 of total; iron 0.111 ≈ 0.10 of total). Wedge/putter keep
  * the legacy neutral roll (land-and-hold), so a spin build's backspin still layers on unchanged. Pure. */
 export function rollFractionFor(profile: FlightProfile, nominalCarry: number): number {
+  if (profile.runFrac !== undefined) return profile.runFrac;
   if (profile.carryFrac >= 1) return legacyRollFraction(nominalCarry);
   return (1 - profile.carryFrac) / profile.carryFrac;
 }

@@ -545,8 +545,8 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     the SIM's — `FLIGHT_PROFILES.carryFrac`, total-preserving — and the irons were ONE row at 0.9, so
     every iron ran LESS than a hybrid and a 3-iron was indistinguishable from a 9-iron. `flightClassOf`
     now splits them at the NUMBER (`ironLong` ≤5 / `ironShort`), still convention-based so a new `4i`
-    row needs no engine edit; the ladder is driver 25% ▸ wood 22% ▸ **long iron 19.8%** ▸ hybrid 17.6% ▸
-    short iron 6.4% ▸ wedge 0 (where the backspin build takes over). Splitting a class is COMPILE-FORCED
+    row needs no engine edit (the ladder itself now lives in `runFrac`, GS-runout-ladder below).
+    Splitting a class is COMPILE-FORCED
     at every `Record<FlightClass,…>` — audio's strike voice and the shop's "irons" item are still ONE
     thing to the player, so both rows share them. Measured on the death-spiral harness (2,880 holes):
     toPar/hole **0.8958 → 0.8740**, floor-hits **9.48% → 8.65%** — both the safe direction, and the
@@ -560,6 +560,36 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     tail (13yd after 7yd off a firm driver) — every hop is now a clean geometric share and the leftover
     rolls. **A piecewise run-out must test `ds/dt` across EVERY phase join**: the old suite pinned
     touchdown alone and shipped a hard stop mid-animation. Guarded by `tests/runout.test.ts`.
+  - **THE RUN IS ITS OWN LEVER; BUYING IT OUT OF THE CARRY IS NOT A FREE TRADE** (GS-runout-ladder,
+    `FlightProfile.runFrac`). The run used to be whatever the flight left over — `(1−carryFrac)/carryFrac`
+    — so the only way to make a driver run further was to make it FLY less. Carry is load-bearing in a way
+    run is not: it decides whether a forced carry is clearable in the AIR, whether a grove knocks the ball
+    down, and (through `arcApex`) how high the ball flies. Buying a 30yd driver run out of the carry
+    dropped its flight 272→257, put its apex UNDER a 2-hybrid's (re-creating the very bug GS-flight-shape
+    fixed), and left **12 of 573** forced-carry tee drives that NO club in an epic bag could fly, 9 of them
+    pre-arming a club that lands wet — reopening what GS-carry-roll-real closed. So `carryFrac` is now
+    purely the FLIGHT scale (values UNCHANGED ⇒ zero carry moved, zero knockdown moved) and `runFrac` says
+    how far the ball then runs; the club's TOTAL grows by the difference, which is the honest reading (a
+    driver carrying 272 and running 38 on firm turf finishes at **310**, and real firm-fairway driving is
+    265–270 + 30–40). Ladder: driver 14% ▸ wood 10.5% ▸ hybrid 7.5% ▸ long iron 6.5% ▸ short iron 5.5% ▸
+    wedge = the legacy taper (absent `runFrac` ⇒ byte-for-byte, so the backspin build is untouched, and
+    the ladder must END above the wedge's 5% peak or a PW outruns a 7-iron). Measured in real play,
+    fairway roll: driver 19.4→**28.1**, wood 12.1→**19.8**, short iron 2.6→**5.7**. Two couplings came
+    with it, both machine-checked: greens must HOLD (`SURFACE_ROLL.green` 0.7→0.55, else approaches
+    release off the back — green-holding fell 28.9%→26.6% before it), and the default aim must never ask
+    for a carry the bag cannot FLY (`carryableBefore`, the twin of `dryStationBefore` — positioning
+    reasons in TOTAL reach and the longer run moved its station out past unflyable banks). Harness:
+    toPar/hole 0.6319 → **0.6406**, floor-hits 8.09% → **8.02%**, both fences unmoved.
+  - **A BOUNCE TRAIN THAT COLLAPSES FASTER THAN IT SHORTENS IS SEEN TWICE AND LOST** (GS-runout-ladder).
+    Physically a hop's apex decays as `kv²` (~30%/bounce on firm turf) while its LENGTH decays as `kh²`
+    (~65%) — both right, and drawn together the height dies more than twice as fast as the ground: the
+    driver planned SIX hops and the player saw **TWO**, the rest sub-pixel scuffs under a 3px ball. Height
+    is already the exaggerated axis here (`hopDrawBoost`), so it is now exaggerated CONSISTENTLY along the
+    train (`hopApex *= kh²`) and each skip is a smaller copy of the last. `kv` still sets the FIRST hop's
+    height, so soft ground plops and firm ground skips exactly as before — only the tail survives to be
+    seen. With `hopLenK` 0.05→0.07 (a decisive first skip, not a stutter) and `runoutMaxMs` 2400→3100 (the
+    longer run was being played at 2× speed), invisible bounces went **6/40 → 3/40** and the three left are
+    30–52yd sand-wedge partials with ~1yd of roll, which is a plop and correctly has none.
   - **THE BALL STAYS ON THE SCREEN, AND A SHADOW UNDER THE BALL IS NO SHADOW** (GS-landing-real). The
     play view drew NOTHING once every shot and putt had played, so the ball blinked out and the player
     watched an empty fairway until the screen changed; it is now drawn at rest until unmount (cleared

@@ -52,7 +52,12 @@ export interface RunoutFeel {
   bounceSoft: number;
   bounceFirm: number;
   /** First hop LENGTH as a fraction of `carry · cos²(descent)` — the ball's own flight decides how
-   *  far it skips, so a long flat drive skips a long way and a short steep wedge barely moves. */
+   *  far it skips, so a long flat drive skips a long way and a short steep wedge barely moves.
+   *
+   *  A real driver's first bounce carries 15–20yd of its 30yd run-out; the first pass here modelled
+   *  7 and spent the rest on a stuttering tail. The ceiling is the run-out itself (`airBudget`), so
+   *  this only decides how the available ground is DIVIDED — bigger means a decisive first skip and
+   *  a shorter tail, which is the shape a landing actually has. */
   hopLenK: number;
   /** First hop APEX as a fraction of `carry · sin²(descent)` — the STEEPER the arrival, the higher
    *  the pop, which is why a wedge bounces up and a driver skids along. Plus a ceiling in yards. */
@@ -162,7 +167,7 @@ export const DEFAULT_RUNOUT_FEEL: RunoutFeel = {
   restitutionFirm: 0.74,
   bounceSoft: 0.16,
   bounceFirm: 0.62,
-  hopLenK: 0.05,
+  hopLenK: 0.07,
   hopApexK: 0.05,
   hopApexMax: 6,
   hopMinYd: 0.35,
@@ -184,7 +189,7 @@ export const DEFAULT_RUNOUT_FEEL: RunoutFeel = {
   rollEntryFloor: 0,
   runoutTimeScale: 0.16,
   runoutMinMs: 340,
-  runoutMaxMs: 2400,
+  runoutMaxMs: 3100,
   backspinSkidFrac: 0.55,
   backspinSkidMax: 7,
   backspinMsPerYd: 55,
@@ -419,7 +424,16 @@ export function planRunout(landing: Landing, feel: RunoutFeel = DEFAULT_RUNOUT_F
     used += want;
     v *= khRun;
     hopLen *= khRun * khRun; // constant horizontal speed within a hop ⇒ length decays as k²
-    hopApex *= kvRun * kvRun;
+    // THE TRAIN STAYS SELF-SIMILAR AS IT DECAYS (GS-runout-ladder). Physically a hop's apex falls as
+    // `kv²` — roughly 30% per bounce on firm turf — while its LENGTH falls as `kh²`, roughly 65%. Both
+    // are right, and drawn together they mean the height collapses more than twice as fast as the
+    // ground: measured in game, a driver planned SIX hops and the player saw TWO, the rest sub-pixel
+    // scuffs under a 3px ball. Height is already the exaggerated axis here (`hopDrawBoost`) — this
+    // simply exaggerates it CONSISTENTLY along the train instead of only on the first hop, so each
+    // skip is a smaller copy of the one before and the whole landing reads. `kv` still sets the
+    // FIRST hop's height, so soft ground still plops and firm ground still skips: the surface's
+    // character is untouched, only the tail survives to be seen.
+    hopApex *= khRun * khRun;
   }
 
   const rollDist = Math.max(0, D - used);
