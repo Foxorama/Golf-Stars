@@ -510,6 +510,14 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-runout-ladder** — the landing got its ground back (`docs/decisions/putting.md`). The run stopped
+  being the flight's leftover: `carryFrac` is now purely the FLIGHT scale (unchanged, so zero carries
+  moved) and `runFrac` is its own lever, because buying a driver's run out of its carry dropped its apex
+  under a hybrid's and left 12 of 573 forced-carry drives that no club could fly. Fairway roll: driver
+  19.4 → 28.1, wood 12.1 → 19.8, short iron 2.6 → 5.7. The drawn bounce train stopped collapsing four
+  times faster than it shortened (invisible bounces 6/40 → 3/40). Greens hold (`SURFACE_ROLL.green`
+  0.7 → 0.55) and the default aim never asks for an unflyable carry (`carryableBefore`). Harness
+  0.6319 → 0.6406 toPar/hole and 8.09% → 8.02% floor-hits, both fences unmoved.
 - **GS-flight-shape** (was GS-flight-arc-tail) — the ball stopped dropping out of the sky
   (`docs/decisions/putting.md`). Height was sampled at the Bézier PARAMETER while the ground ran as
   `2t − t²`, so the terminal descent angle was a literal 90°: a drive glided at under 2° from its apex to

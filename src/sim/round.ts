@@ -137,7 +137,7 @@ export interface ShotLog {
 const SURFACE_ROLL: Record<string, number> = {
   fairway: 1.0,
   tee: 1.0,
-  green: 0.7,
+  green: 0.55,
   rough: 0.42, // thick stuff grabs the ball — a touch draggier than the old 0.5 now it's per-step
   waste: 0.7,
   bunker: 0.2,
@@ -1326,7 +1326,12 @@ export function executeShot(
     const saved = containToDeck(hole, rest);
     if (saved) {
       // Extend the run-out path so the render walks the ball back onto the deck instead of snapping.
-      rollPath = rollPath && rollPath.length ? [...rollPath, saved] : [touchdown, saved];
+      // The ball came to REST first and is then pulled back, so the walk is touchdown → rest → deck.
+      // Dropping `rest` (as this did when the roll was straight enough to carry no path of its own)
+      // hands the renderer a two-point line whose length is SHORT of the roll it is told — the ball
+      // covers less ground than the card says. Only reachable once a roll is long enough to run off
+      // the deck at all, which is why the longer run ladder surfaced it.
+      rollPath = rollPath && rollPath.length ? [...rollPath, saved] : [touchdown, rest, saved];
       roll += dist(rest, saved);
       rest = saved;
     }
@@ -1340,7 +1345,7 @@ export function executeShot(
   // walled-only + only ever moves a ball ONTO the deck (Stableford can only rise) → byte-identical
   // everywhere else.
   if (result.redirect && hole.walls && hole.walls.length && isLostToSpace(lieAt(hole, rest))) {
-    rollPath = rollPath && rollPath.length ? [...rollPath, result.landing] : [touchdown, result.landing];
+    rollPath = rollPath && rollPath.length ? [...rollPath, result.landing] : [touchdown, rest, result.landing];
     roll += dist(rest, result.landing);
     rest = result.landing;
   }
@@ -2224,9 +2229,19 @@ export function autoAimTarget(
   // advance can overshoot on a wandering corridor).
   // `clearLine` samples the line STRICTLY BETWEEN its ends, so it says nothing about the station
   // itself — a corridor that runs into a river has a dry approach and a wet landing. Ask both.
-  if (clearLine(hole, ball, aimPt) && !lieInfo(lieAt(hole, aimPt)).penalty) return aimPt;
-  const safe = safeTarget(hole, ball, pin, maxReach, maxFlightReachOf(bag, carryMult, lie));
-  if (dist(ball, safe) <= maxReach + 1e-6) return safe;
+  const maxFlight = maxFlightReachOf(bag, carryMult, lie);
+  // THE DEFAULT AIM NEVER ASKS FOR A CARRY THE BAG CANNOT FLY (GS-runout-ladder). Every candidate below
+  // goes through this: a target is only usable if the hazard between here and there is one the longest
+  // FLIGHT can clear (`forcedCarry` is cleared in the AIR — the coupling contract 5 names). Positioning
+  // reasons in TOTAL reach, and once the run grew the station a good drive "reaches" moved out past
+  // hazards the carry cannot span: measured over 573 forced-carry tee drives, 12 had no club in an epic
+  // bag that could fly them and 9 pre-armed a club that lands wet. Backing down the line to the last
+  // playable, flyable point is the same move `dryStationBefore` makes for a wet target — here it lays up
+  // short of the bank instead of asking for a carry that does not exist. Interactive only.
+  const reachable = (t: Vec): Vec => carryableBefore(hole, ball, t, maxFlight) ?? t;
+  if (clearLine(hole, ball, aimPt) && !lieInfo(lieAt(hole, aimPt)).penalty) return reachable(aimPt);
+  const safe = safeTarget(hole, ball, pin, maxReach, maxFlight);
+  if (dist(ball, safe) <= maxReach + 1e-6) return reachable(safe);
   // The safe line runs PAST a drive, so keep the positioning station — but never a wet one. `aimPt` is
   // a raw centreline station, and on a hole whose corridor runs THROUGH a river the station itself sits
   // in the water; the whole chain downstream then reads a lie it must never be handed (`forcedCarry`
@@ -2234,7 +2249,27 @@ export function autoAimTarget(
   // a club to carry a bank that has no far side). Back it DOWN the corridor to the furthest dry station
   // instead: that keeps both properties the two candidates each broke on their own — a target that is
   // playable AND inside one drive. Returns `aimPt` untouched whenever it is already dry.
-  return dryStationBefore(hole, t0, tAim) ?? safe;
+  return reachable(dryStationBefore(hole, t0, tAim) ?? safe);
+}
+
+/** The furthest point on the ball→target ray that is BOTH playable and reachable in the AIR — i.e. any
+ *  penalty band in front of it is one the longest flight carry clears. Returns the target untouched when
+ *  it already is (so an ordinary hole is unchanged), and null when nothing on the ray qualifies. Pure,
+ *  zero rng; interactive default-aim only. */
+function carryableBefore(hole: Hole, ball: Vec, target: Vec, maxFlight: number): Vec | null {
+  const STEPS = 16;
+  const d = dist(ball, target);
+  if (d < 1e-6) return target;
+  const ux = (target[0] - ball[0]) / d;
+  const uy = (target[1] - ball[1]) / d;
+  for (let i = 0; i <= STEPS; i++) {
+    const r = (d * (STEPS - i)) / STEPS;
+    const p: Vec = [ball[0] + ux * r, ball[1] + uy * r];
+    if (lieInfo(lieAt(hole, p)).penalty) continue;
+    const fc = forcedCarry(hole, ball, p);
+    if (!fc || fc.carry <= maxFlight + 1e-6) return p;
+  }
+  return null;
 }
 
 /** The furthest penalty-free centreline station at or before `tAim` (walking back toward `t0`), or null

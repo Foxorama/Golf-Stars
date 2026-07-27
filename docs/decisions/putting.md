@@ -1542,3 +1542,114 @@ sibling of GS-green-backstop's "going long is punished". Both sides of that coll
 before accepting it: canopies measure 12–18yd (median 14.2 — 42-foot trees) over 113,709 blobs, which
 is honest timber, so the canopy model was left alone. The player's protection is unchanged and now
 correctly WIDER: the aim overlay's blocked cone walks the same `flightBlockedBy`.
+
+## GS-runout-ladder — the landing got its ground back (2026-07-27)
+
+> *"the driver bounce and run on the fairway is about what it should be in the rough and about what a
+> long iron should have on a fairway. woods should have a larger bounce and run than driver does now
+> and driver should have a larger number of bounces and run than a wood. short irons should have at
+> least one bounce… they are still suffering from the fall down out of the air and splat like an egg
+> and stop."*
+
+### What was actually measured
+
+Real play, mean roll by class and landing lie (60 seeds × 12 worlds):
+
+| class | fairway | rough | | class | fairway | rough |
+|---|---|---|---|---|---|---|
+| driver | **19.4yd** | 9.2 | | ironLong | 5.4 | 2.0 |
+| wood | 12.1 | 5.3 | | ironShort | **2.6** | 0.9 |
+| hybrid | 8.9 | 3.9 | | wedge | 2.2 | 1.0 |
+
+The fairway/rough reading was exact: a driver ran 19.4 on the fairway and 9.2 in the rough, so the
+fairway number was about what the rough one should be. And a short iron's whole run-out was 2.6
+yards — of which the hop train may use 70% — which is not a landing, it is a splat.
+
+### Two separate faults, and the render one could not fix the sim one
+
+**The bounce train collapsed faster than it shortened.** A hop's apex decays as `kv²` (~30% per
+bounce on firm turf) and its length as `kh²` (~65%). Both are right; drawn together the height dies
+more than twice as fast as the ground. Measured in the run-out rig: the driver planned **six** hops
+and the player saw **two** — the rest were sub-pixel scuffs under a 3px ball. Height is already the
+exaggerated axis in this module (`hopDrawBoost`), so it is now exaggerated *consistently along the
+train* (`hopApex *= kh²`), and each skip is a smaller copy of the last. `kv` still sets the FIRST
+hop's height, so soft ground plops and firm ground skips exactly as before.
+
+**But 13.6 yards of hop budget cannot hold five readable skips.** The hop train is bounded by the
+sim's roll (`airBudget = D × 0.7`), so at 19.4yd the driver got either many tiny hops or two big
+ones. The run had to grow. The render pass alone was never going to do it.
+
+### The trap: the run was coming out of the CARRY
+
+`carryFrac` was doing two jobs — it set the flight scale AND the run was its leftover,
+`(1−carryFrac)/carryFrac`. So the only way to make a driver run further was to make it fly less.
+That is not a free trade, and the tests said so immediately:
+
+* driver flight 272 → 257, and its apex dropped **under a 2-hybrid's** — re-creating the exact bug
+  GS-flight-shape had just fixed;
+* **12 of 573** forced-carry tee drives had no club in an epic bag that could fly them, 9 of them
+  pre-arming a club that lands wet — reopening what GS-carry-roll-real closed (main: 0 and 0);
+* and it was expensive: floor-hits 8.09% → 10.28%, straight through the fence.
+
+Carry is load-bearing in a way run is not. It decides whether a forced carry is clearable in the
+air, whether a grove knocks the ball down, and (through `arcApex`) how high the ball flies.
+
+So the run became its own lever. `carryFrac` is now purely the FLIGHT scale — **values unchanged, so
+this pass moved zero carries, zero knockdowns and zero apexes** — and `runFrac` says how far the ball
+then runs. The club's TOTAL grows by the difference, which is the honest reading: a driver that
+carries 272 and runs 38 on firm turf finishes at **310**, and real firm-fairway driving is 265–270 of
+carry plus 30–40 of run. `legacyRollFraction` was only ever a compatibility anchor ("keeps the new
+split's TOTAL equal to the old total"), never a physical claim.
+
+    driver 14%  ▸  wood 10.5%  ▸  hybrid 7.5%  ▸  long iron 6.5%  ▸  short iron 5.5%  ▸  wedge = legacy
+
+The wedges opt out (no `runFrac`) and keep the legacy taper, so the backspin build is byte-for-byte —
+which means the ladder must END above the wedge's 5% peak, or a pitching wedge outruns a 7-iron. It
+did, before this.
+
+### Two couplings came with it
+
+**Greens have to HOLD.** With every scoring club releasing more, approaches started running off the
+back: shots finishing ON the green fell 28.9% → 26.6%, and balls rolling into a worse lie went 11.4%
+→ 17.0%. `SURFACE_ROLL.green` 0.7 → 0.55 — a receptive, watered green against a running fairway,
+which is the actual golf — put green-holding back to 27.8% and bought most of the balance cost back.
+
+**The default aim must never ask for a carry the bag cannot fly.** `autoAimTarget` positions by TOTAL
+reach (correct — GS-carry-roll-real's rule), and a 5% longer total moved the station a good drive
+"reaches" out past banks the FLIGHT cannot span. `carryableBefore` is the twin of the existing
+`dryStationBefore`: walk back down the ball→target ray to the last point that is both playable and
+reachable in the air. Unclearable carries **12 → 0**, wet pre-armed landings **9 → 0**. Interactive
+only, so determinism is untouched.
+
+### Result
+
+Fairway roll, measured in real play — every target in the brief met:
+
+| class | before | after | | class | before | after |
+|---|---|---|---|---|---|---|
+| driver | 19.4 | **28.1** | | ironLong | 5.4 | 7.5 |
+| wood | 12.1 | **19.8** | | ironShort | 2.6 | **5.7** |
+| hybrid | 8.9 | 10.5 | | wedge | 2.2 | 2.2 |
+
+The wood's new run (19.8) is the driver's old run (19.4); the driver's (28.1) is comfortably clear of
+the wood's. Drawn: the driver lands with 6 hops over a 42yd run-out on a fairway, 2 hops over 13yd
+from rough, 1 hop over 2yd in a bunker. Invisible bounces **6/40 → 3/40**, and the three left are
+30–52yd sand-wedge partials with ~1yd of roll — a plop, which correctly has no bounce. `hopLenK`
+0.05 → 0.07 (a decisive first skip rather than a stutter) and `runoutMaxMs` 2400 → 3100 (the longer
+run was being played at 2× speed, `timeBaseSkew` 0.52).
+
+### Verified
+
+Full `npm run check` green — 179 files, 2,072 tests, typecheck and both builds. A real shot end to
+end in the real game (`scripts/shot-frames.mjs`, seed 42): no page errors, ball on screen in its
+3–5.5px band every frame, no freeze, drawn at rest.
+
+**Death-spiral harness: toPar/hole 0.6319 → 0.6406 (fence < 1.0), floor-hits 8.09% → 8.02% (fence <
+0.09). Both fences unmoved** — and the floor-hit rate came in slightly BELOW where GS-flight-shape
+left it, because the extra total distance offsets the extra ground the ball covers finding trouble.
+
+One real bug fell out of the longer rolls: the derelict's `containToDeck` save replaced the run-out
+path with a two-point line when the roll had been straight enough to carry no path of its own, so the
+drawn walk was 8 yards SHORT of the roll the card reported. It now keeps the resting point
+(`touchdown → rest → deck`). Only reachable once a roll is long enough to run off the deck, which is
+why it surfaced here; guarded by `tests/roll.test.ts`.
