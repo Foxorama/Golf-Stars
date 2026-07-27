@@ -15,19 +15,28 @@
  *   │                                          │
  *   │                 (map)                    │
  *   │                                          │
- *   │ [caddy] [ tool row              ] [ » ]  │  bottom: caddy slot · panel · action column
- *   │         [ gauge row             ]        │
- *   │         [ read row              ]        │
+ *   │                                   [ ◎ ]  │  action column, bottom-anchored
+ *   │                                   [ » ]  │
+ *   │ [caddy] [ rows…                 ] [bag]  │  bottom: caddy slot · panel · action column
  *   │         [ COMMIT                ]        │
  *   └──────────────────────────────────────────┘
  *
- * Two rules make it hold:
+ * Three rules make it hold:
  *  - **Nothing is ever removed, only disabled.** A control that can't act in this state renders in
  *    its usual place, greyed (`[disabled]`), so no button ever moves or vanishes between states.
  *  - **The panel is bottom-anchored and the COMMIT row is last**, so the thumb-critical row (commit ·
- *    caddy · auto-finish) sits at the same y in all six states even though the rows above it differ
- *    in height (a pace meter is simply taller than a power bar). `min-height` on the panel makes the
- *    aim/chip/watch states pixel-identical to each other.
+ *    caddy · bag) sits at the same y in all six states even though the rows above it differ in height
+ *    (a pace meter is simply taller than a power bar).
+ *  - **The action column grows UPWARD from the bag.** The bag is the bottom-most, most-tapped cell;
+ *    auto-finish and the aim mode stack above it, and a conditional button (the re-aim-at-pin 🎯)
+ *    lands above those — so nothing that is present in every state ever changes position.
+ *
+ * GS-hud-bag reshaped the aim state around this: the club cycler, the power bar, the spray-odds
+ * legend and the carry range came OUT of the panel (they restated the aim cone drawn on the map, in
+ * a block that cost a quarter of a phone screen), the club moved to the bag + its picker sheet, and
+ * the power read moved onto the commit button itself. The aim/watch panel is now a single commit
+ * row; the PUTT panel is untouched — its pace meter and break read are the only readouts on the
+ * screen that the map does not already draw.
  *
  * Class namespace: the play screen's own `.gs-hud*` / `.gs-mapctrl` / `.gs-caddybadge` prefixes,
  * extended — never another screen's (see the #353 `.gs-hud` map-blur regression in CLAUDE.md).
@@ -38,6 +47,7 @@
  */
 
 import { caddyBadgeHTML } from './helpers';
+import { golfBagSVG } from '../render/bagArt';
 
 /** Which of the three shapes the play screen is in. `aim` covers the full-shot AND chip decisions,
  *  `watch` covers both the shot and putt animations — the frame is the same either way. */
@@ -65,6 +75,26 @@ export interface PlayFrameParts {
   nav: { whole: boolean; moved: boolean; viewDisabled: boolean; settingsDisabled: boolean };
   /** Auto-finish (`»`) — always rendered, disabled while a shot animates. */
   autoFinishDisabled: boolean;
+  /** The golf bag (GS-hud-bag) — the club control, and the anchor of the action column. Required, so
+   *  a new play state has to decide what the bag says rather than quietly dropping it. */
+  bag: {
+    /** Short club code for the face of the bag ('D', '7i', 'SW') — a full name never fits 56px. */
+    code: string;
+    /** The full club name, for the tooltip and the accessible name. */
+    name: string;
+    /** How many sticks the drawn bag shows — the player's own bag size. */
+    clubs: number;
+    /** The golfer's colour, so the corner matches the cap / tracer / caddy frame. */
+    tint?: string;
+    /** No club to change here (mid-flight, or on the green with the flat stick). */
+    disabled: boolean;
+  };
+  /** The aim-mode cycler (GS-default-aim) — auto ◎ / attack 🚩 / safe 🛟. Disabled where aim isn't a
+   *  choice (the putt has its own ◄/► line, the watch state has no decision left to make). */
+  aim: { icon: string; label: string; on: boolean; disabled: boolean };
+  /** Conditional round buttons for the TOP of the action column (today: the re-aim-at-pin 🎯, which
+   *  only exists once the player has dragged the aim off the pin). Never the permanent three. */
+  extraActions?: string;
   /** Left-handed mode (GS-lefty): mirrors the whole frame. */
   lefty: boolean;
   /** Overlays appended after the frame (shot popup, scramble choice). */
@@ -105,6 +135,33 @@ function caddySlotHTML(id: string | undefined, offDuty: boolean): string {
   return `<div class="gs-hud-caddy${offDuty ? ' gs-hud-caddy--off' : ''}"${offDuty ? ' title="On your bag — no read on this one"' : ''}>${badge}</div>`;
 }
 
+/**
+ * The action column: the BAG in flow at the bottom, with the aim mode, auto-finish and any
+ * conditional button STACKED ABOVE IT, over the map (GS-hud-bag).
+ *
+ * The stack floats deliberately. `.gs-hud-bottom`'s height is what the camera measures as the map's
+ * clear band (GS-play-hud-space), so a three-button column left in flow would be 170px tall and hand
+ * back barely any of the screen this feature exists to recover — the bar would be as deep as the
+ * control panel it replaced. In flow the bar is one badge tall (66px: the caddy and the bag); the
+ * stack floats above it like the tight-fit treatment of the flanks, and the ball is drawn centred
+ * between them, never behind them.
+ */
+function actionColumnHTML(p: PlayFrameParts): string {
+  const bag = p.bag;
+  return `
+    <div class="gs-hud-actions">
+      <div class="gs-hud-actionstack">
+        ${p.extraActions ?? ''}
+        <button class="gs-roundbtn gs-glass${p.aim.on ? ' gs-roundbtn--on' : ''}" data-aimmode="1" title="Aim: ${p.aim.label} — tap to change" aria-label="Aim mode: ${p.aim.label}. Tap to change."${p.aim.disabled ? ' disabled' : ''}>${p.aim.icon}</button>
+        <button class="gs-roundbtn gs-glass" data-action='${JSON.stringify({ type: 'autoShotHole' })}' title="Auto-finish this hole"${p.autoFinishDisabled ? ' disabled' : ''}>»</button>
+      </div>
+      <button class="gs-hud-bagbtn gs-glass" data-clubpick="open" title="${bag.name} — tap the bag to change club" aria-label="Club: ${bag.name}. Open the bag to change club."${bag.disabled ? ' disabled' : ''}>
+        <span class="gs-hud-bagart">${golfBagSVG({ tint: bag.tint, clubs: bag.clubs, muted: bag.disabled })}</span>
+        <span class="gs-hud-bagclub">${bag.code}</span>
+      </button>
+    </div>`;
+}
+
 /** Compose the whole play screen from the fixed frame + this state's contents. */
 export function playFrameHTML(p: PlayFrameParts): string {
   const rows = p.rows.filter(Boolean).join('');
@@ -115,13 +172,11 @@ export function playFrameHTML(p: PlayFrameParts): string {
       ${p.top}
       <div class="gs-hud gs-hud-bottom">
         ${caddySlotHTML(p.caddyId, !!p.caddyOffDuty)}
-        <div class="gs-hud-controls gs-glass">
+        <div class="gs-hud-controls gs-glass${rows ? '' : ' gs-hud-controls--slim'}">
           ${rows}
           <div class="gs-hud-commit">${p.commit}</div>
         </div>
-        <div class="gs-hud-actions">
-          <button class="gs-roundbtn gs-glass" data-action='${JSON.stringify({ type: 'autoShotHole' })}' title="Auto-finish this hole"${p.autoFinishDisabled ? ' disabled' : ''}>»</button>
-        </div>
+        ${actionColumnHTML(p)}
       </div>
     </div>
     ${p.after ?? ''}`;

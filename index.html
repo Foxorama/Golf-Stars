@@ -1190,8 +1190,7 @@
       /* Overlays float above the map. Most are pass-through (pointer-events:none) so a pull
          can START anywhere on the map even under a readout; only real buttons capture taps. */
       .gs-hud { position: absolute; z-index: 6; pointer-events: none; }
-      .gs-hud button, .gs-hud [data-cycle], .gs-hud [data-suggest], .gs-hud [data-aimreset],
-      .gs-hud [data-action] { pointer-events: auto; }
+      .gs-hud button, .gs-hud [data-action] { pointer-events: auto; }
       /* The putt-meter canvas is tapped to set pace, so it must capture pointers. */
       .gs-hud #puttmeter, .gs-hud #puttmeter canvas { pointer-events: auto; }
       /* The caddy badge stays pass-through so a power pull can START over it (it's only a portrait). */
@@ -1273,7 +1272,39 @@
          legitimately changes with its contents (a pace meter is taller than a power bar), and a
          stretched button would ride up and down with it. A fixed button also keeps auto-finish the
          smaller target — a fat-finger tap should land on the commit button, not on skipping the hole. */
-      .gs-hud-actions { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; }
+      .gs-hud-actions { flex: 0 0 auto; position: relative; display: flex; flex-direction: column; align-items: flex-end; justify-content: flex-end; gap: 6px; }
+      /* ── The BAG + its floating stack (GS-hud-bag) ────────────────────────────────────────────
+         The bag is the bottom-right anchor of the play screen — one tap opens the whole bag. Only
+         the bag is IN FLOW: `.gs-hud-bottom`'s height is what the camera measures as the map's clear
+         band (GS-play-hud-space), and a three-button column in flow would be 170px deep, i.e. as
+         deep as the control panel this feature exists to delete. So aim/auto-finish (and the
+         conditional 🎯) float ABOVE the bag, over the map, and the bar stays one badge tall. */
+      .gs-hud-actionstack {
+        position: absolute; right: 0; bottom: 100%; margin-bottom: 6px;
+        display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+      }
+      .gs-hud-bagbtn {
+        flex: 0 0 auto; width: 56px; height: 66px; padding: 4px 0 3px;
+        display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 1px;
+        border-radius: 14px; cursor: pointer; color: var(--gs-ink);
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        user-select: none; -webkit-user-select: none;
+        transition: filter .14s ease, border-color .14s ease;
+      }
+      .gs-hud-bagbtn:hover { filter: brightness(1.14); }
+      .gs-hud-bagbtn:active { filter: brightness(.92); }
+      .gs-hud-bagbtn[disabled] { opacity: .42; cursor: default; filter: none; }
+      .gs-hud-bagart { width: 40px; height: 46px; flex: 0 0 auto; }
+      .gs-hud-bagclub {
+        font: 800 12px/1 var(--gs-font); letter-spacing: .02em; color: var(--gs-ink);
+        max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      /* The aim-mode button reads "engaged" the same way the map-nav toggle does — an aim other than
+         the default auto assist is a choice the player made and should be able to see at a glance. */
+      .gs-roundbtn--on {
+        border-color: var(--gs-accent); background: rgba(29, 74, 42, .9);
+        box-shadow: 0 0 10px rgba(95, 212, 90, .25);
+      }
       /* The commit row is the panel's LAST child, so the primary action button sits at the same
          height in every state even though the rows above it differ (a pace meter is taller than a
          power bar). Margin-top pushes it to the panel's floor when the rows are short. */
@@ -1292,6 +1323,35 @@
       .gs-hud-controls {
         flex: 1 1 auto; min-width: 0; padding: 6px 9px 6px; min-height: 118px;
         display: flex; flex-direction: column; gap: 4px;
+      }
+      /* SLIM: the aim + watch states have no rows left (GS-hud-bag) — the club moved to the bag, the
+         aim mode to its own button, and the power onto the commit button itself. With nothing above
+         it the glass frame is just a box drawn around a button, so the panel dissolves and the pill
+         IS the panel. The putt state keeps the full panel: its pace meter and break read are the only
+         readouts on the play screen the map does not already draw. */
+      .gs-hud-controls--slim {
+        min-height: 0; padding: 0; background: none; border: none;
+        box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+      }
+      /* The commit button carries the live pull power as a fill behind its own label, so the charge
+         has a bar and a number without a second row to put them on. The label is absolutely placed
+         over the fill, so the button's height is its own (min-height, ≥44px target) and the fill can
+         sweep the full width. */
+      .gs-swing { position: relative; overflow: hidden; min-height: 46px; }
+      .gs-swing__inner {
+        position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      }
+      .gs-swing__fill {
+        position: absolute; left: 0; top: 0; bottom: 0; width: 0; opacity: .38;
+        transition: width .04s linear, background .1s linear;
+      }
+      .gs-swing__tick {
+        position: absolute; top: 0; bottom: 0; width: 2px; transform: translateX(-1px);
+        background: rgba(255, 255, 255, .55); pointer-events: none;
+      }
+      .gs-swing__lab {
+        position: relative; z-index: 1; padding: 0 8px;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       }
       .gs-clubrow { display: flex; align-items: center; gap: 7px; }
       .gs-clubrow .gs-clubname { flex: 1 1 auto; text-align: center; font-weight: 700;
@@ -1400,6 +1460,11 @@
       .gs-shot--lefty .gs-mapctrl { right: auto; left: 8px; }
       .gs-shot--lefty .gs-hud-top { left: 56px; right: 8px; }
       .gs-shot--lefty .gs-hud-bottom { flex-direction: row-reverse; }
+      /* …and the bag's floating stack hangs off the column's OTHER edge, so it still sits at the
+         screen's outer edge rather than pointing into the middle of the map (GS-hud-bag). */
+      .gs-shot--lefty .gs-hud-actionstack { right: auto; left: 0; align-items: flex-start; }
+      :root[data-gs-fit="tight"] .gs-shot--lefty .gs-hud-bottom > .gs-hud-caddy { left: auto; right: 0; }
+      :root[data-gs-fit="tight"] .gs-shot--lefty .gs-hud-bottom > .gs-hud-actions { right: auto; left: 0; }
 
       /* Page never scrolls sideways — a fixed-width card a hair wider than a tiny viewport
          clips instead of creating a horizontal-scroll jiggle. */
@@ -1496,6 +1561,40 @@
         .gs-sheet { border: 1px solid var(--gs-line); border-radius: var(--gs-r-lg); }
       }
       .gs-sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+      /* ── The club picker (GS-hud-bag) ─────────────────────────────────────────────────────────
+         The whole bag as one grid of big tap targets, behind the play screen's bag button. Reuses
+         the settings sheet's chrome, so it inherits the safe-area/scroll/`safe center` rules and the
+         dialog+focus pass; only the rows are new. `auto-fit` + `minmax(min(…, 100%), 1fr)` so it is
+         two columns on a phone, more on a tablet, and one when the UI scale is cranked — never a
+         breakpoint, which cannot see the root zoom (GS-a11y-scale-wrap). */
+      .gs-clubpick__read { font-size: 13px; line-height: 1.45; color: var(--gs-dim); margin: 0 0 10px; }
+      .gs-clubpick__grid {
+        display: grid; gap: 8px;
+        grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+      }
+      .gs-clubpick__club {
+        position: relative; display: flex; align-items: center; gap: 9px;
+        min-height: 52px; padding: 10px 11px; min-width: 0;
+        border: 1px solid var(--gs-line); border-radius: 12px; background: #14171f;
+        color: var(--gs-ink); text-align: left; cursor: pointer;
+        font: 600 15px/1.2 var(--gs-font);
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        transition: border-color .14s ease, background .14s ease;
+      }
+      .gs-clubpick__club:active { filter: brightness(.93); }
+      .gs-clubpick__club--on {
+        border-color: var(--gs-accent); background: linear-gradient(180deg, #1d4a2a, #163a20);
+        box-shadow: inset 0 0 12px rgba(95, 212, 90, .18);
+      }
+      .gs-clubpick__club--putt { border-color: rgba(159, 216, 230, .5); }
+      .gs-clubpick__glyph {
+        flex: 0 0 26px; width: 26px; height: 26px; font-size: 18px;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .gs-clubpick__name { flex: 1 1 auto; min-width: 0; font-size: 14.5px; overflow-wrap: anywhere; }
+      .gs-clubpick__carry { flex: 0 0 auto; font-size: 13px; font-weight: 800; color: var(--gs-dim); }
+      .gs-clubpick__club--on .gs-clubpick__carry { color: #ecffe9; }
+      .gs-clubpick__star { position: absolute; top: 3px; right: 5px; font-size: 11px; color: #ffd24a; }
       .gs-setrow {
         display: flex; align-items: center; justify-content: space-between; gap: 14px;
         width: 100%; text-align: left; cursor: pointer;

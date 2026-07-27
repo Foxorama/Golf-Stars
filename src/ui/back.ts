@@ -36,6 +36,9 @@ export type BackIntent =
   | { kind: 'dismiss'; action: Action }
   /** Close the settings sheet — app-layer module state, so there is no Action to dispatch (tier 0). */
   | { kind: 'closeSettings' }
+  /** Close the play screen's club picker (GS-hud-bag) — app-layer module state, like the settings
+   *  sheet, so again there is no Action (tier 0). */
+  | { kind: 'closeClubPicker' }
   /** Go to this screen's parent by dispatching `action` (tier 1). */
   | { kind: 'navigate'; action: Action }
   /** A forward-only beat: absorb the press and do nothing (tier 2). */
@@ -50,6 +53,8 @@ export type BackIntent =
  *  rather than this module reaching for the DOM. */
 export interface BackContext {
   settingsOpen?: boolean;
+  /** The play screen's club picker sheet (GS-hud-bag) — module state in `app.ts` for the same reason. */
+  clubPickerOpen?: boolean;
 }
 
 /**
@@ -156,6 +161,9 @@ export function backIntent(state: UiState, ctx: BackContext = {}): BackIntent {
   // Tier 0, innermost first. The exit confirm is the newest layer, so back cancels it rather than
   // confirming — a second back press must never be able to leave the round.
   if (state.pendingExit) return { kind: 'dismiss', action: { type: 'cancelExit' } };
+  // The club picker is raised FROM the play screen and the settings sheet inerts it, so the two are
+  // never both live; it is listed first because it is the innermost thing a play-screen back can mean.
+  if (ctx.clubPickerOpen) return { kind: 'closeClubPicker' };
   if (ctx.settingsOpen) return { kind: 'closeSettings' };
   if (state.characterLoreId) return { kind: 'dismiss', action: { type: 'closeCharacterLore' } };
   if (state.storyInspectId) return { kind: 'dismiss', action: { type: 'storyCloseInspect' } };

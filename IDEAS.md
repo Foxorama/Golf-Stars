@@ -510,6 +510,14 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-hud-bag** — the bag replaced the control panel (`docs/decisions/ui-intro.md`). The aim HUD's power
+  label, spray-odds legend and carry range were restating the aim cone the map already draws to scale, and
+  its club cycler was a dozen taps to reach a wedge — ~140px of an 844px phone between the player and the
+  golf. The club moved into a golf BAG bottom-right + a picker sheet (one tap to any club, Sam's read and ★
+  in its header), the power moved onto the commit button as a fill behind `🏌 Swing · Power 78%`, the aim
+  mode became a round button, and the aim/watch panel dissolved to that one pill. Only the bag stays in
+  flow — the bar's height IS the camera's clear band — so bottom bar 148 → **66px**, clear band 50% →
+  **77%**, and the ball dropped to just above the pill for free. The PUTT panel is untouched.
 - **GS-flight-hang** — the short clubs stopped flying like darts (`docs/decisions/putting.md`). Flight
   time was keyed on the CARRY, but hang time is `2·√(2·apex/g)` — a function of the HEIGHT, and the apex
   is tour-flat across the bag. A 9-iron crossed the screen 3× faster than a driver and spent 44ms on its

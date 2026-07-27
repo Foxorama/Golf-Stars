@@ -16,7 +16,7 @@ import { bandCentreBias, clearOfPanelBias, fitFrame, type ProjectOptions } from 
 import { shotView, previewShot, previewBackspin, resolveAimTarget, awaitingPutt, canPuttFringe, type AimMode } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
 import { drawStoryFigure, hasStoryFigure } from './render/storyFigure';
-import { biomeCarryMult, pinOf, greenDepth, forcedCarry, clubRollFraction, rollFractionFor, DEFAULT_MANUAL_BAND, DEFAULT_PUTT_RANGE, MANUAL_IDEAL_PACE, puttBreakYd, puttBreakBow, puttBandDistanceFactor, idealPuttAim, puttPathPreview } from './sim/round';
+import { biomeCarryMult, pinOf, clubRollFraction, DEFAULT_MANUAL_BAND, DEFAULT_PUTT_RANGE, MANUAL_IDEAL_PACE, puttBreakYd, puttBreakBow, puttBandDistanceFactor, idealPuttAim, puttPathPreview } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
 import { archetypeFor } from './sim/course/themes';
 import { bearing, dist, type Vec } from './sim/course/contract';
@@ -67,7 +67,8 @@ import { HAPTICS, haptic } from './render/haptics';
 import { showAceCelebration, showBirdCelebration, showEndlessMilestone, showSectorScan, showVoyageVictory } from './render/celebrations';
 import { characterScreen, ordinal, leaderboardHTML } from './render/golferCards';
 import { state, setState, btn, header, seedFromUrl, freshRunSeed } from './app/ctx';
-import { playFrameHTML } from './app/playFrame';
+import { playFrameHTML, type PlayFrameParts } from './app/playFrame';
+import { clubPickerOverlay } from './app/clubPicker';
 import {
   burst,
   caddyId,
@@ -130,7 +131,7 @@ import {
 import { backIntent } from './ui/back';
 import { isNativeShell } from './native';
 import { primeHaptics } from './render/haptics';
-import { hazardLabel, mapTopInfo, puttAimLabel, puttAimRow, puttBreakLine, windRead } from './app/playHud';
+import { mapTopInfo, puttAimLabel, puttAimRow, puttBreakLine, windRead } from './app/playHud';
 import { mountWeatherOverlay, playCaddyVoice, playTentBonk, syncMusic } from './app/playFx';
 import { metaFromSave, persist, persistStory } from './app/persist';
 
@@ -1300,6 +1301,34 @@ function puttFocusBias(): number {
   return bandCentreBias(band.top, band.bottom, mapContainerPx().h);
 }
 
+/**
+ * The play frame's BAG cell (GS-hud-bag) for whatever club is in the player's hands. One builder for
+ * all three play states so the corner never disagrees with itself: the aim state shows the selection,
+ * the watch state the club that was struck, the putt state the flat stick (greyed — there is no club
+ * decision left on the green).
+ */
+function bagPart(clubId: string | null | undefined, disabled: boolean): PlayFrameParts['bag'] {
+  const bag = state.run.loadout.bag;
+  const club = bag.find((c) => c.id === clubId);
+  // A short code for the 56px face — the ids already ARE codes ('D', '3W', '7i', 'SW'); the two
+  // word-shaped ones get a two-letter cap so the label never ellipsises to nothing.
+  const code = !club ? '—' : club.id === 'putter' ? 'Pt' : club.id === 'chip' ? 'Ch' : club.id;
+  return {
+    code,
+    name: club?.name ?? 'No club',
+    clubs: bag.length,
+    tint: golferLook()?.cap,
+    disabled,
+  };
+}
+
+/** The play frame's AIM-MODE cell — the persisted default-aim assist (GS-default-aim), shown on every
+ *  play state and live only where aim is still a choice. */
+function aimPart(disabled: boolean): PlayFrameParts['aim'] {
+  const m = aimModeMeta(selAim);
+  return { icon: m.icon, label: m.label, on: selAim !== 'auto', disabled };
+}
+
 /** Reset the map view to the default follow-cam (called on a new shot / new hole). */
 function resetMapView(): void {
   mapView = 'follow';
@@ -1370,17 +1399,22 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
     // framed portrait the player has been looking at all along.
     const struck = anim.shots[anim.shots.length - 1];
     const rolling = !struck; // putts-only batch — the ball is rolling on the green
-    const clubName = struck ? struck.club.name : 'Putter';
-    // The gauge slot holds the shot's CARRY against the club's full carry — the same bar shape the
-    // power meter occupies while aiming, showing what the swing actually produced.
+    // The pill holds the shot's CARRY against the club's full carry — the same bar the power meter
+    // fills while aiming, showing what the swing actually produced.
     const carry = struck ? Math.round(struck.result.carry) : 0;
     const carryFrac = struck && struck.club.carry > 0 ? Math.min(1, struck.result.carry / struck.club.carry) : 0;
     const totalRun = struck ? Math.round(Math.hypot(struck.rest[0] - struck.from[0], struck.rest[1] - struck.from[1])) : 0;
-    const watchGauge = rolling
-      ? `<div class="gs-powerbar"><span class="gs-powerfill" style="width:100%;background:#9fd8e6;"></span></div>
-         <div class="gs-powerlabel"><b>⛳ Putt away</b> · <span style="opacity:.7;">watching it run</span></div>`
-      : `<div class="gs-powerbar"><span class="gs-powerfill" style="width:${(carryFrac * 100).toFixed(0)}%;background:#5fd45a;"></span></div>
-         <div class="gs-powerlabel"><b>Carry ${carry}y</b> · <span style="opacity:.7;">${totalRun}y from the strike</span></div>`;
+    // GS-hud-bag: the watch state's four-row panel (club cycler · carry gauge · caption) collapsed
+    // into the commit pill it always sat on top of. Everything it said is still here — the club, the
+    // carry, the run — in the one row that was already reserved for this state, so the flight is
+    // watched over a map instead of over a readout.
+    const watchLabel = rolling
+      ? `<span class="gs-swing__lab">⛳ Rolling… <span style="opacity:.75;">watching it run</span></span>`
+      // The club NAME is deliberately not here: a reward club is called "The Forgefire Driver", which
+      // ellipsises the numbers off the end of a 240px pill — and the bag in the corner is already
+      // showing which stick was struck. Carry → total is the pair the map cannot draw mid-flight.
+      : `<span class="gs-swing__fill" style="width:${(carryFrac * 100).toFixed(0)}%;background:#5fd45a;opacity:.5;"></span>
+         <span class="gs-swing__lab">🏌 <b>${carry}y</b> carry <span style="opacity:.75;">→ <b>${totalRun}y</b></span></span>`;
     return playFrameHTML({
       mode: 'watch',
       map: `<div class="gs-bigmap" id="play"></div>`,
@@ -1391,19 +1425,13 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
         distLabel: rolling ? '…rolling…' : '…in flight',
         lie: struck ? struck.lieFrom : v.lie,
       }),
-      rows: [
-        `<div class="gs-clubrow">
-          <button class="gs-btn" disabled aria-hidden="true">◄</button>
-          <span class="gs-clubname">${clubName}</span>
-          <button class="gs-btn" disabled aria-hidden="true">►</button>
-        </div>`,
-        watchGauge,
-        `<div class="gs-legend-line" style="opacity:.75;">${rolling ? 'The putt is rolling — reading the break as it goes.' : 'Ball in the air — hold on.'}</div>`,
-      ],
-      commit: `<button class="gs-btn gs-btn--primary" disabled>${rolling ? '⛳ Rolling…' : '🏌 In flight…'}</button>`,
+      rows: [],
+      commit: `<button class="gs-btn gs-btn--primary gs-swing" disabled><span class="gs-swing__inner">${watchLabel}</span></button>`,
       caddyId: caddyId(),
       nav: { whole: mapView === 'whole', moved: mapViewMoved(), viewDisabled: true, settingsDisabled: true },
       autoFinishDisabled: true,
+      bag: bagPart(struck ? struck.club.id : 'putter', true),
+      aim: aimPart(true),
       lefty: lefty(),
     });
   }
@@ -1693,6 +1721,10 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
       caddyOffDuty: !puttCaddyId(),
       nav: { whole: mapView === 'whole', moved: mapViewMoved(), viewDisabled: true, settingsDisabled: false },
       autoFinishDisabled: false,
+      // The flat stick, greyed: there is no club choice on the green, and the aim lives in the panel's
+      // own ◄/► row here. Both cells still MOUNT (GS-hud-frame) so the corner never moves.
+      bag: bagPart('putter', true),
+      aim: aimPart(true),
       lefty: lefty(),
     });
   }
@@ -1701,20 +1733,16 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
   // (The per-shot club/aim/power/putt defaults are seeded above, before the fringe-putt return.)
   // Only lie-legal clubs are selectable (driver tee-only unless the Driver Dan caddy unlocks it).
   const usable = usableBag(bag, play.lie, state.run.loadout.driverAnywhere ?? false);
-  // The EXPLICIT suggestion affordances are a Suggestible Sam caddy perk (GS-caddy): the 🎯 snap-back
-  // button, the legend's `suggested: …` readout, the 🎒 yardage read, and the confidence scoring edge
-  // only appear with Sam. But the DEFAULT-selected club is the green-coverage pick for EVERYONE — its
-  // whole job is to stop you flying the green, so handing the base flow the longest club (an overshoot
-  // by default) was an overcorrection. Sam sells the precise read + confidence, not "don't overshoot".
-  const hasSuggest = !!state.run.loadout.clubSuggest;
+  // The EXPLICIT suggestion affordances are a Suggestible Sam caddy perk (GS-caddy): the 🎒 green-depth
+  // + forced-carry read and the ★ marking Sam's pick — both on the club picker sheet since GS-hud-bag,
+  // built in `render()` — plus the confidence scoring edge, only appear with Sam. But the DEFAULT-selected
+  // club is the green-coverage pick for EVERYONE: its whole job is to stop you flying the green, so
+  // handing the base flow the longest club (an overshoot by default) was an overcorrection. Sam sells
+  // the precise read + confidence, not "don't overshoot".
   const onGreenPutter = v.lie === 'green' && usable.some((c) => c.id === 'putter');
-  // The green-coverage suggestion. Putter is the obvious green default for everyone — that's not a
-  // "suggestion", just the only sensible flat-stick choice. This is Sam's 🏌 snap-to club (the pin
-  // attack), independent of the aim mode.
-  const suggested = onGreenPutter ? 'putter' : v.attackClubId;
   // Default selection: putter on the green, else the club that fits the DEFAULT AIM (GS-default-aim) —
   // the auto/safe positioning club off the tee, the green-coverage club when attacking the flag — so
-  // the pre-armed club matches where we're pre-aimed. You can still cycle/override.
+  // the pre-armed club matches where we're pre-aimed. The bag button still overrides it (GS-hud-bag).
   const defaultClubId = onGreenPutter
     ? 'putter'
     : selAim === 'safe'
@@ -1763,8 +1791,6 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
   const spinPreview = previewBackspin(play, spray, state.run.loadout);
   // Feel escape-hatch: window._gsSpray scales the green centre wedge live (A/B the cone geometry).
   const sprayGeom = (window as unknown as { _gsSpray?: SprayGeomInput })._gsSpray;
-  // % of shots per zone — straight off the shot's asymmetric shape, so the legend reads exactly true.
-  const pctRound = (x: number) => Math.round(x * 100);
   // Frame the map on the FULL-power PIN-AIM shot — NOT the live charge, and NOT the live drag
   // target either: carryHigh folds in the wind component ALONG the shot bearing, so framing on the
   // dragged target made viewRadius wobble with every pixel of aim slide. A sub-pixel projector
@@ -1817,66 +1843,21 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
     sprayGeom,
     ...mapOpts,
   });
-  const cbtn = (label: string, dir: number) =>
-    `<button class="gs-btn" data-cycle="${dir}" aria-label="cycle club ${dir > 0 ? 'up' : 'down'}">${label}</button>`;
-  // Aim-mode toggle (GS-default-aim): cycle the default aim between the smart auto assist, always-attack
-  // the flag, and always-play-safe. It sets the persisted preference AND this shot; a free-drag aim
-  // (🎯 clears it) still overrides for the current shot. Hidden while a manual aim is dragged (the 🎯
-  // reset owns that state) so the two controls never contradict.
-  const aimMeta = aimModeMeta(selAim);
-  const aimBtn = selFreeTarget
-    ? ''
-    : `<button class="gs-btn gs-mini${selAim === 'auto' ? '' : ' gs-btn--on'}" data-aimmode="1" title="Aim: ${aimMeta.label} — tap to change">${aimMeta.icon}</button>`;
-  // Club row: ◄ name ► + aim-mode + (re-aim-at-pin when nudged) + (Sam's snap-to-suggested when hired).
-  const clubRow = `<div class="gs-clubrow">
-      ${cbtn('◄', -1)}
-      <span class="gs-clubname">${usable.find((c) => c.id === selClubId)?.name ?? selClubId}</span>
-      ${cbtn('►', 1)}
-      ${aimBtn}
-      ${selFreeTarget ? `<button class="gs-btn gs-mini" data-aimreset="1" title="Re-aim at the pin">🎯</button>` : ''}
-      ${hasSuggest ? `<button class="gs-btn gs-mini${selClubId === suggested ? ' gs-btn--on' : ''}" data-suggest="1" title="Use the suggested club">🏌</button>` : ''}
-      ${canPuttFringe(play) ? `<button class="gs-btn gs-mini" data-putt-toggle="1" title="Putt from the fringe">⛳</button>` : ''}
-    </div>`;
-  // Power read-out: the bar fills as you pull DOWN on the map (the cone grows in step); past 100%
-  // (with Overdrive) it glows orange as an overpowered shot. Built by a shared inner-HTML builder so
-  // the surgical pull refresh (shotAimRefresh) can update it in place without a full render.
-  const powerHudInner = (): string => {
+  // ── The shot's ONE control row (GS-hud-bag) ────────────────────────────────────────────────────
+  // What used to live here — a club cycler, a power bar with its own label line, a spray-odds legend
+  // and a carry range — was a quarter of a phone screen restating the aim cone drawn on the map. The
+  // cone already shows the spread, the carry arcs and the wind-shifted line, at the size and place
+  // the decision is actually made. So the club moved to the bag button + its picker sheet, the aim
+  // mode to its own round button, and the POWER — the one readout with no equal on the map, because
+  // it is what the pull is setting — onto the commit button itself, as a fill behind the label.
+  const swingInner = (): string => {
     const powerPct = Math.round(selPower * 100);
     const over = selPower > 1.001;
     const powerCol = over ? '#ff8a3d' : selPower >= 0.66 ? '#5fd45a' : selPower >= 0.33 ? '#ffc454' : '#9fd8e6';
-    const aimNote =
-      selFreeTarget && selAimBearing != null && Math.abs(((selAimBearing - bearing(play.ball, pinOf(play.hole)) + 540) % 360) - 180) > 2
-        ? 'aim adjusted'
-        : selFreeTarget
-          ? 'aim: pin'
-          : aimModeMeta(selAim).note;
-    return `<div class="gs-powerbar"><span class="gs-powerfill" style="width:${Math.min(100, (selPower / maxPower) * 100).toFixed(0)}%;background:${powerCol};"></span>${maxPower > 1 ? `<span class="gs-power100" style="left:${(100 / maxPower).toFixed(0)}%;"></span>` : ''}</div>
-      <div class="gs-powerlabel"><b style="color:${powerCol};">${over ? '⚡ ' : ''}Power ${powerPct}%</b> · ${aimNote} · <span style="opacity:.7;">${charging ? 'release to hit' : 'pull ↓ to power'}</span></div>`;
+    return `<span class="gs-swing__fill" style="width:${Math.min(100, (selPower / maxPower) * 100).toFixed(0)}%;background:${powerCol};"></span>${
+      maxPower > 1 ? `<span class="gs-swing__tick" style="left:${(100 / maxPower).toFixed(0)}%;"></span>` : ''
+    }<span class="gs-swing__lab">${charging ? '⚡ Release' : '🏌 Swing'} · <b style="color:${powerCol};">Power ${powerPct}%</b></span>`;
   };
-  const powerHud = `<div class="gs-power" id="gs-powerhud">${powerHudInner()}</div>`;
-  // Condensed spray odds + carry range (the cone on the map carries the detail). Sam (if hired) adds a
-  // compact green-depth + forced-carry read on its own line.
-  let samRead = '';
-  if (hasSuggest && play.lie !== 'green') {
-    const gd = greenDepth(play.hole, play.ball);
-    const fc = forcedCarry(play.hole, play.ball, pinOf(play.hole));
-    const carryTxt = fc ? ` · <span style="color:var(--gs-warn);">⚠ carry <b>${fc.carry}</b> ${hazardLabel(fc.kind)}</span>` : '';
-    samRead = `<div class="gs-legend-line" style="opacity:.9;">🎒 ${Math.round(gd.front)}·${Math.round(dist(play.ball, play.hole.green))}·${Math.round(gd.back)}y${carryTxt}</div>`;
-  }
-  const legendInner = (sp: ShotSpread): string => {
-    const shp = sp.shape;
-    // Carry (where it LANDS) + total (where it ENDS after the run-out) so the player reads the run into
-    // their number and doesn't fly it long / short of a carry (GS-carry-rollout-split). The run is shown
-    // only when it's meaningful (long clubs); wedges land and hold, so carry == total there.
-    const rf = rollFractionFor(sp.flight, sp.nominalCarry);
-    const total = Math.round(sp.expectedCarry * (1 + rf));
-    const runTxt = rf > 0.02 ? ` <span style="opacity:.7;">→ ${total}y total</span>` : '';
-    return `<span style="color:#5fd45a;">●</span> ${pctRound(shp.green)}% ·
-      <span style="color:#ffc454;">●</span> ${pctRound(shp.hookL)}/${pctRound(shp.sliceR)}% ·
-      <span style="color:#ff4c4c;">●</span> ${pctRound(shp.duckHookL)}/${pctRound(shp.shankR)}% ·
-      <b>carry ${Math.round(sp.carryLow)}–${Math.round(sp.carryHigh)}y</b>${runTxt}`;
-  };
-  const legend = `<div class="gs-legend-line" id="gs-shotlegend">${legendInner(spray)}</div>`;
   // Wire the surgical pull-to-power refresh (the decision-lag fix). FOCUS/FOLLOW mode only: the
   // camera is framed on the stable full-power spread and holds still for the whole decision, so the
   // cone overlay re-projects against the SAME framing without rebuilding the scene. Whole-hole fit
@@ -1915,9 +1896,7 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
             tradeTents: tentsActive(),
           });
           const hud = document.getElementById('gs-powerhud');
-          if (hud) hud.innerHTML = powerHudInner();
-          const leg = document.getElementById('gs-shotlegend');
-          if (leg) leg.innerHTML = legendInner(sprayNow);
+          if (hud) hud.innerHTML = swingInner();
         };
   // The commit row (GS-hud-frame): the pull-to-power gesture is still the expressive way to swing,
   // but the frame's action row must be occupied in EVERY state — and a tap-to-swing button is the
@@ -1925,16 +1904,28 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
   // and the resting `selPower`, which is already seeded to reach the pin), through the identical
   // dispatch the gesture release uses — so it's one path, not a second shot mechanic. It also makes
   // the screen playable one-handed, and without a drag at all.
-  const swingBtn = `<button class="gs-btn gs-btn--primary" data-swing="1" title="Swing at the previewed power — or pull down on the map to set it yourself">🏌 Swing</button>`;
+  // …and it carries the live power as a fill behind its own label, so the pull has a number without
+  // a second row to put it on.
+  const swingBtn = `<button class="gs-btn gs-btn--primary gs-swing" data-swing="1" title="Swing at the previewed power — or pull down on the map to set it yourself"><span class="gs-swing__inner" id="gs-powerhud">${swingInner()}</span></button>`;
+  // The one CONDITIONAL control in the action column: re-aim at the pin, which can only exist once the
+  // player has dragged the aim off it. It lands ABOVE the three permanent buttons, so they never move.
+  const extraActions = selFreeTarget
+    ? `<button class="gs-roundbtn gs-glass" data-aimreset="1" title="Re-aim at the pin" aria-label="Re-aim at the pin">🎯</button>`
+    : '';
   return playFrameHTML({
     mode: 'aim',
     map: `<div class="gs-bigmap" data-map="1" data-weather="decision">${svg}</div>`,
     top: mapTopInfo(v, { shotNo: play.strokes + 1, distLabel: `<b>${v.distToPin}</b>y` }),
-    rows: [clubRow, powerHud, legend, samRead],
+    rows: [],
     commit: swingBtn,
     caddyId: caddyId(),
     nav: { whole: mapView === 'whole', moved: mapViewMoved(), viewDisabled: false, settingsDisabled: false },
     autoFinishDisabled: false,
+    bag: bagPart(selClubId, false),
+    // A free-drag aim overrides the mode for this shot, so the mode button greys while the 🎯 reset
+    // owns the aim — the two controls can never contradict each other (the old row hid it outright).
+    aim: aimPart(!!selFreeTarget),
+    extraActions,
     lefty: lefty(),
     after: state.scrambleChoice ? scrambleChoiceOverlay() : awaitingShotPopup ? shotPopupOverlay() : '',
   });
@@ -1942,6 +1933,11 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
 
 // Settings sheet — a view overlay (not reducer state), toggled like the shot popup.
 let settingsOpen = false;
+
+// The club picker sheet (GS-hud-bag) — a view overlay like the settings sheet, raised by the play
+// screen's bag button and closed by picking a club, the ✕, the backdrop, or Escape/Back. Never
+// persisted, and cleared whenever the shot it belonged to is gone.
+let clubPickerOpen = false;
 
 // The Ascension tier picked on the character-select screen (GS-title-2) — view state, like the
 // club selection: the [data-asc] chips set it, every golfer card's select action carries it, and
@@ -2857,6 +2853,7 @@ function render(): void {
       decisionBias = null;
       puttViewRadius = null;
       puttViewBias = null;
+      clubPickerOpen = false;
       resetMapView();
     }
     animatingPlay = pendingAnimation(state.play);
@@ -3037,10 +3034,26 @@ function render(): void {
   // The leave-the-round confirm (GS-android-back) rides over every screen like the settings sheet;
   // only a back press inside a run can raise it.
   const exitConfirm = state.pendingExit ? exitConfirmOverlay() : '';
+  // The club picker (GS-hud-bag) — raised by the play screen's bag. A DIRECT child of #app like every
+  // other sheet, so it gets the dialog/focus/inert pass (and silences the arrow-key aim) for free.
+  // Gated hard on "there is a shot to club up for": a stale flag can never show it anywhere else.
+  const clubPicker =
+    clubPickerOpen && state.screen === 'playing' && state.play && !state.play.done && !animatingPlay
+      ? (() => {
+          const sv = shotView(state.play, state.run.loadout);
+          const onGreenPutter = sv.lie === 'green' && state.run.loadout.bag.some((c) => c.id === 'putter');
+          return clubPickerOverlay({
+            selectedId: selClubId,
+            hasSuggest: !!state.run.loadout.clubSuggest,
+            suggestedId: onGreenPutter ? 'putter' : sv.attackClubId,
+            canPuttFringe: canPuttFringe(state.play) && !selPutt,
+          });
+        })()
+      : '';
   // Note what has focus BEFORE the DOM is torn down (GS-a11y-focus) — it is the last moment the
   // information exists, and closing an overlay needs it to hand focus back to whatever opened it.
   captureFocusOrigin();
-  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}${fit ? ' gs-main--fit' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${introTraits}${introField}${priceNotice}${exitConfirm}`;
+  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}${fit ? ' gs-main--fit' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${introTraits}${introField}${priceNotice}${exitConfirm}${clubPicker}`;
   app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
 
   // Star Tour star map (GS-star-tour): on first mount, centre the pannable chart on the worlds'
@@ -3413,15 +3426,35 @@ function render(): void {
       render();
     });
   });
-  // Local (non-game) controls on the playing screen: club cycle + aim select.
-  app.querySelectorAll<HTMLElement>('[data-cycle]').forEach((el) => {
+  // The BAG (GS-hud-bag): open / close the club picker sheet. `keep` is the sheet body itself — it
+  // swallows the click so a tap inside never reaches the backdrop's dismiss.
+  app.querySelectorAll<HTMLElement>('[data-clubpick]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      const v = el.dataset.clubpick;
+      if (v === 'keep') {
+        e.stopPropagation();
+        return;
+      }
+      clubPickerOpen = v === 'open';
+      resumeAudio();
+      sfx.click();
+      haptic(HAPTICS.tap);
+      render();
+    });
+  });
+  // …and picking a club from it. Only a club actually IN the bag can be selected (the sheet is built
+  // from `usableBag`, but the handler re-checks rather than trusting a stale DOM after a re-render).
+  app.querySelectorAll<HTMLElement>('[data-clubpick-id]').forEach((el) => {
     el.addEventListener('click', () => {
-      // Cycle through only the lie-legal clubs (driver tee-only unless the Driver Dan caddy unlocks it).
-      const lie = state.play?.lie ?? 'tee';
-      const bag = usableBag(state.run.loadout.bag, lie, state.run.loadout.driverAnywhere ?? false);
-      const i = bag.findIndex((c) => c.id === selClubId);
-      const ni = Math.max(0, Math.min(bag.length - 1, (i < 0 ? 0 : i) + Number(el.dataset.cycle)));
-      selClubId = bag[ni]!.id;
+      const id = el.dataset.clubpickId!;
+      if (!state.run.loadout.bag.some((c) => c.id === id)) return;
+      selClubId = id;
+      // Picking a club off the fringe means playing it, not rolling the pace meter (GS-fringe-putt).
+      selPutt = false;
+      clubPickerOpen = false;
+      resumeAudio();
+      sfx.click();
+      haptic(HAPTICS.tap);
       render();
     });
   });
@@ -3471,16 +3504,8 @@ function render(): void {
   // aim, release to fire (GS-power). Pointer-move/up listen on window so the gesture survives the
   // per-frame re-render that replaces the map element.
   wireShotGesture(app);
-  // "Use suggested" snaps the club back to the suggestion for this position.
-  app.querySelectorAll<HTMLElement>('[data-suggest]').forEach((el) => {
-    el.addEventListener('click', () => {
-      if (!state.play) return;
-      const sv = shotView(state.play, state.run.loadout);
-      const onGreen = sv.lie === 'green' && state.run.loadout.bag.some((c) => c.id === 'putter');
-      selClubId = onGreen ? 'putter' : sv.attackClubId;
-      render();
-    });
-  });
+  // (GS-hud-bag: the old 🏌 "use suggested" button is gone — Sam's pick is the ★ on its row in the
+  // club picker, so the suggestion is taken by tapping the club itself, like any other.)
   // PWA install nudge: fire the captured prompt, then forget it (one offer).
   app.querySelectorAll<HTMLElement>('[data-install]').forEach((el) => {
     el.addEventListener('click', () => {
@@ -3649,6 +3674,9 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-putt-toggle]').forEach((el) => {
     el.addEventListener('click', () => {
       selPutt = el.dataset.puttToggle === '1';
+      // "Putt it" also lives as a row IN the club picker (it is a club choice like any other), so
+      // choosing it closes the sheet — the same way picking a stick does.
+      clubPickerOpen = false;
       render();
     });
   });
@@ -4061,10 +4089,14 @@ function shouldPlayIntro(): boolean {
  * a run.
  */
 function handleBack(): boolean {
-  const intent = backIntent(state, { settingsOpen });
+  const intent = backIntent(state, { settingsOpen, clubPickerOpen });
   switch (intent.kind) {
     case 'closeSettings':
       settingsOpen = false;
+      render();
+      return true;
+    case 'closeClubPicker':
+      clubPickerOpen = false;
       render();
       return true;
     case 'swallow':
