@@ -364,6 +364,18 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     have actually MET (`metCoilChampions`, GS-story-champion-met — Scorpius is the Ch.4 WARDEN rival and was
     walking into the Herald climax a stranger). A friend who comes as a PAIR speaks the `confrontPair` voice,
     never the lone-champion `confront` lines (GS-story-pair-voice).
+  - **A COIL AGENT HAS ONE NAME AND ONE JOB** (GS-story-coil-names / -caddy-read / -caddy-partner). The four
+    inner-circle agents are BOTH the Herald caddy roster and the Herald partner pool, so every surface asks a
+    seam instead of deriving. They are spoken by their authored `shortName` — `heraldShortName`, and
+    `allyName`/`allyShortName` (the ONE ally-name seam) resolve them too: the deck/ship/badge used to plate
+    "Sable"/"the Viper"/"Brother"/"Sister" and the quest headline read *"The Shedding — with a"*. The one on
+    your BAG is never offered as a playing partner (`availableStoryPartnerIds` — the rule `finaleMatchup`
+    already applied to the Ch.5 champion; the DRAW stays on the full pool, so a Warden sheet is byte-for-byte).
+    The putt read row NAMES whoever found the line, PROBED off the caddy's own fold (`caddyReadsGreen`) —
+    `loadout.greenRead` says a read exists, not whose, so gear/a reward putter reads as "🔮 Line", never as
+    the Mole. And **a quest promises what it PAYS** (machine-checked: a non-club reward may not say
+    club/wedge/driver/putter/iron — the Shedmaker promised a wedge and handed over hull armour, the Doctor a
+    wedge and handed over a ball). Guards: `tests/story-coil-crew.test.ts` + story-qualifier-formats/quests.
   - **Switched sides is SHOWN** (GS-story-defection-clubhouse / GS-story-coil-garb). The defector's Coil
     costume (`corruptedLookOpts`) KEEPS the golfer's own shirt colour + face + hair and layers an open
     serpent robe + raised cobra hood + serpent circlet OVER it (`golferPreviewSVG`'s `coilGarb` opt), so

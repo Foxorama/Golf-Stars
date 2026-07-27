@@ -15,6 +15,7 @@ import {
 import { STORY_CADDY_STOCK } from '../src/sim/rpg/storyCaddies';
 import { HERALD_CADDY_IDS } from '../src/sim/rpg/storyHeraldCrew';
 import { defaultStoryState } from '../src/sim/rpg/story';
+import { allyName } from '../src/sim/rpg/storyAllies';
 import { grantStoryReward, rewardOwned } from '../src/sim/rpg/storyRewards';
 import { staticCourseSpec, regenerateStaticCourse } from '../src/sim/course/staticCourseSpecs';
 
@@ -225,5 +226,30 @@ describe('Story ally side quests (GS-story-quests)', () => {
     ).toBe('elsewhere');
     // Ready to offer → no beat held at all.
     expect(questBeatPendingReason(withCaddy('driver-dan', { chapter: 3 }), 'driver-dan')).toBeUndefined();
+  });
+});
+
+describe('GS-story-reward-variety — a quest PROMISES what it actually pays', () => {
+  // The report: the Shedmaker's quest hook + pitch said she would forge you a WEDGE, while the reward
+  // channel handed over a ship part (her serpent-scale carapace). The offer beat is the first thing a
+  // player reads about a quest, so a promise it can't keep is a bug in the story, not just a typo.
+  // Words that can only mean a bag CLUB — a quest that pays anything else must not use one.
+  const CLUB_WORDS = /\b(wedge|driver|putter|iron|club)s?\b/i;
+  // …minus the giver's own name, so Driver Dan may keep his ("Driver Dan wants to visit the derelict").
+  const spoken = (q: (typeof STORY_QUESTS)[number], text: string): string => text.split(allyName(q.caddyId)).join('');
+
+  it('a non-club quest never promises a club in its hook or its pitch', () => {
+    for (const q of STORY_QUESTS) {
+      if (q.reward.kind === 'club') continue;
+      expect(spoken(q, q.hook), `${q.id} hook promises a club`).not.toMatch(CLUB_WORDS);
+      for (const line of q.offer) expect(spoken(q, line), `${q.id} offer promises a club`).not.toMatch(CLUB_WORDS);
+    }
+  });
+
+  it("the Shedmaker's quest reads as the ship part it is", () => {
+    const q = STORY_QUESTS.find((x) => x.id === 'quest-coil-ecdysis')!;
+    expect(q.reward.kind).toBe('upgrade');
+    expect(q.hook).toMatch(/hull|carapace/i);
+    expect(q.offer.join(' ')).toMatch(/hull/i);
   });
 });

@@ -22,7 +22,7 @@ import { lorePortraitSVG } from '../render/loreArt';
 import { loreCardHTML } from '../render/loreCard';
 import { isHeraldAgent, heraldAgent, heraldCaddyEffect, COIL_FACTION_BLURB } from '../sim/rpg/storyHeraldCrew';
 import { clubSetById, shopItem } from '../sim/rpg/economy';
-import { allyFactionBlurb } from '../sim/rpg/storyAllies';
+import { allyFactionBlurb, allyShortName } from '../sim/rpg/storyAllies';
 import {
   resolveStoryClub,
   storyClubType,
@@ -147,7 +147,7 @@ export function storyLockerScreen(): string {
   // ── Crew ──
   const active = activeStoryCaddy(story);
   const crewSummary = story.hiredCaddyIds.length
-    ? `${active ? `${caddyDisplayName(active).split(' ')[0]} ★` : 'benched'} · ${story.hiredCaddyIds.length} aboard`
+    ? `${active ? `${allyShortName(active)} ★` : 'benched'} · ${story.hiredCaddyIds.length} aboard`
     : 'none yet';
 
   const overlay = state.storyItemInspectId ? inspectOverlay(state.storyItemInspectId) : '';

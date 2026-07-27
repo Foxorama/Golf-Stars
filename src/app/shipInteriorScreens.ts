@@ -15,7 +15,7 @@ import { state } from './ctx';
 import { shipById } from '../sim/rpg/ships';
 import { shipInteriorTheme, shipRoomArt, shipRoomMeta } from '../render/shipInteriorArt';
 import { SHIP_ROOMS, type ShipRoom } from '../ui/gameState';
-import { crewRoster, allyName } from '../sim/rpg/storyAllies';
+import { crewRoster, allyShortName } from '../sim/rpg/storyAllies';
 import { heraldCrew } from '../sim/rpg/storyHeraldCrew';
 import { activeStoryCaddy } from '../sim/rpg/storyCaddies';
 import { questOfferable } from '../sim/rpg/storyQuests';
@@ -50,13 +50,10 @@ interface Crewmate {
 /** The crew aboard — recruited caddies (Warden) or the Coil inner circle (Herald). */
 function crewAboard(story: StoryState): Crewmate[] {
   if (story.alignment === 'herald') {
-    return heraldCrew(story).map((a) => ({
-      id: a.id,
-      short: (a.name.includes('"') ? a.name.replace(/^.*?["']([^"']+)["'].*$/, '$1') : a.name.split(' ')[0]) || a.name,
-      tint: a.tint,
-    }));
+    // GS-story-coil-names: aboard ship they go by the same short name every other screen uses.
+    return heraldCrew(story).map((a) => ({ id: a.id, short: a.shortName, tint: a.tint }));
   }
-  return crewRoster(story).map((id) => ({ id, short: allyName(id).split(' ')[0] || allyName(id) }));
+  return crewRoster(story).map((id) => ({ id, short: allyShortName(id) }));
 }
 
 /** A stable little hash (byte-stable, no rng) so each crewmate picks a room per boarding visit. */

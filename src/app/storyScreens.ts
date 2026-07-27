@@ -24,7 +24,7 @@ import { worldCaddy, storyCaddyHired, activeStoryCaddy, STORY_CADDY_PRICE } from
 import { shopItem } from '../sim/rpg/economy';
 import { staticCourseSpec } from '../sim/course/staticCourses';
 import { allyInspectOverlayHTML } from '../render/storyCrew';
-import { activeQuest, questWorld, questById, questGiverName, questRewardEffectLabel } from '../sim/rpg/storyQuests';
+import { activeQuest, questWorld, questById, questGiverShortName, questRewardEffectLabel } from '../sim/rpg/storyQuests';
 import { rewardKindIcon, rewardKindLabel } from '../sim/rpg/storyRewards';
 import { storyObjective } from '../sim/rpg/storyGuide';
 import { isHeraldAgent } from '../sim/rpg/storyHeraldCrew';
@@ -259,7 +259,7 @@ function questBannerHTML(story: StoryState): string {
   return `
     <section style="max-width:520px;margin:12px auto 0;">
       <div style="background:linear-gradient(180deg,#1e1630,#140e1e);border:1px solid #5a3f8a;border-radius:12px;padding:14px 16px;">
-        <div style="font-size:15px;font-weight:800;color:#d6c2ff;">🗺 ${q.title} — with ${questGiverName(q).split(' ')[0]}</div>
+        <div style="font-size:15px;font-weight:800;color:#d6c2ff;">🗺 ${q.title} — with ${questGiverShortName(q)}</div>
         <p style="margin:8px 0 10px;color:#e6ddf0;font-size:13px;line-height:1.5;">${q.hook}</p>
         ${rewardTeaser}
         <button class="gs-btn" style="background:linear-gradient(180deg,#2a1e44,#1a1230);border-color:#7a5ab0;color:#e2d4ff;width:100%;text-align:left;padding:11px 14px;"
@@ -450,7 +450,7 @@ export function storyResultScreen(): string {
           : '⛳ Qualifying event'
         : '⛳ World cleared';
   const kicker = quest
-    ? `${quest.title} — ${questGiverName(quest).split(' ')[0]} keeps their word.`
+    ? `${quest.title} — ${questGiverShortName(quest)} keeps their word.`
     : r.wasPrologue
       ? `You've won the final round of the World Tour on Earth — the best golfer on the planet.`
       : q

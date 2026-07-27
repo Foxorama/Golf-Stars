@@ -20,7 +20,7 @@ import { shipSVG } from './shipArt';
 import { shipById } from '../sim/rpg/ships';
 import { prognosticParrotPortraitSVG, carrionCrowPortraitSVG } from './loreArt';
 import { activeStoryCaddy } from '../sim/rpg/storyCaddies';
-import { crewRoster, allyName } from '../sim/rpg/storyAllies';
+import { crewRoster, allyName, allyShortName } from '../sim/rpg/storyAllies';
 import { heraldCrew, type HeraldAgent } from '../sim/rpg/storyHeraldCrew';
 import { storyBarName, type StoryState } from '../sim/rpg/story';
 import { questOfferable } from '../sim/rpg/storyQuests';
@@ -609,8 +609,9 @@ const HERALD_SPOTS: { left: number; top: number }[] = [
 
 /** One Coil agent as a feet-anchored standee (their lore portrait, tinted). Tap → their Herald talk card. */
 function heraldStandee(agent: HeraldAgent, spot: { left: number; top: number }, active: boolean, hasQuest = false): string {
-  const name = agent.name.replace(/^.*?["']([^"']+)["'].*$/, '$1') || agent.name.split(' ')[0];
-  const short = agent.name.includes('"') ? name : agent.name.split(' ')[0];
+  // GS-story-coil-names: the plate says what every other screen says — their short name (Voss / Venoma /
+  // Ouros / Ecdysis), never a re-derived handle ("Sable", "the Viper") or honorific ("Brother", "Sister").
+  const short = agent.shortName;
   // GS-story-herald-quests: a bobbing marker floats over a Coil agent with an offerable quest right now.
   const questMark = hasQuest ? `<span class="gs-sclub-questmark" aria-hidden="true">❗</span>` : '';
   return `<button class="gs-sclub-caddy gs-sclub-caddy--herald${active ? ' gs-sclub-caddy--on' : ''}"
@@ -636,7 +637,7 @@ const CREW_SPOTS: { left: number; top: number }[] = [
 /** One crew ally as a feet-anchored portrait standee on the deck. Tap → their ally talk card. The active
  *  caddy (on the bag) gets a pink ring + a 🎒 plate; the rest get a plain name plate. */
 function crewStandee(caddyId: string, spot: { left: number; top: number }, active: boolean, hasQuest = false): string {
-  const name = allyName(caddyId).split(' ')[0];
+  const name = allyShortName(caddyId);
   // GS-story-quest-icon: a bobbing quest marker floats over a caddy who has an offerable quest right now.
   const questMark = hasQuest ? `<span class="gs-sclub-questmark" aria-hidden="true">❗</span>` : '';
   return `<button class="gs-sclub-caddy${active ? ' gs-sclub-caddy--on' : ''}"

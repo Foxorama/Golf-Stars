@@ -37,7 +37,13 @@
 
 import { Rng } from '../rng';
 import { stablefordPoints } from '../score';
-import { storyPartnerIds, storyPartnerName, storyPartnerPool, type StoryPartnerOption } from './storyPartners';
+import {
+  availableStoryPartnerIds,
+  availableStoryPartnerPool,
+  storyPartnerIds,
+  storyPartnerName,
+  type StoryPartnerOption,
+} from './storyPartners';
 import { storyWorldById, type StoryState } from './story';
 import { resolveStory2v2Match, storyPartnerBestBallScore, type StoryMatchResult, type StoryTeamFormat } from './storyTeams';
 import {
@@ -172,7 +178,12 @@ export function qualifierPlan(
   // own keyed stream, so the sheet's shape — and every existing Warden campaign's draw — is unchanged.
   const others = storyPartnerIds(story);
   const drawn = others[Math.min(others.length - 1, Math.floor(rng.float() * Math.max(1, others.length)))];
-  const partnerId = chosenPartnerId && others.includes(chosenPartnerId) ? chosenPartnerId : drawn;
+  // GS-story-caddy-partner: the DRAW is off the full, alignment-only pool (so the sheet's rng stream is
+  // untouched and a Warden campaign is byte-for-byte), but the agent carrying your bag can't also play
+  // beside you — a drawn or picked caddy steps aside for the next free partner in the pool's stable order.
+  const pickable = availableStoryPartnerIds(story);
+  const partnerId =
+    chosenPartnerId && pickable.includes(chosenPartnerId) ? chosenPartnerId : freePartnerFrom(others, drawn, pickable);
   const paired = isPairedFormat(format);
   return {
     courseId,
@@ -183,10 +194,24 @@ export function qualifierPlan(
   };
 }
 
+/** The first partner at or after `drawn` in the pool's stable order that is actually free to play (the
+ *  drawn one itself whenever it is). Cyclic, so a caddy-blocked draw spreads across the pool rather than
+ *  always falling to the same substitute. */
+function freePartnerFrom(pool: readonly string[], drawn: string | undefined, pickable: readonly string[]): string | undefined {
+  if (!drawn || pickable.includes(drawn)) return drawn;
+  const from = Math.max(0, pool.indexOf(drawn));
+  for (let i = 1; i <= pool.length; i++) {
+    const id = pool[(from + i) % pool.length];
+    if (id && pickable.includes(id)) return id;
+  }
+  return pickable[0];
+}
+
 /** Who you may pick to play a qualifying event beside — your three tour-mates, or the Coil circle on the
- *  Herald path (GS-story-coil-partners). Id + short name; empty-safe. */
+ *  Herald path (GS-story-coil-partners), minus whoever is on your bag (GS-story-caddy-partner). Id + short
+ *  name; empty-safe. */
 export function qualifierPartnerPool(story: StoryState): StoryPartnerOption[] {
-  return storyPartnerPool(story);
+  return availableStoryPartnerPool(story);
 }
 
 /**
