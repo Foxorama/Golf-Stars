@@ -480,6 +480,22 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     it 0.5139 → **0.6319** toPar/hole and 5.66% → **8.09%** floor-hits, both inside their fences, no
     fence moved: a ball that genuinely comes down lets the trees short of a green defend it (knockdowns
     15.72% → 19.03%, entirely in the wooded worlds).
+  - **HANG TIME COMES FROM THE APEX, NOT THE CARRY** (GS-flight-hang, `flightDurationMs`). A ball
+    launched with vertical speed `v` peaks at `v²/2g` and stays up for `2v/g`, so `t = 2·√(2·apex/g)`
+    — **the time comes from the HEIGHT and the carry never enters it.** The animation was keyed on
+    carry, and since GS-flight-shape made the apex tour-FLAT across the bag (31yd → 21) that was
+    exactly backwards: real hang times run 4.8s for a drive to 3.9s for a sand wedge, a ratio of 1.2,
+    while the drawn ratio was **2.15** (816ms → 380). Measured at the cameras the game actually uses,
+    a 9-iron crossed the screen at **1.58 px/ms against a driver's 0.53** — three times faster, the
+    report *"irons, hybrids and wedges fly too fast in the air"*. It was also most of the TAIL
+    complaint: the closing tenth of the ground was spent in **44ms** on a 9-iron against 95 on a
+    drive, so the steepest arcs in the bag were also the most rushed. Keying on apex flattens the
+    drawn times to 666–814ms; with a per-family `dragTaper` (`FlightProfile`, driver 0.72 → wedge
+    0.46 — a lofted club flying slower and steeper sheds proportionally more forward speed, so it
+    SETTLES onto the turf instead of arriving at launch pace) the closing tenth lands at **95–108ms
+    for every club in the bag**. PURE render pacing: the drawn PATH is untouched, no sim module reads
+    `dragTaper`, and the death-spiral harness is byte-identical (0.6406 / 8.02%). Guarded by
+    `tests/runout.test.ts`; measured by `scripts/runout-frames.ts`.
   - **THE LANDING IS BUILT FROM THE FLIGHT, NOT A CLASS LOOKUP** (GS-landing-real, `render/runout.ts`
     `Landing`). A hop's LENGTH scales with `carry·cos²(descent)` and its APEX with `carry·sin²(descent)`,
     so how far it flew and how steeply it fell decide the landing: driver 38° down skips 12yd six times,

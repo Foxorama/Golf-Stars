@@ -36,9 +36,9 @@ function arrival(actualCarry: number, nominal: number, clubId: string) {
   const shape = arcShapeOf(clubId);
   const from: Vec = [0, 0];
   const land: Vec = [0, actualCarry];
-  const dur = flightDurationMs(actualCarry);
+  const dur = flightDurationMs(apex);
   const VEPS = 0.02;
-  const at = (u: number) => sampleCurvedFlight(from, land, 0, flightGroundAt(u), apex, shape);
+  const at = (u: number) => sampleCurvedFlight(from, land, 0, flightGroundAt(u, undefined, pr.dragTaper), apex, shape);
   const a = at(1 - VEPS).ground;
   const b = at(1).ground;
   const v0 = Math.hypot(b[0] - a[0], b[1] - a[1]) / Math.max(1, VEPS * dur);

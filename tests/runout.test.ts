@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { planRunout, sampleRunout, apexOverLenFor, DEFAULT_RUNOUT_FEEL, RUNOUT_BY_CLASS, type Landing, type RunoutPlan } from '../src/render/runout';
-import { arcApex, ARC_FEEL, arcShapeOf, arrivalAngleDeg, descentAngleDeg } from '../src/sim/flight';
+import { arcApex, ARC_FEEL, arcShapeOf, arrivalAngleDeg, descentAngleDeg, flightCarryScale } from '../src/sim/flight';
 import { sampleCurvedFlight, flightDurationMs, flightGroundAt } from '../src/render/trajectory';
 import { flightGroundFrac, flightParamAt } from '../src/sim/flight';
 import { readFileSync } from 'node:fs';
@@ -310,9 +310,9 @@ function arrival(clubId: string): { v0: number; descentDeg: number; carry: numbe
   const shape = arcShapeOf(clubId);
   const from: [number, number] = [0, 0];
   const land: [number, number] = [0, club.carry];
-  const dur = flightDurationMs(club.carry);
-  const a = sampleCurvedFlight(from, land, 0, flightGroundAt(0.98), apex, shape).ground;
-  const b = sampleCurvedFlight(from, land, 0, flightGroundAt(1), apex, shape).ground;
+  const dur = flightDurationMs(apex);
+  const a = sampleCurvedFlight(from, land, 0, flightGroundAt(0.98, undefined, pr.dragTaper), apex, shape).ground;
+  const b = sampleCurvedFlight(from, land, 0, flightGroundAt(1, undefined, pr.dragTaper), apex, shape).ground;
   const v0 = Math.hypot(b[0] - a[0], b[1] - a[1]) / Math.max(1, 0.02 * dur);
   return { v0, descentDeg: arrivalAngleDeg(apex, club.carry, shape), carry: club.carry };
 }
@@ -338,9 +338,51 @@ describe('the ball ARRIVES at speed (GS-flight-pace)', () => {
     for (const id of ['D', '7i', 'SW']) {
       const ar = arrival(id);
       const club = CLUBS.find((c) => c.id === id)!;
-      const mean = club.carry / flightDurationMs(club.carry);
-      expect(ar.v0 / mean, `${id} arrives at this fraction of its average ground speed`).toBeGreaterThan(0.6);
+      const pr = flightProfileOf(id);
+      const mean = club.carry / flightDurationMs(arcApex(club.carry, club.carry, ARC_FEEL, pr));
+      // The taper is per family now (GS-flight-hang) — a lofted club sheds more of its forward speed
+      // into the landing, which is what makes it SETTLE rather than arrive at launch pace.
+      expect(ar.v0 / mean, `${id} arrives at this fraction of its average ground speed`).toBeGreaterThan(
+        (pr.dragTaper ?? 0.72) * 0.85,
+      );
     }
+  });
+
+  it('HANG TIME COMES FROM THE APEX, NOT THE CARRY (GS-flight-hang)', () => {
+    // `t = 2·√(2·apex/g)`: the carry never enters it. Since the apex is tour-flat across the bag, the
+    // drawn flight times must be nearly flat too — they were 816ms for a drive against 380 for a
+    // wedge, a 2.15 ratio against real golf's 1.2, which is why the short clubs flew like darts.
+    const durs = ['D', '3W', '4H', '3i', '7i', '9i', 'PW', 'SW'].map((id) => {
+      const club = CLUBS.find((c) => c.id === id)!;
+      const pr = flightProfileOf(id);
+      const carry = club.carry * flightCarryScale(id, club.carry);
+      return flightDurationMs(arcApex(carry, club.carry, ARC_FEEL, pr));
+    });
+    expect(Math.max(...durs) / Math.min(...durs), 'drive:wedge hang-time ratio').toBeLessThan(1.35);
+    // …and it scales with √apex, so a half-height shot hangs 1/√2 as long — the carry is irrelevant.
+    expect(flightDurationMs(32) / flightDurationMs(16)).toBeCloseTo(Math.SQRT2, 6);
+  });
+
+  it('every club spends the same TIME on the closing tenth of its flight (GS-flight-hang)', () => {
+    // The tail complaint measured: a 9-iron spent 44ms on its last tenth of ground against a drive's
+    // 95, so the steepest arcs in the bag were also the most rushed. The per-family drag taper plus
+    // apex-keyed hang time flattens it.
+    const tails = ['D', '3W', '4H', '3i', '7i', '9i', 'PW', 'SW'].map((id) => {
+      const club = CLUBS.find((c) => c.id === id)!;
+      const pr = flightProfileOf(id);
+      const carry = club.carry * flightCarryScale(id, club.carry);
+      const dur = flightDurationMs(arcApex(carry, club.carry, ARC_FEEL, pr));
+      let u90 = 1;
+      for (let i = 0; i <= 2000; i++) {
+        const u = i / 2000;
+        if (flightGroundAt(u, undefined, pr.dragTaper) >= 0.9) { u90 = u; break; }
+      }
+      return (1 - u90) * dur;
+    });
+    expect(Math.max(...tails) / Math.min(...tails), 'closing-tenth time spread').toBeLessThan(1.3);
+    // A lofted club must taper HARDER than a driver — that is what stretches its tail.
+    expect(FLIGHT_PROFILES.wedge.dragTaper!).toBeLessThan(FLIGHT_PROFILES.driver.dragTaper!);
+    expect(FLIGHT_PROFILES.ironShort.dragTaper!).toBeLessThan(FLIGHT_PROFILES.hybrid.dragTaper!);
   });
 
   it('the pacing walks the whole flight monotonically, in GROUND', () => {

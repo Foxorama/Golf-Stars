@@ -47,7 +47,7 @@ import {
   DEFAULT_FLIGHT_FEEL,
   type FlightFeel,
 } from './trajectory';
-import { arcShapeOf, arrivalAngleDeg } from '../sim/flight';
+import { arcShapeOf, arrivalAngleDeg, flightProfileOf } from '../sim/flight';
 import { planRunout, sampleRunout, DEFAULT_RUNOUT_FEEL, type RunoutFeel, type RunoutPlan } from './runout';
 import {
   advanceFlightSpin,
@@ -802,8 +802,13 @@ export function mountPlayView(
       // the ball has covered, so the drawn arc is the shot's height-vs-distance curve: a near-straight
       // climb to the family's apex position, then a steepening fall onto its own descent angle.
       const arc = arcShapeOf(shot.club.id);
+      // How much forward speed the ball still has as it touches down, per FAMILY (GS-flight-hang).
+      // Animation pacing only — the drawn path is untouched — but it is what makes a lofted club
+      // SETTLE onto the turf instead of arriving at the speed it left the face.
+      const taper = flightProfileOf(shot.club.id).dragTaper;
+      const groundAt = (u: number): number => flightGroundAt(u, F, taper);
       const bearing = shot.result.shotBearing;
-      const flightDur = flightDurationMs(carry);
+      const flightDur = flightDurationMs(peak);
       const [tdx, tdy] = proj.project(touchdown);
       const [rsx, rsy] = proj.project(rest);
       // The LAND → BOUNCE → RUN-OUT plan (GS-runout-feel). The sim already decided the roll distance
@@ -841,7 +846,7 @@ export function mountPlayView(
         const endAt = (u: number): Vec =>
           shot.flightPath && shot.flightPath.length > 1
             ? samplePolylineFlight(shot.flightPath, u, peak, arc).ground
-            : sampleCurvedFlight(shot.from, touchdown, bearing, flightGroundAt(u, F), peak, arc).ground;
+            : sampleCurvedFlight(shot.from, touchdown, bearing, groundAt(u), peak, arc).ground;
         const a = endAt(1 - VEPS);
         const b = endAt(1);
         const v0 = Math.hypot(b[0] - a[0], b[1] - a[1]) / Math.max(1, VEPS * flightDur);
@@ -951,7 +956,7 @@ export function mountPlayView(
           // redirect cinematic gates on it), and `tf` is where along the Bézier that progress actually
           // puts the ball — near-constant GROUND speed instead of a curve that stops dead at the
           // landing. The path is identical; only the pacing moves.
-          const tf = flightGroundAt(tg, F);
+          const tf = groundAt(tg);
           // Real caddy-guard redirect (GS-caddy), or — in the force-redirect DEMO — a fabricated one so
           // the throw fires on every shot. caddyProjectile(cornerCaddyId) is the active guard's kind.
           const projKind = caddyProjectile(cornerCaddyId);
@@ -967,7 +972,7 @@ export function mountPlayView(
             // Eyes-on feel; the SCORE already used the redirected landing.
             const interceptFrac = REDIRECT_HIT_FRAC;
             const fireFrac = REDIRECT_FIRE_FRAC;
-            const sI = sampleCurvedFlight(shot.from, rd.originalLanding, bearing, flightGroundAt(interceptFrac, F), peak, arc);
+            const sI = sampleCurvedFlight(shot.from, rd.originalLanding, bearing, groundAt(interceptFrac), peak, arc);
             // Intercept screen point, recomputed EVERY frame so it tracks the camera pan + zoom.
             const impactScreen: Vec = [0, 0];
             {

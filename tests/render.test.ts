@@ -94,10 +94,12 @@ describe('trajectory (pure)', () => {
     expect(arcPeak(200)).toBeGreaterThan(arcPeak(100));
   });
 
-  it('flightDurationMs scales with carry within clamps', () => {
+  it('flightDurationMs scales with the APEX within clamps (GS-flight-hang)', () => {
+    // Hang time is `2·√(2·apex/g)` — a function of how HIGH the ball went, never of how far.
     expect(flightDurationMs(0)).toBe(DEFAULT_FLIGHT_FEEL.minMs);
     expect(flightDurationMs(99999)).toBe(DEFAULT_FLIGHT_FEEL.maxMs);
-    expect(flightDurationMs(200)).toBeGreaterThan(flightDurationMs(120));
+    expect(flightDurationMs(30)).toBeGreaterThan(flightDurationMs(12));
+    expect(flightDurationMs(32) / flightDurationMs(8)).toBeCloseTo(2, 6); // 4× the height, 2× the time
   });
 
   it('easeOutCubic maps 0→0 and 1→1 monotonically', () => {
