@@ -22,6 +22,7 @@
 import { getCharacter } from './characters';
 import { otherGolferIds } from './storyCast';
 import { HERALD_CREW, heraldAgent } from './storyHeraldCrew';
+import { activeStoryCaddy } from './storyCaddies';
 import { isCoilChampionId, coilChampionName } from './storyBetrayal';
 import type { StoryState } from './story';
 
@@ -44,14 +45,34 @@ export function storyPartnerIds(story: StoryState): string[] {
   return isHerald(story) ? HERALD_CREW.map((a) => a.id) : otherGolferIds(story);
 }
 
-/** The same pool with display names, for a picker. */
-export function storyPartnerPool(story: StoryState): StoryPartnerOption[] {
-  return storyPartnerIds(story).map((id) => ({ id, name: storyPartnerName(id) }));
+/**
+ * GS-story-caddy-partner: **the one carrying your bag cannot also tee it up beside you.** The pool minus
+ * whoever is the active caddy, in the pool's stable order.
+ *
+ * On the Warden road the two rosters can't collide — your partners are golfers and your caddies are the
+ * named caddies — so this is the pool, unchanged. Turn HERALD and the Coil inner circle is BOTH rosters at
+ * once (`applyHeraldCaddies` hands them the bag, `storyPartnerIds` offers them as partners), and the agent
+ * on your bag was being offered as a playing partner too. `finaleMatchup` already applies exactly this rule
+ * to the Ch.5 champion pick (`coilChampionExcluding(activeCaddyId)`); this is that rule everywhere else.
+ *
+ * Never empty — if filtering would empty it (a one-agent pool), the whole pool comes back, because a paired
+ * event with no partner is worse than a caddy pulling double duty.
+ */
+export function availableStoryPartnerIds(story: StoryState): string[] {
+  const pool = storyPartnerIds(story);
+  const onTheBag = activeStoryCaddy(story);
+  const free = pool.filter((id) => id !== onTheBag);
+  return free.length ? free : pool;
+}
+
+/** The pickable pool with display names — what every partner PICKER shows. */
+export function availableStoryPartnerPool(story: StoryState): StoryPartnerOption[] {
+  return availableStoryPartnerIds(story).map((id) => ({ id, name: storyPartnerName(id) }));
 }
 
 /** Is this id a partner the player may actually pick right now (the picker's validation)? */
 export function isStoryPartnerId(story: StoryState, id: string | undefined): boolean {
-  return !!id && storyPartnerIds(story).includes(id);
+  return !!id && availableStoryPartnerIds(story).includes(id);
 }
 
 /**

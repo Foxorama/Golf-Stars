@@ -6,7 +6,11 @@
  */
 
 import { state } from './ctx';
+import { caddyId } from './helpers';
 import { liveLeaderChip, matchHud, teamDuel, teamFormatLabel, teamPartnerChar } from './duelHud';
+import { CADDY_LABEL, hasCaddyArt } from '../render/caddyArt';
+import { caddyReadsGreen } from '../sim/rpg/storyCaddies';
+import { heraldShortName } from '../sim/rpg/storyHeraldCrew';
 import { storySigilMatchChip } from './storySigilHud';
 import { bearing, dist, type Hole } from '../sim/course/contract';
 import { lieInfo, roughLieOf } from '../sim/shot';
@@ -45,6 +49,24 @@ export function puttBreakLine(breakYd: number, dbl = false): string {
 }
 
 /**
+ * WHO found the line, for the read row (GS-story-caddy-read). A green-reading CADDY is named — the Mystic
+ * Mole on a Voyage run, the Coil's Whisperer on a Herald Story round — and anything else that reads for you
+ * (the Seer's Circlet, Penelope's reward putter) speaks as the line itself, because no caddy did it.
+ *
+ * The row used to say "🐀 Mole reads" whatever the source, so a Coil agent on the bag — or a hat — was
+ * credited to a mole who wasn't on the course. The reader is PROBED (`caddyReadsGreen`) off the caddy's own
+ * loadout fold, never a list of ids, and shortened by the same rules the rest of the game speaks them by: a
+ * Coil agent's authored `shortName`, a named caddy's badge label reduced to its last word ("Mystic Mole" →
+ * Mole, the shipped string). The 🔮 is the shop's own icon for this effect ("Break read for you").
+ */
+function greenReadReader(): string {
+  const id = caddyId();
+  if (!caddyReadsGreen(id)) return '🔮 Line';
+  const short = heraldShortName(id) ?? (id && hasCaddyArt(id) ? CADDY_LABEL[id].split(' ').pop() : undefined);
+  return `🔮 ${short ?? 'Caddy'}`;
+}
+
+/**
  * The putt screen's ADJUSTER row (GS-greens-3 · GS-hud-frame): the slope's break + ◄/► aim controls
  * (or the caddy's read), built in the SAME `.gs-clubrow` shape the club cycler uses while aiming — so
  * the two most-tapped buttons on the play screen stay in the same place all the way round the hole.
@@ -59,7 +81,7 @@ export function puttAimRow(breakYd: number, aim: number, reads: boolean, dbl = f
   if (reads) {
     return `<div class="gs-clubrow">
         <button class="gs-btn" disabled aria-hidden="true">◄</button>
-        <span class="gs-clubname gs-clubname--read" id="puttaimlabel">🐀 Mole reads <b>${Math.abs(aim) < 0.2 ? 'straight' : yds(aim)}</b></span>
+        <span class="gs-clubname gs-clubname--read" id="puttaimlabel">${greenReadReader()} reads <b>${Math.abs(aim) < 0.2 ? 'straight' : yds(aim)}</b></span>
         <button class="gs-btn" disabled aria-hidden="true">►</button>
         ${toggle}
       </div>`;

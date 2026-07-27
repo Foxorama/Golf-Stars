@@ -1471,6 +1471,49 @@ shops / stock.
   in the serpent's reaches). Guarded by `tests/story-shop.test.ts` (nine-slot span + the wedge ladder + the
   slice/hook/distance/min-carry effects) and the existing story-flow/locker/avatar suites.
 
+- **GS-story-coil-names / GS-story-caddy-read / GS-story-caddy-partner / GS-story-reward-variety (fixes)** —
+  ✅ *shipped* (`storyHeraldCrew.ts` · `storyAllies.ts` · `storyPartners.ts` · `storyQualifierFormats.ts` ·
+  `storyCaddies.ts` · `storyQuests.ts` · `app/playHud.ts` · `app/helpers.ts` · `render/storySpaceport.ts` ·
+  `app/shipInteriorScreens.ts` · `app/storyScreens.ts` · `app/storyLockerScreens.ts`). Four play-test reports
+  off one Herald campaign, and all four are the SAME defect: a surface re-deriving something a seam already
+  knew.
+  - **Names.** Every screen that showed a Coil agent rolled its own short name out of the full one — the
+    quoted handle (`Malachai "Sable" Voss` → "Sable", `Venoma "the Viper" Krait` → "the Viper") or the first
+    word (`Brother Ouros` → "Brother", `Sister Ecdysis` → "Sister"). So the clubhouse deck, the ship's rooms
+    and the caddy badge called the four of them by four names nothing else in the game used, while the
+    partner chips, draw sheets and scramble cards said Voss / Venoma / Ouros / Ecdysis all along — the
+    authored `shortName`, which had existed since GS-story-coil-partners. `heraldShortName(id)` is now the
+    one accessor and every surface asks it. Worse, `allyName` (the ONE ally-name seam, shared by the quest
+    card, the quest beat's speaker and the crew standees) only knew SHOP caddies, so a Coil volunteer fell
+    through to the `'a friend'` placeholder: the clubhouse quest headline literally read **"The Shedding —
+    with a"**, and the mid-round beat was spoken by "a friend". `allyName` now falls back to the agent
+    roster, and `allyShortName` is the one place that shortens an ally name (Coil → `shortName`, Warden →
+    the long-standing first-word rule, unchanged).
+  - **The read row.** `puttAimRow` hard-coded `🐀 Mole reads` for `loadout.greenRead`, which says a read
+    EXISTS, never where it came from — it can equally be the Whisperer on the bag, the Seer's Circlet, or
+    Penelope's reward putter. So the Coil's Whisperer found the line and the Mole took the credit (and stood
+    dimmed as "off duty" in his own badge slot). The reader is now PROBED off the caddy's own loadout fold
+    (`caddyReadsGreen`, `startingLoadout()` in / `greenRead` out — no second list of who reads greens to
+    fall out of step), named by the same short-name rules, and anything non-caddy reads as "🔮 Line".
+    `puttCaddyId` counts a green-reader as on-duty.
+  - **Partners.** On the Herald path the Coil circle is BOTH the caddy roster (`applyHeraldCaddies`) and the
+    partner pool (`storyPartnerIds`), so the agent carrying your bag was offered as your playing partner in
+    the qualifier picker. `availableStoryPartnerIds` = the pool minus the active caddy (never empty), which
+    is precisely the rule `finaleMatchup` already applied to the Ch.5 champion pick
+    (`coilChampionExcluding(activeCaddyId)`). The DRAW still runs on the full alignment-only pool so the
+    sheet's rng stream is untouched and a Warden campaign is byte-for-byte; a drawn or picked caddy steps
+    aside for the next free partner in stable cyclic order.
+  - **Promises.** The Shedmaker's quest hook + pitch said she would forge you a **wedge** while the reward
+    channel handed over a ship part (her serpent-scale carapace). Fixed — and the new invariant ("a quest
+    whose reward isn't a club may not say club/wedge/driver/putter/iron in its hook or its offer", the
+    giver's own name excepted so Driver Dan keeps his) immediately caught a second one: Dr Chipinski also
+    promised a wedge and hands over the Phoenix Core BALL.
+
+  Zero sim rng, no save/`STORY_VERSION` bump, no new `_gs*`/URL hook. Guarded by `tests/story-coil-crew.test.ts`
+  (names + the read row, driven through the real `puttAimRow`), plus new cases in
+  `tests/story-qualifier-formats.test.ts` (caddy excluded / Warden plans identical) and
+  `tests/story-quests.test.ts` (the promise invariant).
+
 ## Open questions / deferred (revisit as chunks land)
 - **A genuinely-new gas-giant BIOME** (play on gas cloud-tops) — the player's optional "if we need to add
   more" ask. Deferred as its OWN focused session: a new `BiomeArchetype` fans out to ~16 compile-forced

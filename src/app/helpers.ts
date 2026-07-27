@@ -15,7 +15,8 @@ import { storyGearAvatar } from '../sim/rpg/storyGear';
 import { driverForCharacter, golfBagForCharacter, hatForCharacter, pantsForCharacter, shirtForCharacter } from '../ui/game';
 import type { GolferLook } from '../render/playView';
 import { CADDY_LABEL, hasCaddyArt } from '../render/caddyArt';
-import { isHeraldAgent, heraldAgent } from '../sim/rpg/storyHeraldCrew';
+import { isHeraldAgent, heraldShortName } from '../sim/rpg/storyHeraldCrew';
+import { caddyReadsGreen } from '../sim/rpg/storyCaddies';
 import { getSettings } from '../settings';
 import type { Rarity } from '../sim/course/contract';
 
@@ -130,11 +131,13 @@ function forcedDemoCaddy(): string | undefined {
   return kind === 'boomerang' ? 'convict-sheep' : kind === 'laser' ? 'space-ducks' : undefined;
 }
 
-/** The caddy to show on the PUTTING screen — only a putting specialist (Penelope, Mystic Mole). A
- *  distance/guard caddy like Driver Dan has no role on the green, so it doesn't appear there. */
+/** The caddy to show on the PUTTING screen — only a putting specialist (Penelope, Mystic Mole) or anyone
+ *  else who actually reads the break for you (GS-story-caddy-read: the Coil's Whisperer does, and used to
+ *  stand there dimmed while the read row credited his line to the Mole). A distance/guard caddy like Driver
+ *  Dan has no role on the green, so it doesn't appear there. */
 export function puttCaddyId(): string | undefined {
   const id = caddyId();
-  return isPuttingCaddy(id) ? id : undefined;
+  return isPuttingCaddy(id) || caddyReadsGreen(id) ? id : undefined;
 }
 
 /** The framed gold caddy badge (the "cool outline") — shared by the decision and putting screens.
@@ -143,8 +146,9 @@ export function caddyBadgeHTML(id: string | undefined): string {
   if (hasCaddyArt(id))
     return `<div class="gs-caddybadge"><canvas class="gs-caddycv" width="128" height="120" data-caddy="${id}" aria-hidden="true"></canvas><span class="gs-caddyname">${CADDY_LABEL[id]}</span></div>`;
   // GS-story-quality: a Coil VOLUNTEER (Herald caddy) has a story figure but no CADDY_LABEL entry.
+  // GS-story-coil-names: the badge says their short name, the same one every other screen speaks.
   if (id && isHeraldAgent(id)) {
-    const short = heraldAgent(id)?.name.replace(/^.*?["']([^"']+)["'].*$/, '$1') ?? 'Coil';
+    const short = heraldShortName(id) ?? 'Coil';
     return `<div class="gs-caddybadge"><canvas class="gs-caddycv" width="128" height="120" data-caddy="${id}" aria-hidden="true"></canvas><span class="gs-caddyname">${short}</span></div>`;
   }
   return '';

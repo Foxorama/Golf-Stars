@@ -12,7 +12,7 @@
  * PURE + DOM-free. `hiredCaddyIds`/`activeCaddyId` already live on `StoryState` (no save bump).
  */
 
-import { shopItem, isNamedCaddy, type PlayerLoadout } from './economy';
+import { shopItem, isNamedCaddy, startingLoadout, type PlayerLoadout } from './economy';
 import { heraldCaddyEffect, isHeraldAgent } from './storyHeraldCrew';
 import type { StoryState } from './story';
 
@@ -107,4 +107,22 @@ export function applyStoryCaddy(loadout: PlayerLoadout, story: StoryState): Play
   }
   const item = shopItem(id);
   return item?.apply ? item.apply(loadout) : loadout;
+}
+
+/**
+ * GS-story-caddy-read: does THIS caddy read the break for you? PROBED off the caddy's own loadout fold —
+ * the same `apply` the round uses — so there is no second list of "who reads greens" to fall out of step
+ * when a new caddy grants it. Works for a Warden shop caddy (the Mystic Mole) and a Coil volunteer (the
+ * Whisperer) alike; false for a caddy with no read (and for the `undefined` bag).
+ *
+ * The read ROW on the putt screen needs this to name whoever actually found the line: `loadout.greenRead`
+ * alone says a read exists, not where it came from — it can equally be gear (the Seer's Circlet) or a
+ * reward club (Penelope's putter) — and the row hard-coded "Mole reads" for all of them.
+ */
+export function caddyReadsGreen(id: string | undefined): boolean {
+  if (!id) return false;
+  const base = startingLoadout();
+  const item = shopItem(id);
+  if (item?.apply) return !!item.apply(base).greenRead;
+  return !!heraldCaddyEffect(id)?.apply(base).greenRead;
 }

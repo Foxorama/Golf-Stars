@@ -139,6 +139,40 @@ describe('the qualifier DRAW SHEET (GS-story-qualifier-formats)', () => {
     expect(qualifierFormatBlurb(qualifierPlan(herald, event.courseId, 'coil-ouros')!)).toContain('Ouros');
   });
 
+  it('GS-story-caddy-partner: the agent on your BAG is never offered as a playing partner', () => {
+    // On the Herald path the Coil circle is both your caddy roster AND your partner pool, so the volunteer
+    // carrying your bag was being offered to tee it up beside you as well. (`finaleMatchup` already applies
+    // exactly this rule to the Ch.5 champion pick.)
+    const herald: StoryState = {
+      ...CAMPAIGN(),
+      chapter: 4,
+      alignment: 'herald',
+      hiredCaddyIds: [...HERALD_CREW.map((a) => a.id)],
+      activeCaddyId: 'coil-venoma',
+    };
+    expect(qualifierPartnerPool(herald).map((p) => p.id)).not.toContain('coil-venoma');
+    expect(qualifierPartnerPool(herald)).toHaveLength(HERALD_CREW.length - 1);
+    // …in every paired event on the sheet, drawn or picked, whoever is on the bag steps aside.
+    for (const w of STORY_WORLDS) {
+      const drawnPlan = qualifierPlan(herald, w.courseId);
+      if (drawnPlan?.partnerId) expect(drawnPlan.partnerId, w.courseId).not.toBe('coil-venoma');
+      const picked = qualifierPlan(herald, w.courseId, 'coil-venoma');
+      if (picked?.partnerId) expect(picked.partnerId, w.courseId).not.toBe('coil-venoma');
+    }
+    // Bench the caddy and the whole circle is pickable again (the pool is never silently narrowed).
+    const benched: StoryState = { ...herald, activeCaddyId: undefined };
+    expect(qualifierPartnerPool(benched).map((p) => p.id)).toEqual(HERALD_CREW.map((a) => a.id));
+  });
+
+  it('GS-story-caddy-partner: a WARDEN campaign draws exactly as before (caddies are not golfers)', () => {
+    const warden: StoryState = { ...CAMPAIGN(), chapter: 4, alignment: 'warden' };
+    const withCaddy: StoryState = { ...warden, hiredCaddyIds: ['mystic-mole'], activeCaddyId: 'mystic-mole' };
+    expect(qualifierPartnerPool(withCaddy).map((p) => p.id)).toEqual(otherGolferIds(warden));
+    for (const w of STORY_WORLDS) {
+      expect(qualifierPlan(withCaddy, w.courseId), w.courseId).toEqual(qualifierPlan(warden, w.courseId));
+    }
+  });
+
   it('GS-story-qualifier-chapter-gate: a world charted AHEAD of its chapter is not an event yet', () => {
     // The Ghost Wreck is a Chapter-5 world charted at Ch.4 (GS-story-gather-early) so you can fly out and
     // recruit its friend in time. Flying there early is exploration — arming a qualifying plan there played

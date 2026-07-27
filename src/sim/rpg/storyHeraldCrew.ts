@@ -158,6 +158,19 @@ export function heraldAgent(id: string): HeraldAgent | undefined {
   return BY_ID[id];
 }
 
+/**
+ * The ONE name the game speaks a Coil agent by (GS-story-coil-names) — their `shortName`, exactly as the
+ * partner chips, draw sheets and scramble cards already say it: Voss · Venoma · Ouros · Ecdysis.
+ *
+ * Every surface used to re-derive this from the full name, and each derivation got it wrong in its own way:
+ * the quoted handle gave "Sable" and "the Viper" (a nickname and an epithet), the first word gave "Brother"
+ * and "Sister" (honorifics, not names). So the clubhouse deck, the ship's rooms and the caddy badge called
+ * the same four people by four different names than every other screen. Undefined for a non-agent id.
+ */
+export function heraldShortName(id: string | undefined): string | undefined {
+  return id ? BY_ID[id]?.shortName : undefined;
+}
+
 /** The Herald crew to show in the clubhouse — the full Coil circle once you've chosen the dark path,
  *  otherwise none (Warden / undecided clubhouses show the caddy crew instead). */
 export function heraldCrew(story: StoryState): readonly HeraldAgent[] {

@@ -12,6 +12,7 @@ import { caddyPortraitSVG } from './caddyPortraits';
 import {
   crewRoster,
   allyName,
+  allyShortName,
   allyTalk,
   allyLineAt,
   allyFactionName,
@@ -39,7 +40,7 @@ function crewChipHTML(caddyId: string, active: boolean): string {
   return `<button class="gs-crew-chip${active ? ' gs-crew-chip--on' : ''}" data-action='${action}'
     aria-label="Talk to ${allyName(caddyId)}">
     <span class="gs-crew-av">${caddyPortraitSVG(caddyId)}</span>
-    <span class="gs-crew-name">${allyName(caddyId).split(' ')[0]}${active ? ' ★' : ''}</span>
+    <span class="gs-crew-name">${allyShortName(caddyId)}${active ? ' ★' : ''}</span>
   </button>`;
 }
 

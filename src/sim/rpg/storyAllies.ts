@@ -12,6 +12,7 @@
 import { factionForCaddy, factionById } from './factions';
 import { shopItem, isNamedCaddy } from './economy';
 import { STORY_CADDY_STOCK } from './storyCaddies';
+import { heraldAgent, heraldShortName } from './storyHeraldCrew';
 import type { StoryState } from './story';
 
 /** One ally's talk content: a one-line "who they are" tagline + rotating banter lines (cycled by a tap
@@ -115,9 +116,25 @@ export function allyFactionBlurb(caddyId: string): string {
   return (fid && factionById(fid)?.blurb) || '';
 }
 
-/** The ally's display name (the caddy shop item's name), or a fallback. */
+/**
+ * The ally's display name — the caddy shop item's name, or a Coil agent's own name on the Herald path
+ * (GS-story-coil-names). A Coil volunteer carries the bag and gives quests exactly like a Warden friend but
+ * has no shop item, so this used to fall through to the placeholder: the clubhouse quest card read "The
+ * Shedding — with a", and the quest beat was spoken by "a friend". Falls back to 'a friend' for a stranger.
+ */
 export function allyName(caddyId: string): string {
-  return shopItem(caddyId)?.name ?? 'a friend';
+  return shopItem(caddyId)?.name ?? heraldAgent(caddyId)?.name ?? 'a friend';
+}
+
+/**
+ * The name a plate/headline speaks the ally by (GS-story-coil-names) — the ONE place that shortens an ally
+ * name, so no surface re-derives it. A Coil agent has an authored `shortName` (Voss / Venoma / Ouros /
+ * Ecdysis — never the handle "Sable" or the honorific "Sister"); a Warden friend keeps the long-standing
+ * first-word rule off their shop name.
+ */
+export function allyShortName(caddyId: string): string {
+  const full = allyName(caddyId);
+  return heraldShortName(caddyId) ?? full.split(' ')[0] ?? full;
 }
 
 /** The world where this ally was recruited (their "home"), or undefined. */

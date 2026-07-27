@@ -16,7 +16,7 @@
 
 import { NAMED_STORY_CLUBS, type StoryState, type StoryAlignment } from './story';
 import type { LoreLine } from './lore';
-import { allyHomeWorld, allyName } from './storyAllies';
+import { allyHomeWorld, allyName, allyShortName } from './storyAllies';
 import { factionForCaddy, factionById } from './factions';
 import { storyCaddyHired, caddiedWith } from './storyCaddies';
 import { grantStoryReward, rewardClubId, rewardEffectLabel, type StoryReward } from './storyRewards';
@@ -172,8 +172,10 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
         'Coil won’t stop play to help. Para-Spatial Medics don’t abandon a patient. Neither do I."',
       '"I lost one, you know. Years ago, on a course just like Orion — waited for permission that never came, and ' +
         'by the time I moved it was too late. I don’t wait for permission any more. I answer the call."',
+      // GS-story-reward-variety: the Doctor's gift is a BALL, not a wedge — the pitch says so (his `complete`
+      // already hands over the sleeve of Phoenix Cores).
       '"Fly me to Orion Forge. Play the round so the tour can’t cancel it, and I’ll work the sidelines. Save the ' +
-        'game, I save the golfer. And I’ll fit you with a wedge that’ll never let a chip flatline."',
+        'game, I save the golfer. And I’ll mill you a ball that’ll never let a chip flatline."',
     ],
     duringQuest: [
       { kind: 'action', text: 'At the turn Dr Chipinski jogs up from the sideline tent, sleeves rolled and scorched, stethoscope swinging, and flashes you a quick thumbs-up before the worry settles back over his face.' },
@@ -393,14 +395,16 @@ export const STORY_QUESTS: readonly StoryQuest[] = [
     world: 'ocean-18', // the Eridanus Atolls — where the Shedmaker drowns the wards
     minChapter: 4,
     title: 'The Shedding',
-    hook: 'Sister Ecdysis will forge you a wedge from the serpent\'s cast scale.',
+    // GS-story-reward-variety: the Shedmaker's gift is HULL ARMOUR, not a club — the hook and the offer say
+    // so. (They promised a wedge while the reward channel handed over a ship part.)
+    hook: 'Sister Ecdysis will forge your hull a carapace from the serpent\'s cast scale.',
     offer: [
       '🖤 "Bring me to the Atolls, Herald, where I drown the old wards and harvest what the sea gives up. ' +
         'Come hold the tide down with me, and I will grow you a gift from the serpent\'s own cast scale."',
       '"You wonder that I feel nothing for the wards I drown. I felt everything, once — that is precisely why ' +
         'I shed it. A skin you cannot take off is not armour. It is only another thing that can be cut."',
-      '"Play the drowning shrine at my side. When the water is ours, I will fit your bag with a wedge shed ' +
-        'from the World-Eater — power, and its price, as all true things carry."',
+      '"Play the drowning shrine at my side. When the water is ours, I will lay the World-Eater\'s own shed ' +
+        'scale over your hull — power, and its price, as all true things carry."',
     ],
     duringQuest: [
       { kind: 'action', text: 'At the drowning shrine Sister Ecdysis wades out to where an old Warden ward-stone is going under, and does not help it — only watches, patient as the tide, until the water takes it whole.' },
@@ -562,4 +566,9 @@ export function questFactionName(quest: StoryQuest): string {
 /** The giving ally's display name. */
 export function questGiverName(quest: StoryQuest): string {
   return allyName(quest.caddyId);
+}
+
+/** The giving ally's SHORT name, for a headline ("The Shedding — with Ecdysis"). */
+export function questGiverShortName(quest: StoryQuest): string {
+  return allyShortName(quest.caddyId);
 }
