@@ -454,10 +454,42 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     **speed is chained** off the arrival. A hop lands ON ground it samples (`firmAt`) so skipping INTO a
     bunker kills the rest of the train. Per-shot variation is a HASH of the shot's own geometry — zero
     rng, zero draws (contract 1) — because an identical bounce every drive is the tell that it is
-    animation. `hopDrawBoost` is deliberately SMALL (1.8): height is exaggerated and length is not, so
-    the boost multiplies the drawn height-to-length ratio directly and 4× turned a skip into a pop-up.
-    `rollEntryFloor` is retired to 0 — flooring an entry speed IS a velocity step. Eyes-on:
-    `scripts/landing-preview.mjs`.
+    animation. `rollEntryFloor` is retired to 0 — flooring an entry speed IS a velocity step. Eyes-on:
+    `scripts/landing-preview.mjs`; measured per club/power by `scripts/runout-frames.ts`.
+  - **A HOP'S APEX-TO-LENGTH RATIO IS `tan(descent)/4`, AND A FLAT CONSTANT MADE THE BOUNCE SMALLER THAN
+    THE BALL** (GS-runout-visible, `apexOverLenFor`). Launch at θ and the projectile travels `v²sin2θ/g`
+    while peaking at `v²sin²θ/2g`, so apex/length is `tan(θ)/4` — nothing to tune: a driver at 35° skips
+    at **0.18**, a wedge at 62° pops at **0.47**. `apexOverLen` was a flat **0.3** for every club, which
+    was simultaneously too generous for the driver AND far too stingy for the wedge — stingy in the one
+    place it mattered, because a hop's length is bounded by the sim's ROLL and a checking short iron's
+    roll is deliberately tiny, so the cap crushed the apex to nothing and threw away the `sin²(descent)`
+    physics `hopApex` had already computed. Measured at the cameras the game actually uses, **18 of 40
+    club/power combinations drew a peak bounce of 0.7–2.6px under a ball drawn at 3px** — the ball never
+    cleared itself, which is the report *"it just lands and stops or lands and does a flat roll… the
+    bounces are not visible"*. (The reported cause — a bounce sized off MAX distance — was not it:
+    `carry` is the shot's actual carry and hop length scales with it.) Deriving the ratio dropped the
+    driver from 0.3 to 0.18, which bought back the headroom to raise `hopDrawBoost` 3 → 5: the driver's
+    DRAWN ratio is `0.18·0.55·5 = 0.48`, within a whisker of the shipped `0.3·0.55·3 = 0.495`, so its
+    skip is unchanged while every steep club lifts. **18/40 → 4/40**, and the 4 are dinked 30–56yd
+    partials with ~1yd of roll, which is a plop and correctly has no bounce. `hopDrawBoost` must still
+    stay modest — height is exaggerated and length is not, so it multiplies the drawn ratio directly and
+    a big value turns a skip into a pop-up (the reason it is not simply cranked).
+  - **THE GRAVITY CREEP IS ITS OWN EVENT, AND THE SIM IS THE ONE PLACE THAT KNOWS WHERE IT STARTS**
+    (GS-roll-hairpin, `ShotLog.creepFrom`). A ball whose roll ends on a steep piece of sculpt trickles on
+    down the fall line — a direction that owes NOTHING to the way it was travelling, so it can double
+    back by up to **180°**. Drawn as the tail of the roll it inherited the roll's single decelerating
+    sweep, so the ball glided straight through the reversal without ever appearing to stop: the report
+    *"the ball is doing the weird path roll instead of a curve from last bounce to final lie and it just
+    looks buggy as heck"*, and the half of the old "crazed magnet" complaint GS-chipin-roll never reached.
+    Measured over 368 real curved rolls a creep fired on **23%**, and **63 of those reversed >40° at the
+    join**. The fix is to draw what it is: the run-out plan is built on the ROLL ALONE, then the creep
+    plays as its own phase — a `creepPauseMs` beat of stillness so the stop is READ, then a smoothstep
+    trickle at `creepMsPerYd` (deliberately slower per yard than the roll that fed it, because gravity is
+    barely moving the ball). **Non-chip-in hairpins 63 → 0.** No `creepFrom` ⇒ one undivided walk, exactly
+    as before. The renderer must NEVER re-derive the join — that is the second-description mistake every
+    derelict bug was. ⚠️ The CURL was investigated and EXONERATED: its per-step bend never overshoots the
+    fall line at the shipped constants, so don't "fix" it. A holed Chipinski chip-in still kinks where its
+    trickle joins (GS-chipin-roll chose to walk that straight through) — see IDEAS.
   - **BOUNCE AND RUN READ PER CLUB  - **THE RUN-OUT HAS ITS OWN TIME BASE, AND PRETENDING OTHERWISE MADE THE BOUNCE INVISIBLE**
     (GS-landing-real, `runoutTimeScale`). The drawn FLIGHT is **~8× real time** — 750ms for a 250yd
     drive that really takes six seconds — so GS-runout-feel's "no velocity step from strike to rest"

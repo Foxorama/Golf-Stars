@@ -56,6 +56,15 @@ club dialled down, which is the shot a player would actually pick. The power see
 (club, power) PAIR instead of a club. Deliberately left out — it changes the pre-armed power on shots
 that are currently fine, so it wants its own pass and its own eyes-on.
 
+**GS-chipin-trickle-phase — a holed chip-in still kinks where its trickle joins the roll**
+*(found while fixing GS-roll-hairpin; the only path hairpin left, and it is a deliberate old choice)*
+GS-chipin-roll appends a curling trickle to the cup and decided to walk it straight through — "the ball
+going in beats the check drama". Measured: every remaining >40° drawn kink is a `chipIn && holed` shot,
+27 of them, up to 153°, where the natural roll meets the trickle at an angle. The creep now has the
+treatment that would fix it too (stop, beat, slow trickle — `ShotLog.creepFrom`), so this is a small
+change: give the trickle its own phase off the same seam. Left out because it is a celebration moment
+nobody has complained about, and reversing that call deserves its own eyes-on.
+
 **GS-auto-ai-weak — the headless auto sim is far weaker than a human, and it gates everything**
 The auto sim stalls around hole 40 of the Unending Universe; human players reach 350+. Every balance
 harness in the suite measures THAT player, so the fences are calibrated to a weak one and have twice now

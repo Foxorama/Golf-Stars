@@ -804,7 +804,17 @@ export function mountPlayView(
       // ball arrived and there is no velocity step anywhere from strike to rest. The old run-out
       // started from a duration (`20ms × yards`, floored at 150ms) that had nothing to do with the
       // flight, which is half of why a short check read as a teleport.
-      const rollYds = Math.abs(shot.roll ?? 0);
+      // THE GRAVITY CREEP IS ITS OWN EVENT, NOT THE TAIL OF THE ROLL (GS-roll-hairpin). The sim runs the
+      // ball out, and where it STOPS on a steep piece of sculpt the mound field pulls it on down the fall
+      // line — a direction that owes nothing to the way it was travelling, so it can double back by up to
+      // 180°. Blended into the roll it was drawn as one continuous decelerating sweep straight through the
+      // reversal, which is the "weird path roll … looks buggy as heck" report: the ball never appears to
+      // stop, so it reads as a magnet yanking it rather than gravity taking a ball at rest. The sim now
+      // says WHERE it stopped (`creepFrom`) and the run-out plan is built on the roll ALONE; the creep
+      // gets its own slow phase below. No `creepFrom` ⇒ `rollYds` is the whole roll, exactly as before.
+      const rollTotalYds = Math.abs(shot.roll ?? 0);
+      const rollYds = shot.creepFrom !== undefined ? Math.min(shot.creepFrom, rollTotalYds) : rollTotalYds;
+      const creepYds = Math.max(0, rollTotalYds - rollYds);
       const landFirm = surfaceFirmness(shot.landLie ?? shot.lieTo);
       // A backspin CHECK is drawn as a forward skid that reverses. A Dr Chipinski chip-in
       // (GS-chipin-roll) appends a forward trickle into the cup, so its path ends AHEAD of the pitch
@@ -868,6 +878,10 @@ export function mountPlayView(
         runoutPlan ??
         planRunout({ dist: rollYds, firm: landFirm, v0: 0.2, carry, descentDeg: 45, checking: isCheck, clubId: shot.club.id }, F);
       const rollDur = plan.totalMs;
+      // The creep's own clock: a beat of stillness so the ball is SEEN to stop, then a slow trickle.
+      const creepDur = creepYds > 1e-6 ? Math.max(F.creepMinMs, creepYds * F.creepMsPerYd) : 0;
+      const creepPause = creepDur > 0 ? F.creepPauseMs : 0;
+      const runDur = rollDur + creepPause + creepDur; // the whole ground phase, creep included
       // A swing windup leads each full shot: the ball rests at address while the golfer winds
       // up and swings, and the actual flight clock starts at CONTACT (lead ms in).
       const lead = F.golfer ? F.swingLeadMs : 0;
@@ -1113,19 +1127,31 @@ export function mountPlayView(
             }
             return rollPath[rollPath.length - 1]!;
           };
+          // The roll's share of the drawn path. The sim's `roll` is arc length, so the run-out (built on
+          // the roll ALONE) owns the path up to here and the creep owns the rest.
+          const rollArc = rollTotalYds > 1e-6 ? rollLen * (rollYds / rollTotalYds) : rollLen;
           // The ballistic sample: `s` is signed travel in yards (negative only inside a backspin
           // drag-back, which really does travel back past the pitch mark), `h` the height off the deck.
           const rs = sampleRunout(plan, rt);
-          if (rs.s >= 0 && plan.check) {
+          if (creepDur > 0 && elapsed >= flightDur + rollDur + creepPause) {
+            // GRAVITY CREEP (GS-roll-hairpin): the ball has stopped and sat still, and now the sculpt
+            // takes it. Smoothstep — it eases OUT of rest and back INTO it, because both ends are a ball
+            // at a standstill, and it is deliberately slower per yard than the roll that fed it.
+            const ct = Math.min(1, Math.max(0, (elapsed - flightDur - rollDur - creepPause) / creepDur));
+            const e = ct * ct * (3 - 2 * ct);
+            ground = alongRoll(rollArc + (rollLen - rollArc) * e);
+            height = 0;
+          } else if (rs.s >= 0 && plan.check) {
             // Backspin beat one — the ball is still in the air, carrying its flight momentum FORWARD
             // down the shot bearing. (The sim's roll path runs the other way, so it can't be walked.)
             const br = (bearing * Math.PI) / 180;
             ground = [touchdown[0] + Math.sin(br) * rs.s, touchdown[1] + Math.cos(br) * rs.s];
           } else {
             // Beat two of a check, or an ordinary forward run: both walk the sim's own path, scaled so
-            // the far end of the walk lands exactly on the resolved rest point.
+            // the far end of the walk lands exactly where the ROLL ended (the creep phase above carries
+            // it the rest of the way; with no creep `rollArc === rollLen` and this is unchanged).
             const frac = plan.totalDist > 1e-6 ? Math.abs(rs.s) / plan.totalDist : 1;
-            ground = alongRoll(frac * rollLen);
+            ground = alongRoll(frac * rollArc);
           }
           height = rs.h;
         }
@@ -1223,7 +1249,7 @@ export function mountPlayView(
 
         // At the moment the run-out finishes: fire the hole-out explosion (holed only) once,
         // and start the rest-hold pause.
-        if (elapsed >= flightDur + rollDur && lastImpactShot !== shotIndex) {
+        if (elapsed >= flightDur + runDur && lastImpactShot !== shotIndex) {
           lastImpactShot = shotIndex;
           if (shot.holed) {
             spawnImpact([rsx, rsy], 1);
@@ -1240,7 +1266,7 @@ export function mountPlayView(
           trail = [];
         }
         // Advance to the next shot only after the ball has sat at rest for restHoldMs.
-        if (elapsed >= flightDur + rollDur + F.restHoldMs) {
+        if (elapsed >= flightDur + runDur + F.restHoldMs) {
           shotIndex++;
           segStart = now + F.gapMs;
         }

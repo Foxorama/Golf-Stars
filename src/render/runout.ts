@@ -71,9 +71,12 @@ export interface RunoutFeel {
    *  The cap keeps it a net and not a second model: a club whose own bounce is bigger keeps it. */
   hopFirstMinShare: number;
   hopFloorMax: number;
-  /** Ceiling on a hop's apex as a fraction of its own length, BEFORE `hopDrawBoost`. Uncapped, a
-   *  short wedge hop peaks higher than it travels and the ball bounces vertically off the turf. */
-  apexOverLen: number;
+  /** Bounds on a hop's apex as a fraction of its own length, BEFORE `hopDrawBoost`. The ratio itself
+   *  is not tuned — it comes from the descent angle (`apexOverLenFor`). These are the safety rails:
+   *  below the floor a hop is a scuff, above the ceiling the ball reads as bouncing vertically off the
+   *  turf instead of skipping along it. */
+  apexOverLenMin: number;
+  apexOverLenMax: number;
   /** Below this carry the ball did not really arrive from the SKY — a putter tap, a dribbled chip —
    *  so it is not given the guaranteed bounce. */
   minAirCarry: number;
@@ -101,6 +104,12 @@ export interface RunoutFeel {
    *  bounces identically, which is the tell that it is animation and not golf. */
   varyLen: number;
   varyApex: number;
+  /** The gravity CREEP's own timing (GS-roll-hairpin), drawn AFTER the ball has come to rest: a beat of
+   *  stillness so the stop is READ, then a slow trickle down the fall line. It has to be slower per yard
+   *  than the roll it follows — a ball gravity is barely moving, not a ball still carrying pace. */
+  creepPauseMs: number;
+  creepMsPerYd: number;
+  creepMinMs: number;
   /**
    * DEPRECATED, kept at 0 and honoured only if a caller raises it.
    *
@@ -151,13 +160,17 @@ export const DEFAULT_RUNOUT_FEEL: RunoutFeel = {
   hopMinMs: 130,
   hopFirstMinShare: 0.35,
   hopFloorMax: 2.5,
-  apexOverLen: 0.3,
+  apexOverLenMin: 0.12,
+  apexOverLenMax: 0.55,
   minAirCarry: 12,
   rollMinShare: 0.3,
   holedEndSpeed: 0.45,
-  hopDrawBoost: 3,
+  hopDrawBoost: 5,
   varyLen: 0.22,
   varyApex: 0.3,
+  creepPauseMs: 260,
+  creepMsPerYd: 420,
+  creepMinMs: 380,
   rollEntryFloor: 0,
   runoutTimeScale: 0.16,
   runoutMinMs: 340,
@@ -297,6 +310,25 @@ export interface Landing {
  *  - **speed is chained.** The first hop leaves at the ball's actual arrival speed times the
  *    restitution, so there is no step at touchdown.
  */
+/**
+ * The apex-to-length ratio a hop leaving the turf at `descentDeg` actually has (GS-runout-visible).
+ * There is nothing to tune here: a projectile launched at angle θ travels `v²·sin2θ/g` and peaks at
+ * `v²·sin²θ/2g`, so **apex / length = tan(θ) / 4**. A driver arriving at 35° skips at 0.18; a wedge
+ * dropping in at 62° pops at 0.47.
+ *
+ * This replaced a FLAT `apexOverLen` of 0.3, which was simultaneously too generous for the driver and
+ * far too stingy for the wedge — and stingy in the one place it mattered. `hopApex` already carries the
+ * steep-descent physics (it scales with `sin²(descent)`), but the flat cap threw it away: a hop's
+ * length is bounded by the sim's ROLL, and a checking short iron's roll is deliberately tiny, so the
+ * cap crushed the apex to nothing. Measured at the cameras the game actually uses, 18 of 40 club/power
+ * combinations drew a peak bounce of 0.7–2.6px under a ball drawn at 3px — the ball never cleared
+ * itself, which is exactly the reported "it lands and stops, or lands and does a flat roll". Pure.
+ */
+export function apexOverLenFor(descentDeg: number, feel: RunoutFeel = DEFAULT_RUNOUT_FEEL): number {
+  const t = Math.tan((clamp(descentDeg, 5, 85) * Math.PI) / 180) / 4;
+  return clamp(t, feel.apexOverLenMin, feel.apexOverLenMax);
+}
+
 export function planRunout(landing: Landing, feel: RunoutFeel = DEFAULT_RUNOUT_FEEL): RunoutPlan {
   const f = clamp(landing.firm, 0, 1);
   const speed = Math.max(0.02, landing.v0); // yd/ms; guard a degenerate zero-carry shot
@@ -307,6 +339,8 @@ export function planRunout(landing: Landing, feel: RunoutFeel = DEFAULT_RUNOUT_F
   const rad = (clamp(landing.descentDeg, 5, 85) * Math.PI) / 180;
   const cosD = Math.cos(rad);
   const sinD = Math.sin(rad);
+  // How tall a hop is allowed to be relative to its length, from the arrival angle (GS-runout-visible).
+  const apexOverLen = apexOverLenFor(landing.descentDeg, feel);
 
   // Forward restitution: what survives a contact. Clamped short of 1 — a bounce that lost nothing
   // would never stop hopping.
@@ -331,7 +365,7 @@ export function planRunout(landing: Landing, feel: RunoutFeel = DEFAULT_RUNOUT_F
     // need to bounce at least once and then spin/roll on the land from the bounce".)
     const skid = Math.min(Math.max(hopLen, Math.min(D * feel.hopFirstMinShare, feel.hopFloorMax)), feel.backspinSkidMax);
     const skidMs = clamp(skid / speed, 170, 420);
-    const skidApex = Math.max(0.25, Math.min(feel.hopApexMax * 0.6, hopApex, skid * feel.apexOverLen));
+    const skidApex = Math.max(0.25, Math.min(feel.hopApexMax * 0.6, hopApex, skid * apexOverLen));
     const backMs = Math.max(feel.backspinMinMs, (skid + D) * feel.backspinMsPerYd);
     const skidV = skidMs > 0 ? skid / skidMs : 0;
     return {
@@ -370,7 +404,7 @@ export function planRunout(landing: Landing, feel: RunoutFeel = DEFAULT_RUNOUT_F
     if (want <= (i === 0 && fromTheAir ? 1e-4 : feel.hopMinYd)) break;
     // …and a hop is never taller than it is long by much, or the ball reads as bouncing vertically
     // off the turf instead of skipping along it.
-    const apex = Math.max(0.05, Math.min(hopApex, want * feel.apexOverLen));
+    const apex = Math.max(0.05, Math.min(hopApex, want * apexOverLen));
     hops.push({ dist: want, ms: Math.max(feel.hopMinMs, want / Math.max(0.01, v)), apex });
     used += want;
     v *= khRun;

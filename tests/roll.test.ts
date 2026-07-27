@@ -211,3 +211,69 @@ describe('a spin build can only spin the clubs that spin (GS-spin-gate)', () => 
     }
   });
 });
+
+/**
+ * GS-roll-hairpin — *"for backspin and green contours the ball is doing the weird path roll instead of a
+ * curve from last bounce to final lie and it just looks buggy as heck."*
+ *
+ * The cause was not the curl (that was investigated and exonerated — its per-step bend never overshoots
+ * at the shipped constants). It was the gravity CREEP: once the roll's energy is spent, a ball resting on
+ * a steep piece of sculpt trickles on down the fall line, in a direction that owes NOTHING to the way it
+ * was travelling — so it can double back by up to 180°. Measured over 368 real curved rolls, a creep
+ * fired on 23% of them and 63 of those reversed by more than 40° at the join. Blended into the roll's
+ * deceleration the ball glided straight through the reversal, which is what read as a magnet.
+ *
+ * The creep is a separate physical event and the sim is the only thing that knows where it starts, so it
+ * says so. One description, read by the renderer — never a second one guessed downstream.
+ */
+describe('the sim says where the ball came to REST before gravity took it (GS-roll-hairpin)', () => {
+  it('reports creepFrom whenever a creep happened, inside the roll and on the path', () => {
+    let seen = 0;
+    for (let seed = 0; seed < 300 && seen < 12; seed++) {
+      let hole;
+      try {
+        hole = generateCourse(seed, { holes: 1 }).holes[0]!;
+      } catch {
+        continue;
+      }
+      for (const s of playHole(hole, new Rng(`${seed}:p`)).shots) {
+        if (s.creepFrom === undefined) continue;
+        seen++;
+        const total = Math.abs(s.roll);
+        // The join is a real distance INSIDE the travel: the ball rolled, stopped, then crept on.
+        expect(s.creepFrom, `seed ${seed}`).toBeGreaterThanOrEqual(0);
+        expect(s.creepFrom, `seed ${seed}`).toBeLessThan(total + 1e-6);
+        expect(total - s.creepFrom, `seed ${seed} crept nothing`).toBeGreaterThan(0);
+        // A creep only ever happens on a path the renderer can walk, and that path still ends at rest.
+        expect(s.rollPath, `seed ${seed}`).toBeDefined();
+        const path = s.rollPath!;
+        expect(dist(path[path.length - 1]!, s.rest), `seed ${seed} path end`).toBeCloseTo(0, 6);
+      }
+    }
+    expect(seen, 'no creeps found to check').toBeGreaterThan(4);
+  });
+
+  it('a roll with no creep is left exactly as it was — one undivided walk', () => {
+    // The renderer keys the whole split on `creepFrom` being present, so the ordinary roll must not
+    // acquire one. (Most rolls never creep: it needs a rest ON a steep piece of sculpt.)
+    let plain = 0;
+    for (let seed = 0; seed < 120; seed++) {
+      let hole;
+      try {
+        hole = generateCourse(seed, { holes: 1 }).holes[0]!;
+      } catch {
+        continue;
+      }
+      for (const s of playHole(hole, new Rng(`${seed}:p`)).shots) {
+        if (s.creepFrom !== undefined) continue;
+        plain++;
+        // No creep ⇒ nothing extra was appended, so |roll| is the whole of whatever path there is.
+        if (!s.rollPath) continue;
+        let arc = 0;
+        for (let i = 1; i < s.rollPath.length; i++) arc += dist(s.rollPath[i]!, s.rollPath[i - 1]!);
+        expect(arc, `seed ${seed}`).toBeCloseTo(Math.abs(s.roll), 4);
+      }
+    }
+    expect(plain).toBeGreaterThan(50);
+  });
+});
