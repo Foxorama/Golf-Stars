@@ -729,12 +729,28 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     putt × decide/watch) mount the SAME five regions in the SAME places: info bar · nav column · caddy slot ·
     controls panel · action column. Only the CONTENTS change. Two rules: **nothing is removed, only
     `disabled`** (a dead control greys in place — the nav column always ships its five buttons), and the panel
-    is **bottom-anchored with the COMMIT row last**, so commit · caddy · `»` land at the same y in every state
+    is **bottom-anchored with the COMMIT row last**, so commit · caddy · bag land at the same y in every state
     while the rows above differ in height. A new play state = new row contents, never a new skeleton
     (`tests/play-hud-frame.test.ts` forbids a second `class="gs-shot gs-shot--full"`). The caddy's slot is
     PERMANENT (hired ⇒ badge · no read here ⇒ dimmed · none ⇒ reserved placeholder), so the badge — not a
     canvas corner figure — is the caddy everywhere; `playView` takes a measured `caddyAnchor` (`{muzzle,head}`)
     and skips its own figure, absent ⇒ the classic corner figure (replay screen, unchanged).
+  - **A READOUT THE MAP ALREADY DRAWS IS NOT A HUD ROW** (GS-hud-bag, `app/clubPicker.ts` + `render/bagArt.ts`).
+    The aim panel's power label, spray-odds legend and carry range restated the aim cone — drawn to scale, on
+    the map, where the decision is made — for ~140px of an 844px phone, and its club CYCLER was a dozen taps
+    to reach a wedge in a full bag. So the club is a BAG button bottom-right opening a picker sheet (glyph ·
+    name · carry, one tap to any club), the power rides the commit button as a fill behind
+    `🏌 Swing · Power 78%`, the aim mode is a round button, and the aim/watch panel dissolves to that one pill
+    (`--slim`). **The PUTT panel is untouched** — its pace meter and break read are the only play-screen
+    readouts the map does not draw. Sam's green-depth/forced-carry read moves to the picker HEADER (it is
+    advice about which club) and stays gated on `clubSuggest`, with the ★ marking their pick; every row's
+    carry is the club's own bag stat, so the sheet is a bag, not an adviser. **Only the BAG is in flow** —
+    `.gs-hud-bottom`'s height IS the camera's clear band, so the aim/`»`/🎯 stack floats above it over the map
+    or the bar would be as deep as the panel it replaced (bar 148→66px, band 50%→77%, and the ball drops to
+    just above the pill for free through `playFocusBias`). The sheet is a `.gs-sheet` DIRECT child of `#app`,
+    so dialog/focus/`inert`/Escape all come from GS-a11y-focus + `backIntent`, never hand-rolled. Guarded by
+    `tests/club-picker.test.ts`; the bag art is a leaf module (pure SVG, NO ids — they are document-global and
+    the glyphs ship a dozen per sheet).
   - **THE HUD FLOATS OVER THE GOLF, SO THE CAMERA MUST FRAME AROUND IT** (GS-play-hud-space). The camera
     biases the ball as LOW as the control panel allows and no lower (`project.ts clearOfPanelBias`; a low
     ball is what fills the frame with the shot AHEAD, so "just centre it" is the wrong fix), and the putt

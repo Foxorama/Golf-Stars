@@ -135,9 +135,15 @@ describe('arrow keys drive the shot (real browser)', () => {
 
         // …and one press must still be ONE step after further renders, or the per-render listener
         // is stacking and a single key press steps the aim N times.
-        await page.evaluate(() => {
-          const btns = [...document.querySelectorAll<HTMLElement>('[data-cycle]')];
-          for (let i = 0; i < 3; i++) btns.forEach((b) => b.click());
+        // Force a handful of full re-renders WITHOUT touching the aim or the power: the whole-hole /
+        // follow-cam toggle, clicked in pairs so the camera ends where it started. (It used to be the
+        // club cycler, which GS-hud-bag moved into the bag's picker sheet — and a sheet inerts the
+        // page, which is exactly the state the key handler declines to act in.)
+        await page.evaluate(async () => {
+          for (let i = 0; i < 6; i++) {
+            document.querySelector<HTMLElement>('[data-mapview="toggle"]')!.click();
+            await new Promise((r) => setTimeout(r, 30));
+          }
         });
         const a = await coneX();
         await page.keyboard.press('ArrowRight');

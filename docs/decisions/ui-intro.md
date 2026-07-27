@@ -509,6 +509,98 @@ sessions.
 
 ---
 
+## GS-hud-bag: the bag replaces the control panel (2026-07-27)
+
+### The report
+
+A play-test screenshot of a par-4 tee shot on a Pixel-class phone, with the verdict: *"the gameplay
+screen is way too crowded and things don't fit in really well. Bottom of the screen, the useful
+information is only the change club and the aim setting. As well as caddy and autoplay. The rest of
+the info is just a duplicate of the pull down shot arc."* Plus the ask: a golf bag graphic bottom
+right that opens a club picker, the chunky panel deleted, *"a good quarter of the screen space back"*,
+and the golf re-framed lower once the room exists. Mobile-first, and an accessibility hit on the
+smaller targets was explicitly accepted.
+
+It was right. GS-hud-frame gave every play state ONE panel, which was the correct fix for six
+drifting layouts — but it left the panel's *contents* alone, and those had accreted:
+
+| row | what it said | where the player already read it |
+| --- | --- | --- |
+| club cycler | `◄ The Forgefire Driver ►` | nowhere — this one was load-bearing |
+| power | `Power 100% · aim: auto · pull ↓ to power` | the cone's size; the aim mode's own control |
+| legend | `72% · 13/8% · 5/2% · carry 181–285y → 291y total` | the cone's three coloured zones + its arc labels, drawn to scale, on the map |
+| Sam's read | `🎒 181·205·229y ⚠ carry 240 the water` | a paid caddy perk — real, but not per-frame |
+
+Three of four restated the aim cone, in a block measuring ~140px of an 844px phone. And the cycler
+was the wrong shape for the job it *was* doing: a full bag is ten to fourteen clubs, so reaching a
+wedge from the driver was a dozen taps through a control that had to be wide enough to print a club
+NAME between two arrows — which is what forced the panel to be full-width in the first place.
+
+### The shape of the fix
+
+- **The club moves into a BAG** (`render/bagArt.ts` + `app/clubPicker.ts`). One tap opens the whole
+  bag as a grid of 52px cards — glyph, name, carry — and one more picks. Two taps to any club instead
+  of up to twelve, and the corner of the screen instead of a full-width row.
+- **The power moves onto the commit button.** It is the one readout with no equal on the map, because
+  it is what the pull is *setting*; as a fill sweeping behind `🏌 Swing · Power 78%` it costs zero
+  extra rows. The surgical pull refresh (`shotAimRefresh`) now updates that one span.
+- **The aim mode becomes a round button** in the action column, lit when it is off `auto`. The 🎯
+  re-aim-at-pin joins it, above, only when a drag aim exists.
+- **The legend and the carry range are deleted**, not moved. The cone is the better version of both.
+- **Sam's read moves into the picker sheet's header** — it is advice about *which club*, so it belongs
+  where the club is chosen, and it stays gated on `clubSuggest` (as does the ★ marking Sam's pick).
+  Without Sam the sheet is a bag, not an adviser; every row's carry is the club's own bag stat, which
+  is printed on the Pro Shop card it was bought from.
+- **The panel dissolves** (`.gs-hud-controls--slim`): with no rows left, the glass frame was a box
+  drawn around a button. The putt state keeps the full panel — its pace meter and break read are the
+  only readouts on the play screen the map does not already draw, and the report said so explicitly.
+
+### The one non-obvious layout rule
+
+**Only the bag is in flow.** `.gs-hud-bottom`'s height is what the camera measures as the map's clear
+band (GS-play-hud-space), so an action column holding three stacked buttons would be ~170px tall —
+the bar would be as deep as the panel this feature exists to delete, and the whole exercise would
+have bought nothing. So the aim/auto-finish/🎯 stack floats ABOVE the bag over the map
+(`.gs-hud-actionstack`, `bottom: 100%`), exactly the way GS-a11y-tight-fit already floats the flanks,
+and the in-flow bar is one badge tall. Measured on a 390×844 phone at the ship scale: bottom bar
+**148px → 66px**, clear band **50% → 77%** of the screen, and because `playFocusBias` reads that band
+the ball now sits just above the Swing pill — the "golf focus back near the bottom" half of the ask,
+which came for free rather than as a second tuning pass.
+
+### The bag graphic
+
+`render/bagArt.ts` is a leaf: pure SVG strings, no ids (they are document-global and the club glyphs
+are emitted a dozen per sheet — the `holeIdPrefix` lesson), tinted by the golfer's own colour so the
+corner matches the cap, the tracer and the caddy frame. The first pass read as a **drinking cup**: a
+straight-sided tapered body, a full-ellipse rim that looked like a lid, a side arc that looked like a
+mug handle, and a bundle of parallel shafts that looked like straws. Three details fix it and are
+worth keeping: the clubs **fan** from a point inside the mouth with each head rotated onto its own
+shaft (alternating wood pear / iron blade), the bag **leans**, and it stands on **stand legs**. A
+preview rig is the only way to judge this — it is 40×46 CSS px on screen and a shape that reads at
+3× can be a blob at 1×.
+
+### Guards
+
+`tests/club-picker.test.ts` (browser, against the built artifact): the cycler / power bar / legend are
+gone from the shot screen, the power still reads on the panel, the bottom bar is under 11% of the
+screen and the clear band over 68%; the bag opens the whole legal bag with exactly one row marked as
+the pick, every row clears a 44px target, the page behind is `inert` and the sheet is a `role=dialog`
+(both inherited from GS-a11y-focus by being a direct child of `#app`, not hand-rolled), picking a
+different club closes the sheet and changes the bag's face, and Escape closes it through the shared
+back intent. `tests/play-hud-frame.test.ts` gains the frame half: bag + aim cells mount in all three
+shapes, greyed off the aim state, the stack precedes the bag in the DOM, aim/watch are `--slim` and
+putt is not, and the source carries no `data-cycle` any more.
+
+### Accepted costs
+
+The ◄/► club step is gone — a keyboard/switch player now opens the sheet and tabs the grid, which is
+more presses for a single-step change and fewer for a big one. The player explicitly took that trade
+for the screen space, and the sheet is fully keyboard-operable, so nothing became unreachable. The
+old 🏌 "use Sam's suggestion" shortcut is gone too: the suggestion is the ★ on its row, taken by
+tapping the club like any other.
+
+---
+
 ## Migrated from CLAUDE.md — System-index bullets (2026-07-23 refactor)
 
 > These are the verbatim terse System-index bullets moved out of `CLAUDE.md` when it was
