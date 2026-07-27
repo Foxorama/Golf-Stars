@@ -12,8 +12,9 @@
  */
 import { describe, it, expect } from 'vitest';
 import { planRunout, sampleRunout, apexOverLenFor, DEFAULT_RUNOUT_FEEL, RUNOUT_BY_CLASS, type Landing, type RunoutPlan } from '../src/render/runout';
-import { arcApex, ARC_FEEL, flightApexT } from '../src/sim/flight';
-import { sampleCurvedFlight, flightDurationMs, flightT } from '../src/render/trajectory';
+import { arcApex, ARC_FEEL, arcShapeOf, arrivalAngleDeg, descentAngleDeg } from '../src/sim/flight';
+import { sampleCurvedFlight, flightDurationMs, flightGroundAt } from '../src/render/trajectory';
+import { flightGroundFrac, flightParamAt } from '../src/sim/flight';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { CLUBS } from '../src/sim/clubs';
@@ -237,8 +238,12 @@ describe('bounce and run read per CLUB', () => {
   });
 
   it('the long irons BORE and the short irons CLIMB', () => {
-    expect(FLIGHT_PROFILES.ironLong.peakMult).toBeLessThan(FLIGHT_PROFILES.ironShort.peakMult);
-    expect(FLIGHT_PROFILES.ironLong.apexAt).toBeLessThan(FLIGHT_PROFILES.ironShort.apexAt);
+    // Launch angle is the height lever now (GS-flight-shape) — a long iron leaves flatter than a
+    // short one, and being flatter it is still climbing further down the hole (`apexAt`).
+    const c5 = CLUBS.find((c) => c.id === '5i')!.carry;
+    const c8 = CLUBS.find((c) => c.id === '8i')!.carry;
+    expect(descentAngleDeg(FLIGHT_PROFILES.ironLong, c5)).toBeLessThan(descentAngleDeg(FLIGHT_PROFILES.ironShort, c8));
+    expect(FLIGHT_PROFILES.ironLong.apexAt).toBeGreaterThan(FLIGHT_PROFILES.ironShort.apexAt);
   });
 
   it('a driver skips further off the same landing than a wedge, which plops', () => {
@@ -299,17 +304,15 @@ describe('bounce and run read per CLUB', () => {
 function arrival(clubId: string): { v0: number; descentDeg: number; carry: number } {
   const club = CLUBS.find((c) => c.id === clubId)!;
   const pr = flightProfileOf(clubId);
-  const apex = arcApex(club.carry, club.carry, ARC_FEEL, pr.peakMult);
-  const apexT = flightApexT(pr);
+  const apex = arcApex(club.carry, club.carry, ARC_FEEL, pr);
+  const shape = arcShapeOf(clubId);
   const from: [number, number] = [0, 0];
   const land: [number, number] = [0, club.carry];
   const dur = flightDurationMs(club.carry);
-  const a = sampleCurvedFlight(from, land, 0, flightT(0.98), apex, apexT).ground;
-  const b = sampleCurvedFlight(from, land, 0, flightT(1), apex, apexT).ground;
+  const a = sampleCurvedFlight(from, land, 0, flightGroundAt(0.98), apex, shape).ground;
+  const b = sampleCurvedFlight(from, land, 0, flightGroundAt(1), apex, shape).ground;
   const v0 = Math.hypot(b[0] - a[0], b[1] - a[1]) / Math.max(1, 0.02 * dur);
-  const s = sampleCurvedFlight(from, land, 0, flightT(0.88), apex, apexT);
-  const g = Math.hypot(land[0] - s.ground[0], land[1] - s.ground[1]);
-  return { v0, descentDeg: (Math.atan2(s.height, Math.max(0.5, g)) * 180) / Math.PI, carry: club.carry };
+  return { v0, descentDeg: arrivalAngleDeg(apex, club.carry, shape), carry: club.carry };
 }
 function land(clubId: string, dist: number, firm = 0.85, extra: Partial<Landing> = {}): RunoutPlan {
   const ar = arrival(clubId);
@@ -337,25 +340,25 @@ describe('the ball ARRIVES at speed (GS-flight-pace)', () => {
     }
   });
 
-  it('the pacing maps onto the curve monotonically and covers the whole flight', () => {
-    expect(flightT(0)).toBeCloseTo(0, 6);
-    expect(flightT(1)).toBeCloseTo(1, 6);
+  it('the pacing walks the whole flight monotonically, in GROUND', () => {
+    expect(flightGroundAt(0)).toBeCloseTo(0, 6);
+    expect(flightGroundAt(1)).toBeCloseTo(1, 6);
     let prev = -1;
     for (let i = 0; i <= 40; i++) {
-      const t = flightT(i / 40);
-      expect(t).toBeGreaterThan(prev);
-      prev = t;
+      const g = flightGroundAt(i / 40);
+      expect(g).toBeGreaterThan(prev);
+      prev = g;
     }
   });
 
   it('the ball is PAST halfway down the fairway around halfway through the flight, not at 75%', () => {
     // The old parameterisation put it at 75% of the ground at half time.
-    const club = CLUBS.find((c) => c.id === 'D')!;
-    const t = flightT(0.5);
-    const ground = 2 * t - t * t; // the degenerate Bézier's own ground fraction
+    const ground = flightGroundAt(0.5);
     expect(ground).toBeGreaterThan(0.4);
     expect(ground).toBeLessThan(0.62);
-    expect(club.carry).toBeGreaterThan(0); // (keeps the club lookup meaningful)
+    // …and the raw curve parameter is exactly the trap it was: 75% of the ground by half-way.
+    expect(flightGroundFrac(0.5)).toBeCloseTo(0.75, 9);
+    expect(flightParamAt(flightGroundAt(0.5))).toBeLessThan(flightGroundAt(0.5));
   });
 });
 

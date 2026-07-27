@@ -14,44 +14,92 @@
  *     barely bows; a fade/slice/hook bows toward where it finishes, so the ball reads as starting
  *     on line and curving away (the banana). The lateral offset of the landing is already baked in
  *     by `resolveShot`'s angular spray; this just shapes the PATH between launch and that landing.
- *  2. The ARC HEIGHT is a loft-scaled arc, shaped PER CLUB FAMILY (GS-flight-3): lofted/short clubs
- *     fly relatively higher, long clubs flatter, and each family (driver/wood/hybrid/iron/wedge —
- *     `FLIGHT_PROFILES`) has its own apex height multiplier and apex POSITION along the ground, so a
- *     driver bores low-and-late, a hybrid launches high for its carry, and a wedge towers early and
- *     drops steeply. Tall obstacles (trees) have a canopy height; if the ball's arc height where it
- *     crosses a tree is BELOW that canopy it's knocked down INTO the tree (a tough non-penalty lie),
- *     so arc height genuinely matters — a high wedge drops over a guarding tree a low runner clips,
- *     and the SAME grove blocks a driver line while a 7-iron sails it.
+ *  2. The ARC HEIGHT is a real ball-flight PROFILE, measured against the GROUND the ball has covered
+ *     (GS-flight-shape): a near-straight lift-supported climb to an apex at `apexAt` of the carry,
+ *     then a steepening fall that arrives at a genuine descent angle. Every number in it is a real
+ *     golf number — launch angle, apex height, descent angle — and they are tied together rather
+ *     than declared independently (see `ARC_FEEL` / `FlightProfile` below), so a family cannot be
+ *     given a launch angle its apex contradicts. Tall obstacles (trees) have a canopy height; if the
+ *     ball's arc height where it crosses a tree is BELOW that canopy it's knocked down INTO the tree
+ *     (a tough non-penalty lie), so arc height genuinely matters — a high wedge drops over a
+ *     guarding tree a low runner clips, and the SAME grove blocks a driver line while a 7-iron
+ *     sails it.
+ *
+ * HEIGHT IS A FUNCTION OF GROUND COVERED, NEVER OF THE CURVE'S PARAMETER (GS-flight-shape). The
+ * ground path is a quadratic Bézier and its forward progress at parameter `t` is `2t − t²` — fast
+ * early, and STOPPING DEAD at t=1. Height used to be evaluated at `t` as well, so over the last few
+ * percent of ground the parameter still had a third of its range left to spend and the ball fell
+ * out of the sky on a vertical tangent: measured on a drive, the arc lost 6.9yd of height over the
+ * 69yd from its apex to 90% of the carry and then the remaining 16.6yd over the last 23yd. A long
+ * flat glide, then a plummet — "it looks buggy as heck, not like a real ball flight", and the reason
+ * the run-out had to measure its descent over a closing TENTH to dodge the artefact. Sampling height
+ * at the GROUND fraction removes it at the root: the drawn shape IS the height-vs-distance profile,
+ * and its terminal slope is exactly the family's descent angle (`arrivalAngleDeg`).
  */
 
 import type { Hole, Vec } from './course/contract';
 import { pointInPoly, segDist } from './course/contract';
 
 // --- Arc height --------------------------------------------------------------
+/**
+ * The GLOBAL half of the flight model — the loft ramp every club is read off, plus the one
+ * aerodynamic constant that turns a launch angle into an apex.
+ *
+ * A club's LAUNCH ANGLE is a function of its loft, and in a bag whose only loft signal is the
+ * distance on the sole, distance IS loft: the ramp runs from `launchLongDeg` at `flatCarry` (the
+ * driver) to `launchShortDeg` at `loftCarry` (the shortest wedge), and each family trims it
+ * (`FlightProfile.launchTrimDeg`). The real ladder — driver ~11°, mid iron ~16°, wedge ~25° — falls
+ * straight out, and a club BETWEEN two rows (a 4-iron, a 60° wedge) is placed by its own number
+ * without an engine edit, which is the whole point of the convention.
+ *
+ * THE RAMP IS CURVED, AND A STRAIGHT ONE PUT THE BAG'S HIGHEST BALL FLIGHT ON THE HYBRIDS. Real
+ * launch angle barely moves across the long clubs (driver 10.4° → 3-iron 10.4° on tour) and then
+ * climbs hard through the short irons into the wedges; a linear ramp instead spends a third of its
+ * range between the driver and the hybrids, handing a 181yd 3-hybrid a 17° launch and a 35yd apex —
+ * higher than the driver, which no bag does. `loftCurve` bends it (`(1−t)^loftCurve`) so the long
+ * end stays flat and the loft arrives where the loft actually is.
+ *
+ * `liftGain` is the one piece of aerodynamics we model, and it is what makes the numbers hang
+ * together. A drag-free projectile launched at θ peaks at `tan(θ)/4` of its range — the same
+ * relation the run-out's bounce uses (`apexOverLenFor`). A real golf ball flies much higher than
+ * that for its launch, because backspin generates lift that holds it up: measured against tour
+ * numbers the inflation is remarkably steady across the bag (driver 31.7yd apex on 275yd carry is
+ * 2.36× the drag-free 0.0486, a pitching wedge 29.6 on 136 is 2.33×), so ONE constant carries it.
+ * Apex is therefore never declared — it is DERIVED, `carry · tan(launch)/4 · liftGain`, which is why
+ * a family cannot be handed a launch angle and an apex that disagree.
+ */
 export interface ArcFeel {
-  /** Peak height as a fraction of carry for a LONG club (driver). */
-  peakFracLong: number;
-  /** Peak height as a fraction of carry for a SHORT/lofted club (wedge). */
-  peakFracShort: number;
-  /** Carry at/below which a club flies at the short (high-loft) fraction. */
+  /** Launch angle (degrees) of a club at/above `flatCarry` — the driver. */
+  launchLongDeg: number;
+  /** Launch angle (degrees) of a club at/below `loftCarry` — the shortest wedge. */
+  launchShortDeg: number;
+  /** Carry at/below which a club launches at `launchShortDeg`. */
   loftCarry: number;
-  /** Carry at/above which a club flies at the long (flat) fraction. */
+  /** Carry at/above which a club launches at `launchLongDeg`. */
   flatCarry: number;
+  /** Curvature of the ramp between them. 1 = linear; >1 keeps the long clubs flat and puts the rise
+   *  into the scoring clubs, which is the shape real launch data has. */
+  loftCurve: number;
+  /** How much higher backspin lift carries the ball than a drag-free projectile off the same tee. */
+  liftGain: number;
   /** Floor / ceiling on the apex (yards). */
   peakMin: number;
   peakMax: number;
 }
 
 export const ARC_FEEL: ArcFeel = {
-  peakFracLong: 0.12,
-  peakFracShort: 0.22,
-  loftCarry: 70,
+  launchLongDeg: 11,
+  launchShortDeg: 27,
+  loftCarry: 40,
   flatCarry: 250,
+  loftCurve: 1.6,
+  liftGain: 2.35,
   peakMin: 4,
   peakMax: 60,
 };
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
+const DEG = Math.PI / 180;
 
 // --- Per-family flight profiles (GS-flight-3) ---------------------------------
 /** Club FAMILY for flight purposes — the same id convention the audio strike voices use
@@ -78,15 +126,29 @@ export function flightClassOf(clubId?: string): FlightClass {
   return 'wedge';
 }
 
-/** How a club family SHAPES its flight (GS-flight-3) — content-as-data, the hook future flight-
- *  shaping Pro-Shop gear mods (a piercing driver, a sky-high wedge) will scale. */
+/** How a club family SHAPES its flight (GS-flight-3 / GS-flight-shape) — content-as-data, the hook
+ *  future flight-shaping Pro-Shop gear mods (a piercing driver, a sky-high wedge) will scale.
+ *
+ *  Three shape levers, and NONE of them is the apex height: that is derived from the launch angle
+ *  (`ARC_FEEL.liftGain`), so the rows below cannot describe a trajectory that doesn't close. */
 export interface FlightProfile {
-  /** Where the apex sits along the GROUND path, as a fraction of carry (0..1). Later = a longer
-   *  climb and a steeper final drop; earlier = up quickly, then a long shallow glide. */
+  /** Where the apex sits along the GROUND path, as a fraction of carry (0..1).
+   *
+   *  THE FLATTER CLUB PEAKS LATER, which is the opposite of the intuition this table used to
+   *  encode. The rise ends at the apex with zero slope and the fall ends at touchdown at the
+   *  descent angle, so the two legs split the ground in proportion to how shallow each is: a driver
+   *  climbs at ~11° and drops at ~38°, so it spends two thirds of its carry going up (0.66); a
+   *  wedge climbs at ~25° and drops at ~50°, so it is over the top by 0.56. Bounded by real
+   *  geometry, not taste — `apexAt` must exceed `apex/(carry·tan(launch))` or the climb cannot be
+   *  reached at that launch angle, and `arcShapeFor` turns it into the rise coefficient. */
   apexAt: number;
-  /** Multiplier on the loft-interpolated peak fraction (`arcApex`): >1 flies higher for the same
-   *  carry (hybrid/wedge), <1 bores (driver). */
-  peakMult: number;
+  /** How much steeper the ball comes DOWN than it went up: `tan(descent)/tan(launch)`. This is the
+   *  drag signature of the family and the single number that most decides how the shot behaves on
+   *  the ground — a driver arrives at 4× its launch angle and skips, a wedge at 2.7× and sits. */
+  dropRatio: number;
+  /** Family trim (degrees) on the global loft ramp's launch angle — the rescue-club identity
+   *  (a hybrid launches higher than the wood it replaces) and the wedge's extra loft. */
+  launchTrimDeg: number;
   /**
    * CARRY as a fraction of the club's TOTAL distance (GS-carry-rollout-split). A club's nominal
    * number is its TOTAL (carry + roll): the ball FLIES this fraction of it and RUNS the rest, so a
@@ -100,11 +162,24 @@ export interface FlightProfile {
 }
 
 /**
- * The family table. Tuned to read like the real bag WITHIN the game's arcade scale (canopies are
- * 7–22y, so absolute heights stay game-sized): the driver launches shallow (~12°) and bores under
- * tall trouble; hybrids are the high-launch rescue clubs — visibly higher than a wood of the same
- * carry; irons climb steadily; wedges tower early and drop steeply over greenside trouble. The
- * putter row keeps the legacy neutral arc (its "flights" are tap-length chips).
+ * The family table — every row a real reference trajectory (GS-flight-shape). Read off the loft
+ * ramp with the trims below, the bag flies:
+ *
+ *     club   launch   apex    descent      club   launch   apex    descent
+ *     D      11.0°    31yd    37.9°        7i     20.3°    28yd    49.9°
+ *     3W     11.7°    32yd    38.6°        9i     21.7°    24yd    51.9°
+ *     5H     19.5°    36yd    48.6°        PW     23.5°    27yd    49.5°
+ *     3i     18.1°    27yd    48.0°        SW     25.9°    21yd    52.7°
+ *     6i     19.2°    25yd    49.9°        64°    28.5°    13yd    55.7°
+ *
+ * — i.e. tour-shaped: a near-constant apex through the long and mid bag tapering off in the short
+ * wedges, a descent angle climbing from the driver's 38° to the wedges' mid-50s, and every launch
+ * angle inside a degree or two of the real club. Absolute heights land where the old hand-tuned
+ * fractions already sat (canopies are 7–22y, so the tree game is preserved) — what changed is that
+ * they are now CONSEQUENCES of the launch ramp rather than independent guesses, and the descent
+ * angles finally differ enough per family to be felt on the ground.
+ *
+ * The putter row is the neutral arc for tap-length chips; it never really flies.
  */
 export const FLIGHT_PROFILES: Record<FlightClass, FlightProfile> = {
   // GS-carry-roll-real: the carry/roll split is set from REAL golf, not from what the auto sim found
@@ -113,13 +188,13 @@ export const FLIGHT_PROFILES: Record<FlightClass, FlightProfile> = {
   // club's carry, since a club's number here is its TOTAL. The old numbers had a driver releasing 25%
   // of its carry (62 yards) and a long iron 20% (31), which is not golf; and because the split is
   // total-preserving, over-rolling meant under-CARRYING — a 250yd driver flew 200.
-  driver: { apexAt: 0.6, peakMult: 0.85, carryFrac: 0.922 },
-  wood: { apexAt: 0.61, peakMult: 0.95, carryFrac: 0.945 },
-  hybrid: { apexAt: 0.64, peakMult: 1.12, carryFrac: 0.945 },
-  ironLong: { apexAt: 0.63, peakMult: 0.92, carryFrac: 0.959 },
-  ironShort: { apexAt: 0.68, peakMult: 1.06, carryFrac: 0.976 },
-  wedge: { apexAt: 0.7, peakMult: 1.12, carryFrac: 1.0 },
-  putter: { apexAt: 0.75, peakMult: 1.0, carryFrac: 1.0 },
+  driver: { apexAt: 0.66, dropRatio: 4.0, launchTrimDeg: 0, carryFrac: 0.922 },
+  wood: { apexAt: 0.65, dropRatio: 4.2, launchTrimDeg: -0.4, carryFrac: 0.945 },
+  hybrid: { apexAt: 0.62, dropRatio: 3.9, launchTrimDeg: 1, carryFrac: 0.945 },
+  ironLong: { apexAt: 0.63, dropRatio: 3.9, launchTrimDeg: 0, carryFrac: 0.959 },
+  ironShort: { apexAt: 0.6, dropRatio: 3.7, launchTrimDeg: 0.5, carryFrac: 0.976 },
+  wedge: { apexAt: 0.56, dropRatio: 3.2, launchTrimDeg: 2.5, carryFrac: 1.0 },
+  putter: { apexAt: 0.55, dropRatio: 3.2, launchTrimDeg: 2.5, carryFrac: 1.0 },
 };
 
 /** The flight profile a club id flies with — the ONE lookup every consumer (sim resolve, knockdown
@@ -200,36 +275,128 @@ export function clubTotalReach(clubId: string | undefined, nominalCarry: number)
   return totalReachFor(flightProfileOf(clubId), nominalCarry);
 }
 
-/**
- * The profile's apex position converted from GROUND fraction to flight-PARAM fraction. The curved
- * path's Bézier param covers ground non-uniformly (a straight shot's ground progress is 2t−t², fast
- * early, slow late), so placing the apex at ground fraction `apexAt` means peaking at param
- * `1 − √(1 − apexAt)`. Exact for a straight shot, a close approximation for the banana. Pure.
- */
-export function flightApexT(profile: FlightProfile): number {
-  return 1 - Math.sqrt(Math.max(0, 1 - profile.apexAt));
+/** The LAUNCH angle (degrees) a club of `nominalCarry` leaves the clubface at — the global loft ramp
+ *  plus the family's trim. Distance is the bag's loft signal, so this is where "which club is it"
+ *  becomes a physical number. Pure. */
+export function launchAngleDeg(profile: FlightProfile, nominalCarry: number, feel: ArcFeel = ARC_FEEL): number {
+  const t = clamp01((nominalCarry - feel.loftCarry) / (feel.flatCarry - feel.loftCarry));
+  const loft = Math.pow(1 - t, Math.max(0.2, feel.loftCurve));
+  return feel.launchLongDeg + (feel.launchShortDeg - feel.launchLongDeg) * loft + profile.launchTrimDeg;
+}
+
+/** The DESCENT angle (degrees) that same club touches down at — its launch steepened by the family's
+ *  `dropRatio`. The nominal-carry twin of `arrivalAngleDeg` (which measures the angle off a resolved
+ *  shot's own arc, apex clamps and all); the two agree wherever the apex is unclamped. Pure. */
+export function descentAngleDeg(profile: FlightProfile, nominalCarry: number, feel: ArcFeel = ARC_FEEL): number {
+  return Math.atan(Math.tan(launchAngleDeg(profile, nominalCarry, feel) * DEG) * profile.dropRatio) / DEG;
+}
+
+/** Apex height as a fraction of carry: the drag-free `tan(launch)/4` inflated by the lift a spinning
+ *  ball generates (`ARC_FEEL.liftGain`). Pure. */
+export function apexFractionOf(profile: FlightProfile, nominalCarry: number, feel: ArcFeel = ARC_FEEL): number {
+  return (Math.tan(launchAngleDeg(profile, nominalCarry, feel) * DEG) / 4) * feel.liftGain;
 }
 
 /**
- * Aerial apex height (yards) for a shot of `carry`, flown by a club of `nominalCarry`. Lofted
- * (short) clubs peak higher relative to carry than long clubs, so a wedge balloons and a driver
- * bores — the lever that lets a high approach drop over a tree a flat one would clip. `peakMult`
- * is the club family's height character (`FlightProfile.peakMult`); 1 = the neutral ramp. Pure.
+ * Aerial apex height (yards) for a shot of `carry`, flown by a club of `nominalCarry`. DERIVED from
+ * the club's launch angle, never declared: lofted (short) clubs launch steeper and so peak higher
+ * relative to carry, which is the lever that lets a high approach drop over a tree a flat one would
+ * clip. Clamped to the game's readable band — a clamp scales the whole arc, it does not reshape it.
+ * Pure.
  */
-export function arcApex(carry: number, nominalCarry: number, feel: ArcFeel = ARC_FEEL, peakMult = 1): number {
-  const t = clamp01((nominalCarry - feel.loftCarry) / (feel.flatCarry - feel.loftCarry));
-  const frac = (feel.peakFracShort + (feel.peakFracLong - feel.peakFracShort) * t) * peakMult;
+export function arcApex(
+  carry: number,
+  nominalCarry: number,
+  feel: ArcFeel = ARC_FEEL,
+  profile: FlightProfile = FLIGHT_PROFILES.ironShort,
+): number {
+  const frac = apexFractionOf(profile, nominalCarry, feel);
   return Math.max(feel.peakMin, Math.min(feel.peakMax, Math.abs(carry) * frac));
 }
 
-/** Height above ground (yards) at normalised flight progress `t` ∈ [0,1] for a given apex — a
- *  two-piece sine arc peaking at param `apexT` (C1-smooth at the peak; `flightApexT` converts a
- *  profile's ground-fraction apex). The default 0.5 reproduces the classic symmetric `sin(πt)`
- *  parabola exactly, matching the render's `sampleFlight` (putts/legacy). Pure. */
-export function arcHeight(apex: number, t: number, apexT = 0.5): number {
-  const tt = clamp01(t);
-  if (tt <= apexT) return Math.sin((Math.PI / 2) * (tt / Math.max(1e-6, apexT))) * apex;
-  return Math.cos(((Math.PI / 2) * (tt - apexT)) / Math.max(1e-6, 1 - apexT)) * apex;
+// --- The arc SHAPE (GS-flight-shape) -----------------------------------------
+/**
+ * A family's height-vs-ground profile, as the two cubic legs that draw it. Both coefficients are
+ * DERIVED from the family row (`arcShapeFor`) — they are the shape the launch angle, apex height and
+ * descent angle imply, not free numbers, so the three can never contradict each other.
+ */
+export interface ArcShape {
+  /** Ground fraction of the apex (`FlightProfile.apexAt`). */
+  apexAt: number;
+  /** Rise leg: the launch slope as a multiple of the climb's AVERAGE slope. ~1 across the whole bag,
+   *  which is the signature of a lift-supported climb — the ball goes up in very nearly a straight
+   *  line and rounds over at the top, rather than arcing like a thrown stone (which would be 2). */
+  rise: number;
+  /** Fall leg: the touchdown slope as a multiple of the descent's average. 2 is a plain parabola;
+   *  the rows sit above it because drag bleeds forward speed while gravity keeps adding downward. */
+  fall: number;
+}
+
+/** Keep both cubic legs strictly monotonic (at a coefficient of 3 the leg develops a flat spot — the
+ *  ball would hover). Only reachable from an out-of-range table row. */
+const shapeCoef = (x: number): number => Math.max(0.2, Math.min(2.95, x));
+
+/**
+ * The family's arc shape. Both legs fall out of the same relation the apex height does — a leg's
+ * AVERAGE slope is `apex / (its share of the ground)` and its outer end slope is the launch/descent
+ * tangent, so:
+ *
+ *     rise = tan(launch)·apexAt·carry / apex      = 4·apexAt / liftGain
+ *     fall = tan(descent)·(1−apexAt)·carry / apex = 4·(1−apexAt)·dropRatio / liftGain
+ *
+ * The carry cancels, and so does the apex. THAT is why the shape can be a per-FAMILY constant: it
+ * depends only on where the ball peaks and how much steeper it lands than it launched — nothing
+ * about the particular shot — while the height it is scaled to is the shot's own. Pure. */
+export function arcShapeFor(profile: FlightProfile, feel: ArcFeel = ARC_FEEL): ArcShape {
+  const ga = Math.max(0.05, Math.min(0.95, profile.apexAt));
+  const k = 4 / feel.liftGain;
+  return { apexAt: ga, rise: shapeCoef(k * ga), fall: shapeCoef(k * (1 - ga) * profile.dropRatio) };
+}
+
+/** `arcShapeFor` keyed by club id — the ONE lookup a consumer needs to draw a club's flight. Pure. */
+export function arcShapeOf(clubId?: string, feel: ArcFeel = ARC_FEEL): ArcShape {
+  return arcShapeFor(flightProfileOf(clubId), feel);
+}
+
+/** The neutral mid-bag arc, for the few callers with no club in hand. */
+export const NEUTRAL_ARC: ArcShape = arcShapeFor(FLIGHT_PROFILES.ironShort);
+
+/**
+ * Height above the ground (yards) once the ball has covered ground fraction `g` of its carry — THE
+ * flight profile, shared by the sim's knockdown walk and the renderer's animation.
+ *
+ * Two cubic legs, each pinned at both ends in value AND slope: the rise leaves the clubface at the
+ * launch angle and reaches the apex flat; the fall leaves the apex flat and reaches the turf at the
+ * descent angle. Zero at both ends, exactly `apex` at `apexAt`, C¹ at the peak, monotonic on each
+ * leg — so the ball climbs, tops out once and comes down, with no hover and no plummet. Pure. */
+export function arcHeight(apex: number, g: number, shape: ArcShape = NEUTRAL_ARC): number {
+  const gg = clamp01(g);
+  const ga = shape.apexAt;
+  if (gg <= ga) {
+    // f(0)=0, f'(0)=rise, f(1)=1, f'(1)=0 — the climb: straight, then rounding over.
+    const u = gg / Math.max(1e-6, ga);
+    const a = shape.rise;
+    return (a * u + (3 - 2 * a) * u * u + (a - 2) * u * u * u) * apex;
+  }
+  // k(0)=1, k'(0)=0, k(1)=0, k'(1)=−fall — the fall: easing off the apex, then steepening in.
+  const v = (gg - ga) / Math.max(1e-6, 1 - ga);
+  const b = shape.fall;
+  return (1 + (b - 3) * v * v + (2 - b) * v * v * v) * apex;
+}
+
+/**
+ * The angle (degrees) the ball is genuinely falling at as it touches down, taken off the arc it just
+ * flew: the fall leg's terminal slope, `fall · apex / ((1−apexAt) · carry)`. THE run-out's arrival
+ * angle (GS-landing-real) — how far and how high the ball skips is decided here.
+ *
+ * Measured rather than looked up, so it stays honest wherever the arc is not the family's stock one:
+ * a clamped apex (a chip, a monstrous drive), a partial swing, or the derelict's straight pinball
+ * polyline all report the angle they actually arrive at. It replaces sampling the drawn curve over
+ * its closing TENTH — a workaround for the vertical-tangent artefact that no longer exists, and
+ * which under-read a driver's arrival by 3° and a wedge's by 9°. Pure. */
+export function arrivalAngleDeg(apex: number, carry: number, shape: ArcShape = NEUTRAL_ARC): number {
+  const run = Math.max(1e-3, (1 - shape.apexAt) * Math.abs(carry));
+  return Math.atan2(shape.fall * Math.abs(apex), run) / DEG;
 }
 
 // --- Curved ground path ------------------------------------------------------
@@ -251,6 +418,24 @@ export function flightControl(from: Vec, landing: Vec, bearingDeg: number): Vec 
   const uy = Math.cos(br);
   const fwd = Math.max(0, (landing[0] - from[0]) * ux + (landing[1] - from[1]) * uy);
   return [from[0] + ux * fwd, from[1] + uy * fwd];
+}
+
+/**
+ * GROUND FRACTION ↔ CURVE PARAMETER (GS-flight-shape). The two are NOT the same number and every
+ * consumer works in the first: with the control point on the landing's own depth, the Bézier's
+ * forward progress at parameter `t` is exactly `2t − t²` — 75% of the ground gone by t=0.5, and dead
+ * stopped at t=1. Height, pacing and the knockdown walk are all indexed by how far the ball has
+ * TRAVELLED; only the curve evaluation needs the parameter, and this is the one place that converts.
+ * Exact for a shot finishing on its line, a close approximation for the banana. Pure.
+ */
+export function flightGroundFrac(t: number): number {
+  const tt = clamp01(t);
+  return tt * (2 - tt);
+}
+
+/** The curve parameter that has covered ground fraction `g` — the inverse of `flightGroundFrac`. */
+export function flightParamAt(g: number): number {
+  return 1 - Math.sqrt(1 - clamp01(g));
 }
 
 /** Quadratic Bézier point at `t` ∈ [0,1] through (from → control → landing). Pure. */
@@ -312,7 +497,7 @@ export interface Knockdown {
   point: Vec;
   /** Actual carry to that point (yards). */
   carry: number;
-  /** Flight fraction at impact (0..1). */
+  /** Fraction of the GROUND carry covered at impact (0..1). */
   t: number;
 }
 
@@ -384,17 +569,20 @@ export function flightBlockedBy(
   if (candidates.length === 0) return null;
 
   const control = flightControl(from, landing, bearingDeg);
-  const apex = arcApex(carry, nominalCarry, ARC_FEEL, profile.peakMult);
-  const apexT = flightApexT(profile);
+  const apex = arcApex(carry, nominalCarry, ARC_FEEL, profile);
+  const shape = arcShapeFor(profile);
+  // Walked in GROUND fraction, so the samples are evenly spread over the turf the ball crosses (the
+  // curve's own parameter bunches them into the first half of the flight) and each height is the one
+  // the renderer draws at that point — contract 5.
   for (let i = 1; i <= steps; i++) {
-    const t = i / steps;
-    const pos = flightGround(from, control, landing, t);
-    const h = arcHeight(apex, t, apexT);
+    const g = i / steps;
+    const pos = flightGround(from, control, landing, flightParamAt(g));
+    const h = arcHeight(apex, g, shape);
     for (const cand of candidates) {
       const inNow = pointInPoly(pos, cand.poly);
       // A fresh outside→inside crossing while below the canopy = a clip.
       if (inNow && !cand.inside && h < cand.canopy) {
-        return { point: pos, carry: Math.hypot(pos[0] - from[0], pos[1] - from[1]), t };
+        return { point: pos, carry: Math.hypot(pos[0] - from[0], pos[1] - from[1]), t: g };
       }
       cand.inside = inNow;
     }

@@ -72,18 +72,31 @@ been mistaken for statements about the physics (see contract 4). Worth its own p
 play-back-to-fairway recovery, better club selection — after which the fences can be re-derived and
 tightened honestly. Until then: fences move, physics doesn't.
 
-**GS-flight-arc-tail — the drawn flight drops its last yards almost vertically** *(found while fixing
-GS-flight-pace; a BALANCE change, so deliberately left out of that PR)*
-The height is `arcHeight`, a two-piece sine in the Bézier's PARAMETER, while the ground advances as
-`2t − t²`. Expressed against ground the descending half therefore falls as `√(1−G)` — an infinite slope
-at touchdown. Measured: at 98% of the ground a driver is still **8.8 yards up**, and drops it over the
-last five yards. It reads as a ball plunging in rather than descending, and it is why the honest descent
-angle has to be measured over the closing TENTH of the ground instead of the last percent.
-The fix is to map height against the GROUND fraction (`arcHeight(apex, groundFrac, profile.apexAt)`)
-rather than the parameter. That changes the (ground, height) pairs — which is exactly what the sim's
-knockdown walk tests, so trees near a landing would start blocking shots they currently clear. Contract
-5 says the two must agree, so BOTH sides move together and the death-spiral harness has to be re-run.
-Worth doing: the tail is the least convincing part of the flight now that the pacing is right.
+**GS-knockdown-tunnel — the tree collision walks in steps wider than the trees** *(measured while
+shipping GS-flight-shape; deliberately left out of that PR)*
+`flightBlockedBy` samples the flight at a fixed `steps = 22`, which on a 250yd drive is an 11-yard
+stride — wider than the median tree blob (radius 4.8yd, p10 3.6). It steps straight over trees. Measured
+over 3,821 clean-flight shots, raising the walk to 176 steps finds a clip on **3.85%** of the shots the
+22-step walk let through (converged: 44 → 2.28%, 88 → 3.09%, 176 → 3.59%, 352 → 3.85%). This is a
+contract-5 hole in the direction of leniency — a ball drawn passing through a canopy that the sim let
+by — and it predates GS-flight-shape; that change only altered which shots tunnel, not whether they do.
+Fix shape: step by DISTANCE, not by a count (`ceil(carry / ~4yd)`, clamped), or test the step SEGMENT
+against the blob rather than its endpoint. Not free: `sprayBlocking` probes hundreds of candidate
+landings per hole through the same function, and closing the leniency makes the wooded worlds harder
+again — so it wants the death-spiral harness and probably wants `GS-aim-tree-aware` alongside it.
+
+**GS-aim-tree-aware — the pre-armed default aim and club are blind to trees** *(surfaced by
+GS-flight-shape; pre-existing, not caused by it)*
+`clearLine` only asks whether a line crosses a PENALTY hazard, so `autoAimTarget`/`autoAimClub` will
+happily pre-arm a driver on a line through a grove. GS-carry-roll-real closed exactly this hole for
+water ("the default aim never points at a hazard, and the pre-armed club never flies into one") and
+trees are the remaining half. It matters more now that the ball genuinely descends into them: knockdowns
+run at 19% of full shots. The player is not defenceless — the aim overlay's blocked cone walks the same
+`flightBlockedBy` and correctly widened — but the DEFAULT should not be a shot into timber.
+Fix shape: give the interactive aim/club picker the same `flightBlockedBy` probe the overlay uses, as a
+tiebreak (prefer a target/club whose flight is clear), interactive-only so determinism is untouched.
+Would also lift the auto AI if threaded into `layupTarget` — but that is `GS-auto-ai-weak`'s job and a
+harness change.
 
 **GS-green-surface-bite — non-penalty hazards eat the putting surface** *(found while building
 GS-green-backstop; real, measured, deliberately left out of that PR)*
@@ -497,6 +510,14 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-flight-shape** (was GS-flight-arc-tail) — the ball stopped dropping out of the sky
+  (`docs/decisions/putting.md`). Height was sampled at the Bézier PARAMETER while the ground ran as
+  `2t − t²`, so the terminal descent angle was a literal 90°: a drive glided at under 2° from its apex to
+  90% of its carry, then fell 16.6yd over the last 23. Height now indexes on the GROUND fraction, and the
+  arc became a real trajectory — two cubic legs pinned in value and slope, launch angle off a curved loft
+  ramp, apex DERIVED from it (`tan(θ)/4 · liftGain`), descent from a per-family drag ratio. Driver
+  11°/31yd/38°, 6-iron 16.5°/26yd/49°, sand wedge 26°/21yd/57°. Harness 0.5139 → 0.6319 toPar/hole and
+  5.66% → 8.09% floor-hits, both inside their fences.
 - **GS-a11y-sheet-scroll / GS-a11y-tight-fit** — the accessibility settings survive a phone (#607,
   `docs/decisions/accessibility.md`). Every `position:fixed` overlay caps to the viewport and scrolls
   (the settings sheet was 1515px on an 844px screen — and already −326px at the SHIP scale); the raw

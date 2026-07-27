@@ -41,13 +41,13 @@ import {
 import {
   easeOutCubic,
   flightDurationMs,
-  flightT,
+  flightGroundAt,
   sampleCurvedFlight,
   samplePolylineFlight,
   DEFAULT_FLIGHT_FEEL,
   type FlightFeel,
 } from './trajectory';
-import { flightApexT, flightProfileOf } from '../sim/flight';
+import { arcShapeOf, arrivalAngleDeg } from '../sim/flight';
 import { planRunout, sampleRunout, DEFAULT_RUNOUT_FEEL, type RunoutFeel, type RunoutPlan } from './runout';
 import {
   advanceFlightSpin,
@@ -162,6 +162,14 @@ function fabricateRedirect(
 
 /** Tiny deterministic PRNG (mulberry32) — the house style, so the ambient FX are stable. */
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
+
+/** Total length of a flight polyline (the derelict's pinball carom) — the GROUND the arc spans, so
+ *  its arrival angle is measured against the same run a parkland shot's carry is. */
+function polylineLength(path: readonly Vec[]): number {
+  let total = 0;
+  for (let i = 1; i < path.length; i++) total += Math.hypot(path[i]![0] - path[i - 1]![0], path[i]![1] - path[i - 1]![1]);
+  return total;
+}
 
 /**
  * A stable 0..1 variation for a shot, from the shot's own geometry (GS-landing-real).
@@ -790,7 +798,10 @@ export function mountPlayView(
       // a driver visibly bores while a wedge towers. The curved ground path launches along the shot
       // bearing and bends to the landing (the fade/hook banana).
       const peak = shot.result.apex;
-      const apexT = flightApexT(flightProfileOf(shot.club.id));
+      // The club family's real flight PROFILE (GS-flight-shape) — height is read off how much GROUND
+      // the ball has covered, so the drawn arc is the shot's height-vs-distance curve: a near-straight
+      // climb to the family's apex position, then a steepening fall onto its own descent angle.
+      const arc = arcShapeOf(shot.club.id);
       const bearing = shot.result.shotBearing;
       const flightDur = flightDurationMs(carry);
       const [tdx, tdy] = proj.project(touchdown);
@@ -829,25 +840,19 @@ export function mountPlayView(
         // whole run-out chain 2% of the flight's average speed.
         const endAt = (u: number): Vec =>
           shot.flightPath && shot.flightPath.length > 1
-            ? samplePolylineFlight(shot.flightPath, u, peak, apexT).ground
-            : sampleCurvedFlight(shot.from, touchdown, bearing, flightT(u, F), peak, apexT).ground;
+            ? samplePolylineFlight(shot.flightPath, u, peak, arc).ground
+            : sampleCurvedFlight(shot.from, touchdown, bearing, flightGroundAt(u, F), peak, arc).ground;
         const a = endAt(1 - VEPS);
         const b = endAt(1);
         const v0 = Math.hypot(b[0] - a[0], b[1] - a[1]) / Math.max(1, VEPS * flightDur);
-        // How STEEPLY it came down, over the closing tenth of the ground rather than the last
-        // fraction (where the arc has a near-vertical tangent — see GS-flight-pace). Shallow arrivals
-        // skip and run; steep ones pop up and stop, and that one number is most of why the clubs feel
-        // different on the ground.
-        const closeAt = (frac: number): { g: number; h: number } => {
-          const u = 1 - frac;
-          const smp =
-            shot.flightPath && shot.flightPath.length > 1
-              ? samplePolylineFlight(shot.flightPath, u, peak, apexT)
-              : sampleCurvedFlight(shot.from, touchdown, bearing, flightT(u, F), peak, apexT);
-          return { g: Math.hypot(touchdown[0] - smp.ground[0], touchdown[1] - smp.ground[1]), h: smp.height };
-        };
-        const close = closeAt(0.12);
-        const descentDeg = (Math.atan2(close.h, Math.max(0.5, close.g)) * 180) / Math.PI;
+        // How STEEPLY it came down — the TERMINAL slope of the arc the ball just flew, off the same
+        // shared geometry (GS-flight-shape). Shallow arrivals skip and run; steep ones pop up and
+        // stop, and that one number is most of why the clubs feel different on the ground. It used to
+        // be sampled as a chord over the closing tenth, to dodge the old arc's vertical touchdown
+        // tangent; the arc now lands at a real angle, so it can simply be asked.
+        const flightRun =
+          shot.flightPath && shot.flightPath.length > 1 ? polylineLength(shot.flightPath) : carry;
+        const descentDeg = arrivalAngleDeg(peak, flightRun, arc);
         // Per-shot variation with ZERO rng (contract 1): a stable hash of the shot's own geometry, so
         // the same shot always lands the same way and no two drives land alike.
         const vary = shotVariance(shot);
@@ -946,7 +951,7 @@ export function mountPlayView(
           // redirect cinematic gates on it), and `tf` is where along the Bézier that progress actually
           // puts the ball — near-constant GROUND speed instead of a curve that stops dead at the
           // landing. The path is identical; only the pacing moves.
-          const tf = flightT(tg, F);
+          const tf = flightGroundAt(tg, F);
           // Real caddy-guard redirect (GS-caddy), or — in the force-redirect DEMO — a fabricated one so
           // the throw fires on every shot. caddyProjectile(cornerCaddyId) is the active guard's kind.
           const projKind = caddyProjectile(cornerCaddyId);
@@ -962,7 +967,7 @@ export function mountPlayView(
             // Eyes-on feel; the SCORE already used the redirected landing.
             const interceptFrac = REDIRECT_HIT_FRAC;
             const fireFrac = REDIRECT_FIRE_FRAC;
-            const sI = sampleCurvedFlight(shot.from, rd.originalLanding, bearing, flightT(interceptFrac, F), peak, apexT);
+            const sI = sampleCurvedFlight(shot.from, rd.originalLanding, bearing, flightGroundAt(interceptFrac, F), peak, arc);
             // Intercept screen point, recomputed EVERY frame so it tracks the camera pan + zoom.
             const impactScreen: Vec = [0, 0];
             {
@@ -1010,9 +1015,9 @@ export function mountPlayView(
             else if (tg < interceptFrac + 0.14) zoomTarget = REDIRECT_ZOOM;
             else zoomTarget = REDIRECT_ZOOM + (1 - REDIRECT_ZOOM) * easeInOut(clamp01((tg - interceptFrac - 0.14) / 0.3));
 
-            height = sampleCurvedFlight(shot.from, touchdown, bearing, tf, peak, apexT).height;
+            height = sampleCurvedFlight(shot.from, touchdown, bearing, tf, peak, arc).height;
             if (tg < interceptFrac) {
-              ground = sampleCurvedFlight(shot.from, rd.originalLanding, bearing, tf, peak, apexT).ground;
+              ground = sampleCurvedFlight(shot.from, rd.originalLanding, bearing, tf, peak, arc).ground;
             } else {
               const e = easeInOut((tg - interceptFrac) / (1 - interceptFrac));
               ground = [
@@ -1025,7 +1030,7 @@ export function mountPlayView(
             // polyline — the ball flies straight and cracks off the bulkheads down the hallway, never the
             // parkland banana. Same segments the aim/physics used (graphic ≡ physics).
             const fp = shot.flightPath;
-            const s = samplePolylineFlight(fp, tg, peak, apexT);
+            const s = samplePolylineFlight(fp, tg, peak, arc);
             ground = s.ground;
             height = s.height;
             // Fire a metal spark + hull clang at EACH interior bounce vertex the instant the ball reaches it
@@ -1050,7 +1055,7 @@ export function mountPlayView(
               }
             }
           } else {
-            const s = sampleCurvedFlight(shot.from, touchdown, bearing, tf, peak, apexT);
+            const s = sampleCurvedFlight(shot.from, touchdown, bearing, tf, peak, arc);
             ground = s.ground;
             height = s.height;
           }

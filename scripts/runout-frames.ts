@@ -13,8 +13,8 @@
  */
 import { planRunout, sampleRunout, DEFAULT_RUNOUT_FEEL, RUNOUT_BY_CLASS } from '../src/render/runout';
 import { CLUBS } from '../src/sim/clubs';
-import { flightProfileOf, arcApex, ARC_FEEL, flightApexT, flightScaleFor, rollFractionFor, flightClassOf } from '../src/sim/flight';
-import { sampleCurvedFlight, flightDurationMs, flightT } from '../src/render/trajectory';
+import { flightProfileOf, arcApex, ARC_FEEL, arcShapeOf, arrivalAngleDeg, flightScaleFor, rollFractionFor, flightClassOf } from '../src/sim/flight';
+import { sampleCurvedFlight, flightDurationMs, flightGroundAt } from '../src/render/trajectory';
 import type { Vec } from '../src/sim/course/contract';
 
 // What the play view multiplies a modelled height by to get pixels (playView.ts DEFAULT_PLAY_FEEL).
@@ -29,22 +29,20 @@ const scaleFor = (carry: number): number => (carry > 200 ? 1.6 : carry > 120 ? 3
 const VISIBLE_PX = 3;
 const VISIBLE_FRAMES = 3;
 
-/** Arrival speed + descent angle measured off the DRAWN arc, exactly as playView.ts measures them. */
+/** Arrival speed + descent angle off the DRAWN arc, exactly as playView.ts takes them. */
 function arrival(actualCarry: number, nominal: number, clubId: string) {
   const pr = flightProfileOf(clubId);
-  const apex = arcApex(actualCarry, nominal, ARC_FEEL, pr.peakMult);
-  const apexT = flightApexT(pr);
+  const apex = arcApex(actualCarry, nominal, ARC_FEEL, pr);
+  const shape = arcShapeOf(clubId);
   const from: Vec = [0, 0];
   const land: Vec = [0, actualCarry];
   const dur = flightDurationMs(actualCarry);
   const VEPS = 0.02;
-  const at = (u: number) => sampleCurvedFlight(from, land, 0, flightT(u), apex, apexT);
+  const at = (u: number) => sampleCurvedFlight(from, land, 0, flightGroundAt(u), apex, shape);
   const a = at(1 - VEPS).ground;
   const b = at(1).ground;
   const v0 = Math.hypot(b[0] - a[0], b[1] - a[1]) / Math.max(1, VEPS * dur);
-  const close = at(1 - 0.12);
-  const g = Math.hypot(land[0] - close.ground[0], land[1] - close.ground[1]);
-  const descentDeg = (Math.atan2(close.height, Math.max(0.5, g)) * 180) / Math.PI;
+  const descentDeg = arrivalAngleDeg(apex, actualCarry, shape);
   return { v0, descentDeg, flightDur: dur };
 }
 

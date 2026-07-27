@@ -1410,3 +1410,135 @@ straight through; filed as `GS-chipin-trickle-phase` rather than quietly reverse
 5.66% floor-hits**, unchanged. Full gate green, 2,054 tests. Frame-by-frame in the real game across seeds
 42/7/101 (`scripts/shot-frames.mjs`): no page errors, ball on screen every frame inside its 3–5.5px band,
 opens on the windup, no freeze between contact and rest, still drawn at rest at the end.
+
+## GS-flight-shape — the ball stopped dropping out of the sky (2026-07-27)
+
+> *"the ball ends up just dropping out of the air and it looks buggy as heck, not like a real ball
+> flight, ball flight also needs to make sure it's tailored for each group of clubs"*
+
+### The bug was one line, and it was a units error
+
+`arcHeight(apex, t, apexT)` was evaluated at the flight curve's **Bézier parameter**. The ground
+position was evaluated at the same `t` — but the curve's forward progress at parameter `t` is
+`2t − t²`, because `flightControl` puts the control point on the landing's own depth and the
+quadratic degenerates. Ground and height were therefore on **two different clocks**, and the ground
+one stops dead at `t=1` while the height one does not.
+
+Measured on a drive (272yd carry, 27.7yd apex):
+
+| ground covered | height | slope over the step |
+|---|---|---|
+| 60% (apex) | 27.7yd | — |
+| 75% | 26.3 | 3.7° |
+| 85% | 22.8 | 8.8° |
+| 90% | 19.6 | 13.0° |
+| 95% | 14.6 | 20.1° |
+| 100% | 0 | **47.1°** |
+
+A 68-yard glide at under 2°, then a cliff. Geometrically the terminal descent angle was **90°** — as
+`t → 1`, `dh/dt` is finite and `dg/dt → 0`, so `dh/dg → ∞`. The ball genuinely fell vertically out of
+the last few yards of every shot. GS-runout-visible had already tripped over this and worked around
+it ("the last 1% has a near-vertical tangent artefact"), sampling the arrival angle as a chord over
+the closing TENTH rather than fixing the arc.
+
+**Height is now a function of the GROUND fraction** (`arcHeight(apex, g, shape)`), and
+`flightGroundFrac`/`flightParamAt` are the one place the two are converted. Everything that walks a
+flight — the sim's knockdown walk, the tent walk, the renderer's animation, the aim overlay's blocked
+cone — works in ground and converts only to evaluate the curve.
+
+### …which meant the arc had to become a real trajectory
+
+Two cubic legs, each pinned at both ends in value AND slope: the climb leaves the clubface at the
+launch angle and reaches the apex flat; the fall leaves the apex flat and reaches the turf at the
+descent angle. Same drive, same 90% mark:
+
+| ground covered | height | slope |
+|---|---|---|
+| 66% (apex) | 31.1yd | — |
+| 80% | 26.8 | 10.9° |
+| 90% | 17.0 | 22.7° |
+| 95% | 9.5 | 28.9° |
+| 100% | 0 | **35.0° → 37.9° at touchdown** |
+
+### The numbers are TIED TOGETHER, which is the point
+
+The old table declared `apexAt` and a `peakMult` independently and the launch/descent angles were
+whatever fell out. The new one declares three physical levers per family — `apexAt`, `dropRatio`
+(`tan(descent)/tan(launch)`, the drag signature) and `launchTrimDeg` — and **derives** everything else:
+
+* **Launch** is the global loft ramp (`ARC_FEEL`, 11° at 250yd → 27° at 40yd) plus the family trim.
+  Distance is the bag's only loft signal, so distance IS loft.
+* **Apex** is never declared. A drag-free projectile launched at θ peaks at `tan(θ)/4` of its range —
+  the same relation the run-out's own bounce uses. A spinning ball beats that by a steady factor:
+  tour driver 31.7yd on 275 is 2.36× the drag-free value, tour PW 29.6 on 136 is 2.33×. **One
+  constant** (`liftGain` 2.35) carries the whole bag, so a family cannot be handed a launch angle its
+  apex contradicts.
+* **The shape coefficients** fall out of the same relation with the carry AND the apex cancelling:
+  `rise = 4·apexAt/liftGain`, `fall = 4·(1−apexAt)·dropRatio/liftGain`. That is why the shape can be a
+  per-FAMILY constant while the height it is scaled to is the shot's own.
+
+`rise` lands at 0.95–1.12 across every row — the signature of a lift-supported climb (the ball goes up
+in nearly a straight line and rounds over at the top; a thrown stone would be 2). Nobody tuned that;
+it is what the real apex/launch numbers imply, and it is the strongest evidence the model closes.
+
+### Two things the old table had backwards
+
+**The flatter club peaks LATER.** The rise ends flat and the fall ends at the descent angle, so the
+legs split the ground in proportion to how shallow each is: a driver climbing at 11° and dropping at
+38° is still going up two thirds of the way (0.66); a wedge at 25°/53° is over the top by 0.56. The
+table had driver 0.60 and wedge 0.70.
+
+**The loft ramp is CURVED, and a straight one put the highest ball flight in the bag on the hybrids.**
+Real launch barely moves across the long clubs (tour driver 10.4°, 3-iron 10.4°) then climbs hard
+through the scoring clubs. A linear ramp spent a third of its range between the driver and the
+hybrids and gave a 181yd 3-hybrid a 17.3° launch and a 35yd apex — higher than the driver, which no
+bag does. `loftCurve` 1.6 fixes it; a test now forbids any club out-flying the driver.
+
+### The bag it produces
+
+| club | launch | apex | descent | | club | launch | apex | descent |
+|---|---|---|---|---|---|---|---|---|
+| D | 11.0° | 31yd | 37.9° | | 7i | 17.7° | 26yd | 49.7° |
+| 3W | 10.8° | 29yd | 38.8° | | 9i | 19.3° | 25yd | 52.3° |
+| 4H | 15.2° | 29yd | 46.7° | | PW | 22.2° | 25yd | 52.6° |
+| 3i | 15.3° | 27yd | 46.9° | | SW | 25.6° | 21yd | 56.8° |
+| 6i | 16.5° | 26yd | 49.2° | | 64° | 29.5° | 13yd | 61.1° |
+
+Tour-shaped: a near-constant apex through the long and mid bag tapering into the short wedges, a
+descent ladder from 38° to the low 60s, and every launch angle within a degree or two of the real
+club. Eyes-on: `scripts/flight-preview.mjs` draws the whole bag to scale with the old arc ghosted
+behind it.
+
+### The run-out got a re-calibration, and it is the interesting part
+
+`planRunout` takes the arrival angle, and the old chord sampling read a 7-iron in at **55°** and a
+sand wedge at **62°**. The honest tangents are 50° and 57°: the driver got 2.5° STEEPER (35.4 → 37.9)
+while every scoring club got 5–6° FLATTER. Since the drawn hop ratio follows `tan(descent)`
+(GS-runout-visible), the one constant that was rescuing the short clubs quietly stopped working —
+full-swing invisible bounces went 0 → 2, with a 141yd 7-iron into a soft green falling to 2.9px under
+a ball drawn at 3px. `hopDrawBoost` 5 → 5.4 puts every shot at 0.7 power and above back over the
+floor on both firmnesses and leaves the driver's drawn skip at 1:1.7, still clearly a skip against
+the 1:1.4 line where it starts reading as a vertical bounce. Measured with
+`scripts/runout-frames.ts`, not guessed.
+
+`playView` no longer measures the arrival at all — `arrivalAngleDeg(apex, carry, shape)` is the fall
+leg's exact terminal slope, so it stays honest for a clamped apex, a partial swing and the derelict's
+straight pinball polyline alike, and there is one description of the number instead of two.
+
+### Verified
+
+Full `npm run check` green — 179 files, 2,071 tests, typecheck and both builds. A real shot end to end
+in the real game (`scripts/shot-frames.mjs`, seed 42): no page errors, ball on screen inside its
+3–5.5px band every frame, opens on the windup, no freeze between contact and rest, drawn at rest at
+the end.
+
+**Death-spiral harness (contract 4): toPar/hole 0.5139 → 0.6319 (fence < 1.0), floor-hits 5.66% →
+8.09% (fence < 9.00%). Both bars hold; no fence moved.** The move is real and it is the physics: tree
+knockdowns went 15.72% → 19.03% of full shots, concentrated entirely in the wooded worlds
+(spore-jungle 0.846 → 1.033, verdant-station 0.675 → 0.904) while the sparse ones barely moved
+(scrap-belt 0.275 → 0.275, earth-links 0.142 → 0.138). A ball that genuinely comes down over the last
+fifty yards is a ball the trees short of the green can defend against, which is correct golf and the
+sibling of GS-green-backstop's "going long is punished". Both sides of that collision were checked
+before accepting it: canopies measure 12–18yd (median 14.2 — 42-foot trees) over 113,709 blobs, which
+is honest timber, so the canopy model was left alone. The player's protection is unchanged and now
+correctly WIDER: the aim overlay's blocked cone walks the same `flightBlockedBy`.

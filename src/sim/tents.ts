@@ -28,7 +28,7 @@
 
 import type { Hole, Vec } from './course/contract';
 import { dist, pointInPoly } from './course/contract';
-import { arcApex, arcHeight, ARC_FEEL, flightApexT, flightControl, flightGround, type FlightProfile } from './flight';
+import { arcApex, arcHeight, arcShapeFor, ARC_FEEL, flightControl, flightGround, flightParamAt, type FlightProfile } from './flight';
 
 /**
  * What lives inside a tent (GS-tent-interactions). A ball that bonks a tent triggers its effect the
@@ -204,7 +204,7 @@ export interface TentHit {
   dir: Vec;
   /** Carry (yards) to the impact. */
   carry: number;
-  /** Flight fraction at impact (0..1). */
+  /** Fraction of the GROUND carry covered at impact (0..1). */
   t: number;
 }
 
@@ -234,13 +234,14 @@ export function tentFlightHit(
   if (!near.length) return null;
 
   const control = flightControl(from, landing, bearingDeg);
-  const apex = arcApex(carry, nominalCarry, ARC_FEEL, profile.peakMult);
-  const apexT = flightApexT(profile);
+  const apex = arcApex(carry, nominalCarry, ARC_FEEL, profile);
+  const shape = arcShapeFor(profile);
   let prev = from;
+  // Walked in GROUND fraction, exactly like `flightBlockedBy` — same arc, same samples (contract 5).
   for (let i = 1; i <= steps; i++) {
     const t = i / steps;
-    const pos = flightGround(from, control, landing, t);
-    const h = arcHeight(apex, t, apexT);
+    const pos = flightGround(from, control, landing, flightParamAt(t));
+    const h = arcHeight(apex, t, shape);
     for (const tent of near) {
       // Inside the footprint AND below the roof there → a clip. Use the segment's nearer point so the
       // impact reads as the near roof face.

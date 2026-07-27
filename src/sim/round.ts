@@ -1189,7 +1189,7 @@ export function executeShot(
     knockedDown = true;
     result.landing = kd.point;
     result.carry = kd.carry;
-    result.apex = arcApex(kd.carry, nominalCarry, ARC_FEEL, flight.peakMult);
+    result.apex = arcApex(kd.carry, nominalCarry, ARC_FEEL, flight);
   }
 
   // Trade-camp tent ricochet (GS-tents): if NOT already knocked into the woods, a low/flat shot whose
@@ -1206,7 +1206,7 @@ export function executeShot(
     if (tentHit) {
       result.landing = tentHit.point;
       result.carry = tentHit.carry;
-      result.apex = arcApex(tentHit.carry, nominalCarry, ARC_FEEL, flight.peakMult);
+      result.apex = arcApex(tentHit.carry, nominalCarry, ARC_FEEL, flight);
     }
   }
   // The MARMOT tent (GS-tent-interactions) is the one exception to "tents are non-penalty": the marmot
@@ -1231,7 +1231,7 @@ export function executeShot(
     if (safe) {
       result.landing = safe;
       result.carry = dist(from, safe);
-      result.apex = arcApex(result.carry, nominalCarry, ARC_FEEL, flight.peakMult);
+      result.apex = arcApex(result.carry, nominalCarry, ARC_FEEL, flight);
     }
   }
 
