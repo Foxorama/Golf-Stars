@@ -875,7 +875,7 @@ export function resolveShot(input: ShotInput): ShotResult {
     shotBearing,
     wind: w,
     intended,
-    apex: arcApex(carry, nominal, ARC_FEEL, flightProfileOf(club.id).peakMult),
+    apex: arcApex(carry, nominal, ARC_FEEL, flightProfileOf(club.id)),
     redirect,
   };
 }

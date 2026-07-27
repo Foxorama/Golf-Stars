@@ -73,8 +73,8 @@ describe('GS-ship-walls — the bulkhead is un-clearable, and the ROLLING ricoch
     for (const club of ['SW', 'PW', '9i', 'D'] as const) {
       const p = flightProfileOf(club);
       // Apex of a full shot of this family, at the most-lofted (shortest-relative) carry there is.
-      expect(arcApex(60, 240, ARC_FEEL, p.peakMult)).toBeLessThan(WALL_HEIGHT);
-      expect(arcApex(240, 240, ARC_FEEL, p.peakMult)).toBeLessThan(WALL_HEIGHT);
+      expect(arcApex(60, 240, ARC_FEEL, p)).toBeLessThan(WALL_HEIGHT);
+      expect(arcApex(240, 240, ARC_FEEL, p)).toBeLessThan(WALL_HEIGHT);
     }
   });
 

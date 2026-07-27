@@ -449,17 +449,45 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     drawn arc: 75% of the ground covered in the first HALF of the animation, 99% by t=0.9, touchdown at
     **2% of average speed**. The ball rocketed off the club and floated down, and every downstream
     number inherited it — the run-out chain starts from the measured arrival speed, so it was faithfully
-    continuous from a broken one. `flightT(u)` maps animation time to the parameter for near-constant
-    GROUND speed (tapering only as far as `flightDragTaper` — a drive loses a third of its horizontal
-    speed, not all of it); arrival speed went 0.0067 → 0.28 yd/ms. The drawn PATH is untouched: the same
-    `t` still feeds ground AND `arcHeight`, so every (ground, height) pair the sim's knockdown walk tests
-    is one the renderer draws (contract 5). `samplePolylineFlight` is exempt — it already walked by arc
-    length, i.e. it was already right.
+    continuous from a broken one. `flightGroundAt(u)` spends the animation clock so the GROUND advances
+    at a near-constant rate (tapering only as far as `flightDragTaper` — a drive loses a third of its
+    horizontal speed, not all of it); arrival speed went 0.0067 → 0.28 yd/ms. Pure pacing: the PATH is
+    untouched. `samplePolylineFlight` is exempt — it already walked by arc length, i.e. it was already
+    right.
+  - **HEIGHT IS A FUNCTION OF GROUND COVERED, NEVER OF THE CURVE'S PARAMETER** (GS-flight-shape). Ground
+    and height were on two different clocks — the Bézier's forward progress is `2t − t²` and STOPS DEAD
+    at t=1, so as `t→1` the terminal descent angle went to a literal **90°**. A drive glided from its
+    apex to 90% of its carry at under 2°, then fell 16.6yd over the last 23: *"it looks buggy as heck,
+    not like a real ball flight"*, and the reason GS-landing-real had to dodge "a near-vertical tangent
+    artefact". `arcHeight(apex, g, shape)` now takes the GROUND fraction and `flightGroundFrac`/
+    `flightParamAt` are the ONE place the two are converted — every walker (sim knockdown, tents, the
+    aim overlay's blocked cone, the play animation) works in ground. The arc is two cubic legs pinned at
+    both ends in value AND slope: a near-straight lift-supported climb to the apex, then a steepening
+    fall onto a real descent angle. Guarded by `tests/flight.test.ts`; eyes-on `scripts/flight-preview.mjs`.
+  - **A FAMILY DECLARES THREE PHYSICAL LEVERS AND EVERYTHING ELSE IS DERIVED** (GS-flight-shape,
+    `FLIGHT_PROFILES`): `apexAt`, `dropRatio` (`tan(descent)/tan(launch)`, the drag signature) and
+    `launchTrimDeg` on the global loft ramp (`ARC_FEEL`, 11° at 250yd → 27° at 40yd, CURVED by
+    `loftCurve` because real launch barely moves across the long clubs). **Apex is NEVER declared** —
+    a drag-free projectile peaks at `tan(θ)/4` of its range and a spinning ball beats that by a steady
+    `liftGain` 2.35 (tour driver 2.36×, tour PW 2.33×), so a row cannot be handed a launch angle its
+    apex contradicts. The shape coefficients derive from the same relation with carry AND apex
+    cancelling (`rise = 4·apexAt/liftGain`), which is why the shape is a per-FAMILY constant. Two rules
+    the old table had backwards: **the FLATTER club peaks LATER** (driver 0.66, wedge 0.56 — the legs
+    split the ground in proportion to how shallow each is), and a LINEAR loft ramp puts the highest ball
+    flight in the bag on the HYBRIDS (a 181yd 3-hybrid launched 17.3° and out-flew the driver; a test
+    now forbids any club out-flying it). Bag: driver 11°/31yd/38° down · 6i 16.5°/26yd/49° · SW
+    26°/21yd/57°. Retuning a row is a physics change (re-run the harness, contract 4) — this pass moved
+    it 0.5139 → **0.6319** toPar/hole and 5.66% → **8.09%** floor-hits, both inside their fences, no
+    fence moved: a ball that genuinely comes down lets the trees short of a green defend it (knockdowns
+    15.72% → 19.03%, entirely in the wooded worlds).
   - **THE LANDING IS BUILT FROM THE FLIGHT, NOT A CLASS LOOKUP** (GS-landing-real, `render/runout.ts`
     `Landing`). A hop's LENGTH scales with `carry·cos²(descent)` and its APEX with `carry·sin²(descent)`,
-    so how far it flew and how steeply it fell decide the landing: driver 36° down skips 12yd six times,
-    a wedge at 62° pops once. Descent is measured off the drawn arc over the closing TENTH of the ground
-    (the last 1% has a near-vertical tangent artefact). Three rules: **every airborne shot bounces at
+    so how far it flew and how steeply it fell decide the landing: driver 38° down skips 12yd six times,
+    a wedge at 57° pops once. Descent is `arrivalAngleDeg` — the fall leg's EXACT terminal slope, off the
+    same shared geometry, so it stays honest for a clamped apex, a partial swing and the derelict's
+    pinball polyline alike (it replaced a chord over the closing tenth, a workaround for the vertical
+    tangent GS-flight-shape deleted; that chord under-read a driver by 3° and a wedge by 9°, and
+    re-honesting it forced `hopDrawBoost` 5 → 5.4 to keep the scoring clubs' bounce visible). Three rules: **every airborne shot bounces at
     least once** (wedges planned ZERO hops before — their run is shorter than the old length floor);
     **the hop train can never outrun the sim** (capped so a closing roll always remains, and since the
     sim's own `dist` collapses on soft ground the surface kills the bounce through the physics); and

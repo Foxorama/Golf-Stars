@@ -36,8 +36,8 @@ const html = `<!doctype html><meta charset="utf8">
   import { planRunout, sampleRunout, DEFAULT_RUNOUT_FEEL } from '/src/render/runout.ts';
   import { drawBall, drawBallShadow, ballRadiusPx, advanceRollPhase, BALL_SKINS } from '/src/render/ball.ts';
   import { CLUBS } from '/src/sim/clubs.ts';
-  import { flightProfileOf, arcApex, ARC_FEEL, flightApexT } from '/src/sim/flight.ts';
-  import { sampleCurvedFlight, flightDurationMs, flightT } from '/src/render/trajectory.ts';
+  import { flightProfileOf, arcApex, ARC_FEEL, arcShapeOf, arrivalAngleDeg } from '/src/sim/flight.ts';
+  import { sampleCurvedFlight, flightDurationMs, flightGroundAt } from '/src/render/trajectory.ts';
 
   const ctx = document.getElementById('c').getContext('2d');
   ctx.fillStyle = '#2f6f3a'; ctx.fillRect(0,0,${W},${H});
@@ -46,16 +46,14 @@ const html = `<!doctype html><meta charset="utf8">
   // What the play view measures off the drawn arc at touchdown.
   function arrival(club) {
     const pr = flightProfileOf(club.id);
-    const apex = arcApex(club.carry, club.carry, ARC_FEEL, pr.peakMult);
-    const apexT = flightApexT(pr);
+    const apex = arcApex(club.carry, club.carry, ARC_FEEL, pr);
+    const shape = arcShapeOf(club.id);
     const from=[0,0], land=[0,club.carry];
     const dur = flightDurationMs(club.carry);
-    const a = sampleCurvedFlight(from,land,0,flightT(1-0.02),apex,apexT).ground;
-    const b = sampleCurvedFlight(from,land,0,flightT(1),apex,apexT).ground;
+    const a = sampleCurvedFlight(from,land,0,flightGroundAt(1-0.02),apex,shape).ground;
+    const b = sampleCurvedFlight(from,land,0,flightGroundAt(1),apex,shape).ground;
     const v0 = Math.hypot(b[0]-a[0],b[1]-a[1]) / Math.max(1, 0.02*dur);
-    const s = sampleCurvedFlight(from,land,0,flightT(1-0.12),apex,apexT);
-    const g = Math.hypot(land[0]-s.ground[0], land[1]-s.ground[1]);
-    return { v0, descentDeg: (Math.atan2(s.height, Math.max(0.5,g))*180)/Math.PI, carry: club.carry };
+    return { v0, descentDeg: arrivalAngleDeg(apex, club.carry, shape), carry: club.carry };
   }
 
   const HEIGHT_EXAG = 0.55;   // playView's heightExaggeration

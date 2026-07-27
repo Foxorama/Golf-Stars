@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { samplePolylineFlight } from '../src/render/trajectory';
+import { NEUTRAL_ARC, arcShapeOf } from '../src/sim/flight';
 import type { Vec } from '../src/sim/course/contract';
 
 // GS-ship-pinball-flight: the renderer walks the sim's stored reflected polyline BY ARC LENGTH, so the ball
@@ -23,10 +24,17 @@ describe('samplePolylineFlight — walks a reflected polyline by arc length', ()
     expect(samplePolylineFlight(path, 0.75, 40).ground).toEqual([100, 50]);
   });
 
-  it('height is the family arc — 0 at the ends, the apex mid-flight', () => {
+  it('height is the family arc — 0 at the ends, the apex at the family apex position', () => {
     expect(samplePolylineFlight(path, 0, 40).height).toBeCloseTo(0, 6);
     expect(samplePolylineFlight(path, 1, 40).height).toBeCloseTo(0, 6);
-    expect(samplePolylineFlight(path, 0.5, 40).height).toBeCloseTo(40, 6);
+    // Arc-length fraction IS ground fraction, so the family profile applies unchanged: the peak sits
+    // where the club peaks, not at the halfway vertex.
+    expect(samplePolylineFlight(path, NEUTRAL_ARC.apexAt, 40).height).toBeCloseTo(40, 6);
+    const wedge = arcShapeOf('SW');
+    expect(samplePolylineFlight(path, wedge.apexAt, 40, wedge).height).toBeCloseTo(40, 6);
+    expect(samplePolylineFlight(path, 0.95, 40, wedge).height).toBeLessThan(
+      samplePolylineFlight(path, 0.95, 40, arcShapeOf('D')).height,
+    );
   });
 
   it('a degenerate 1-point path returns that point (no crash)', () => {

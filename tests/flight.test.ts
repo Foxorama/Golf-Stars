@@ -2,8 +2,15 @@ import { describe, it, expect } from 'vitest';
 import {
   arcApex,
   arcHeight,
+  arcShapeFor,
+  arcShapeOf,
+  arrivalAngleDeg,
+  launchAngleDeg,
+  descentAngleDeg,
+  apexFractionOf,
   ARC_FEEL,
-  flightApexT,
+  flightGroundFrac,
+  flightParamAt,
   flightClassOf,
   flightControl,
   flightGround,
@@ -31,7 +38,7 @@ function blob(c: Vec, r: number): Vec[] {
   ];
 }
 
-describe('arc apex (loft-scaled)', () => {
+describe('arc apex (derived from the launch angle)', () => {
   it('scales with carry and is clamped', () => {
     expect(arcApex(10, 250)).toBe(4); // tiny carry → floor
     expect(arcApex(99999, 250)).toBe(60); // huge → ceiling
@@ -39,15 +46,153 @@ describe('arc apex (loft-scaled)', () => {
   });
 
   it('a lofted (short) club flies relatively higher than a long club for the same carry', () => {
-    // Same carry, but the short-club fraction is higher → a balloon vs a borer.
+    // Same carry, but the short club launches steeper → a balloon vs a borer.
     expect(arcApex(120, 70)).toBeGreaterThan(arcApex(120, 250));
   });
 
-  it('arcHeight defaults to the classic parabola peaking at midflight, zero at the ends', () => {
-    expect(arcHeight(30, 0)).toBeCloseTo(0, 6);
-    expect(arcHeight(30, 1)).toBeCloseTo(0, 6);
-    expect(arcHeight(30, 0.5)).toBeCloseTo(30, 6);
-    expect(arcHeight(30, 0.25)).toBeCloseTo(Math.sin(Math.PI * 0.25) * 30, 6); // = sin(πt) exactly
+  it('APEX IS NOT DECLARED — it is the launch angle inflated by lift (GS-flight-shape)', () => {
+    // The one relation the whole model hangs off: a drag-free projectile peaks at tan(θ)/4 of its
+    // range, and a spinning ball beats that by `liftGain`. If these ever disagree, some row has been
+    // handed an apex its launch angle cannot produce.
+    for (const c of CLUBS) {
+      const p = flightProfileOf(c.id);
+      const want = (Math.tan((launchAngleDeg(p, c.carry) * Math.PI) / 180) / 4) * ARC_FEEL.liftGain;
+      expect(apexFractionOf(p, c.carry)).toBeCloseTo(want, 12);
+      const apex = arcApex(c.carry, c.carry, ARC_FEEL, p);
+      if (apex > ARC_FEEL.peakMin && apex < ARC_FEEL.peakMax) expect(apex / c.carry).toBeCloseTo(want, 9);
+    }
+  });
+
+  it('the whole bag launches, peaks and lands on REAL golf numbers', () => {
+    // Reference bands, not point values — the table is allowed to be tuned inside them.
+    const bands: Record<string, { launch: [number, number]; apex: [number, number]; descent: [number, number] }> = {
+      D: { launch: [9, 13], apex: [27, 35], descent: [35, 41] },
+      '3W': { launch: [9, 14], apex: [26, 34], descent: [36, 43] },
+      '3H': { launch: [13, 17], apex: [25, 33], descent: [42, 49] },
+      '6i': { launch: [15, 19], apex: [22, 30], descent: [45, 52] },
+      '9i': { launch: [18, 23], apex: [21, 29], descent: [48, 55] },
+      PW: { launch: [20, 26], apex: [20, 30], descent: [48, 56] },
+      SW: { launch: [23, 29], apex: [16, 26], descent: [52, 60] },
+    };
+    for (const [id, band] of Object.entries(bands)) {
+      const club = CLUBS.find((c) => c.id === id)!;
+      const p = flightProfileOf(id);
+      const carry = club.carry * flightCarryScale(id, club.carry);
+      const launch = launchAngleDeg(p, club.carry);
+      const apex = arcApex(carry, club.carry, ARC_FEEL, p);
+      const descent = descentAngleDeg(p, club.carry);
+      expect(launch, `${id} launch`).toBeGreaterThanOrEqual(band.launch[0]);
+      expect(launch, `${id} launch`).toBeLessThanOrEqual(band.launch[1]);
+      expect(apex, `${id} apex`).toBeGreaterThanOrEqual(band.apex[0]);
+      expect(apex, `${id} apex`).toBeLessThanOrEqual(band.apex[1]);
+      expect(descent, `${id} descent`).toBeGreaterThanOrEqual(band.descent[0]);
+      expect(descent, `${id} descent`).toBeLessThanOrEqual(band.descent[1]);
+    }
+  });
+
+  it('NO CLUB OUT-FLIES THE DRIVER: the loft ramp is curved, not linear (GS-flight-shape)', () => {
+    // A linear ramp gave a 181yd hybrid a 17° launch and the highest ball flight in the bag. Every
+    // club's apex must sit at or under the driver's, and the long clubs must launch within a few
+    // degrees of it rather than fanning out.
+    const dP = flightProfileOf('D');
+    const dApex = arcApex(250 * flightCarryScale('D', 250), 250, ARC_FEEL, dP);
+    for (const c of CLUBS) {
+      if (c.id === 'putter') continue;
+      const p = flightProfileOf(c.id);
+      const apex = arcApex(c.carry * flightCarryScale(c.id, c.carry), c.carry, ARC_FEEL, p);
+      expect(apex, `${c.id} apex vs driver`).toBeLessThanOrEqual(dApex + 1e-9);
+      if (c.carry >= 165) expect(launchAngleDeg(p, c.carry), `${c.id} launch`).toBeLessThan(17);
+    }
+  });
+});
+
+describe('the arc SHAPE — height against GROUND covered (GS-flight-shape)', () => {
+  const SHAPES = Object.values(FLIGHT_PROFILES).map((p) => arcShapeFor(p));
+
+  it('is anchored: zero at both ends, exactly the apex at apexAt, and it peaks ONCE', () => {
+    for (const sh of SHAPES) {
+      expect(arcHeight(30, 0, sh)).toBeCloseTo(0, 9);
+      expect(arcHeight(30, 1, sh)).toBeCloseTo(0, 9);
+      expect(arcHeight(30, sh.apexAt, sh)).toBeCloseTo(30, 9);
+      // Strictly up to the apex, strictly down after it — no hover, no second bump.
+      let prev = -1;
+      for (let i = 0; i <= 400; i++) {
+        const g = i / 400;
+        const h = arcHeight(30, g, sh);
+        if (g <= sh.apexAt) expect(h).toBeGreaterThan(prev - 1e-9);
+        else expect(h).toBeLessThan(prev + 1e-9);
+        prev = h;
+      }
+    }
+  });
+
+  it('THE BALL DOES NOT DROP OUT OF THE SKY: the descent steepens smoothly to its arrival angle', () => {
+    // The old model sampled height at the CURVE PARAMETER while the ground ran as 2t−t², so the last
+    // few yards of ground had a third of the parameter left to spend: a driver glided at under 2° for
+    // 68yd and then fell at 47°. The regression that catches it is the RATIO of the closing slope to
+    // the one before it — a plummet shows up as a step change, not as a wrong angle.
+    for (const id of ['D', '3W', '3H', '6i', 'PW']) {
+      const club = CLUBS.find((c) => c.id === id)!;
+      const p = flightProfileOf(id);
+      const carry = club.carry * flightCarryScale(id, club.carry);
+      const apex = arcApex(carry, club.carry, ARC_FEEL, p);
+      const sh = arcShapeOf(id);
+      const slopeAt = (g: number): number => {
+        const d = 0.01;
+        return ((arcHeight(apex, g - d, sh) - arcHeight(apex, g + d, sh)) / (2 * d * carry) / Math.PI) * 180;
+      };
+      let prev = 0;
+      for (let g = sh.apexAt + 0.05; g <= 0.995; g += 0.05) {
+        const s = slopeAt(g);
+        expect(s, `${id} descending at ${g.toFixed(2)}`).toBeGreaterThan(prev - 1e-9);
+        prev = s;
+      }
+      const descent = descentAngleDeg(p, club.carry);
+      // It finishes at exactly the family's real descent angle…
+      expect(arrivalAngleDeg(apex, carry, sh)).toBeCloseTo(descent, 6);
+      // …and it ARRIVES there, rather than snapping to it. The chord over the closing 5% of ground
+      // is within a hair of the true tangent; on the old arc a driver's was 47° against a 35° run-in,
+      // which is exactly what "drops out of the air" looks like as a number.
+      const chord = (Math.atan2(arcHeight(apex, 0.95, sh), 0.05 * carry) / Math.PI) * 180;
+      expect(chord / descent, `${id} closing chord vs true descent`).toBeGreaterThan(0.85);
+      expect(chord / descent, `${id} closing chord vs true descent`).toBeLessThan(1.02);
+      // And most of the height is gone before the last stretch — the old model still had 71% of a
+      // driver's apex left to shed at 90% of the ground, and 42% of it at 97%.
+      expect(arcHeight(apex, 0.9, sh) / apex, `${id} height left at 90%`).toBeLessThan(0.6);
+      expect(arcHeight(apex, 0.97, sh) / apex, `${id} height left at 97%`).toBeLessThan(0.25);
+    }
+  });
+
+  it('the shape is a per-FAMILY constant — the carry and the apex both cancel out', () => {
+    const sh = arcShapeOf('D');
+    expect(arrivalAngleDeg(30, 250, sh)).toBeCloseTo(arrivalAngleDeg(30, 250, arcShapeFor(FLIGHT_PROFILES.driver)), 9);
+    // Halving the carry at the same apex doubles the tangent of the arrival angle (the ball comes
+    // down over half the ground) — the shape did not change, only what it is drawn across.
+    const a = Math.tan((arrivalAngleDeg(30, 250, sh) * Math.PI) / 180);
+    const b = Math.tan((arrivalAngleDeg(30, 125, sh) * Math.PI) / 180);
+    expect(b / a).toBeCloseTo(2, 6);
+  });
+
+  it('a lift-supported climb: every family rises in very nearly a straight line', () => {
+    // `rise` is the launch slope as a multiple of the climb's average. 1 = straight, 2 = a thrown
+    // stone. A golf ball is held up by its own backspin, so the whole bag sits close to 1.
+    for (const sh of SHAPES) {
+      expect(sh.rise).toBeGreaterThan(0.85);
+      expect(sh.rise).toBeLessThan(1.25);
+      // …and it comes down harder than it went up, which is what drag does.
+      expect(sh.fall).toBeGreaterThan(sh.rise * 1.8);
+      expect(sh.fall).toBeLessThan(2.95);
+    }
+  });
+
+  it('ground fraction and curve parameter are inverses, and are NOT the same number', () => {
+    for (let i = 0; i <= 20; i++) {
+      const g = i / 20;
+      expect(flightGroundFrac(flightParamAt(g))).toBeCloseTo(g, 9);
+    }
+    // The curve is three-quarters done in ground by its half-way parameter — the whole reason height
+    // must be indexed by ground.
+    expect(flightGroundFrac(0.5)).toBeCloseTo(0.75, 9);
   });
 });
 
@@ -108,27 +253,26 @@ describe('per-family flight profiles (GS-flight-3)', () => {
   });
 
   it('a hybrid flies higher than a wood of the same carry (the rescue-club identity)', () => {
-    expect(arcApex(180, 181, ARC_FEEL, FLIGHT_PROFILES.hybrid.peakMult)).toBeGreaterThan(
-      arcApex(180, 181, ARC_FEEL, FLIGHT_PROFILES.wood.peakMult),
+    expect(arcApex(180, 181, ARC_FEEL, FLIGHT_PROFILES.hybrid)).toBeGreaterThan(
+      arcApex(180, 181, ARC_FEEL, FLIGHT_PROFILES.wood),
+    );
+    expect(FLIGHT_PROFILES.hybrid.launchTrimDeg).toBeGreaterThan(FLIGHT_PROFILES.wood.launchTrimDeg);
+  });
+
+  it('a driver bores; a wedge towers — at the SAME carry, off the launch ramp', () => {
+    expect(arcApex(200, 250, ARC_FEEL, FLIGHT_PROFILES.driver)).toBeLessThan(
+      arcApex(200, 90, ARC_FEEL, FLIGHT_PROFILES.wedge),
     );
   });
 
-  it('a driver bores lower than the neutral ramp; a wedge towers above it', () => {
-    expect(arcApex(200, 250, ARC_FEEL, FLIGHT_PROFILES.driver.peakMult)).toBeLessThan(arcApex(200, 250));
-    expect(arcApex(90, 90, ARC_FEEL, FLIGHT_PROFILES.wedge.peakMult)).toBeGreaterThan(arcApex(90, 90));
-  });
-
-  it('apex position: a wedge peaks later along the ground than a driver; every arc stays anchored', () => {
-    const dT = flightApexT(FLIGHT_PROFILES.driver);
-    const wT = flightApexT(FLIGHT_PROFILES.wedge);
-    expect(wT).toBeGreaterThan(dT);
-    for (const T of [dT, wT]) {
-      expect(arcHeight(30, 0, T)).toBeCloseTo(0, 6);
-      expect(arcHeight(30, 1, T)).toBeCloseTo(0, 6);
-      expect(arcHeight(30, T, T)).toBeCloseTo(30, 6); // the peak sits exactly at apexT
-      expect(arcHeight(30, T - 0.05, T)).toBeLessThan(30);
-      expect(arcHeight(30, T + 0.05, T)).toBeLessThan(30);
-    }
+  it('THE FLATTER CLUB PEAKS LATER along the ground (GS-flight-shape)', () => {
+    // A driver climbs at ~11° and lands at ~38°, so it is still going up two thirds of the way; a
+    // wedge climbs at ~25° and lands at ~53°, so it is over the top well before that. The table used
+    // to have this exactly backwards.
+    expect(FLIGHT_PROFILES.driver.apexAt).toBeGreaterThan(FLIGHT_PROFILES.ironShort.apexAt);
+    expect(FLIGHT_PROFILES.ironShort.apexAt).toBeGreaterThan(FLIGHT_PROFILES.wedge.apexAt);
+    // …and the steeper-landing club arrives at a genuinely bigger angle.
+    expect(descentAngleDeg(FLIGHT_PROFILES.wedge, 74)).toBeGreaterThan(descentAngleDeg(FLIGHT_PROFILES.driver, 250) + 10);
   });
 });
 
@@ -196,8 +340,11 @@ describe('tree canopy + knockdown (arc height matters)', () => {
   });
 
   it('ARC HEIGHT decides it: a lofted approach clears a guarding tree a low borer would clip', () => {
-    // Same target + same tree guarding the front of the green; only the arc differs.
-    const hole = treeAt([0, 90], 3);
+    // Same target + same tree guarding the approach; only the arc differs. The tree sits at 70 of a
+    // 100yd shot — under the wedge's apex, and still on the driver's flat climb. (It used to sit at
+    // 90, i.e. ten yards short of the flag: with a real descent profile BOTH clubs are on their way
+    // down through a canopy there, which is correct golf, not a loft test.)
+    const hole = treeAt([0, 70], 3);
     const lofted = flightKnockdown(hole, [0, 0], [0, 100], 0, 100, 106, flightProfileOf('PW')); // balloons up & over
     const borer = flightKnockdown(hole, [0, 0], [0, 100], 0, 100, 250, flightProfileOf('D')); // a flat low strike: clipped
     expect(lofted).toBeNull();

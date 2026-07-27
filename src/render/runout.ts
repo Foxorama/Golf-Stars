@@ -98,6 +98,16 @@ export interface RunoutFeel {
    * the ball appears to bounce vertically off the turf rather than skip along it. 1.8x lifts the
    * first hop about eight pixels clear of its shadow at the shot camera, which is enough to read as
    * air, and keeps the skip looking like a skip.
+   *
+   * RE-CALIBRATED BY GS-flight-shape, because it was fitted against arrival angles that were an
+   * ARTEFACT. The old arc dropped the ball on a near-vertical tangent, so the closing-tenth chord the
+   * run-out sampled read a 7-iron in at 55° and a sand wedge at 62°. The honest tangents are 50° and
+   * 57° — the driver got 2.5° STEEPER (35.4° → 37.9°) while every scoring club got 5–6° flatter, and
+   * since the drawn ratio follows `tan(descent)`, the one constant that was rescuing the short clubs
+   * quietly stopped: full-swing invisible bounces went 0 → 2 (a 141yd 7-iron into a soft green fell to
+   * 2.9px under a 3px ball). 5 → 5.4 puts every shot at 0.7 power and above back over the floor on
+   * both firmnesses, and leaves the driver's drawn skip at 1:1.7 — still a skip, with room before the
+   * 1:1.4 line. Measured by `scripts/runout-frames.ts`, not guessed.
    */
   hopDrawBoost: number;
   /** How much a shot's deterministic variation may stretch a hop train (±). Without it every drive
@@ -165,7 +175,7 @@ export const DEFAULT_RUNOUT_FEEL: RunoutFeel = {
   minAirCarry: 12,
   rollMinShare: 0.3,
   holedEndSpeed: 0.45,
-  hopDrawBoost: 5,
+  hopDrawBoost: 5.4,
   varyLen: 0.22,
   varyApex: 0.3,
   creepPauseMs: 260,

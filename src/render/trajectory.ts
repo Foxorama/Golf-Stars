@@ -8,9 +8,10 @@
  */
 
 import type { Vec } from '../sim/course/contract';
-import { flightControl, flightGround, arcHeight } from '../sim/flight';
+import { flightControl, flightGround, flightParamAt, arcHeight, NEUTRAL_ARC, type ArcShape } from '../sim/flight';
 
-export { flightControl, flightGround, arcHeight } from '../sim/flight';
+export { flightControl, flightGround, flightParamAt, flightGroundFrac, arcHeight, arcShapeOf, arrivalAngleDeg } from '../sim/flight';
+export type { ArcShape } from '../sim/flight';
 
 export interface FlightFeel {
   /** Min/max flight animation duration (ms). */
@@ -50,47 +51,42 @@ export function flightDurationMs(carry: number, feel: FlightFeel = DEFAULT_FLIGH
 }
 
 /**
- * Animation progress → the flight curve's Bézier PARAMETER (GS-flight-pace).
+ * Animation progress → the fraction of its GROUND the ball has covered (GS-flight-pace).
  *
- * The drawn flight is a quadratic Bézier, and `flightControl` puts the control point at the landing's
- * projection onto the shot bearing — so for a shot that finishes ON its line (the overwhelming
- * majority) the control point sits exactly ON the landing and the curve degenerates to
+ * Progress through the animation is not progress along the shot: a real drive leaves the clubface
+ * far faster than it arrives, so a ball drawn at constant ground speed reads as floating and one
+ * drawn on the curve's own parameter (`2t − t²`, see `flightGroundFrac`) is worse still — it covers
+ * 75% of its ground in the first HALF of the animation, 99% by t = 0.9, and touches down at 2% of
+ * its average speed. It rockets off the club and hangs, which is the opposite of a struck golf ball.
  *
- *     P(t) = from + (2t − t²)·(landing − from)
- *
- * whose ground speed is `2(1 − t)`: **twice the average at the strike and exactly ZERO at the
- * landing**. Measured on the drawn arc, the ball covers 75% of its ground in the first HALF of the
- * animation, 99% by t = 0.9, and then hangs almost stationary in the air for the final tenth before
- * touching down at 2% of its average speed. It rockets off the club and floats down — the opposite of
- * a struck golf ball, and the biggest single reason the shot did not feel like one.
- *
- * It also poisoned everything downstream: the run-out chain starts from the ball's measured arrival
- * speed (GS-runout-feel's "no velocity step from strike to rest"), and that speed was being measured
- * at the bottom of this collapse. The chain was faithfully continuous from a broken number.
- *
- * This maps animation time to the parameter so the GROUND advances at a near-constant rate, tapering
- * only as far as drag would take it (`flightDragTaper` — a real drive loses roughly a third of its
- * horizontal speed between launch and landing, not all of it). The drawn PATH is untouched: the same
- * `t` still feeds both the ground and `arcHeight`, so every (ground, height) pair the sim's knockdown
- * walk tests is a pair the renderer still draws — contract 5 holds exactly. Only the pacing changes.
+ * This spends the animation clock so the ground advances under a linear speed ramp, tapering only as
+ * far as drag would take it (`flightDragTaper` — a drive loses roughly a third of its horizontal
+ * speed between launch and landing, not all of it). Pure pacing: the PATH is untouched, and both the
+ * height and the ground position are read off the ground fraction this returns, so every (ground,
+ * height) pair the sim's knockdown walk tests is one the renderer draws — contract 5 holds exactly.
  *
  * `samplePolylineFlight` (the derelict's pinball flight) deliberately does NOT go through this: it
  * already walks its path by ARC LENGTH, which is to say it was already right.
  */
-export function flightT(u: number, feel: FlightFeel = DEFAULT_FLIGHT_FEEL): number {
+export function flightGroundAt(u: number, feel: FlightFeel = DEFAULT_FLIGHT_FEEL): number {
   const uu = u < 0 ? 0 : u > 1 ? 1 : u;
   const taper = Math.max(0.05, Math.min(1, feel.flightDragTaper));
   // Ground fraction under a linear speed ramp from 1 to `taper`, normalised to unit mean.
   const c = 1 / (1 - (1 - taper) / 2);
-  const g = Math.min(1, c * (uu - ((1 - taper) * uu * uu) / 2));
-  // …and invert the Bézier's own ground fraction, 2t − t², to reach it.
-  return 1 - Math.sqrt(Math.max(0, 1 - g));
+  return Math.min(1, c * (uu - ((1 - taper) * uu * uu) / 2));
+}
+
+/** Animation progress → the flight curve's Bézier PARAMETER: `flightGroundAt` put through the
+ *  ground↔parameter conversion. Only the curve evaluation wants this; everything else works in
+ *  ground fraction. */
+export function flightT(u: number, feel: FlightFeel = DEFAULT_FLIGHT_FEEL): number {
+  return flightParamAt(flightGroundAt(u, feel));
 }
 
 export interface FlightSample {
   /** Ground position in course-space (yards), linear from→landing. */
   ground: Vec;
-  /** Height above the ground (yards), a sine parabola peaking at t=0.5. */
+  /** Height above the ground (yards). */
   height: number;
 }
 
@@ -104,36 +100,39 @@ export function sampleFlight(from: Vec, landing: Vec, t: number, peak: number): 
 }
 
 /**
- * Sample the CURVED flight at progress `t`: the ground follows a quadratic Bézier that launches
- * along the shot bearing and curves to the landing (the fade/hook banana), and the height follows
- * the family-shaped arc whose apex the SIM resolved (`shot.result.apex`; `apexT` is the club
- * family's peak position — `flightApexT(flightProfileOf(club.id))`, GS-flight-3, defaulting to the
- * classic symmetric arc). Both come from the shared `sim/flight` geometry, so the ball the player
- * watches tower/bore + clear/clip a tree is exactly the ball the sim computed. Pure.
+ * Sample the CURVED flight once the ball has covered ground fraction `g` of its carry: the ground
+ * follows a quadratic Bézier that launches along the shot bearing and curves to the landing (the
+ * fade/hook banana), and the height follows the club family's real flight profile scaled to the apex
+ * the SIM resolved (`shot.result.apex`; `shape` is `arcShapeOf(club.id)`, GS-flight-shape). Both come
+ * from the shared `sim/flight` geometry, so the ball the player watches tower/bore + clear/clip a
+ * tree is exactly the ball the sim computed.
+ *
+ * INDEXED BY GROUND, NOT BY THE CURVE'S PARAMETER — pass `flightGroundAt(u)`, never `flightT(u)`.
+ * Pure.
  */
 export function sampleCurvedFlight(
   from: Vec,
   landing: Vec,
   bearingDeg: number,
-  t: number,
+  g: number,
   apex: number,
-  apexT = 0.5,
+  shape: ArcShape = NEUTRAL_ARC,
 ): FlightSample {
-  const tt = Math.max(0, Math.min(1, t));
+  const gg = Math.max(0, Math.min(1, g));
   const control = flightControl(from, landing, bearingDeg);
-  return { ground: flightGround(from, control, landing, tt), height: arcHeight(apex, tt, apexT) };
+  return { ground: flightGround(from, control, landing, flightParamAt(gg)), height: arcHeight(apex, gg, shape) };
 }
 
 /**
  * Sample the ship-corridor PINBALL flight at progress `t`: the ground walks the STRAIGHT-segment polyline
  * the sim resolved (`shot.flightPath`, tee → each bulkhead ricochet → landing) BY ARC LENGTH, so the ball
- * tracks the exact reflected path the sim computed — the graphic IS the physics (contract 5). The height is
- * the same family-shaped arc as the banana, spanning the whole polyline (one rise-and-fall over the carom).
- * Used only on the derelict, where the flight cracks off metal instead of curving. Pure.
+ * tracks the exact reflected path the sim computed — the graphic IS the physics (contract 5). Arc-length
+ * fraction IS ground fraction, so `t` feeds the family flight profile directly (one rise-and-fall over the
+ * whole carom). Used only on the derelict, where the flight cracks off metal instead of curving. Pure.
  */
-export function samplePolylineFlight(path: Vec[], t: number, apex: number, apexT = 0.5): FlightSample {
+export function samplePolylineFlight(path: Vec[], t: number, apex: number, shape: ArcShape = NEUTRAL_ARC): FlightSample {
   const tt = Math.max(0, Math.min(1, t));
-  const height = arcHeight(apex, tt, apexT);
+  const height = arcHeight(apex, tt, shape);
   if (path.length < 2) return { ground: path[0] ?? [0, 0], height };
   let total = 0;
   for (let i = 1; i < path.length; i++) total += Math.hypot(path[i]![0] - path[i - 1]![0], path[i]![1] - path[i - 1]![1]);
