@@ -601,6 +601,92 @@ tapping the club like any other.
 
 ---
 
+## GS-hud-compass: the top bar becomes an instrument cluster (2026-07-27)
+
+The same pass, the other end of the screen. GS-hud-bag had taken the bottom bar from 148px to 66px;
+the top bar was now the biggest single piece of chrome on the play screen, at 112px of an 844px
+phone. The report named the problem exactly: *"in the main bar section we have hole/total holes, hole
+length, effective length, required points, hole fun facts, hole number then total holes with score
+icon, then score. We don't need all that duplication."* Plus: a weather compass top-left, the essential
+readouts centred, and — separately — *"we have 4 effective zoom options, min, +, -, max, then
+settings; let's combine all the zoom buttons into the min button."*
+
+### The bar
+
+Six rows became one row of PODS — a big value over a small all-caps caption, the same shape for every
+number on the bar — with the compass anchored left and the lie + placing on the line beneath:
+
+```
+╭────╮      5/9         347        13
+│ ↑9 │    PAR 4·338Y   Y TO PIN   OF 20 PTS
+╰────╯       🟢 Tee  ·  🏆 1st/20 · leading
+▪▪▪▪▫▫▫▫▫
+```
+
+**112px → 88px, and the map's clear band 50% → 80% of the screen** (with the GS-hud-bag bottom bar).
+
+What went where:
+
+| was | now |
+| --- | --- |
+| `⛳ 5/9` + `Par 4·450y` + `464y` as three separate spans | one HOLE pod (`5/9` over `par 4 · 338y`) + one HERO pod (the live yardage, the number you club off) |
+| `🌬 9 mph tailwind ⬆` — a whole row, direction as a rotated emoji | the compass dial |
+| `13/20 pts` chip + `🏆 1st/20` chip on their own row | the SCORE pod + the placing folded onto the lie line |
+| `🏌 Drivable` · `🌾 Broad fairway` | the TEE CARD (`introScreens.ts`) — deleted from the play bar, not hidden |
+
+The descriptors are the interesting deletion. They are briefing: fixed for the whole hole, and read
+before you play it. GS-a11y-tight-fit was already dropping them at large text sizes for exactly that
+reason, and CLAUDE.md already claimed they lived "on the tee card" — they didn't, so this pass made
+the claim true rather than throwing the content away.
+
+### Three rules worth keeping
+
+**A pod's width is FIXED, not a floor.** The hero pod's caption changes with the play state — "y to
+pin" while aiming, "in air" mid-flight — and "IN FLIGHT" is wider than "Y TO PIN", so the first build
+pushed the score pod onto a second row *the instant a shot was struck*. That is precisely the reflow
+GS-hud-frame exists to forbid, re-introduced by a `min-width` where a fixed width was needed. (The
+caption was also shortened to "in air", because the honest fix is to make the content fit the
+instrument, not the instrument fit the worst content.)
+
+**The needle reads against the SHOT bearing, and that is not a cosmetic choice.** `shot.ts` resolves
+head/tail/cross off the shot bearing, never the hole's, and the map is oriented down the aim line
+(GS-default-aim) — so a dial drawn against the same bearing is simultaneously what the physics does
+and what the player is looking at: needle up = the ball flies further, needle right = it gets pushed
+right, and it gets pushed right *on screen*. `windRead(hole, upBearing?)` takes the bearing as an
+OPTIONAL argument defaulting to the hole line, so the once-per-hole screen-reader narration
+(GS-a11y-announce), which is a briefing about the hole, is byte-for-byte unchanged.
+
+**Colour on the dial means one thing.** The play-direction index mark at 12 o'clock is deliberately
+neutral grey. It was green first, which put a green index mark next to a green tailwind needle — two
+different meanings wearing one colour. (It also started as a long tick *inside* the ring, where it
+merged with the needle head on every tailwind — the one reading it exists to disambiguate. It lives
+outside the ring now.)
+
+### The nav column: five buttons → two
+
+Whole-hole, ＋, －, recenter, settings — four controls for one axis, three of them redundant on a
+device that pinches. The whole-hole view is now a latching toggle exactly like the aim mode
+(`aria-pressed`, lit when on), and **leaving it resets zoom and pan**, which is the old ⌖ recenter
+folded in rather than dropped. Custom zoom is pinch on touch and ⌘/Ctrl-wheel on desktop.
+
+### One thing fixed on the way past
+
+The Stableford pod coloured itself by `cut − points`, which on the first tee is the whole cut — so
+every stop opened on a **red zero**, and the bigger pod made that read as failure before a ball was
+struck. It now colours by PACE: the pro-rata target for the holes actually played, neutral at zero
+holes. Same number, honest verdict.
+
+### Guards
+
+`tests/hud-topbar.test.ts`. Pure: the default hole-line read (so the narration can't drift), the
+shot-relative re-read, no ids in the dial, needle-vs-no-needle, and that the arrowhead's tip actually
+points where the wind pushes (up for a tailwind, right for a left-to-right cross). Browser: three pods
+on one row, the bar under 12% of the screen, the wind sentence gone from the visible text but alive in
+its `.gs-sr-only` twin, two nav buttons, the toggle latching — and the height identical between aiming
+and watching, which is the assertion that would have caught the reflow.
+
+---
+
 ## Migrated from CLAUDE.md — System-index bullets (2026-07-23 refactor)
 
 > These are the verbatim terse System-index bullets moved out of `CLAUDE.md` when it was

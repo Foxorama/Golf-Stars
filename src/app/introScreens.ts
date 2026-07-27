@@ -13,6 +13,7 @@
 
 import { btn, header, state } from './ctx';
 import { holeBiome, holeThemeId, rainbowActive, rarityFlavour } from './helpers';
+import type { Hole } from '../sim/course/contract';
 import { currentOpponentId, opponentScouting, teamDuel, teamFormatLabel, teamFormatRule, teamPartnerChar } from './duelHud';
 import { eventDescFor } from './travelScreens';
 import { difficultyPips, zoneProfile } from '../sim/course/zones';
@@ -371,6 +372,37 @@ export function introFieldOverlay(): string {
  * viewport-capped map so it holds one phone screen; "Tee Off" starts play, "Watch AI" auto-plays,
  * "Back" returns to the arc step.
  */
+/** A short, fun label for a notable hole SHAPE archetype (GS-shapes-2); '' for a plain straight/dogleg. */
+function shapeLabel(shapeId?: string): string {
+  if (!shapeId) return '';
+  if (shapeId === 'drivable-par-4') return '🏌 Drivable';
+  if (shapeId.includes('hairpin')) return '↩ Hairpin';
+  if (shapeId.includes('cape')) return '🌊 Cape';
+  if (shapeId.includes('double')) return '〰 Double dogleg';
+  if (shapeId.startsWith('short-3')) return 'Short';
+  if (shapeId.startsWith('long-3')) return 'Long';
+  if (shapeId.startsWith('long-')) return 'Long';
+  if (shapeId.startsWith('three-shot')) return '3-shot';
+  if (shapeId.startsWith('reachable')) return 'Reachable';
+  return '';
+}
+
+/** A short label for a notable fairway-WIDTH archetype (GS-fairway-width); '' for the plain ones
+ *  (classic/wander read off the map; 'island' already has the lost-rough warning). */
+function widthLabel(widthId?: string): string {
+  if (widthId === 'chute') return '🌲 Tight drive';
+  if (widthId === 'neck') return '🎯 Tight approach';
+  if (widthId === 'hourglass') return '⏳ Pinched waist';
+  if (widthId === 'thin') return '📏 Ribbon fairway';
+  if (widthId === 'broad') return '🌾 Broad fairway';
+  return '';
+}
+
+/** The hole's notable shape + corridor-width descriptors, for the tee card. */
+function holeArchetypeLabels(hole: Hole): string[] {
+  return [shapeLabel(hole.shapeId), widthLabel(hole.widthId)].filter(Boolean);
+}
+
 function holeIntroScreen(): string {
   const { c, zone, col, diffPips, salvageNote, boss } = introShared();
   const hole = c.holes[0]!;
@@ -400,6 +432,16 @@ function holeIntroScreen(): string {
           <div style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--gs-accent);opacity:.85;">First hole</div>
           <div style="font-size:18px;font-weight:800;line-height:1.1;">${zone.name}</div>
           <div style="font-size:12px;opacity:.72;margin-top:2px;">${zone.signature} · par ${hole.par} · ${c.meta.name}</div>
+          ${(() => {
+            // The hole's SHAPE + corridor-width archetypes ("Drivable", "Ribbon fairway"). These used
+            // to ride the play HUD's conditions line every single shot, which is one shot too many:
+            // both are fixed for the whole hole, so they are BRIEFING, and briefing belongs on the
+            // card you read before you tee off (GS-hud-compass moved them here from the play bar).
+            const labels = holeArchetypeLabels(hole);
+            return labels.length
+              ? `<div style="font-size:12px;color:var(--gs-info);margin-top:3px;">${labels.join(' · ')}</div>`
+              : '';
+          })()}
         </div>
         <div style="text-align:right;flex:0 0 auto;">
           <div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:.06em;">Difficulty</div>

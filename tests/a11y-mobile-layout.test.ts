@@ -282,14 +282,16 @@ describe.runIf(chromePath)('overlays fit the phone at the top text size (real br
           panelFrac: panel.width / bottom.width,
           // The caddy sits BESIDE the panel, on the same row, exactly as GS-hud-frame drew it.
           caddyBeside: caddy.right <= panel.left + 1 && caddy.bottom > panel.top,
-          brief: !!document.querySelector('.gs-hud-brief'),
+          // GS-hud-compass: the hole's shape/width descriptors left the play bar for the tee card,
+          // so what this scale case now proves is that the CLUSTER holds its one-row shape here.
+          pods: document.querySelectorAll('.gs-hudx__pod').length,
         };
       });
       expect(m.fit).toBe('roomy');
       expect(m.panelFrac).toBeLessThan(0.8);
       expect(m.caddyBeside).toBe(true);
-      // …and the hole's shape/width descriptors are still on the conditions line.
-      expect(m.brief).toBe(true);
+      // …and the instrument cluster still carries its three readouts (hole · distance · score).
+      expect(m.pods).toBe(3);
       await page.close();
     } catch (e) {
       await page.close();

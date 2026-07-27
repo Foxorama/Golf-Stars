@@ -68,11 +68,11 @@ export interface PlayFrameParts {
   /** True when the caddy is on the bag but has no role in THIS state (e.g. Driver Dan on the green):
    *  the slot keeps its place and the portrait dims, rather than the badge disappearing. */
   caddyOffDuty?: boolean;
-  /** Nav column: which view the map is in, whether it has been panned/zoomed off the default, and
-   *  which halves can act. The view controls are dead on a fixed-frame screen (the putt map is framed
-   *  on the ball↔cup span, the watch map on the follow-cam) — they stay in place, greyed. The ⚙ is
-   *  live wherever a re-render is safe, which is everywhere except mid-animation. */
-  nav: { whole: boolean; moved: boolean; viewDisabled: boolean; settingsDisabled: boolean };
+  /** Nav column: which view the map is in and which halves can act. The view toggle is dead on a
+   *  fixed-frame screen (the putt map is framed on the ball↔cup span, the watch map on the follow-cam)
+   *  — it stays in place, greyed. The ⚙ is live wherever a re-render is safe, which is everywhere
+   *  except mid-animation. */
+  nav: { whole: boolean; viewDisabled: boolean; settingsDisabled: boolean };
   /** Auto-finish (`»`) — always rendered, disabled while a shot animates. */
   autoFinishDisabled: boolean;
   /** The golf bag (GS-hud-bag) — the club control, and the anchor of the action column. Required, so
@@ -101,17 +101,20 @@ export interface PlayFrameParts {
   after?: string;
 }
 
-/** The map navigation column (overview/follow · zoom · recenter · settings). Present in EVERY state;
- *  the view controls grey out where they can't act, the ⚙ stays live wherever a render is safe. */
+/**
+ * The map navigation column — now TWO buttons (GS-hud-compass): the whole-hole TOGGLE and the ⚙.
+ *
+ * It used to be five: whole-hole/follow, ＋, －, recenter, settings. That is four controls for one
+ * axis, and on a touch screen three of them are redundant — the map already takes a two-finger pinch
+ * for a custom zoom. So the whole-hole view becomes a latching toggle exactly like the aim mode: ON
+ * you see the hole, OFF you are back at the default follow-cam. Turning it off also RESETS zoom and
+ * pan, which is what the old ⌖ recenter did — so nothing was lost, it was folded in. Custom zoom is
+ * pinch (touch) or ⌘/Ctrl-wheel (desktop).
+ */
 function navColumnHTML(nav: PlayFrameParts['nav']): string {
-  const v = nav.viewDisabled ? ' disabled' : '';
-  const zoom = nav.viewDisabled || nav.whole ? ' disabled' : '';
   return `
     <div class="gs-mapctrl">
-      <button class="gs-mapbtn${nav.whole ? ' gs-mapbtn--on' : ''}" data-mapview="toggle" title="${nav.whole ? 'Follow the ball' : 'See the whole hole'}"${v}>${nav.whole ? '🎯' : '🗺'}</button>
-      <button class="gs-mapbtn" data-mapzoom="in" title="Zoom in"${zoom}>＋</button>
-      <button class="gs-mapbtn" data-mapzoom="out" title="Zoom out"${zoom}>－</button>
-      <button class="gs-mapbtn" data-mapview="reset" title="Recenter on the ball"${nav.moved && !nav.viewDisabled ? '' : ' disabled'}>⌖</button>
+      <button class="gs-mapbtn${nav.whole ? ' gs-mapbtn--on' : ''}" data-mapview="toggle" aria-pressed="${nav.whole}" title="${nav.whole ? 'Back to the ball (resets zoom)' : 'See the whole hole'}"${nav.viewDisabled ? ' disabled' : ''}>🗺</button>
       <button class="gs-mapbtn" data-open-settings="1" title="Settings"${nav.settingsDisabled ? ' disabled' : ''}>⚙</button>
     </div>`;
 }

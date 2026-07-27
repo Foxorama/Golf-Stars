@@ -1050,18 +1050,9 @@
         height: calc(var(--gs-dvh) - 46px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
         overflow: hidden;
       }
-      .gs-topbar {
-        flex: 0 0 auto;
-        display: flex; flex-direction: column; gap: 3px;
-        padding: 7px 12px; border: 1px solid var(--gs-line); border-radius: var(--gs-r);
-        background: linear-gradient(180deg, #141823, var(--gs-bg-2));
-      }
-      .gs-topbar .gs-stats {
-        display: flex; align-items: center; gap: 13px; flex-wrap: wrap;
-        font-size: 14px; color: var(--gs-dim);
-      }
-      .gs-topbar .gs-stats b { color: var(--gs-ink); }
-      .gs-topbar .gs-sub { font-size: 12px; opacity: .82; line-height: 1.5; }
+      /* The play screen's team/partner sub-line (the only survivor of the old stacked info chip —
+         GS-hud-compass replaced the rest with the instrument cluster). */
+      .gs-hud-top .gs-sub { font-size: 12.5px; opacity: .9; line-height: 1.35; margin-top: 4px; }
       /* The lie is the player's most decision-relevant fact — a bordered, colour-coded chip
          (green ok / amber caution / red trouble) right in the sub-line, with its carry+spray hit. */
       .gs-liechip {
@@ -1070,16 +1061,12 @@
         border: 1px solid currentColor; white-space: nowrap;
       }
       /* Momentum rail — one pip per hole, coloured by score; current ringed, upcoming dim. */
-      .gs-pips { display: flex; gap: 4px; align-items: center; margin-top: 1px; }
+      .gs-pips { display: flex; gap: 3px; align-items: center; margin-top: 4px; }
       .gs-pip {
-        width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto;
+        width: 8px; height: 8px; border-radius: 2.5px; flex: 0 0 auto;
         background: #2a3142; box-shadow: inset 0 0 0 1px rgba(0,0,0,.25);
       }
       .gs-pip--cur { box-shadow: 0 0 0 2px var(--gs-info); background: #3a4356; }
-      .gs-shotscore {
-        margin-left: auto; font-weight: 700; font-size: 14px;
-        padding: 2px 11px; border-radius: 999px; border: 1px solid currentColor;
-      }
       .gs-bigmap {
         /* min-height:0 lets the map shrink to whatever the topbar + controls leave, so the
            controls never get pushed below the fold. position:relative anchors the nav overlay. */
@@ -1208,29 +1195,51 @@
         right: 56px; /* clear the top-right nav column */
         padding: 5px 10px 6px;
       }
-      /* Readout sizing (GS-hud-frame): the play-test verdict on a Pixel 9a was that these numbers —
-         the hole, the yardage, the score, the lie — were simply too small to parse at a glance while
-         playing. Bumped a step across the whole frame; the chip still occludes little of the cone. */
-      /* GS-play-hud-space: the gaps carry the row, so they can come in without costing legibility.
-         What the row must NOT do is wrap — a wrapped stats row measured 49px for one line's worth of
-         content, the single biggest waste in the whole chip. The hole/par/live-distance triplet fits
-         one line at this size; the hole's shape/width LABELS moved down to the conditions line (they
-         are conditions, like the lie and the wind), which is what stopped the wrap. */
-      .gs-hud-top .gs-stats {
-        display: flex; align-items: center; gap: 6px 9px; flex-wrap: wrap;
-        font-size: 14.5px; color: var(--gs-dim);
+      /* ── The INSTRUMENT CLUSTER (GS-hud-compass) ──────────────────────────────────────────────
+         The bar was a stack of up to six independently-wrapping rows saying overlapping things. It
+         is now one row: the wind COMPASS anchored left, and the readouts as centred PODS — a big
+         value over a small all-caps caption, one shape for every number on the bar — with the lie +
+         placing on a line under them. Each pod carries a `min-width` so the cluster is pixel-
+         identical between aiming and watching (GS-hud-frame's no-reflow rule), which is the job the
+         old `.gs-hud-dist` floor used to do for the yardage alone. */
+      .gs-hudx { position: relative; min-height: 52px; padding-left: 58px; }
+      .gs-hudx__compass {
+        position: absolute; left: 0; top: 0; width: 52px; height: 52px;
       }
-      .gs-hud-top .gs-stats b { color: var(--gs-ink); }
-      /* The distance slot keeps a floor width so the stats row wraps the SAME way whether it reads
-         "347y" or "…in flight" — the info bar used to visibly reflow the instant you struck a shot
-         (GS-hud-frame). 78px still clears the longest label ("…in flight") at this size. */
-      .gs-hud-top .gs-hud-dist { min-width: 78px; }
-      /* …and the score/placing chips get their OWN row rather than trailing the stats and wrapping
-         whenever the line above them grew — the two groups now never trade places. */
-      .gs-hud-top .gs-stats--score { margin-top: 1px; }
-      .gs-hud-top .gs-stats--score .gs-shotscore { margin-left: 0; }
-      .gs-hud-top .gs-sub { font-size: 12.5px; opacity: .9; line-height: 1.35; margin-top: 2px;
-        display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+      /* The active sky's badge, on the dial it belongs to — the weather used to be readable only on
+         the route card you flew in on. */
+      .gs-hudx__sky {
+        position: absolute; right: -2px; bottom: -1px; font-size: 14px; line-height: 1;
+        filter: drop-shadow(0 1px 2px rgba(0,0,0,.7));
+      }
+      .gs-hudx__pods {
+        display: flex; align-items: flex-start; justify-content: center;
+        gap: 4px 10px; flex-wrap: wrap;
+      }
+      .gs-hudx__pod {
+        display: flex; flex-direction: column; align-items: center; min-width: 54px;
+        line-height: 1.05; text-align: center;
+      }
+      /* Hairline dividers between pods — the dashboard read. They ride the pod itself (not a gap
+         element) so a wrap can never leave a rule hanging on its own. */
+      .gs-hudx__pod + .gs-hudx__pod { border-left: 1px solid rgba(255,255,255,.1); padding-left: 10px; }
+      .gs-hudx__pod > b { font-size: 19px; font-weight: 800; color: var(--gs-ink); }
+      .gs-hudx__pod > span {
+        font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+        color: var(--gs-dim); margin-top: 3px; white-space: nowrap;
+      }
+      /* The live yardage is the number the whole screen is about — one step bigger than its
+         neighbours, and wide enough that "—" while the ball is in the air cannot shrink the row. */
+      /* FIXED, not just a floor: the hero pod's caption changes with the play state ("y to pin" while
+         aiming, "in air" mid-flight), and a pod that could GROW pushed the score pod onto a second row
+         the instant a shot was struck — the exact reflow GS-hud-frame exists to forbid. */
+      .gs-hudx__pod--hero { flex: 0 0 74px; min-width: 74px; }
+      .gs-hudx__pod--hero > b { font-size: 25px; color: #eef3fb; }
+      .gs-hudx__lie {
+        display: flex; align-items: center; justify-content: center; gap: 7px; flex-wrap: wrap;
+        font-size: 12.5px; margin-top: 4px; min-height: 19px;
+      }
+      .gs-hudx__place { color: var(--gs-dim); white-space: nowrap; }
       /* ── The persistent play frame's ACTION ZONE (GS-hud-frame) ──────────────────────────────
          One skeleton for all six play states: caddy slot · controls panel · action column, bottom-
          anchored so the thumb-critical row (commit button · caddy · auto-finish) lands at the same
@@ -1388,11 +1397,15 @@
       :root[data-gs-fit="tight"] .gs-hud-bottom > .gs-hud-caddy { left: 0; }
       :root[data-gs-fit="tight"] .gs-hud-bottom > .gs-hud-actions { right: 0; }
       :root[data-gs-fit="tight"] .gs-hud-bottom > .gs-hud-controls { flex: 1 1 100%; }
-      /* The two hole DESCRIPTORS come off the conditions line. They are constant for the hole and are
-         already on the tee card you just read; the lie, the wind and the yardage are the live ones and
-         they need the room. At the top rung this line was four wrapped rows — 136 of the info chip's
-         325 units, more than the hole/par/score rows put together. */
-      :root[data-gs-fit="tight"] .gs-hud-top .gs-hud-brief { display: none; }
+      /* (The hole's shape/width DESCRIPTORS used to be dropped here at a tight fit. GS-hud-compass
+         moved them off the play bar entirely, onto the tee card where briefing belongs, so there is
+         nothing left to hide.)
+         What the cluster gives up instead, at a tight fit and only there: the arc PLACING, which is
+         the one readout on the bar that changes nothing about the shot in front of you — and the pod
+         DIVIDERS, which are a row ornament and read as stray marks once the pods have stacked. Fewer
+         things at the same size, never the same things smaller. */
+      :root[data-gs-fit="tight"] .gs-hudx__place { display: none; }
+      :root[data-gs-fit="tight"] .gs-hudx__pod + .gs-hudx__pod { border-left: none; padding-left: 0; }
       /* Caddy badge — the hired caddy, framed so it really stands out (GS-fullmap / GS-caddy-display):
          a glowing gold frame, a warm radial backdrop, and a slow rotating sheen behind the figure +
          a pulsing glow, so it reads as a "premium" hire, not a plain portrait. */

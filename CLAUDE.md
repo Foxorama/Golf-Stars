@@ -751,6 +751,22 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     so dialog/focus/`inert`/Escape all come from GS-a11y-focus + `backIntent`, never hand-rolled. Guarded by
     `tests/club-picker.test.ts`; the bag art is a leaf module (pure SVG, NO ids — they are document-global and
     the glyphs ship a dozen per sheet).
+  - **THE TOP BAR IS AN INSTRUMENT CLUSTER, NOT A LIST OF CHIPS** (GS-hud-compass, `render/windCompass.ts`).
+    It was up to six independently-wrapping rows saying overlapping things (hole/total · par+length · live
+    yardage · points · placing · lie · a wind SENTENCE · two hole descriptors). Now: a wind COMPASS anchored
+    left + centred PODS — one shape for every number, `big value / small ALL-CAPS caption` — with lie + placing
+    on the line under, then the pips. **A pod's width is FIXED, not a floor** (the hero yardage pod's caption
+    changes per state — "y to pin" → "in air" — and a growable pod pushed the score onto a second row the
+    instant a shot was struck, the exact reflow GS-hud-frame forbids). **The needle reads against the SHOT
+    bearing** (`windRead(hole, upBearing)`), because that is BOTH what the map is oriented down (GS-default-aim)
+    AND what the sim resolves wind against (`playWind`) — so needle, picture and physics agree; the argument is
+    OPTIONAL and defaults to the hole line, so the once-per-hole a11y narration is byte-for-byte. Weather rides
+    the dial as the effect's own badge. Hole SHAPE/WIDTH descriptors moved to the TEE CARD (briefing, fixed for
+    the hole) — the play-bar copy is deleted, not hidden. The nav column is **TWO buttons**: the whole-hole view
+    is a latching toggle like the aim mode and leaving it RESETS zoom+pan (the old ⌖ recenter folded in);
+    ＋/－ are retired in favour of pinch. The Stableford pod colours by PACE (`cut × holesPlayed / holes`), never
+    the raw gap — the old test opened every stop on a red zero. Guarded by `tests/hud-topbar.test.ts`
+    (bar 112→88px, band 50%→80%).
   - **THE HUD FLOATS OVER THE GOLF, SO THE CAMERA MUST FRAME AROUND IT** (GS-play-hud-space). The camera
     biases the ball as LOW as the control panel allows and no lower (`project.ts clearOfPanelBias`; a low
     ball is what fills the frame with the shot AHEAD, so "just centre it" is the wrong fix), and the putt
