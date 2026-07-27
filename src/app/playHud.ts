@@ -9,6 +9,9 @@ import { state } from './ctx';
 import { caddyId } from './helpers';
 import { liveLeaderChip, matchHud, teamDuel, teamFormatLabel, teamPartnerChar } from './duelHud';
 import { CADDY_LABEL, hasCaddyArt } from '../render/caddyArt';
+import { windCompassSVG } from '../render/windCompass';
+import { COURSE_EFFECTS, type CourseEffectId } from '../sim/rpg/effects';
+import { currentEffect } from './helpers';
 import { caddyReadsGreen } from '../sim/rpg/storyCaddies';
 import { heraldShortName } from '../sim/rpg/storyHeraldCrew';
 import { storySigilMatchChip } from './storySigilHud';
@@ -95,25 +98,40 @@ export function puttAimRow(breakYd: number, aim: number, reads: boolean, dbl = f
 }
 
 /**
- * The wind, read relative to the hole's play direction (up = toward the green), as DATA. The visible
- * chip and the screen-reader narration (GS-a11y-announce) both build their words from this, so the
- * spoken wind and the drawn wind can never disagree. `spd: 0` means calm.
+ * The wind as DATA, read relative to a play direction (up = the way you are playing). The compass
+ * dial and the screen-reader narration (GS-a11y-announce) both build from this, so the spoken wind
+ * and the drawn wind can never disagree. `spd: 0` means calm.
+ *
+ * `upBearing` defaults to the HOLE's tee→green line, which is what the once-per-hole narration wants
+ * (a briefing about the hole). The play HUD passes the SHOT's own bearing instead, because that is
+ * both what the map is oriented down (GS-default-aim) and what the sim resolves wind against
+ * (`shot.ts playWind` reads head/tail/cross off the SHOT bearing, never the hole's) — so the needle
+ * agrees with the physics AND with the picture. Absent ⇒ byte-for-byte the old read.
  */
-export function windRead(hole: Hole): { spd: number; kind: string; delta: number } {
+export function windRead(hole: Hole, upBearing?: number): { spd: number; kind: string; delta: number } {
   const w = hole.wind;
   if (!w || w.spd < 1) return { spd: 0, kind: 'calm', delta: 0 };
-  const holeBearing = bearing(hole.tee, hole.green);
-  const delta = ((w.dir - holeBearing + 540) % 360) - 180; // −180..180; 0 = tailwind (toward green)
+  const up = upBearing ?? bearing(hole.tee, hole.green);
+  const delta = ((w.dir - up + 540) % 360) - 180; // −180..180; 0 = tailwind (the way you are playing)
   const along = Math.cos((delta * Math.PI) / 180);
   return { spd: w.spd, kind: along > 0.4 ? 'tailwind' : along < -0.4 ? 'headwind' : 'crosswind', delta };
 }
 
-/** Plain-language wind read relative to the hole's play direction (up = toward the green). */
-function windDescription(hole: Hole): string {
-  const r = windRead(hole);
-  if (!r.spd) return '🍃 Calm';
-  const arrow = `<span style="display:inline-block;transform:rotate(${r.delta.toFixed(0)}deg);">⬆</span>`;
-  return `🌬 ${Math.round(r.spd)} mph ${r.kind} ${arrow}`;
+/**
+ * The compass POD: the dial plus the active sky's badge (GS-hud-compass). The weather effect used to
+ * be readable only on the route card you flew in on — here it rides the instrument it belongs to, and
+ * its tooltip carries the label so "why is the air like this" is one long-press away.
+ */
+function windCompass(hole: Hole, upBearing?: number): string {
+  const r = windRead(hole, upBearing);
+  const eff = currentEffect();
+  const info = eff && eff !== 'none' ? COURSE_EFFECTS[eff as CourseEffectId] : undefined;
+  const title = r.spd ? `${Math.round(r.spd)} mph ${r.kind}` : 'Calm air';
+  return `<div class="gs-hudx__compass" title="${title}${info ? ` · ${info.label}` : ''}">
+      ${windCompassSVG(r)}
+      ${info ? `<span class="gs-hudx__sky" aria-hidden="true">${info.icon}</span>` : ''}
+      <span class="gs-sr-only">${title}${info ? `, ${info.label}` : ''}.</span>
+    </div>`;
 }
 
 /** The current lie as a prominent, colour-coded chip with its effect on the NEXT shot — so the
@@ -174,6 +192,15 @@ function holePips(): string {
   return `<div class="gs-pips" aria-hidden="true">${pips}</div><span class="gs-sr-only">${spoken}</span>`;
 }
 
+/** One instrument pod: a big value over a small all-caps caption. The shape every readout in the
+ *  cluster shares (GS-hud-compass), so the bar reads as one instrument rather than a list of chips. */
+function pod(value: string, cap: string, opts: { col?: string; title?: string; hero?: boolean } = {}): string {
+  return `<div class="gs-hudx__pod${opts.hero ? ' gs-hudx__pod--hero' : ''}"${opts.title ? ` title="${opts.title}"` : ''}>
+      <b${opts.col ? ` style="color:${opts.col};"` : ''}>${value}</b>
+      <span>${cap}</span>
+    </div>`;
+}
+
 /** Running stop score vs the cut-to-beat, coloured by how the run is tracking:
  *  🟢 beating the cut · 🟠 within striking distance · 🔴 well short. */
 function zoneScoreChip(): string {
@@ -183,7 +210,10 @@ function zoneScoreChip(): string {
   if (state.run.formatId === STROKEPLAY_FORMAT) {
     const done = state.stopPlayed ?? [];
     const totals = playTotals(done.map((p) => p.record));
-    return `<span class="gs-shotscore" style="color:${toParColour(totals.toPar)};" title="running score — total strokes vs par through ${done.length} holes">🏌 ${formatToPar(totals.toPar)} · ${totals.gross} thru ${done.length}</span>`;
+    return pod(formatToPar(totals.toPar), `${totals.gross} thru ${done.length}`, {
+      col: toParColour(totals.toPar),
+      title: `running score — total strokes vs par through ${done.length} holes`,
+    });
   }
   // The Unending Universe (GS-set-survival): the number that matters is THIS SET's running four-hole
   // total vs its allowance — show how far under/over you are through the holes played so far, and the
@@ -196,84 +226,67 @@ function zoneScoreChip(): string {
     const room = target - setSoFar; // over-par budget left for the rest of the set (current hole included)
     const col = room >= 3 ? '#5fd45a' : room >= 0 ? '#ffc454' : '#ff6b6b';
     const soFar = setSoFar > 0 ? `+${setSoFar}` : setSoFar === 0 ? 'E' : `−${-setSoFar}`;
-    return `<span class="gs-shotscore" style="color:${col};" title="this set of 4: you're ${soFar} through ${done.length}, needing ${endlessSetLabel(target)} or better for the whole set — a blow-up won't end the run, the four-hole total is what counts">🎯 ${soFar} · need ${endlessSetLabel(target)}</span>`;
+    return pod(soFar, `need ${endlessSetLabel(target)}`, {
+      col,
+      title: `this set of 4: you're ${soFar} through ${done.length}, needing ${endlessSetLabel(target)} or better for the whole set — a blow-up won't end the run, the four-hole total is what counts`,
+    });
   }
   const done = state.stopPlayed ?? [];
+  const holes = state.course.holes.length;
   const sf = playTotals(done.map((p) => p.record)).stableford;
-  const cut = effectiveCut(state.run, state.course.holes.length);
-  const gap = cut - sf;
-  const col = gap <= 0 ? '#5fd45a' : gap <= Math.ceil(cut / 2) ? '#ffc454' : '#ff6b6b';
-  return `<span class="gs-shotscore" style="color:${col};" title="stop Stableford vs the cut to make">${sf}/${cut} pts</span>`;
-}
-
-/** A short, fun label for a notable hole archetype (GS-shapes-2); '' for a plain straight/dogleg. */
-function shapeLabel(shapeId?: string): string {
-  if (!shapeId) return '';
-  if (shapeId === 'drivable-par-4') return '🏌 Drivable';
-  if (shapeId.includes('hairpin')) return '↩ Hairpin';
-  if (shapeId.includes('cape')) return '🌊 Cape';
-  if (shapeId.includes('double')) return '〰 Double dogleg';
-  if (shapeId.startsWith('short-3')) return 'Short';
-  if (shapeId.startsWith('long-3')) return 'Long';
-  if (shapeId.startsWith('long-')) return 'Long';
-  if (shapeId.startsWith('three-shot')) return '3-shot';
-  if (shapeId.startsWith('reachable')) return 'Reachable';
-  return '';
-}
-
-/** A short label for a notable fairway-width archetype (GS-fairway-width); '' for the plain ones
- *  (classic/wander read off the map; 'island' already has the lost-rough warning). */
-function widthLabel(widthId?: string): string {
-  if (widthId === 'chute') return '🌲 Tight drive';
-  if (widthId === 'neck') return '🎯 Tight approach';
-  if (widthId === 'hourglass') return '⏳ Pinched waist';
-  if (widthId === 'thin') return '📏 Ribbon fairway';
-  if (widthId === 'broad') return '🌾 Broad fairway';
-  return '';
+  const cut = effectiveCut(state.run, holes);
+  // Coloured by PACE, not by the raw gap to the cut (GS-hud-compass). The old test was `cut − points`,
+  // which on the first tee is the whole cut — so a fresh stop opened on a red zero, and the bigger pod
+  // made that read as "you are failing" before a ball had been struck. What the player wants to know is
+  // whether they are ON for the cut: compare against the pro-rata target for the holes actually played.
+  const paceTarget = (cut * done.length) / Math.max(1, holes);
+  const col = !done.length ? 'var(--gs-ink)' : sf >= paceTarget ? '#5fd45a' : sf >= paceTarget - 2 ? '#ffc454' : '#ff6b6b';
+  return pod(`${sf}`, `of ${cut} pts`, {
+    col,
+    title: `stop Stableford vs the cut to make${done.length ? ` — on pace you'd want ${Math.round(paceTarget)} through ${done.length}` : ''}`,
+  });
 }
 
 /**
- * The hole's shape + width archetype labels, for the CONDITIONS sub-line (GS-play-hud-space).
+ * The floating top info bar for the full-bleed hole screen — an INSTRUMENT CLUSTER (GS-hud-compass).
  *
- * They used to trail the hole/par/distance stats row, where — on a par 4 with any label at all — they
- * pushed the live yardage onto a second line: a wrapped stats row measured 49px to carry one line's
- * worth of content, the biggest single waste in the chip. They belong here anyway; "Drivable" and
- * "Tight approach" are facts about the hole in front of you, exactly like the lie and the wind.
- */
-/**
- * The hole's shape + corridor-width descriptors ("Drivable", "Ribbon fairway"). Marked
- * `gs-hud-brief` because that is what they are — BRIEFING, not live state: both are fixed for the
- * whole hole and both are already read on the tee card before you play it. At a tight fit
- * (GS-a11y-tight-fit) the CSS drops them, because at the top text size they cost two of the info
- * chip's four lines and the live lie/wind/distance have to win that argument.
- */
-function shapeWidthLabels(hole: Hole): string {
-  return [shapeLabel(hole.shapeId), widthLabel(hole.widthId)]
-    .filter(Boolean)
-    .map((l) => ` <span class="gs-hud-brief" style="color:var(--gs-info);">${l}</span>`)
-    .join('');
-}
-
-/** The floating top-left info chip for the full-bleed hole screen (GS-fullmap): hole #/total, par +
- *  length, the live distance, the running zone score on line 1; a thin lie · wind sub-line + the
- *  momentum pips below. Conditions are pared to what matters (an armed lost-rough warning + scramble);
- *  the verbose biome string moved off the play HUD. Translucent, non-intrusive, pass-through.
+ * It used to be a stack of up to six rows, and most of them said the same things twice: `⛳ 5/9` and a
+ * par-and-length line and a live yardage and a points chip and a placing chip and a lie chip and a
+ * wind sentence and two hole descriptors, each wrapping independently. The report: *"we don't need
+ * all that duplication."*
  *
- *  GS-hud-frame: the distance slot is min-width'd in CSS so the stats row wraps IDENTICALLY between
- *  the aim and watch states — the bar used to visibly reflow the instant a shot was struck, because
- *  "…watching…" is far wider than "347y". `opts.lie` overrides the live lie for the same reason plus
- *  one better: while the ball is in the air `play.lie` is ALREADY the lie it will finish in, so the
- *  bar was quietly spoiling the result before the ball landed. The watch state passes the lie the
- *  shot was played FROM. */
+ * So it is one row of pods — a big value over a small caption, the shape every readout shares — with
+ * the WIND COMPASS anchored at the left and the pods centred in what is left:
+ *
+ *   ╭────╮      5/9         464        13
+ *   │ ↑9 │    PAR 4·450Y   Y TO PIN   OF 20 PTS
+ *   ╰────╯       🟢 Tee −25% carry  ·  🏆 1st/20
+ *   ▪▪▪▪▫▫▫▫▫
+ *
+ * What went, and why:
+ *  - the WIND SENTENCE → the compass dial, which shows the one thing that matters (which way it
+ *    pushes) as a direction rather than as a rotated emoji;
+ *  - the hole SHAPE/WIDTH descriptors ("Drivable", "Ribbon fairway") → gone. They are briefing, fixed
+ *    for the whole hole, and already read on the tee card; GS-a11y-tight-fit was already dropping
+ *    them at large text sizes for exactly this reason. The map draws the shape better than a word.
+ *  - par + hole LENGTH → the caption under the hole number, where they belong: both are static
+ *    briefing, and the live distance-to-pin is the number you actually club off.
+ *
+ * `opts.lie` overrides the live lie: while the ball is in the air `play.lie` is ALREADY the lie it
+ * will finish in, so the bar was quietly spoiling the result before the ball landed. The watch state
+ * passes the lie the shot was played FROM. `opts.dist` is split into value + caption for the same
+ * no-reflow reason the old `distLabel` was min-width'd (GS-hud-frame): the pod's own min-width keeps
+ * the cluster pixel-identical between aiming and watching.
+ */
 export function mapTopInfo(
   v: ReturnType<typeof shotView>,
-  opts: { shotNo: number; distLabel: string; lie?: string },
+  opts: { dist: { big: string; cap: string }; lie?: string; upBearing?: number },
 ): string {
   const play = state.play!;
   const len = Math.round(dist(play.hole.tee, play.hole.green));
   // Only the decision-relevant warning survives onto the play HUD (the full conditions list lives on
   // the zone splash): the void's armed lost-rough, which turns an offline miss into a lost ball.
-  const lostRough = lieInfo(roughLieOf(play.hole)).penalty ? ' · <span style="color:var(--gs-warn);">🕳 lost rough</span>' : '';
+  const lostRough = lieInfo(roughLieOf(play.hole)).penalty ? ' <span style="color:var(--gs-warn);">🕳 lost rough</span>' : '';
   const boss = currentBoss(state.run);
   // Team duel (GS-team-duel): when YOU carry the partner, show them + the format on the HUD.
   const duel = isTeamDuelBoss(boss) ? teamDuel() : undefined;
@@ -292,18 +305,18 @@ export function mapTopInfo(
       scrambleLine = `<div class="gs-sub" style="color:${partner.style.cap};">🤝 <b>${partner.name}</b> · ${teamFormatLabel(duel.format)}${tail}</div>`;
     }
   }
+  const place = liveLeaderChip();
   return `
     <div class="gs-hud gs-hud-top gs-glass">
-      <div class="gs-stats">
-        <span>⛳ <b>${play.holeIndex + 1}/${state.course.holes.length}</b></span>
-        <span>Par <b>${play.hole.par}</b>·${len}y</span>
-        <span class="gs-hud-dist">${opts.distLabel}</span>
+      <div class="gs-hudx">
+        ${windCompass(play.hole, opts.upBearing)}
+        <div class="gs-hudx__pods">
+          ${pod(`${play.holeIndex + 1}/${state.course.holes.length}`, `par ${play.hole.par} · ${len}y`, { title: `hole ${play.holeIndex + 1} of ${state.course.holes.length} — par ${play.hole.par}, ${len} yards` })}
+          ${pod(opts.dist.big, opts.dist.cap, { hero: true })}
+          ${zoneScoreChip()}
+        </div>
+        <div class="gs-hudx__lie">${lieChip(opts.lie ?? v.lie)}${lostRough}${place ? ` <span class="gs-hudx__place">${place}</span>` : ''}</div>
       </div>
-      <div class="gs-stats gs-stats--score">
-        ${zoneScoreChip()}
-        ${liveLeaderChip()}
-      </div>
-      <div class="gs-sub">${lieChip(opts.lie ?? v.lie)} ${windDescription(play.hole)}${lostRough}${shapeWidthLabels(play.hole)}</div>
       ${scrambleLine}
       ${state.match ? `<div style="margin-top:5px;">${matchHud()}</div>` : ''}
       ${!state.match && (state.run.storyTournament || state.run.storyQualifier) ? (() => { const chip = storySigilMatchChip(); return chip ? `<div style="margin-top:5px;">${chip}</div>` : ''; })() : ''}

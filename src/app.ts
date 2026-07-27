@@ -1155,6 +1155,23 @@ function wireShotGesture(app: HTMLElement): void {
   window.addEventListener('keydown', onPlayKey);
   playKeyCleanup = () => window.removeEventListener('keydown', onPlayKey);
 
+  // ── Wheel zoom (GS-hud-compass) ─────────────────────────────────────────────────────────────
+  // The nav column's ＋/－ are gone, folded into the whole-hole toggle, on the reasoning that a phone
+  // pinches. A desktop does not: a trackpad pinch arrives as a ctrl+wheel and a mouse has no second
+  // finger at all, so without this the ＋/－ removal would have taken custom zoom off desktop
+  // entirely. Bound to the SVG, which `render()` replaces every frame — so it needs no cleanup, and
+  // it cannot stack the way the window-level key listener could.
+  svg.addEventListener(
+    'wheel',
+    (e: WheelEvent) => {
+      if (mapView === 'whole') return; // the whole-hole fit has no zoom to give
+      e.preventDefault(); // the play screen does not scroll; the wheel is a zoom here
+      mapZoom = Math.min(4, Math.max(0.4, mapZoom * Math.exp(-e.deltaY / 400)));
+      scheduleRender();
+    },
+    { passive: false },
+  );
+
   svg.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     const now = performance.now();
@@ -1336,11 +1353,6 @@ function resetMapView(): void {
   mapPan = [0, 0];
 }
 
-/** Whether the view has been moved off the default follow-cam (so we offer a Recenter button). */
-function mapViewMoved(): boolean {
-  return mapView !== 'follow' || mapZoom !== 1 || mapPan[0] !== 0 || mapPan[1] !== 0;
-}
-
 /**
  * The decision/aim map projector options, derived from the current map-nav state. SHARED by the
  * decision render AND `wireMapAiming`'s unproject so tap/drag aiming can never drift from what's
@@ -1421,14 +1433,18 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
       // The lie shown is the one this shot was played FROM (`lieFrom`) — `play.lie` is already the
       // lie the ball will FINISH in, so the bar was spoiling the result mid-flight.
       top: mapTopInfo(v, {
-        shotNo: play.strokes,
-        distLabel: rolling ? '…rolling…' : '…in flight',
+        // No live yardage mid-flight, deliberately: `play.ball` is ALREADY where the ball will finish,
+        // so a number here would spoil the result before it landed (GS-hud-frame). The pod keeps its
+        // width, so the cluster does not reflow the instant a shot is struck.
+        dist: { big: '—', cap: rolling ? 'rolling' : 'in air' },
         lie: struck ? struck.lieFrom : v.lie,
+        // The compass keeps reading against the shot that is in the air, not the hole's line.
+        upBearing: struck ? bearing(struck.from, struck.rest) : undefined,
       }),
       rows: [],
       commit: `<button class="gs-btn gs-btn--primary gs-swing" disabled><span class="gs-swing__inner">${watchLabel}</span></button>`,
       caddyId: caddyId(),
-      nav: { whole: mapView === 'whole', moved: mapViewMoved(), viewDisabled: true, settingsDisabled: true },
+      nav: { whole: mapView === 'whole', viewDisabled: true, settingsDisabled: true },
       autoFinishDisabled: true,
       bag: bagPart(struck ? struck.club.id : 'putter', true),
       aim: aimPart(true),
@@ -1708,7 +1724,12 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
     return playFrameHTML({
       mode: 'putt',
       map: `<div class="gs-bigmap" data-weather="putt">${puttSvg}</div>`,
-      top: mapTopInfo(v, { shotNo: play.strokes + play.putts + 1, distLabel: `<b>${v.distToPin}</b>y · putt <b>${play.putts + 1}</b>` }),
+      top: mapTopInfo(v, {
+        dist: { big: `${v.distToPin}`, cap: `y · putt ${play.putts + 1}` },
+        // A putt is played along the ball→cup line, and wind does not touch it — the dial reads the
+        // line you are on so it agrees with the map, which is framed on exactly that span.
+        upBearing: bearing(play.ball, puttPin),
+      }),
       rows: [
         puttAimRow(breakYd, puttAim, reads, doubleBreak, fringePutt),
         `<div id="puttmeter"></div>`,
@@ -1719,7 +1740,7 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
       // caddy) — the badge dims instead of vanishing, so the bar's left edge never jumps.
       caddyId: caddyId(),
       caddyOffDuty: !puttCaddyId(),
-      nav: { whole: mapView === 'whole', moved: mapViewMoved(), viewDisabled: true, settingsDisabled: false },
+      nav: { whole: mapView === 'whole', viewDisabled: true, settingsDisabled: false },
       autoFinishDisabled: false,
       // The flat stick, greyed: there is no club choice on the green, and the aim lives in the panel's
       // own ◄/► row here. Both cells still MOUNT (GS-hud-frame) so the corner never moves.
@@ -1915,11 +1936,16 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
   return playFrameHTML({
     mode: 'aim',
     map: `<div class="gs-bigmap" data-map="1" data-weather="decision">${svg}</div>`,
-    top: mapTopInfo(v, { shotNo: play.strokes + 1, distLabel: `<b>${v.distToPin}</b>y` }),
+    // The compass reads against the SHOT's own bearing — the line the map is oriented down and the
+    // line the sim resolves wind against (`playWind`), so needle, picture and physics all agree.
+    top: mapTopInfo(v, {
+      dist: { big: `${v.distToPin}`, cap: 'y to pin' },
+      upBearing: bearing(play.ball, orientTarget),
+    }),
     rows: [],
     commit: swingBtn,
     caddyId: caddyId(),
-    nav: { whole: mapView === 'whole', moved: mapViewMoved(), viewDisabled: false, settingsDisabled: false },
+    nav: { whole: mapView === 'whole', viewDisabled: false, settingsDisabled: false },
     autoFinishDisabled: false,
     bag: bagPart(selClubId, false),
     // A free-drag aim overrides the mode for this shot, so the mode button greys while the 🎯 reset
@@ -3483,20 +3509,15 @@ function render(): void {
     });
   });
   // Map-nav: overview/follow toggle + recenter.
+  // Map-nav (GS-hud-compass): ONE latching toggle for the whole-hole view, the way the aim mode
+  // latches. Leaving it also RESETS zoom + pan — that is the old ⌖ recenter folded in, so a pinch
+  // that wandered always has a one-tap way home and no button had to survive to provide it.
   app.querySelectorAll<HTMLElement>('[data-mapview]').forEach((el) => {
     el.addEventListener('click', () => {
-      const a = el.dataset.mapview;
-      if (a === 'reset') resetMapView();
-      else mapView = mapView === 'whole' ? 'follow' : 'whole';
-      render();
-    });
-  });
-  // Map-nav: zoom the follow-cam in/out (no-op in whole-hole mode).
-  app.querySelectorAll<HTMLElement>('[data-mapzoom]').forEach((el) => {
-    el.addEventListener('click', () => {
-      if (mapView === 'whole') return;
-      const factor = el.dataset.mapzoom === 'in' ? 1.4 : 1 / 1.4;
-      mapZoom = Math.min(4, Math.max(0.4, mapZoom * factor));
+      if (mapView === 'whole') resetMapView();
+      else mapView = 'whole';
+      sfx.click();
+      haptic(HAPTICS.tap);
       render();
     });
   });

@@ -510,6 +510,15 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-hud-compass** — the top bar became an instrument cluster (`docs/decisions/ui-intro.md`). Six
+  independently-wrapping rows of overlapping readouts (hole/total · par+length · live yardage · points ·
+  placing · lie · a wind SENTENCE · two hole descriptors) collapsed into one row of PODS — big value over
+  a small caption — with a WIND COMPASS anchored left, whose needle reads against the SHOT bearing, i.e.
+  both what the map is oriented down and what the sim resolves wind against. The hole's shape/width
+  descriptors moved to the tee card where briefing belongs. The nav column went five buttons → two: the
+  whole-hole view is a latching toggle and leaving it resets zoom+pan (the old recenter, folded in);
+  pinch/⌘-wheel do custom zoom. Bar 112 → **88px**, clear band 50% → **80%**. Also fixed: the Stableford
+  chip coloured by the raw gap to the cut, so every stop opened on a red zero — it colours by PACE now.
 - **GS-hud-bag** — the bag replaced the control panel (`docs/decisions/ui-intro.md`). The aim HUD's power
   label, spray-odds legend and carry range were restating the aim cone the map already draws to scale, and
   its club cycler was a dozen taps to reach a wedge — ~140px of an 844px phone between the player and the

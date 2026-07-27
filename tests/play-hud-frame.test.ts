@@ -69,7 +69,7 @@ describe('the persistent play HUD frame (GS-hud-frame)', () => {
       commit: '<button class="gs-btn gs-btn--primary">go</button>',
       caddyId,
       caddyOffDuty,
-      nav: { whole: false, moved: false, viewDisabled: mode !== 'aim', settingsDisabled: mode === 'watch' },
+      nav: { whole: false, viewDisabled: mode !== 'aim', settingsDisabled: mode === 'watch' },
       autoFinishDisabled: mode === 'watch',
       bag: { code: '7i', name: '7-Iron', clubs: 12, disabled: mode !== 'aim' },
       aim: { icon: '◎', label: 'Auto aim', on: false, disabled: mode !== 'aim' },
@@ -83,8 +83,9 @@ describe('the persistent play HUD frame (GS-hud-frame)', () => {
         expect(html, `${sel} missing in the ${mode} frame`).toContain(sel.slice(1));
       }
       expect(html, `the commit row is missing in the ${mode} frame`).toContain('gs-hud-commit');
-      // The nav column always ships the SAME five buttons — a dead control greys out, it never goes.
-      expect((html.match(/class="gs-mapbtn/g) ?? []).length, `${mode} nav column button count`).toBe(5);
+      // The nav column always ships the SAME two buttons — a dead control greys out, it never goes.
+      // (GS-hud-compass collapsed the four zoom/recenter controls into the one whole-hole toggle.)
+      expect((html.match(/class="gs-mapbtn/g) ?? []).length, `${mode} nav column button count`).toBe(2);
     }
   });
 
