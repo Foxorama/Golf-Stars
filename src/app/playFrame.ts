@@ -35,8 +35,10 @@
  * legend and the carry range came OUT of the panel (they restated the aim cone drawn on the map, in
  * a block that cost a quarter of a phone screen), the club moved to the bag + its picker sheet, and
  * the power read moved onto the commit button itself. The aim/watch panel is now a single commit
- * row; the PUTT panel is untouched — its pace meter and break read are the only readouts on the
- * screen that the map does not already draw.
+ * row; the PUTT panel KEEPS its rows — its pace meter and break read are the only readouts on the
+ * screen that the map does not already draw — and GS-putt-panel repainted them in the same language
+ * (an instrument pod for the aim, quiet nudges, a caption for the read, and the tap instruction
+ * drawn on the meter itself instead of a prose row).
  *
  * Class namespace: the play screen's own `.gs-hud*` / `.gs-mapctrl` / `.gs-caddybadge` prefixes,
  * extended — never another screen's (see the #353 `.gs-hud` map-blur regression in CLAUDE.md).

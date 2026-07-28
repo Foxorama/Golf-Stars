@@ -1362,17 +1362,64 @@
         position: relative; z-index: 1; padding: 0 8px;
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       }
-      .gs-clubrow { display: flex; align-items: center; gap: 7px; }
-      .gs-clubrow .gs-clubname { flex: 1 1 auto; text-align: center; font-weight: 700;
-        font-size: 16.5px; color: var(--gs-ink); min-width: 0;
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      /* The same slot on the putt screen carries the aim/break READ instead of a club name — a
-         sentence, not a noun, so it takes a step down in size to stay on one line (GS-hud-frame). */
-      .gs-clubrow .gs-clubname--read { font-size: 13px; font-weight: 600; }
-      .gs-clubrow .gs-btn { margin: 0; padding: 9px 11px; font-size: 16px; }
-      .gs-clubrow .gs-btn[disabled] { opacity: .38; }
-      .gs-clubrow .gs-mini { padding: 7px 9px; font-size: 13px; }
-      .gs-legend-line { font-size: 12.5px; line-height: 1.3; opacity: .95; }
+      /* ── The PUTT panel (GS-putt-panel) ────────────────────────────────────────────────────────
+         The putt is the one play state that keeps a full control panel — its pace meter and break
+         read are the only readouts on the screen the map does not already draw (GS-hud-bag). But it
+         kept the chrome of a screen that no longer exists: `.gs-clubrow`'s two heavy dark slabs
+         around a sentence (built for the club cycler the bag replaced), a flat hard-cornered canvas,
+         and three lines of prose re-teaching the controls every putt. Beside an instrument-cluster
+         top bar and a one-pill commit row it read as a different game's UI.
+         So the panel speaks the frame's language: a POD for the value (the cluster's one shape for
+         every number — big value, small all-caps caption), quiet nudges that are controls rather
+         than slabs, and the note line dropped to a caption. `.gs-putt*` is its own namespace inside
+         the play screen's `.gs-hud*` frame — never another screen's (the #353 regression). */
+      .gs-puttrow { display: flex; align-items: stretch; gap: 5px; }
+      /* The aim nudges. Same visual weight as the map-nav/aim-mode round buttons, not the commit
+         button — a nudge is a repeatable adjustment, and it should never out-shout ⛳ Putt. Sized to
+         clear the 44px touch target at the SHIP scale, before `--gs-uiscale` lifts it further. */
+      .gs-puttnudge {
+        flex: 0 0 auto; width: 40px; min-height: 44px; padding: 0;
+        display: flex; align-items: center; justify-content: center;
+        font: 700 15px/1 var(--gs-font); color: var(--gs-ink);
+        border-radius: 12px; border: 1px solid rgba(255, 255, 255, .10);
+        background: rgba(255, 255, 255, .06); cursor: pointer;
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        user-select: none; -webkit-user-select: none;
+        transition: filter .14s ease, border-color .14s ease;
+      }
+      .gs-puttnudge:hover { filter: brightness(1.2); }
+      .gs-puttnudge:active { filter: brightness(.9); }
+      .gs-puttnudge[disabled] { opacity: .3; cursor: default; filter: none; }
+      /* The fringe's chip/putt toggle rides the same row but is not an aim control — narrower, so
+         the three buttons together still leave the pod room to print "12.4yd right" unclipped. */
+      .gs-puttnudge--alt { width: 36px; font-size: 13px; }
+      /* The pod: identical proportions to `.gs-hudx__pod`, so the aim reads as one of the screen's
+         instruments rather than as a label. Both halves clip — a big borrow on a wide green prints
+         "12.4yd right", and the row must never wrap (GS-hud-frame's no-reflow rule). */
+      .gs-puttread {
+        flex: 1 1 auto; min-width: 0;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        line-height: 1.05; text-align: center;
+      }
+      .gs-puttread > b {
+        font-size: 16px; font-weight: 800; color: var(--gs-ink);
+        max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .gs-puttread > span {
+        font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+        color: var(--gs-dim); margin-top: 3px;
+        max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      /* The meter mounts at a clamped pixel width (it is a canvas), so centre it in whatever width
+         the panel has rather than letting it hang off the left edge. */
+      .gs-puttmeter { display: flex; justify-content: center; }
+      /* The read, as a caption line: the break the map draws but does not number, plus where the
+         read runs out. What it is NOT any more is the instructions. */
+      .gs-puttnote {
+        font-size: 11.5px; line-height: 1.25; color: var(--gs-dim); text-align: center;
+        overflow-wrap: anywhere;
+      }
+      .gs-puttnote b { color: var(--gs-ink); font-weight: 700; }
 
       /* ── TIGHT FIT: give the controls panel its width back (GS-a11y-tight-fit) ──────────────────
          GS-play-hud-space already found the shape of this bug and named it: "the flanking caddy/action
