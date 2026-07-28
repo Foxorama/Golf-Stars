@@ -1138,6 +1138,21 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     turning a side-on COMPOSITION; only a portrait-authored pose fixes it.** Guarded by
     `tests/battle-intro.test.ts`; eyes-on `scripts/battle-preview.mjs` (its assault waits carry an explicit
     `ENTRY` term — a bare number is a silent 2.8s error).
+    **AND THE GUNS ARE THE SHIP'S GUNS** (GS-story-battle-arms, `render/battleArms.ts` — the battle twin of
+    the star map's `shipWeapons.ts`). Every hull used to fire from ONE point off the nose with no muzzle
+    flash, so a mythic saucer spat buckshot exactly like the woody estate. An armament is a **ROW keyed by
+    `look.kind`** (compile-forced by the `Record`, so a new kind fails to build until its guns are decided):
+    MOUNTS (hull-local hardpoints) · FIRE pattern · MUZZLE FLASH shape · TRAIL motif, in the ship's OWN
+    `look.flame`/`glass` so a new ship row brings its weapon livery with it. **THE SPLIT: the upgrade says
+    what a shot DOES, the hull says where it comes from and how it reads** — the HUD seats one trigger per
+    arsenal upgrade, so a hull that overrode the projectile SHAPE would make all five fire the same thing
+    and an arsenal would stop reading as an arsenal. **ZERO BALANCE: a mount moves where a shot is BORN,
+    never how many there are** (`landPlayerHit` is per projectile, so one extra is one extra hit).
+    `shipBank()`/`shipBob()` are the ONE definition of where the hull is — sprite, barrels, flashes and
+    shots all read them, and a flash is stored by MOUNT INDEX, never a world position, or it slides off a
+    hull that is flying. Guarded by `tests/battle-arms.test.ts`; eyes-on the preview's SHIP RAIL (which
+    samples each hull in a BURST — a 150ms flash against an ~800ms autopilot cadence means one wait lands
+    between shots).
   - **Intro cinematic** (`docs/decisions/ui-intro.md`) — cosmetic Canvas2D, not in the reducer; degrades
     safely (every frame in try/catch → `finish()`); the many-instance glow uses a cached sprite, never
     per-element `shadowBlur`. The real title boots first; the intro overlays it.
