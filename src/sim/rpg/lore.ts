@@ -420,7 +420,7 @@ export const LORE_EVENTS: readonly LoreEvent[] = [
     speaker: 'Venoma "the Viper" Krait',
     portrait: 'venoma',
     kicker: 'One of us now',
-    title: 'Welcome, Sister',
+    title: 'Welcome, Darling',
     accent: '#b060c0',
     cta: 'Coil and strike →',
     lines: [
