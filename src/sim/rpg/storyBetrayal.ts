@@ -559,7 +559,7 @@ const BETRAYAL_VOICE: Record<string, BetrayalVoice> = {
       [
         { kind: 'action', text: 'Two majors on the wrong side of the ropes. Tonight Woo doesn’t save you a seat at dinner — because they aren’t at dinner. You find them out past the marshals, and Venoma is leaning in close, saying something with her hand on their arm.' },
         { kind: 'say', text: 'Venoma, pitched to carry: "They put a voice like that behind a rope. Sweet thing, on my side the gallery never goes home. Never. Ask them why they didn’t pick you and watch how fast they change the subject."' },
-        { kind: 'say', text: 'Woo, to you, with a grin nailed on: "Wasn’t looking for you! Wasn’t— it’s fine, it’s FINE. Go on, get your rest. Big man’s got a big round." They don’t follow you in.' },
+        { kind: 'say', text: 'Woo, to you, with a grin nailed on: "Wasn’t looking for you! Wasn’t— it’s fine, it’s FINE. Go on, get your rest. Big name’s got a big round." They don’t follow you in.' },
       ],
     ],
     // GS-story-heard-the-word: the Herald payoff — Venoma reached them too, and they chose the quiet nights.

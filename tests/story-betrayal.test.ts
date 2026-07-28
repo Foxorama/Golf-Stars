@@ -22,6 +22,15 @@ import {
   friendRivalHalftime,
   everyGolferHasBetrayalVoice,
   betrayerHasDefected,
+  betrayalDefection,
+  betrayalFarewell,
+  betrayalDoubt,
+  betrayalDistance,
+  betrayalSidelined,
+  betrayalTempted,
+  betrayalHeardTheWord,
+  betrayalEnticed,
+  betrayalOverlooked,
   COIL_SHIRT,
   COIL_ACCENT,
 } from '../src/sim/rpg/storyBetrayal';
@@ -271,5 +280,53 @@ describe('GS-story-sigil5-npc — the Ch.5 finale partner is a player CHOICE', (
   it('a skipped picker still tees off with a sensible default (legacy byte-identical)', () => {
     expect(finaleMatchup(warden(A, B)).allyId).toBe(loyalAllyId(warden(A, B)));
     expect(finaleMatchup(herald()).allyId).toBe(coilChampionExcluding(undefined));
+  });
+});
+
+// GS-story-neutral-address — the protagonist's gender is the PLAYER's, never the copy's.
+// Every friend speaks in first person precisely so their own pronouns never need inflecting
+// (see the `storyCast.ts` header) — but that only holds for how they refer to THEMSELVES. The
+// moment a line addresses YOU it can smuggle a gender back in, and one did: Huang-Woo's stage-1
+// `overlooked` beat sent the player off with "Big man's got a big round", which misgenders Bo
+// (they/them) and Feather (she/her) both. A vocative is the one shape to watch for — third-person
+// copy about an NPC ("a gaunt man in a coat of shed scale") is correctly gendered and stays.
+const GENDERED_ADDRESS = [
+  /\b(big|good|my|young|dear|old|nice|poor) (man|men|lady|ladies|girl|girls|boy|boys)\b/i,
+  /\b(sonny|missy|attaboy|atta-boy|atta-girl|attagirl|laddie|lassie|m['’]?lady)\b/i,
+  /\b(lad|lass|sir|ma['’]?am|madam|mister|missus)\b[,.!?"”]/i,
+];
+
+describe('GS-story-neutral-address — betrayal copy never assumes the player is a man', () => {
+  // Every line the BETRAYAL_VOICE tables can put on screen, plus every generic fallback (a bogus id).
+  const allLines = (): string[] => {
+    const ids = [...CHARACTERS.map((c) => c.id), 'no-such-golfer'];
+    const out: string[] = [];
+    for (const id of ids) {
+      out.push(...betrayalDefection(id), ...betrayalFarewell(id));
+      for (const beat of [betrayalDoubt, betrayalDistance, betrayalSidelined, betrayalTempted, betrayalHeardTheWord]) {
+        out.push(...beat(id).map((l) => l.text));
+      }
+      for (const stage of [0, 1] as const) {
+        out.push(...betrayalEnticed(id, stage).map((l) => l.text));
+        out.push(...betrayalOverlooked(id, stage).map((l) => l.text));
+      }
+      for (const voice of ['confront', 'corrupt', 'confrontPair'] as const) {
+        out.push(friendRivalTaunt(id, voice), friendRivalHalftime(id, voice, true), friendRivalHalftime(id, voice, false));
+      }
+    }
+    return out;
+  };
+
+  it('no gendered vocative anywhere in the betrayal voices', () => {
+    const lines = allLines();
+    expect(lines.length).toBeGreaterThan(200); // the walk actually reached the tables
+    const offenders = lines.filter((t) => GENDERED_ADDRESS.some((re) => re.test(t)));
+    expect(offenders).toEqual([]);
+  });
+
+  it('the guard would have caught the shipped line', () => {
+    expect(GENDERED_ADDRESS.some((re) => re.test('Go on, get your rest. Big man’s got a big round.'))).toBe(true);
+    // ...and leaves third-person copy about an NPC alone.
+    expect(GENDERED_ADDRESS.some((re) => re.test('A gaunt man in a coat of shed scale has stopped at her shoulder.'))).toBe(false);
   });
 });
