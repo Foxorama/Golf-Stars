@@ -65,6 +65,21 @@ treatment that would fix it too (stop, beat, slow trickle — `ShotLog.creepFrom
 change: give the trickle its own phase off the same seam. Left out because it is a celebration moment
 nobody has complained about, and reversing that call deserves its own eyes-on.
 
+**GS-creep-friction — the creep stops because its budget ran out, not because the slope did**
+*(measured while fixing GS-creep-fallline; the "could flow slightly better" half of that report)*
+`CREEP_MAX` is a flat 5 yards, and measured over 753 real creeps (`scripts/creep-census.ts`) **66% of
+them halt on that budget rather than because the ground flattened or the collar caught them** (61.7%
+before GS-creep-fallline — it is pre-existing, not introduced by it, and the fix only nudged it because
+the creep now follows the plane, which does not flatten). So the ball trickles down the hill and stops
+dead mid-slope for no reason the player can see. What actually stops a real ball is friction beating the
+slope, so the honest shape is a decelerating creep whose LENGTH falls out of the steepness it was shed
+onto — a ball off a savage bank onto a gentle plane runs a couple of yards, one on a genuinely steep
+green keeps going to the collar. Left out because it is a second physics model on the same phase, it
+changes rest positions on every contoured green (so it needs the death-spiral harness and probably some
+fixture re-pins), and the reporter explicitly ranked it "not the worst thing in the world" against the
+wrong-way bug. Cheap interim if it reads badly in play: the drawn creep already eases to a stop
+(`creepMsPerYd` smoothstep), so raising `CREEP_MAX` alone would just move the invisible wall further out.
+
 **GS-auto-ai-weak — the headless auto sim is far weaker than a human, and it gates everything**
 The auto sim stalls around hole 40 of the Unending Universe; human players reach 350+. Every balance
 harness in the suite measures THAT player, so the fences are calibrated to a weak one and have twice now
