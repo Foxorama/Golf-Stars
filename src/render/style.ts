@@ -576,7 +576,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // platform" read): without it a long par-4/5 fairway melted into the equally-purple platform
     // margin around it. Traced off `fwRuns` — the fairway system's ONE silhouette — so a split lane
     // or a broken island segment glows on every piece, not just the first.
-    if (glow) prims.push(...glowRim(fwRuns, glow));
+    if (glow) prims.push(...glowRim(fwRuns, glow, proj.scale));
   }
   for (const f of hole.features) {
     if (f.kind === 'fairway') continue; // drawn in the grouped pass above

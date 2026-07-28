@@ -59,12 +59,12 @@ const GREEN_COMPLEX: Record<BiomeArchetype, GreenComplexLook> = {
   desert: { apronYd: 6.5, collarYd: 3.4, mowBands: 5 }, // firm run-offs — you can putt from off the surface
   frost: { apronYd: 6, collarYd: 3, mowBands: 7 }, // a broad frozen skirt around the shelf
   inferno: { apronYd: 3.5, collarYd: 1.8, mowBands: 5 }, // scorched ground gives up quickly at the edge
-  void: { apronYd: 4, collarYd: 2.2, mowBands: 6 },
+  void: { apronYd: 5.5, collarYd: 2.8, mowBands: 6 }, // GS-cetus-void-deep: the tightest complexes in the game sat on the two worlds whose green is hardest to FIND — a surface with no complex around it reads smaller than it is
   crystal: { apronYd: 4, collarYd: 2, mowBands: 8 }, // finely faceted
   tempest: { apronYd: 5.5, collarYd: 2.6, mowBands: 6 },
   fungal: { apronYd: 3, collarYd: 1.6, mowBands: 7 }, // the jungle crowds right up to the surface
   ocean: { apronYd: 6, collarYd: 3.2, mowBands: 6 }, // seaside links run-offs
-  cetus: { apronYd: 4, collarYd: 2.2, mowBands: 6 },
+  cetus: { apronYd: 5.5, collarYd: 2.8, mowBands: 6 }, // GS-cetus-void-deep, as void above
   swamp: { apronYd: 3, collarYd: 1.6, mowBands: 5 }, // the mire closes in
   metal: { apronYd: 4, collarYd: 2, mowBands: 5 },
   derelict: { apronYd: 3.5, collarYd: 1.8, mowBands: 5 },

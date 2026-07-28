@@ -370,7 +370,15 @@ export const BIOMES: readonly Biome[] = [
     treeDensity: 0, // nothing grows in the void — crystals are the spice
     fairwayBunkers: 0.5,
     lostRough: 'voidrough', // signature: there is no rough — off the fairway is lost to the void
-    greenSize: 1.05, // GS-green-diversity: bigger ANGULAR asteroid greens adrift in the abyss (was tiny 0.85)
+    // GS-cetus-void-deep: 1.05 → 1.2, the pack MEDIAN. The report was "the greens look really small
+    // in these two biomes", and half of it was true — void and cetus carried the two smallest greens
+    // in the game outside the derelict (the rest of the field runs 1.15–1.5), on the two worlds whose
+    // green is also hardest to FIND: no landmarks, one hue, and a dilated platform margin all round
+    // that dwarfs the surface. (The other half was a render bug — see `rimYd` in `style/glow.ts`.)
+    // These worlds are BALANCE_EXEMPT, so the shipped harness skips them; measured separately over
+    // 240 holes at wildness 1, the move is near-neutral — void toPar/hole 1.0125 → 1.0333, cetus
+    // 0.8583 → 0.8500. Going the whole way to 1.25 cost void 1.0708, which is not worth the yard.
+    greenSize: 1.2,
     greenAspect: 1.7,
     greenIrregular: 1.25,
     greenSlopeMax: 0.55, // low-grav greens roll far + tilt hard (GS-green-diversity: 0.4 → 0.55)
@@ -631,7 +639,7 @@ export const BIOMES: readonly Biome[] = [
     treeDensity: 0.3, // sparse wind-bent coastal stacks
     fairwayBunkers: 1.4, // sandy clifftop coves
     lostRough: 'cetusdeep', // signature: off the clifftop is lost to the star-ocean (deep/wild stops)
-    greenSize: 1.1, // GS-green-diversity: bigger organic TIDE-POOL greens on the clifftop (was 0.95)
+    greenSize: 1.2, // GS-cetus-void-deep: 1.1 → 1.2, up to the pack median (see the void row)
     greenAspect: 1.85,
     greenIrregular: 1.2,
     greenSlopeMax: 0.6, // clifftop tide-pool roll (GS-green-diversity: 0.5 → 0.6)

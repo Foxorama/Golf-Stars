@@ -510,6 +510,18 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-cetus-void-deep** — the glow was right, everything around it was too loud
+  (`docs/decisions/render.md`). Play-test follow-up: *"much more vibrant now, but the pillars and the
+  space background have been brightened too and the holes don't stand out… the greens look really small."*
+  One rule, three surfaces: on a world that IS the dark, the only bright thing in the frame is the golf.
+  The NEBULA is sized off the screen, so at the play camera the player sees only its bright cores — cut to
+  the dimmest in the game, colour at near-zero strength. The CLIFF's top stratum was lighter than the
+  fairway standing on it and ran to two-fifths of the drawn island — strata dropped under the fairway,
+  depth now a `skirt` row (so the derelict + rainbow, on the same painter, stay byte-for-byte). The GREENS
+  were half a render bug (the glow moved bands to yards and left rim STROKES in px — a 6.4px halo over a
+  30px green) and half a real outlier (`greenSize` 1.05/1.10, the smallest in the game; both → 1.2, the
+  pack median, measured near-neutral on the exempt worlds' own balance run). Vibrance held while the sky
+  went dark, which is the whole point.
 - **GS-cetus-void-glow** — the two worlds built to glow were the two that didn't
   (`docs/decisions/render.md`). Void and Cetus share one design idea — off the cut turf is the open deep,
   so the player is looking at a LIT SHAPE floating in it — and the game was tinting a slab and drawing a
