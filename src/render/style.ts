@@ -60,7 +60,7 @@ import {
   n1,
 } from './style/shared';
 import { landHullCourse, lostPlatformsCourse, mergedHazardsFor, derelictBreachesFor } from './style/land';
-import { rainbowRibbon, styleFairways, styleTee } from './style/fairway';
+import { fairwayEdgeRuns, rainbowRibbon, strokeRun, styleFairways, styleTee } from './style/fairway';
 import { styleGreen, styleGreenSurround, greenSlopeArt } from './style/green';
 import {
   styleSandFamily,
@@ -562,16 +562,22 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // to be drawn HERE, under the fairway pass, which is what made it a one-sided crescent: hidden
     // wherever the green-flare fairway wrapped the green, and a lump of a third colour wherever it
     // didn't.
-    prims.push(...styleFairways(fairwaySps, art, fwShade, fwFringe, arch, groundedFw ? fwCollar : undefined, proj.scale));
+    // ONE silhouette for the whole fairway system (GS-fairway-silhouette), walked once and shared: the
+    // ink edge + first-cut ease inside `styleFairways` and the void/cetus rims below all describe the
+    // SAME edge, so none of them can cut back across turf another piece of fairway has covered.
+    const fwRuns = fairwayEdgeRuns(fairwaySps, proj.scale);
+    prims.push(
+      ...styleFairways(fairwaySps, art, fwShade, fwFringe, arch, groundedFw ? fwCollar : undefined, proj.scale, fwRuns),
+    );
     // Derelict corridor → riveted metal DECK PLATING (GS-ship-deck): panel seams, a painted hazard-
     // caution edge stripe, directional deck chevrons, and the scuffs/scorch of abandonment, clipped to
     // the corridor. Pure geometry, zero rng; gated to the derelict so every other world is untouched.
     if (arch === 'derelict') prims.push(...styleShipDeck(hole, fairwaySps, proj));
     // Void corridors get a luminous rim on top of the turf (the par-3 islands' "lit platform" read):
     // without it a long par-4/5 fairway melted into the equally-purple platform margin around it.
-    if (voidGlow) for (const sp of fairwaySps) prims.push({ t: 'poly', pts: sp, fill: 'none', stroke: 'rgba(165,175,255,0.5)', sw: 1.6 });
+    if (voidGlow) for (const rs of fwRuns) for (const r of rs) prims.push(strokeRun(r, 'rgba(165,175,255,0.5)', 1.6));
     // Cetus shelf gets a lit cyan rim so the raised edge catches the starlight (void has its own above).
-    if (calmShelf && arch === 'cetus') for (const sp of fairwaySps) prims.push({ t: 'poly', pts: sp, fill: 'none', stroke: 'rgba(150,232,255,0.55)', sw: 1.6 });
+    if (calmShelf && arch === 'cetus') for (const rs of fwRuns) for (const r of rs) prims.push(strokeRun(r, 'rgba(150,232,255,0.55)', 1.6));
   }
   for (const f of hole.features) {
     if (f.kind === 'fairway') continue; // drawn in the grouped pass above

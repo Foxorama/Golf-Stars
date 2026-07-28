@@ -510,6 +510,17 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-fairway-silhouette** — every piece of fairway is outlined, and nothing is outlined where fairway
+  meets fairway (`docs/decisions/render.md`). The ink edge was stamped on the FIRST fairway polygon only —
+  a real fix for the green flare slashing its ring back across the corridor, which left every OTHER piece
+  of cut grass with no outline at all. A census of 1,512 holes: **94% are drawn from more than one fairway
+  polygon and 25% carry one that touches nothing else** (a split lane, a broken island segment) — the
+  player's "the top fairway doesn't have it". Both wants are one rule: walk each polygon's own edge, keep
+  the runs no other fairway polygon buries, and feed that ONE silhouette to the ink, the first-cut edge
+  ease (same fault in reverse: the flare's flush join ramped a dark band across mid-fairway) and the
+  void/cetus rims. Tolerances are widths of GROUND and unclamped, so the silhouette is a fact about the
+  course and a follow-cam zoom can't pop a run in or out. The stacked crown sheen was measured (~2/255)
+  and deliberately left alone.
 - **GS-green-apron-blend** — the green's apron was never a ring, it was a crescent
   (`docs/decisions/render.md`). The surround was TWO passes: an opaque ramp drawn UNDER the fairway plus a
   tinted collar on top — and once GS-green-flare made the fairway genuinely wrap the green, "under the

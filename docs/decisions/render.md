@@ -1909,3 +1909,85 @@ The derelict is excluded outright: it has no grass, and seats its green in a mac
 `scripts/greenblend-preview.mjs` (approach) and `scripts/green-zoom.mjs` (putt) before/after. New rig
 `scripts/green-apron-preview.mjs` frames each world's green plus about a green-radius of surround —
 the zoom the whole question lives at, and the one that produced the crescent diff above.
+
+## GS-fairway-silhouette — the fairway system has ONE outline, and every piece of it gets one (2026-07-28)
+
+**The report** (with an in-game screenshot): *"looking at the fairway outlines, in split fairway holes,
+the outline does not cover the second fairway… the top fairway doesn't have it and there are probably
+some other issues associated with it as well. Note that it happens in all biomes."*
+
+It did, and the cause was one line in `style/fairway.ts`:
+
+```ts
+// ONE soft ink edge, on the main corridor only — no hard outline cuts back across it near the green.
+if (art.ink && sps[0]) out.push({ t: 'poly', pts: sps[0], … });
+```
+
+That line is a fix for a real bug. `styleFairways` draws the hole's fairway polygons as one grouped pass
+precisely because per-poly art fell apart at the green: the GS-green-flare apron stamped its own fringe
+ring and ink outline straight across the bright corridor (the "section around the green that doesn't
+fit"). Stamping the ink on the first polygon only made that stop.
+
+**What it also did was leave every other piece of cut grass with no outline at all.** Censused over
+1,512 generated holes across fourteen worlds:
+
+| fairway polygons on a hole | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| holes | 84 | 502 | 698 | 215 | 13 |
+
+**94% of holes are drawn from more than one fairway polygon**, and on **25%** at least one of them
+touches nothing else — a GS-fairway-water split lane, a broken island corridor's far segment. Those are
+the ones the player sees as a bare green smear beside an inked corridor. It is not a split-fairway bug;
+split fairways are just where the eye catches it, because the two pieces sit side by side in frame.
+
+### The fix: one silhouette, walked once, shared by everything that draws an edge
+
+Both wants — outline every piece, cut back across nothing — are the same rule. `fairwayEdgeRuns(sps,
+scale)` walks each polygon's own edge and keeps the runs that no OTHER fairway polygon buries:
+
+* a piece standing alone returns its **whole ring, on its original vertices** — so a lone fairway (the
+  void islands) is byte-for-byte the old closed stroke;
+* the apron keeps only the part outside the corridor, so nothing slashes across the turf;
+* an open run strokes as a `path`, never a `poly` — a closed poly chords straight across the fairway.
+
+The runs lie **exactly on the drawn polygons**. A tempting alternative was `merge.ts`'s `unionPolys`,
+but that rasterises and re-smooths: the ink would then be a SECOND description of an edge the fills have
+already committed to, which is the mistake behind every derelict-corridor bug in this repo.
+
+One walk feeds every layer that describes that edge: the ink, the first-cut EDGE EASE (which had the
+same fault in reverse — the apron's flush join ramped a dark band across the middle of the fairway), and
+the void/cetus luminous RIMS in `style.ts`. They cannot disagree because there is only one of them.
+
+### Measured in yards, which is what makes it camera-proof
+
+Every tolerance is a width of GROUND, not pixels — GS-green-complex's rule, one step further. Where one
+piece of fairway buries another is a fact about the COURSE; decide it in pixels and a follow-cam zoom
+pops a run of ink in or out mid-shot, and `tests/camera-stability` (which pins the whole scene's prim
+count and type sequence across a pan) goes flaky. The projector is a similarity (uniform scale +
+rotation), so a yard-derived decision taken on projected points *is* the course-space one. Note this
+means the tolerances are deliberately **unclamped**, unlike `turfPx` — a clamp is a camera-dependent
+decision, and these numbers decide structure, not just width.
+
+* `OUTLINE_STEP_YD` 1.5 — how finely the ring is walked (the sample budget is a count of ground samples).
+* `OUTLINE_BLEED_YD` 0.8 — an edge on the inside lip of a neighbour counts as buried.
+* `OUTLINE_CLOSE_YD` 4 — a buried DIP shorter than this is stitched back in.
+* `OUTLINE_MIN_RUN_YD` 2.5 — a visible run shorter than this is dropped.
+
+The last two are a **morphological close, then open**, in that order. Two pieces that join flush weave
+across each other for a few yards at a time, and drawn literally that is a row of dashes along one
+continuous edge of grass; open-then-close leaves the dashes behind as specks. Over 1,563 polygons the
+close takes fragmented rings (3+ runs) from 14 to 9, and no polygon anywhere produced more than 3 runs.
+
+Cost, measured: **0.05 ms per hole at map zoom, 0.33 ms at the deepest**, so it is fine in the follow-cam's
+per-frame scene rebuild (pinned by a test).
+
+**Deliberately not changed:** the crown SHEEN still stacks where two pieces overlap. It was measured
+before touching it — two washes at α 0.09/0.08 of `s.light` over `s.base` come out around **2/255**, under
+the visible-step threshold, and it never appeared in the before/after pixel diff. Fixing an invisible
+seam by building a real union polygon would have been churn.
+
+**Verification:** full suite green (2,117 tests), `tsc` clean, gallery re-shot, before/after pixel diffs
+at the approach camera (the change is edges ONLY — no area, tone or sheen shifted) and at the lane
+close-up. New rig `scripts/fairway-outline-preview.mjs` hunts down the holes that actually have a loose
+fairway polygon and frames it — the whole-hole gallery buries them, which is exactly how a lane with no
+outline shipped in the first place. Guarded by `tests/fairway-silhouette.test.ts`.
