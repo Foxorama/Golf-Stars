@@ -243,40 +243,65 @@ export interface CliffLook {
   dustB: string;
   shadow: string; // cast shadow at the foot
   contact: string; // contact shadow tucked under the lip
+  /** How deep the extrusion runs, as a fraction of the platform's SHORT span, floored/capped in px
+   *  (GS-cetus-void-deep). A ROW, because the same painter carries four materials with four jobs: a
+   *  derelict hull SECTION is a torn slab of ship and wants real depth, a Rainbow Road buttress is a
+   *  pillar, and the void/cetus landmass wants a SKIRT — enough to say "this is floating in space"
+   *  and no more. Omitted ⇒ the classic 0.6/44/190, so ship + rainbow are byte-for-byte. */
+  skirt?: { k: number; min: number; max: number };
 }
+/** The classic extrusion depth, kept for every look that does not declare its own. */
+const SKIRT_DEFAULT = { k: 0.6, min: 44, max: 190 };
 export const CETUS_CLIFF: CliffLook = {
-  // A bold TEAL → COBALT → DEEP-BLUE → BLACK plunge (GS-void-cetus-cliffs): the strata were greyed
-  // and read washed-out against the dark deep, flattening the side-on face; saturated + widened so
-  // the clifftop's descent to the abyss pops with the world's cyan identity. GS-cetus-void-glow took
-  // the last of the grey out of the mid bands (the plateau above them is a saturated ocean cyan now,
-  // and a duller face under a brighter top reads as a decal rather than one lit landform).
-  strata: ['#12b4c3', '#0a8db1', '#06659b', '#044378', '#02284f', '#01132a'],
+  // A COBALT → DEEP-BLUE → BLACK plunge into the star-ocean. GS-cetus-void-deep set the rule the
+  // face had never obeyed: **the supporting structure sits BELOW the surface it holds up.** Its top
+  // band was a lit teal at OKLab L 0.703 against a fairway at 0.556 — the buttress out-valued the
+  // golf, and on a half-frame of drawn island the eye went to the masonry. Now the brightest band
+  // starts a clear step under the fairway and falls away from there, so the plateau caps a mass in
+  // shadow. Colour is kept (it is still the world's blue); it is the LIGHT that was wrong.
+  strata: ['#0a5a6e', '#074363', '#052e52', '#031d3d', '#020f27', '#010816'],
   deepMix: '#02070d',
   lipA: 'rgba(150,232,255,0.9)',
   lipB: 'rgba(232,252,255,0.7)',
   crackDark: 'rgba(3,9,16,0.5)',
-  crackLit: 'rgba(120,190,225,0.22)',
-  dustA: 'rgba(190,236,255,0.5)',
-  dustB: 'rgba(140,205,255,0.4)',
+  crackLit: 'rgba(120,190,225,0.16)',
+  dustA: 'rgba(190,236,255,0.3)',
+  dustB: 'rgba(140,205,255,0.24)',
   shadow: 'rgba(2,7,13,0.5)',
   contact: 'rgba(3,10,18,0.34)',
+  // GS-cetus-void-deep: a SKIRT, not a second object. At the classic 0.6 of the short span the
+  // buttress ran to two-fifths of the drawn island — measured on the play camera it took as much of
+  // the frame as the fairway it supports, which is the "supporting art is competing with the hole"
+  // report. A third of that still says "this is a slab floating in space". The floor barely moves:
+  // below ~26px the strata collapse into a dark line and a small pad stops reading side-on at all.
+  skirt: { k: 0.32, min: 26, max: 96 },
 };
 export const VOID_CLIFF: CliffLook = {
   // A vivid VIOLET → BLACK asteroid underside (GS-void-cetus-cliffs): the old strata sat as a greyed
   // lavender that washed out against the abyss; pushed toward a saturated cosmic purple descending to
   // near-black so the floating rock reads as solid, luminous void-stone. GS-cetus-void-glow rotated
   // them off blue-violet onto the plateau's own purple hue — the face and the turf it holds up are
-  // the same rock, lit by the same light.
-  strata: ['#7e57bc', '#653c9c', '#4f277e', '#39165d', '#23083b', '#10031d'],
+  // the same rock, lit by the same light. GS-cetus-void-deep then dropped them a long way DOWN that
+  // hue: the asteroid was the loudest thing on the screen, a stack of bright violet slabs at L 0.546
+  // under a fairway at 0.400, i.e. the underside was lighter than the golf course standing on it.
+  // The top band now starts under the world's ROUGH and falls to near-black — an asteroid seen from
+  // above is a shadowed mass, and the only light in the frame should be the hole.
+  strata: ['#2d104e', '#21083b', '#16042a', '#0f0320', '#0a0216', '#05010c'],
   deepMix: '#04010c',
   lipA: 'rgba(190,140,255,0.85)',
   lipB: 'rgba(224,205,255,0.72)',
   crackDark: 'rgba(6,3,16,0.55)',
-  crackLit: 'rgba(150,110,220,0.24)',
-  dustA: 'rgba(206,180,255,0.5)',
-  dustB: 'rgba(150,120,220,0.4)',
+  crackLit: 'rgba(150,110,220,0.16)',
+  dustA: 'rgba(206,180,255,0.3)',
+  dustB: 'rgba(150,120,220,0.24)',
   shadow: 'rgba(3,1,10,0.5)',
   contact: 'rgba(6,3,16,0.36)',
+  // GS-cetus-void-deep: a SKIRT, not a second object. At the classic 0.6 of the short span the
+  // buttress ran to two-fifths of the drawn island — measured on the play camera it took as much of
+  // the frame as the fairway it supports, which is the "supporting art is competing with the hole"
+  // report. A third of that still says "this is a slab floating in space". The floor barely moves:
+  // below ~26px the strata collapse into a dark line and a small pad stops reading side-on at all.
+  skirt: { k: 0.32, min: 26, max: 96 },
 };
 // Derelict (GS-derelict): each hull SECTION is a slab of broken ship floating in space, so its
 // underside reads as a cold riveted METAL cross-section — dark gunmetal strata descending to black, a
@@ -447,9 +472,10 @@ export function platformCliffs(
     if (top.length < 2) continue;
     const bb = bboxOf(plat);
     const cx = (bb.minX + bb.maxX) / 2;
-    // Height keys off the SMALLER span so a narrow, tall island still gets a substantial wall rather
-    // than a sliver (its width alone barely cleared the old floor); floored higher for a solid read.
-    const cliffH = Math.max(44, Math.min(190, Math.min(bb.maxX - bb.minX, bb.maxY - bb.minY) * 0.6));
+    // Depth keys off the SMALLER span so a narrow, tall island still gets a wall rather than a
+    // sliver (its width alone barely cleared the old floor); how deep is this material's own row.
+    const sk = look.skirt ?? SKIRT_DEFAULT;
+    const cliffH = Math.max(sk.min, Math.min(sk.max, Math.min(bb.maxX - bb.minX, bb.maxY - bb.minY) * sk.k));
     faces.push({ top, height: cliffH });
     // Drop the lip down (a slight outward splay so the block reads solid, base roughened into rubble).
     const dropped = (t: number): Vec[] =>

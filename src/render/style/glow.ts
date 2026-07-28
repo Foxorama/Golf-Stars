@@ -44,9 +44,14 @@ export interface WorldGlow {
   greenBloom: string;
   greenBloomYd: number;
   greenBloomAlpha: number;
-  /** The lit edge itself, and the width of its brightest (innermost) stroke. */
+  /** The lit edge itself, and the width of its brightest (innermost) stroke — in course yards, like
+   *  every other reach here. It was a fixed 1.6px, which is the mistake this module was written to
+   *  avoid, just applied to strokes instead of bands: the widest pass is 4x the core, so at the
+   *  whole-hole camera a 6.4px halo sat on a green barely 30px across and ate a fifth of the
+   *  putting surface. That is most of "the greens look really small in these two biomes" — the
+   *  green was not small, its own glow was covering it. */
   rim: string;
-  rimW: number;
+  rimYd: number;
   /** Inward reach of a lone surface's inner glow, in course yards, and its alpha at the edge. */
   coreYd: number;
   coreAlpha: number;
@@ -68,7 +73,7 @@ const WORLD_GLOW: Partial<Record<BiomeArchetype, WorldGlow>> = {
     greenBloomYd: 13,
     greenBloomAlpha: 0.42,
     rim: '#c9aeff',
-    rimW: 1.6,
+    rimYd: 1.1,
     coreYd: 3.2,
     coreAlpha: 0.22,
   },
@@ -82,7 +87,7 @@ const WORLD_GLOW: Partial<Record<BiomeArchetype, WorldGlow>> = {
     greenBloomYd: 13,
     greenBloomAlpha: 0.44,
     rim: '#9be8ff',
-    rimW: 1.6,
+    rimYd: 1.1,
     coreYd: 3.2,
     coreAlpha: 0.24,
   },
@@ -114,11 +119,14 @@ const BLOOM_STEPS = 9;
  * outline — and because it takes the same `EdgeRun`s the ink does, it traces the fairway system's
  * ONE silhouette and never chords across buried turf.
  */
-export function glowRim(runs: EdgeRun[][], g: WorldGlow): Prim[] {
+export function glowRim(runs: EdgeRun[][], g: WorldGlow, scale: number): Prim[] {
   const out: Prim[] = [];
+  // Floored so the filament never vanishes on the whole-hole map, capped so a putt-camera zoom can't
+  // turn the halo into a flood — the same clamp `turfPx` applies to every other turf band.
+  const core = turfPx(scale, g.rimYd, 1.2, 6);
   for (const rs of runs)
     for (const r of rs)
-      for (const [w, a] of RIM_PASSES) out.push(strokeRun(r, hexAlpha(g.rim, a), g.rimW * w));
+      for (const [w, a] of RIM_PASSES) out.push(strokeRun(r, hexAlpha(g.rim, a), core * w));
   return out;
 }
 /** Width multiple × alpha, widest/faintest first — the falloff either side of the filament. */
@@ -155,7 +163,7 @@ export function glowSurfaceEdge(sp: Vec[], g: WorldGlow, scale: number): Prim[] 
       sw: step * 1.3,
     });
   }
-  out.push(...glowRim([[{ closed: true, pts: sp }]], g));
+  out.push(...glowRim([[{ closed: true, pts: sp }]], g, scale));
   return out;
 }
 const CORE_RINGS = 4;

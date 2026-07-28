@@ -723,6 +723,27 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     the arrival hero: the splash and the course you land on are one place). Cetus 48.6 → **60.7**
     colourfulness, void chroma 0.199 → **0.238** (now above verdant's). Guarded by `tests/biome-glow.test.ts`;
     measured by `scripts/biome-vibrance.mjs`.
+  - **ON A LUMINOUS WORLD THE ONLY BRIGHT THING IN THE FRAME IS THE GOLF** (GS-cetus-void-deep — the
+    play-test follow-up; raising the hole is half the job, the other half is not raising the room with
+    it). Three surfaces had to come DOWN. **The sky**: `nebula` is three glows sized off the SCREEN at
+    1.9× the row alpha, so at the PLAY camera — where the sky is a thin margin round the hole — the
+    player sees only their bright cores and the deep reads as a flat mid wash at the platform's own
+    value. Void/cetus now carry the dimmest nebula in the game (0.07) and a soft rim (0.15): on the two
+    worlds that ARE the dark, the sky is COLOUR AT NEAR-ZERO STRENGTH. **The pillars**: the cliff's top
+    stratum was LIGHTER than the fairway standing on it (cetus L 0.703 vs 0.556, void 0.546 vs 0.400)
+    and ran 0.6 of the platform's short span ≈ two-fifths of the drawn island. Strata now start a step
+    UNDER the fairway (pinned to the fairway, NOT the rough — cetus is a sea cliff whose upper face
+    legitimately catches light), and depth is a `CliffLook.skirt` ROW at 0.32 — a row because
+    `platformCliffs` carries four materials with four jobs, and omitting it keeps the classic 0.6 so the
+    derelict hull sections + Rainbow buttress are byte-for-byte. **The greens**: half render bug — the
+    glow pass moved every BAND to yards and left the rim STROKES at a fixed 1.6px, and the widest pass
+    is 4× the core, so a 6.4px halo covered a fifth of a 30px green (`rimYd` finishes the rule); half
+    data — void 1.05 / cetus 1.10 `greenSize` were the smallest in the game outside the derelict against
+    a 1.15–1.5 field, both → **1.2** (pack median; a pure multiplier AFTER the radius draw ⇒ zero rng
+    moved). They are BALANCE_EXEMPT so the harness skips them — measured separately over 240 holes,
+    void toPar/hole 1.0125 → 1.0333, cetus 0.8583 → 0.8500; 1.25 cost void 1.0708 and wasn't worth it.
+    Vibrance HELD while the sky went dark (cetus 60.9, void 34.8) — vibrant AND dark, never vibrant
+    because bright.
   - Merges: platforms + hazard families through `render/merge.ts` — platforms `dilateUnion(…,14)` (never a
     mitred outset), sand/liquid families `unionClose` bridging near pairs with a slim neck (GS-hazard-merge,
     render-only, sim penalty polys unchanged). Lost-rough cliffs extrude from the REAL lower silhouette

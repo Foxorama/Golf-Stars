@@ -369,8 +369,12 @@ export const ARCHETYPE_SPACE: Record<BiomeArchetype, SpaceLook> = {
   inferno: { base: '#0f0403', nebula: 'rgba(205,60,30,0.13)', edge: 'rgba(255,125,65,0.20)' },
   // Void — the abyss: deepest base, violet nebula, luminous violet shore. GS-cetus-void-glow
   // saturated all three (the shore rim was a periwinkle BLUE, which is what pulled the world off
-  // its own purple) without lightening the sky — a vibrant dark world, not a brighter one.
-  void: { base: '#040109', nebula: 'rgba(140,55,235,0.15)', edge: 'rgba(170,110,255,0.26)' },
+  // its own purple). GS-cetus-void-deep then took the STRENGTH back out of both: the nebula is drawn
+  // as three glows sized off the SCREEN, so at the play camera — where the sky is a thin margin round
+  // the hole — the player sees only their bright cores, and the deep read as a flat mid-purple wash
+  // at nearly the platform's own value. On the two worlds that ARE the dark, the sky is colour at
+  // near-zero strength; the light in the frame has to come from the golf.
+  void: { base: '#040109', nebula: 'rgba(140,55,235,0.07)', edge: 'rgba(170,110,255,0.15)' },
   // Crystal — a cool prismatic dark with an icy-cyan nebula and a bright crystalline shore.
   crystal: { base: '#0a1420', nebula: 'rgba(150,210,230,0.11)', edge: 'rgba(180,235,240,0.20)' },
   // Tempest — a storm-violet dark, electric nebula, lightning-lit shore.
@@ -382,8 +386,9 @@ export const ARCHETYPE_SPACE: Record<BiomeArchetype, SpaceLook> = {
   // Cetus — the star-ocean: an abyssal blue-black sea, a bioluminescent cyan bloom, a glowing
   // cliff-shore where the plateau meets the deep (the surrounding void IS the ocean the whales swim).
   // (GS-cetus-void-glow: the bloom deepened to a saturated cobalt — the world's light comes from
-  // BELOW, out of the sea, so the sky it stains should be ocean blue rather than a pale cyan haze.)
-  cetus: { base: '#01080f', nebula: 'rgba(25,120,235,0.15)', edge: 'rgba(95,205,255,0.28)' },
+  // BELOW, out of the sea, so the sky it stains should be ocean blue rather than a pale cyan haze.
+  // GS-cetus-void-deep pulled its strength right down, same reason as the void's above.)
+  cetus: { base: '#01080f', nebula: 'rgba(25,120,235,0.07)', edge: 'rgba(95,205,255,0.16)' },
   // Swamp — a fetid green-black gloom lit by a toxic-green miasma nebula, with a sickly chartreuse
   // shore glow where the mire meets the murk.
   swamp: { base: '#0b1206', nebula: 'rgba(120,180,60,0.12)', edge: 'rgba(160,205,90,0.18)' },

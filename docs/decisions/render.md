@@ -2090,3 +2090,77 @@ and `tests/biome-glow.test.ts` pins a perceptual floor on green-vs-fairway separ
 before/after at the whole-hole, approach and putt cameras. Guarded by `tests/biome-glow.test.ts`
 (row-only-or-nothing, yards-not-pixels, camera-invariant prim counts, silhouette coverage, and a
 chroma floor so the two worlds cannot quietly wash out again).
+
+---
+
+## GS-cetus-void-deep — the glow was right, everything around it was too loud (2026-07-28)
+
+Play-test follow-up to GS-cetus-void-glow, from four in-game screenshots: *"they look much more
+vibrant now which is great, but the pillars supporting the fairways and the space background have
+also been tonally brightened and the holes themselves don't really stand out… the greens are
+probably the right size, but for some reason they look really small in these two biomes."*
+
+All three are the same rule, stated three ways. **On a world whose whole point is a lit shape in
+the dark, the only bright thing in the frame is the golf.** Everything else is scenery, and scenery
+sits underneath. The glow pass had raised the hole and then raised the room with it.
+
+### 1. The sky
+
+`ARCHETYPE_SPACE.nebula` is drawn as three radial glows whose radius is a fraction of the **screen**,
+at 1.9× the row's alpha. On the whole-hole map that is a soft wash in the corners. At the *play*
+camera — where the sky is a thin margin around the hole — the player is looking at nothing but their
+bright cores, and the deep read as a flat mid-purple at nearly the platform's own value. GS-cetus-
+void-glow had made it worse in two ways at once (0.13 → 0.15 alpha *and* a much more saturated hue,
+which reads as more present at equal alpha).
+
+Both worlds now carry the dimmest nebula in the game (0.07) and a much softer shore rim (0.26 → 0.15).
+The hue stays saturated: these are the two worlds that ARE the dark, so their sky is **colour at
+near-zero strength**.
+
+### 2. The pillars
+
+Measured against the palette, the buttress was lighter than the golf course standing on it:
+
+| | cliff top stratum | its own fairway |
+|---|---|---|
+| cetus | OKLab L **0.703** | 0.556 |
+| void | L **0.546** | 0.400 |
+
+…and it was drawn at 0.6 of the platform's short span (capped 190px), which on a play-camera frame
+ran to roughly two-fifths of the drawn island — as much of the frame as the fairway it supports.
+
+Both fixed. The strata now start a clear step **under** the fairway and fall away to near-black, and
+the depth is a `CliffLook.skirt` **row** at 0.32 (capped 96px). The row matters: `platformCliffs` is
+shared by four materials with four jobs — a derelict hull SECTION is a torn slab of ship and a
+Rainbow Road buttress is a pillar, and both want the classic depth. Omitting the field keeps the old
+constants, so those two worlds are byte-for-byte and a void art pass cannot quietly restyle them.
+
+Note the rule is pinned to the **fairway**, not to the darkest ground: Cetus is a sea cliff whose
+upper face legitimately catches light — that side-on read is the world's signature (GS-cetus-3) —
+so "darker than the rough" would be describing the void's asteroid and calling it a general law.
+
+### 3. The greens
+
+Half a render bug, half a data outlier — worth separating, because the report guessed at the first
+and the second was real.
+
+**The render bug.** GS-cetus-void-glow moved every *band* to yards and left the rim *strokes* at a
+fixed 1.6px. The widest rim pass is 4× the core, so on the whole-hole map a 6.4px halo sat on a green
+barely 30px across and covered about a fifth of the putting surface. The green was not small; its own
+glow was on top of it. `rimYd` (1.1 yd, floored 1.2px, capped 6px) finishes the rule the module was
+written to keep.
+
+**The data.** Void 1.05 and Cetus 1.10 were the two smallest `greenSize` values in the game outside
+the derelict, against a field running 1.15–1.5 — on the two worlds whose green is also hardest to
+*find* (no landmarks, one hue, and a dilated platform margin that dwarfs the surface). Both to **1.2**,
+the pack median. They are `BALANCE_EXEMPT_BIOMES`, so the shipped harness skips them; measured
+separately over 240 holes at wildness 1 the move is near-neutral — void toPar/hole 1.0125 → **1.0333**,
+cetus 0.8583 → **0.8500**. Going the whole way to 1.25 cost void **1.0708**, which is not worth the
+extra yard. `greenSize` is a pure multiplier applied *after* the radius draw, so the rng stream is
+untouched (contract 1). Their green complexes — the tightest in the game at 4/2.2 yd — also came up to
+the parkland band, since a surface with no complex around it reads smaller than it is.
+
+**Verification:** 2,134 tests green, `tsc` clean, gallery re-shot (every other world pixel-identical,
+derelict included), before/after at the play framing the report came from. Vibrance held while the sky
+went dark — cetus 60.7 → **60.9** colourfulness, void 34.9 → **34.8** — which is the point: *vibrant
+and dark*, not vibrant *because* bright. Guarded by the new blocks in `tests/biome-glow.test.ts`.
