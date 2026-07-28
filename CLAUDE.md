@@ -684,6 +684,22 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     emitters share ONE `surfaceProjector`/`DIMPLES`/`bandPoint`, so the pattern can't change at the
     moment the swing starts, and `ballSVG` emits **no ids** (they are document-global — see
     `holeIdPrefix`). Guarded by `tests/ball.test.ts`; eyes-on `scripts/ball-preview.mjs`.
+  - **THE FAIRWAY SYSTEM HAS ONE SILHOUETTE, AND EVERY PIECE OF IT IS OUTLINED** (GS-fairway-silhouette,
+    `fairwayEdgeRuns`). A hole's fairway is nearly always SEVERAL polygons — corridor + green flare +
+    a split lane / broken-island segments (**94%** of holes; **25%** carry a piece touching nothing else) —
+    and the ink edge was stamped on `sps[0]` alone, because a per-poly outline slashed the apron's ring
+    back across the corridor (GS-blend). So every other piece of cut grass shipped with NO outline: a
+    split fairway drawn as a bare green smear beside an inked corridor. Both wants are one rule — walk
+    each poly's own edge, keep the runs no OTHER fairway poly buries. A lone piece returns its whole ring
+    (void islands byte-for-byte); an open run is a `path`, never a `poly` (which chords across the turf).
+    ONE walk feeds the ink, the first-cut EDGE EASE (same fault in reverse — the flush join ramped a dark
+    band across mid-fairway) and the void/cetus RIMS, so they cannot disagree. Runs lie exactly on the
+    DRAWN polys — never a re-derived `unionPolys` outline (a second description of a committed edge).
+    **Every tolerance is a width of GROUND, deliberately UNCLAMPED** (unlike `turfPx`): burial is a fact
+    about the COURSE, and a px decision pops a run in/out on a follow-cam zoom (`tests/camera-stability`
+    pins the scene's prim count across a pan). Close-then-OPEN, in that order — a flush join weaves for a
+    few yards and drawn literally that is a row of dashes. Guarded by `tests/fairway-silhouette.test.ts`;
+    eyes-on `scripts/fairway-outline-preview.mjs` (the gallery BURIES loose lanes — that is how it shipped).
   - Merges: platforms + hazard families through `render/merge.ts` — platforms `dilateUnion(…,14)` (never a
     mitred outset), sand/liquid families `unionClose` bridging near pairs with a slim neck (GS-hazard-merge,
     render-only, sim penalty polys unchanged). Lost-rough cliffs extrude from the REAL lower silhouette
