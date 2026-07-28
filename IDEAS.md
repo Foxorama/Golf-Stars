@@ -500,6 +500,18 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
   fresh, planned session.
 
 ## Later
+- **GS-story-serpent-portrait — a portrait-authored pose for the finale boss.** The remaining half of the
+  player's *"because all our graphics are side on it looks pretty weird"*. `paintSerpent` composes the
+  beast lying HORIZONTALLY — a side elevation — and the turned finale camera (GS-story-battle-portrait)
+  rotates that whole drawing 90°, so what the player sees is a snake's flank while its head dives at them.
+  GS-story-battle-epic proved the cheap fix does not exist: rotating the form-shading key light onto
+  screen-up shades it along its own spine and drops the head into shadow, and the two are near
+  indistinguishable side by side. The real answer is a pose authored for a portrait frame — the skull
+  turned toward the camera (a foreshortened three-quarter head, so the maw and BOTH eyes face down the
+  screen) with the body coiling away behind it. That is a `SerpentOpts` variant, not a rewrite, but it is
+  a real art job and it must not disturb the sigil ceremonies, which are landscape and share the painter —
+  so it wants its own PR, its own `serpent-preview.mjs` pass, and the ceremony shot as the control.
+  Same question then applies to the Warden Ark (hull-relative shading, so it survives the turn far better).
 - **GS-ship-greenside-ring — re-arm the derelict's greenside breach RING.** `ringAllowed = !ship ||
   !lostRough` gates the sanctioned ring of greenside penalty blobs off on any lost-rough hole; since
   GS-ship-calm-space armed the derelict's lost-rough at every wildness, that means always. Not a
@@ -525,6 +537,19 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-story-battle-epic** — the finale battle is a set-piece, not a skirmish
+  (`docs/decisions/story-mode.md`). Reported on the freshly-turned portrait fight: *"because all our
+  graphics are side on it looks pretty weird… given it's the final boss battle campaign it should be pretty
+  flashy and epic, and at the moment it is just fine."* Five render-only rules — the boss ARRIVES (a 2.8s
+  entrance: loom out of the dark, name plate slam, roar, HUD wipe), hits BITE (hitstop with the art clock
+  frozen, a sprung flinch, sparks, floating damage), the phase turn is a BEAT (one `bossRoar()` whose
+  shockwave blows the field clear), the arena has a PLACE (the root, parallax wreckage, a far fleet, a
+  waking storm) and the bar is a BOSS BAR (name + epithet, a chip bar draining behind, shattering shields).
+  The portrait boss is drawn a fifth bigger about a fixed head pivot, with its ANCHORS mapped through the
+  same scale so targeting/muzzle/finisher stay one description. Nothing about damage, spawns, cooldowns,
+  thresholds or hitboxes moved. ⚠️ Re-lighting the serpent for the turned camera was built and thrown away
+  — screen-up is the beast's own spine, so it shades lengthwise and shadows the head; the side-on read is
+  a property of turning a side-on COMPOSITION and wants a portrait-authored pose (see `GS-story-serpent-portrait`).
 - **GS-story-battle-portrait** — the finale boss fight is drawn at the orientation the screen has room for
   (`docs/decisions/story-mode.md`). Reported from the couch: *"the end fight works really well… except it's
   a landscape battle when the entire game is in portrait."* On a 390×844 phone the 1000×600 arena
