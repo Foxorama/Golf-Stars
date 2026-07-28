@@ -525,6 +525,19 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-story-battle-portrait** — the finale boss fight is drawn at the orientation the screen has room for
+  (`docs/decisions/story-mode.md`). Reported from the couch: *"the end fight works really well… except it's
+  a landscape battle when the entire game is in portrait."* On a 390×844 phone the 1000×600 arena
+  meet-fitted at scale **0.39** — a 390×234 strip of fight between two slabs of black. An orientation lock
+  was rejected on availability (none on iOS Safari, fullscreen-only on Android, a native plugin in the
+  shell), so the arena TURNS instead — the same answer `fitFrame` gives the hole map. `battleFrame.ts` is
+  the camera: rotate 90° CCW when the container is taller than wide, boss at the top, ship at the bottom,
+  **2.8× the drawn area** — and the FIGHT never leaves design space, so every hitbox, speed, spawn and
+  phase timing (and therefore the balance) is untouched. The art needed no changes: it was all drawn facing
+  along design +x, so the maw and the lance batteries end up pointing down at the player. The HUD gets its
+  own always-upright frame — the arena box in landscape (byte-for-byte), the whole safe screen when turned,
+  which hands the bars the letterbox bands instead of the playfield. Two seams the turn exposed: full-frame
+  washes now cover the view rect, and `paintSerpent` no longer hard-clips its haze at the design box.
 - **GS-play-bleed-holeout** — the page frame came back while the putt was still rolling
   (`docs/decisions/ui-intro.md`). Reported from the green: *"the putt make window adds black borders and
   slides slightly down off the bottom of the screen."* The tell was in the screenshot — TWO settings cogs,

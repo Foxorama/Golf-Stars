@@ -26,6 +26,16 @@
  *     cells — survive it with shields in hand and the spent serpent bares its eye for the golf FINISHER.
  *     Phases key off health, so a maxed arsenal shortens the fight but never skips the gauntlet.
  *
+ *   • IT IS DRAWN AT THE ORIENTATION THE SCREEN HAS ROOM FOR (GS-story-battle-portrait). The fight is
+ *     composed in a 1000×600 LANDSCAPE frame and the rest of the game is portrait, so on a phone it
+ *     meet-fitted to a 390×234 strip between two slabs of black. There is no orientation lock worth
+ *     having (none at all on iOS Safari, fullscreen-only on Android, a native plugin in the shell), so
+ *     on a taller-than-wide screen the whole arena TURNS 90° instead: the boss looms at the top, your
+ *     ship flies at the bottom, its fire rains down. Every piece of art was drawn facing along design
+ *     +x, so it all comes along for free. `battleFrame.ts` owns that camera; the fight NEVER leaves
+ *     design space, so nothing about its balance or fairness moves — only the HUD, which draws in its
+ *     own always-upright frame.
+ *
  * FAIR BY CONSTRUCTION: the deterministic gate verdict still rules what is POSSIBLE — under the breach
  * gate the hide holds at the hopeless floor (the serpent can be worn to it but never past); the Skip
  * button / reduced-motion (guarded at the call site) always resolve the ARMED verdict cleanly (never a
@@ -38,6 +48,17 @@ import { paintSerpent, type SerpentAnchors } from './sigilCeremony';
 import { paintWardenArk, arkBatteryPos } from './wardenArk';
 import { shipSVG } from './shipArt';
 import { canvasRatio } from './pixelRatio';
+import { safeAreaInsets } from './safeArea';
+import {
+  BATTLE_DW,
+  BATTLE_DH,
+  battleFrame,
+  toDesignPoint,
+  toHudPoint,
+  designViewRect,
+  arenaTopHud,
+  type BattleFrame,
+} from './battleFrame';
 import {
   FINALE_SERPENT_HP,
   FINALE_PHASES,
@@ -57,8 +78,8 @@ export interface StoryBattleHandle {
   destroy(): void;
 }
 
-const DW = 1000;
-const DH = 600;
+const DW = BATTLE_DW;
+const DH = BATTLE_DH;
 
 const clamp = (x: number, a: number, b: number): number => (x < a ? a : x > b ? b : x);
 const clamp01 = (x: number): number => clamp(x, 0, 1);
@@ -96,6 +117,7 @@ const HIT_ZONE = 88; // finisher reticle tolerances (the golf strike)
 const CLEAN_ZONE = 26;
 const SWEEP_AMP = 220;
 const SWEEP_SPEED = 1.9;
+const WEAPON_BAR_H = 72; // deep triggers — they letterbox down to thumb-size on phones
 
 /** Serpent attack cadence per phase index (ms between volleys) — pressure rises as it wakes. */
 const PHASE_ATTACK_MS = [2600, 2300, 2100, 1900] as const;
@@ -235,9 +257,8 @@ export function mountStoryBattle(opts: {
   let dpr = 1;
   let cssW = 0;
   let cssH = 0;
-  let scale = 1;
-  let offX = 0;
-  let offY = 0;
+  /** The camera: which way the arena is turned, and the upright HUD frame beside it (GS-story-battle-portrait). */
+  let view: BattleFrame = battleFrame(DW, DH);
 
   // ── the deep-space backdrop (star-map family: parallax starfields + seeded nebula washes) ───────────
   const rng = mulberry32(0x5e79a1 ^ (herald ? 0x77 : 0x11));
@@ -270,9 +291,42 @@ export function mountStoryBattle(opts: {
     cssH = overlay.clientHeight || window.innerHeight;
     canvas.width = Math.max(1, Math.round(cssW * dpr));
     canvas.height = Math.max(1, Math.round(cssH * dpr));
-    scale = Math.min(cssW / DW, cssH / DH);
-    offX = (cssW - DW * scale) / 2;
-    offY = (cssH - DH * scale) / 2;
+    // A turned frame hugs the screen edges, so its HUD has to clear the notch / home indicator; the
+    // classic landscape frame sits inside its own letterbox and never did.
+    view = battleFrame(cssW, cssH, safeAreaInsets());
+    // Skip must never sit under the weapon bar, and a turned bar spans the full width — so it moves to
+    // the top corner exactly when the arena turns.
+    skip.style.top = view.rotated ? 'calc(16px + env(safe-area-inset-top, 0px))' : '';
+    skip.style.bottom = view.rotated ? '' : '16px';
+  }
+
+  /** The WORLD transform: design space, turned to match the screen. Everything the fight simulates draws here. */
+  function applyWorld(shx: number, shy: number): void {
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.translate(view.offX, view.offY);
+    ctx.scale(view.scale, view.scale);
+    if (view.rotated) {
+      ctx.translate(0, DW);
+      ctx.rotate(-Math.PI / 2);
+    }
+    ctx.translate(shx, shy);
+  }
+
+  /** The HUD transform: ALWAYS upright, whatever the arena did. Readouts, triggers and captions draw here. */
+  function applyHud(shx: number, shy: number): void {
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.translate(view.hudX, view.hudY);
+    ctx.scale(view.scale, view.scale);
+    ctx.translate(shx, shy);
+  }
+
+  /** Fill the whole VISIBLE screen in world space — a full-frame wash must cover the letterbox bands too. */
+  function fillView(): void {
+    if (!ctx) return;
+    const v = designViewRect(view, cssW, cssH);
+    ctx.fillRect(v.x, v.y, v.w, v.h);
   }
 
   function finish(): void {
@@ -298,7 +352,12 @@ export function mountStoryBattle(opts: {
 
   function toDesign(e: { clientX: number; clientY: number }): { x: number; y: number } {
     const r = overlay.getBoundingClientRect();
-    return { x: (e.clientX - r.left - offX) / scale, y: (e.clientY - r.top - offY) / scale };
+    return toDesignPoint(view, e.clientX - r.left, e.clientY - r.top);
+  }
+
+  function toHud(e: { clientX: number; clientY: number }): { x: number; y: number } {
+    const r = overlay.getBoundingClientRect();
+    return toHudPoint(view, e.clientX - r.left, e.clientY - r.top);
   }
 
   function fireWeapon(i: number): void {
@@ -338,13 +397,14 @@ export function mountStoryBattle(opts: {
     }
   }
 
-  function onTap(x: number, y: number): void {
+  /** A tap: `d` in arena design space (where the ship flies), `h` in upright HUD space (the triggers). */
+  function onTap(d: { x: number; y: number }, h: { x: number; y: number }): void {
     if (finished || !interactive) return;
     if (phase === 'aim' && !struck) {
       if (now0 < lashUntil) return;
       const t = now0 / 1000;
-      const target = aimTarget();
-      const dx = Math.abs(reticleX(t, target.x) - target.x);
+      // The sweep is ONE offset, so the strike tolerance is identical whichever axis it is drawn on.
+      const dx = Math.abs(reticleOffset(t));
       if (dx <= HIT_ZONE) {
         struck = true;
         strike = dx <= CLEAN_ZONE ? 'clean' : 'graze';
@@ -360,13 +420,13 @@ export function mountStoryBattle(opts: {
     // a tap on a weapon trigger FIRES it; anywhere else FLIES the ship there
     for (let i = 0; i < weaponRects.length; i++) {
       const r = weaponRects[i]!;
-      if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
+      if (h.x >= r.x && h.x <= r.x + r.w && h.y >= r.y && h.y <= r.y + r.h) {
         fireWeapon(i);
         return;
       }
     }
-    ship.tx = clamp(x, SHIP_MIN_X, SHIP_MAX_X);
-    ship.ty = clamp(y, SHIP_MIN_Y, SHIP_MAX_Y);
+    ship.tx = clamp(d.x, SHIP_MIN_X, SHIP_MAX_X);
+    ship.ty = clamp(d.y, SHIP_MIN_Y, SHIP_MAX_Y);
     moveMark = 1;
     moveMarkX = ship.tx;
     moveMarkY = ship.ty;
@@ -377,7 +437,7 @@ export function mountStoryBattle(opts: {
     else if (e.key >= '1' && e.key <= '5') fireWeapon(Number(e.key) - 1);
     else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      if (phase === 'aim') onTap(DW / 2, DH / 2);
+      if (phase === 'aim') onTap({ x: DW / 2, y: DH / 2 }, { x: -1, y: -1 });
       else fireWeapon(weaponReadyAt.findIndex((t) => now0 >= t));
     }
   };
@@ -386,8 +446,7 @@ export function mountStoryBattle(opts: {
     skipToEnd();
   });
   overlay.addEventListener('pointerdown', (e) => {
-    const p = toDesign(e);
-    onTap(p.x, p.y);
+    onTap(toDesign(e), toHud(e));
   });
   window.addEventListener('keydown', onKey);
 
@@ -712,12 +771,17 @@ export function mountStoryBattle(opts: {
   // ── drawing ──────────────────────────────────────────────────────────────────
   function drawSpace(t: number, flash: number): void {
     if (!ctx) return;
-    const g = ctx.createLinearGradient(0, 0, 0, DH);
+    // The deep runs top-of-SCREEN to bottom-of-screen, so its axis follows the turn — and it covers the
+    // whole visible frame, bands included, or the letterbox reads as a seam against the flat overlay.
+    const v = designViewRect(view, cssW, cssH);
+    const g = view.rotated
+      ? ctx.createLinearGradient(v.x + v.w, 0, v.x, 0)
+      : ctx.createLinearGradient(0, v.y, 0, v.y + v.h);
     g.addColorStop(0, '#05060f');
     g.addColorStop(0.5, '#090714');
     g.addColorStop(1, '#04060e');
     ctx.fillStyle = g;
-    ctx.fillRect(0, 0, DW, DH);
+    fillView();
     // seeded nebula washes (the star-map family look)
     for (const n of nebulae) {
       const ng = ctx.createRadialGradient(n.x, n.y, 10, n.x, n.y, n.r);
@@ -767,10 +831,10 @@ export function mountStoryBattle(opts: {
     haze.addColorStop(0, herald ? `rgba(150,190,255,${0.1 + roar * 0.08})` : `rgba(60,200,140,${0.1 + roar * 0.08})`);
     haze.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = haze;
-    ctx.fillRect(0, 0, DW, DH);
+    fillView();
     if (flash > 0) {
       ctx.fillStyle = `rgba(255,120,80,${flash * 0.32})`;
-      ctx.fillRect(0, 0, DW, DH);
+      fillView();
     }
   }
 
@@ -791,7 +855,11 @@ export function mountStoryBattle(opts: {
     const rage = fighting ? Math.max(windUp * 0.85, spit) : 0;
     anchors = herald
       ? paintWardenArk(ctx, ARK_CX, ARK_CY, tPose, worn(), focus + roar * 0.08, { rage })
-      : paintSerpent(ctx, SERPENT_CX, SERPENT_CY, tPose, 1, focus + roar * 0.12, { rage });
+      : // its haze covers the frame WE have, not the ceremony's — a turned camera sees past the design box
+        paintSerpent(ctx, SERPENT_CX, SERPENT_CY, tPose, 1, focus + roar * 0.12, {
+          rage,
+          frame: designViewRect(view, cssW, cssH),
+        });
     ctx.globalAlpha = 1;
   }
 
@@ -803,7 +871,13 @@ export function mountStoryBattle(opts: {
     r: herald ? anchors.eyeR * 1.6 : anchors.headH * 0.55,
   });
   const aimTarget = (): { x: number; y: number } => ({ x: anchors.eyeX, y: anchors.eyeY });
-  const reticleX = (t: number, cx: number): number => cx + Math.sin(t * SWEEP_SPEED) * SWEEP_AMP;
+  /** The sweep is ONE offset — the strike test reads it directly, so the tolerance can't drift per axis. */
+  const reticleOffset = (t: number): number => Math.sin(t * SWEEP_SPEED) * SWEEP_AMP;
+  /** …and it is DRAWN across the boss's face on SCREEN: design x when flat, design y when turned. */
+  const reticleAt = (t: number, target: { x: number; y: number }): { x: number; y: number } => {
+    const o = reticleOffset(t);
+    return view.rotated ? { x: target.x, y: target.y + o } : { x: target.x + o, y: target.y };
+  };
 
   /** GS-story-warden-ark: the exposed REACTOR CORE, laid bare when the Ark's hull finally fails — the
    *  Herald finisher's target (the serpent's bared eye needs no ring; the Ark's core does). */
@@ -1207,12 +1281,19 @@ export function mountStoryBattle(opts: {
     }
   }
 
-  // ── HUD ──────────────────────────────────────────────────────────────────────
+  // ── HUD (always upright — it draws in the HUD frame, never the arena) ────────
+  /** The classic side-by-side cluster (shields left, boss bar right) needs a WIDE frame; a turned
+   *  portrait frame stacks them into the band above the arena. `wide` reproduces the shipped numbers. */
+  const wideHud = (): boolean => view.hudW >= 900;
+  /** The weapon bar's top edge — every bottom caption hangs off it, so both orientations agree. */
+  const barTop = (): number => view.hudH - WEAPON_BAR_H - 12;
+
   function drawHealthBar(): void {
     if (!ctx) return;
-    const x = 470;
-    const y = 34;
-    const w = 470;
+    const wide = wideHud();
+    const x = wide ? 470 : 16;
+    const y = wide ? 34 : 104;
+    const w = wide ? 470 : view.hudW - 32;
     const frac = hp / hpMax;
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.font = '800 13px system-ui, sans-serif';
@@ -1249,7 +1330,7 @@ export function mountStoryBattle(opts: {
 
   function drawShieldPips(): void {
     if (!ctx) return;
-    const x = 60;
+    const x = wideHud() ? 60 : 16;
     const y = 34;
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.font = '800 13px system-ui, sans-serif';
@@ -1343,15 +1424,21 @@ export function mountStoryBattle(opts: {
     ctx.restore();
   }
 
-  /** The multi-weapon HUD bar — one trigger per owned weapon, cooldown ring + hotkey. */
+  /** The multi-weapon HUD bar — one trigger per owned weapon, cooldown ring + hotkey. A turned frame is
+   *  narrower, so the buttons centre up and fall back to a stacked GLYPH-over-NAME face rather than
+   *  running their labels off the edge (the wide branch is the shipped landscape layout, untouched). */
   function drawWeaponBar(): void {
     if (!ctx) return;
     weaponRects.length = 0;
     const n = loadout.weapons.length;
-    const bw = Math.min(160, Math.floor((DW - 240) / Math.max(1, n)) - 10);
-    const bh = 72; // deep buttons — they letterbox down to thumb-size on phones
-    const y = DH - bh - 12;
-    let x = 20;
+    const wide = wideHud();
+    const bw = wide
+      ? Math.min(160, Math.floor((view.hudW - 240) / Math.max(1, n)) - 10)
+      : Math.min(160, Math.floor((view.hudW - 24 - 10 * (n - 1)) / Math.max(1, n)));
+    const compact = bw < 116; // no room for a label beside the glyph — stack them instead
+    const bh = WEAPON_BAR_H; // deep buttons — they letterbox down to thumb-size on phones
+    const y = barTop();
+    let x = wide ? 20 : Math.max(12, (view.hudW - (bw * n + 10 * (n - 1))) / 2);
     for (let i = 0; i < n; i++) {
       const w = loadout.weapons[i]!;
       const readyIn = Math.max(0, weaponReadyAt[i]! - now0);
@@ -1376,14 +1463,25 @@ export function mountStoryBattle(opts: {
         ctx.restore();
       }
       // glyph + label + damage
-      drawWeaponGlyph(w.style, x + 22, y + bh / 2, w.color, w.color2);
-      ctx.fillStyle = ready ? '#eaf1fb' : 'rgba(200,210,225,0.55)';
-      ctx.font = '800 14px system-ui, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(w.name, x + 42, y + 31);
-      ctx.fillStyle = ready ? w.color : 'rgba(160,170,190,0.5)';
-      ctx.font = '600 12.5px system-ui, sans-serif';
-      ctx.fillText(ready ? `⚡ ${w.damage} dmg` : `${(readyIn / 1000).toFixed(1)}s`, x + 42, y + 50);
+      if (compact) {
+        drawWeaponGlyph(w.style, x + bw / 2, y + 22, w.color, w.color2);
+        ctx.textAlign = 'center';
+        ctx.fillStyle = ready ? '#eaf1fb' : 'rgba(200,210,225,0.55)';
+        ctx.font = '800 12px system-ui, sans-serif';
+        ctx.fillText(w.name, x + bw / 2, y + 48);
+        ctx.fillStyle = ready ? w.color : 'rgba(160,170,190,0.5)';
+        ctx.font = '600 11.5px system-ui, sans-serif';
+        ctx.fillText(ready ? `⚡ ${w.damage}` : `${(readyIn / 1000).toFixed(1)}s`, x + bw / 2, y + 63);
+      } else {
+        drawWeaponGlyph(w.style, x + 22, y + bh / 2, w.color, w.color2);
+        ctx.fillStyle = ready ? '#eaf1fb' : 'rgba(200,210,225,0.55)';
+        ctx.font = '800 14px system-ui, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(w.name, x + 42, y + 31);
+        ctx.fillStyle = ready ? w.color : 'rgba(160,170,190,0.5)';
+        ctx.font = '600 12.5px system-ui, sans-serif';
+        ctx.fillText(ready ? `⚡ ${w.damage} dmg` : `${(readyIn / 1000).toFixed(1)}s`, x + 42, y + 50);
+      }
       // ready pulse edge
       if (ready && interactive) {
         ctx.strokeStyle = `rgba(255,255,255,${0.2 + 0.2 * Math.sin(now0 / 220 + i)})`;
@@ -1397,32 +1495,36 @@ export function mountStoryBattle(opts: {
 
   function caption(text: string, sub: string, a: number): void {
     if (!ctx) return;
+    const base = barTop();
     ctx.globalAlpha = a;
     ctx.textAlign = 'center';
     ctx.fillStyle = '#f4ecd6';
     ctx.font = '800 40px Georgia, serif';
-    ctx.fillText(text, DW / 2, DH - 120);
+    ctx.fillText(text, view.hudW / 2, base - 36);
     if (sub) {
       ctx.fillStyle = '#c2ccda';
       ctx.font = '500 17px system-ui, sans-serif';
-      ctx.fillText(sub, DW / 2, DH - 88);
+      ctx.fillText(sub, view.hudW / 2, base - 4);
     }
     ctx.globalAlpha = 1;
   }
 
   function phaseBanner(t: number): void {
     if (!ctx || now0 > phaseCaptionUntil || !phaseCaption) return;
+    // The banner rides the ARENA, not the screen — a turned frame has a HUD band above the arena, and a
+    // caption floated up into it would sit on the boss health bar.
+    const top = (wideHud() ? 0 : arenaTopHud(view)) + 108;
     const left = (phaseCaptionUntil - now0) / 2600;
     const a = clamp01(left * 3) * clamp01((1 - left) * 6 + 0.3);
     ctx.globalAlpha = a;
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffd9a0';
     ctx.font = '800 30px Georgia, serif';
-    ctx.fillText(phaseCaption, DW / 2, 108 + Math.sin(t * 2) * 2);
+    ctx.fillText(phaseCaption, view.hudW / 2, top + Math.sin(t * 2) * 2);
     if (phaseCaptionSub) {
       ctx.fillStyle = '#cdd8e8';
       ctx.font = '600 15px system-ui, sans-serif';
-      ctx.fillText(phaseCaptionSub, DW / 2, 134);
+      ctx.fillText(phaseCaptionSub, view.hudW / 2, top + 26);
     }
     ctx.globalAlpha = 1;
   }
@@ -1433,7 +1535,7 @@ export function mountStoryBattle(opts: {
     ctx.fillStyle = col;
     ctx.font = '700 19px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(text, DW / 2, DH - 106); // clears the deep weapon bar
+    ctx.fillText(text, view.hudW / 2, barTop() - 22); // clears the deep weapon bar
     ctx.globalAlpha = 1;
   }
 
@@ -1458,12 +1560,16 @@ export function mountStoryBattle(opts: {
 
     update(dt);
 
+    // One shake offset, spent by BOTH passes — the world and the upright HUD rock together, and the
+    // private rng is drawn exactly as often as it always was.
+    const shx = shake > 0.4 ? (rng() - 0.5) * shake : 0;
+    const shy = shake > 0.4 ? (rng() - 0.5) * shake : 0;
+    /** What the HUD pass owes this frame — the climax captions are raised inside the WORLD block. */
+    let pendingCaption: [string, string, number] | null = null;
+
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cssW, cssH);
-    ctx.save();
-    ctx.translate(offX, offY);
-    ctx.scale(scale, scale);
-    if (shake > 0.4) ctx.translate((rng() - 0.5) * shake, (rng() - 0.5) * shake);
+    applyWorld(shx, shy);
 
     if (phase === 'assault' || phase === 'overwhelm') {
       drawSpace(t, hitFlash * 0.55 + (phase === 'overwhelm' ? 0.12 : 0));
@@ -1472,6 +1578,7 @@ export function mountStoryBattle(opts: {
       drawPlayerShots(t);
       drawBursts();
       drawShip(t);
+      applyHud(shx, shy);
       drawHealthBar();
       drawShieldPips();
       drawWeaponBar();
@@ -1486,9 +1593,9 @@ export function mountStoryBattle(opts: {
       drawBoss(t, focus, 0);
       const lash = now0 < lashUntil;
       if (herald) drawCoreTarget(t, lash);
-      const target = aimTarget();
-      const rx = reticleX(now0 / 1000, target.x);
-      const ry = target.y;
+      const r = reticleAt(now0 / 1000, aimTarget());
+      const rx = r.x;
+      const ry = r.y;
       ctx.strokeStyle = lash ? 'rgba(255,90,60,0.9)' : 'rgba(255,240,160,0.9)';
       ctx.lineWidth = 2.5;
       ctx.beginPath();
@@ -1499,6 +1606,7 @@ export function mountStoryBattle(opts: {
       ctx.lineTo(rx, ry + 36);
       ctx.stroke();
       drawShip(t);
+      applyHud(shx, shy);
       drawShieldPips();
       if (interactive) {
         prompt(lash ? (herald ? 'the batteries swing round — steady…' : 'it lashes — steady…') : herald ? '🎯 TAP TO STRIKE THE CORE' : '🎯 TAP TO STRIKE THE EYE', '#ffe6a0', t * 1.25);
@@ -1553,17 +1661,17 @@ export function mountStoryBattle(opts: {
           rg.addColorStop(0, `rgba(120,255,180,${p * 0.5})`);
           rg.addColorStop(1, 'rgba(0,0,0,0)');
           ctx.fillStyle = rg;
-          ctx.fillRect(0, 0, DW, DH);
+          fillView();
           const vg = ctx.createRadialGradient(DW / 2, DH / 2, 200, DW / 2, DH / 2, 640);
           vg.addColorStop(0, 'rgba(0,0,0,0)');
           vg.addColorStop(1, `rgba(0,4,2,${p * 0.9})`);
           ctx.fillStyle = vg;
-          ctx.fillRect(0, 0, DW, DH);
-          caption(
+          fillView();
+          pendingCaption = [
             strike === 'clean' ? 'The Ark breaks clean.' : 'A clipping blow — enough.',
             'The blockade is gone — the root lies open, and something vast begins to stir.',
             p,
-          );
+          ];
         }
       } else {
         drawBoss(t, 0.95, ballT < 1 ? 0 : p);
@@ -1576,7 +1684,7 @@ export function mountStoryBattle(opts: {
           ctx.fill();
         } else {
           ctx.fillStyle = `rgba(255,255,255,${Math.max(0, 1 - Math.abs(p - 0.25) / 0.25) * 0.8})`;
-          ctx.fillRect(0, 0, DW, DH);
+          fillView();
           ctx.fillStyle = `rgba(140,255,190,${(1 - p) * 0.8})`;
           for (let k = 0; k < 26; k++) {
             const a = k * 0.97;
@@ -1585,11 +1693,11 @@ export function mountStoryBattle(opts: {
             ctx.arc(anchors.eyeX + Math.cos(a) * rr, anchors.eyeY + Math.sin(a) * rr, 3, 0, 6.283);
             ctx.fill();
           }
-          caption(
+          pendingCaption = [
             strike === 'clean' ? 'A perfect strike.' : 'A clipping blow — enough.',
             'The serpent comes apart across the sky.',
             p,
-          );
+          ];
         }
       }
       if (e > 2200) {
@@ -1604,7 +1712,7 @@ export function mountStoryBattle(opts: {
       drawBoss(t, 0, 0);
       drawShip(t);
       const repelled = won; // an armed ship that lost the fight was merely repelled
-      caption(
+      pendingCaption = [
         repelled ? 'Driven back.' : 'Overwhelmed.',
         repelled
           ? herald
@@ -1614,14 +1722,17 @@ export function mountStoryBattle(opts: {
             ? 'The Wardens drive you back — but the root will keep. Arm up and return.'
             : 'You pull back into the dark — but the campaign is saved. Arm up and return.',
         p,
-      );
+      ];
       if (e > 1800) {
         finish();
         return;
       }
     }
 
-    ctx.restore();
+    if (pendingCaption) {
+      applyHud(shx, shy);
+      caption(pendingCaption[0], pendingCaption[1], pendingCaption[2]);
+    }
     raf = requestAnimationFrame(frame);
   }
 

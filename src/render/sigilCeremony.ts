@@ -132,6 +132,11 @@ export interface SerpentOpts {
   /** 0..1 — battle ROAR: the maw gapes open (the boss visibly spits its volleys, GS-story-serpent-2).
    *  Driven by the finale battle around each volley; 0 everywhere else. */
   rage?: number;
+  /** The FRAME its full-bleed washes (the eldritch haze, the body's form shading) cover, in the caller's
+   *  own design units. Default is the 1000×640 ceremony frame. The finale's turned portrait camera
+   *  (GS-story-battle-portrait) sees design space BEYOND that box, and a wash that stops at 1000 draws a
+   *  hard seam across the sky there — so the caller that knows how much frame it has says so. */
+  frame?: { x: number; y: number; w: number; h: number };
 }
 
 export function paintSerpent(
@@ -143,8 +148,7 @@ export function paintSerpent(
   focusHead: number,
   opts: SerpentOpts = {},
 ): SerpentAnchors {
-  const DWl = 1000;
-  const DHl = 640;
+  const fr = opts.frame ?? { x: 0, y: 0, w: 1000, h: 640 };
   const sleep = clamp01(opts.sleep ?? 0);
   const rage = clamp01(opts.rage ?? 0);
   const still = 1 - sleep * 0.85; // stillness takes the body
@@ -154,7 +158,7 @@ export function paintSerpent(
   haze.addColorStop(0, `rgba(60,${160 + wake * 60},120,${(0.1 + wake * 0.16) * (1 - sleep * 0.4)})`);
   haze.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = haze;
-  ctx.fillRect(0, 0, DWl, DHl);
+  ctx.fillRect(fr.x, fr.y, fr.w, fr.h);
 
   const stir = wake * (0.6 + 0.4 * Math.sin(t * (1.2 + wake) * spd)) * still;
   const phase = t * (0.55 + wake * 0.85) * spd;
@@ -313,7 +317,7 @@ export function paintSerpent(
   sh.addColorStop(0.45, 'rgba(0,0,0,0)');
   sh.addColorStop(1, 'rgba(1,6,8,0.7)');
   ctx.fillStyle = sh;
-  ctx.fillRect(0, 0, DWl, DHl);
+  ctx.fillRect(fr.x, fr.y, fr.w, fr.h);
   // NEBULA HEARTS — the body is a torn ribbon of night sky, not solid flesh (the eldritch move).
   // Kept OFF the coil (u ~0.52–0.79) so the wound loop stays flesh-dark, not a glowing disc.
   const nebulaAt: [number, string][] = [
