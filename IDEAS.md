@@ -510,6 +510,17 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-green-apron-blend** — the green's apron was never a ring, it was a crescent
+  (`docs/decisions/render.md`). The surround was TWO passes: an opaque ramp drawn UNDER the fairway plus a
+  tinted collar on top — and once GS-green-flare made the fairway genuinely wrap the green, "under the
+  fairway" meant hidden on every side the flare reaches. Rendering 14 worlds with it on and off measured
+  what was left: 0.54% of pixels at up to 189/765 of contrast, all of it a one-sided lump of a third colour
+  behind the green — on desert/links/ocean/metal, somebody else's turf smeared on the sand. Now ONE skirt
+  drawn over the turf and under the surface, two translucent bands walking ground → collar tone → green
+  turf, each fading to nothing at its outer edge (a band that meets the ground on a STEP is an object), at a
+  tight turf miter so a star green's notches can't spike it. Apron widths in by a third: the broad run-off
+  is the FLARE, a real playable feature, and two art passes describing the same yards of approach is what
+  read as stacked stickers.
 - **GS-hud-gear-reads** — the HUD stopped quoting a bare bag (`docs/decisions/ui-intro.md`). The lie chip
   printed the raw LIE TABLE and the wind read printed the raw SKY, so a bunker said "−50% carry · wild" to
   a player whose escape caddy had halved it and a 45%-resist ball was shown the 20mph gale it flies through

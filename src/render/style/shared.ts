@@ -153,8 +153,14 @@ function signedArea(pts: Vec[]): number {
  * a RIVER band gets channel-following depth rings, and a turf fringe is uniform-width on a kidney
  * green or a long fairway alike. The miter is clamped so a reflex vertex can't spike; depth bands
  * are drawn filled on top so the rare self-touch on a very thin neck is hidden.
+ *
+ * `miterCap` is that clamp, as a multiple of |d| (GS-green-apron-blend). The default 4 is generous
+ * on purpose — a river band wants its channel corners to stay sharp — but a green is a STAR shape
+ * r(θ) whose concave vertices are exactly where a 4× miter fires: a 10-yard band spiking 40 yards
+ * off one notch is what gave the green's surround its lumpy, hand-drawn silhouette. A band that is
+ * meant to read as a uniform skirt passes a tight cap (~1.2) and rounds the corner off instead.
  */
-export function offsetPoly(pts: Vec[], d: number): Vec[] {
+export function offsetPoly(pts: Vec[], d: number, miterCap = 4): Vec[] {
   const n = pts.length;
   if (n < 3) return pts.slice();
   const sign = signedArea(pts) >= 0 ? 1 : -1; // winding → which bisector direction is interior
@@ -178,7 +184,7 @@ export function offsetPoly(pts: Vec[], d: number): Vec[] {
     bx /= bl; by /= bl;
     const cos = bx * n1x + by * n1y || 1; // half-angle cosine → miter length
     let m = (d * sign) / cos;
-    const cap = 4 * Math.abs(d);
+    const cap = miterCap * Math.abs(d);
     if (m > cap) m = cap;
     else if (m < -cap) m = -cap;
     out.push([cur[0] + bx * m, cur[1] + by * m]);
@@ -439,38 +445,34 @@ export function turfPx(scale: number, yd: number, minPx = 2, maxPx = 64): number
   return px < minPx ? minPx : px > maxPx ? maxPx : px;
 }
 
-/**
- * A smooth OUTWARD blend ramp around a play surface (GS-green-complex): `steps` nested rings running
- * from `outerPx` in to the surface edge, each filled with a mix walking `outer` → `inner`. Two or
- * three opaque rings read as concentric stickers however carefully the tones are picked — the eye
- * finds the step. Enough steps and the per-step tone jump falls under the banding threshold, so the
- * transition reads as ground. Widest ring FIRST (each is drawn over the last). Pure, zero rng.
- */
-export function turfRamp(poly: Vec[], outerPx: number, outer: string, inner: string, steps = 6): Prim[] {
-  const out: Prim[] = [];
-  const n = Math.max(1, Math.round(steps));
-  for (let i = 0; i < n; i++) {
-    const u = i / n; // 0 = the outermost (widest, most `outer`-toned) ring
-    out.push({ t: 'poly', pts: offsetPoly(poly, -outerPx * (1 - u)), fill: mixHex(outer, inner, u) });
-  }
-  return out;
-}
+/** Miter clamp for a turf blend band (GS-green-apron-blend) — see `offsetPoly`. A skirt around a
+ *  star-shaped green must stay a uniform skirt; a generous miter turns every concave notch into a
+ *  spike and the band grows a silhouette of its own. */
+export const TURF_MITER = 1.2;
 
 /**
- * The same ramp drawn as ALPHA tints rather than opaque fills (GS-green-complex) — for a collar that
- * sits ON TOP of an already-dressed surface (the green's collar over the flared fairway apron). An
- * opaque ring wipes the fairway's mowing stripes, sheen and texture and re-reads as a painted ring
- * around the green; a tint carries the same colour walk while the groundskeeping underneath shows
- * through, so the collar reads as the fairway MOWN DOWN toward the green. Pure, zero rng.
+ * An outward blend SKIRT that fades to NOTHING at its outer edge (GS-green-apron-blend) — the ONE
+ * way a play surface eases into the ground around it.
+ *
+ * It replaces two earlier ramps (an opaque `turfRamp`, and a `turfRampTint` whose first ring was
+ * already 0.35 of peak). Both STARTED at a visible tone: however finely the inner steps graded, the
+ * OUTERMOST ring landed on the ground as a step — and a band with an outer step has an outer
+ * silhouette, i.e. it is an object. Here alpha ramps QUADRATICALLY from ~0 at the outer edge to
+ * `peakAlpha` at the surface edge, so there is no outer boundary for the eye to find, and every ring
+ * is a TINT so the ground's own cover, relief and texture read straight through. Nested rings
+ * accumulate, so keep `peakAlpha` modest and let the stacking do the grading. Widest ring FIRST;
+ * pure, zero rng.
  */
-export function turfRampTint(poly: Vec[], outerPx: number, col: string, peakAlpha: number, steps = 6): Prim[] {
+export function turfApron(poly: Vec[], outerPx: number, col: string, peakAlpha: number, steps = 8): Prim[] {
   const out: Prim[] = [];
   const n = Math.max(1, Math.round(steps));
   for (let i = 0; i < n; i++) {
-    const u = i / n;
-    // Each ring adds another tint layer, so alpha ACCUMULATES inward toward the green edge; keep the
-    // per-ring alpha low and let the stacking do the grading.
-    out.push({ t: 'poly', pts: offsetPoly(poly, -outerPx * (1 - u)), fill: hexAlpha(col, peakAlpha * (0.35 + 0.65 * u)) });
+    const u = (i + 1) / n; // 0⁺ at the outer edge → 1 at the surface edge
+    out.push({
+      t: 'poly',
+      pts: offsetPoly(poly, -outerPx * (1 - u), TURF_MITER),
+      fill: hexAlpha(col, peakAlpha * u * u),
+    });
   }
   return out;
 }

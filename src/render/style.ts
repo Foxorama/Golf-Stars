@@ -58,12 +58,10 @@ import {
   rgbaParts,
   fadeCol,
   n1,
-  turfPx,
-  turfRampTint,
 } from './style/shared';
 import { landHullCourse, lostPlatformsCourse, mergedHazardsFor, derelictBreachesFor } from './style/land';
 import { rainbowRibbon, styleFairways, styleTee } from './style/fairway';
-import { styleGreen, styleGreenSurround, greenSlopeArt, greenComplexFor } from './style/green';
+import { styleGreen, styleGreenSurround, greenSlopeArt } from './style/green';
 import {
   styleSandFamily,
   styleLiquidFamily,
@@ -509,7 +507,6 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // "First-cut" fringe tones — each surface blended halfway toward this world's rough — so the cut
   // grass eases into the surrounding land instead of meeting it on a hard cut-out edge.
   const fwFringe = mixHex(fwShade.base, rs.base, 0.5);
-  const grFringe = mixHex(collar, rs.base, 0.5);
   const teeFringe = mixHex(teeShade.base, rs.base, 0.45);
   // GS-fairway: the first-cut ROUGH collar tone (mostly toward rough — a taller mown band) + the
   // gate for it. Only the parkland worlds get the grounded collar/sheen; void/cetus edge their
@@ -560,14 +557,11 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // face + cast shadow UNDER the fairway fill — so it reads with depth like the deep-stop pads. Deep
     // stops already sit on extruded platforms, so gate to !lostHole. Pure geometry (no rng).
     if (calmShelf) for (const sp of fairwaySps) prims.push(...raisedShelf(sp, proj.scale, shelfLook));
-    // GS-green-apron: the green's outward fringe/collar rings ease it into the ROUGH, but they grow
-    // PAST the green edge — a green at the end of a fairway ribbon painted a dark apron ring ON TOP of
-    // the bright fairway. Draw that surround HERE, UNDER the fairway pass (the fairway then covers it at
-    // the green/fairway junction, its own collar handling that seam) so the apron only ever shows in the
-    // rough. The green surface itself is still drawn flush, on top, in the feature loop below.
-    for (const f of hole.features) {
-      if (f.kind === 'green') prims.push(...styleGreenSurround(projPoly(f.poly, proj), collar, grFringe, arch, proj.scale));
-    }
+    // GS-green-apron-blend: the green's surround is now ONE translucent skirt drawn on TOP of the turf
+    // (in the feature loop below, just before the surface itself) — see `styleGreenSurround`. It used
+    // to be drawn HERE, under the fairway pass, which is what made it a one-sided crescent: hidden
+    // wherever the green-flare fairway wrapped the green, and a lump of a third colour wherever it
+    // didn't.
     prims.push(...styleFairways(fairwaySps, art, fwShade, fwFringe, arch, groundedFw ? fwCollar : undefined, proj.scale));
     // Derelict corridor → riveted metal DECK PLATING (GS-ship-deck): panel seams, a painted hazard-
     // caution edge stripe, directional deck chevrons, and the scuffs/scorch of abandonment, clipped to
@@ -594,23 +588,18 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // Raise the green onto the same shelf as the fairway so the play surface reads as one continuous
     // raised mesa (GS-cetus-6) rather than the green sitting back down at rough level.
     if (calmShelf && f.kind === 'green') prims.push(...raisedShelf(sp, proj.scale, shelfLook));
-    // GS-green-blend: a mown COLLAR ring drawn ON TOP of the fairway, easing the green into the
-    // flared apron/fairway that now wraps it (GS-green-flare). styleGreenSurround eases the green into
-    // the ROUGH (drawn UNDER the fairway) — but where the apron fairway wraps the green the fairway
-    // covers that, so the green butted the bright fairway with only its hard ink edge between (the "green
-    // and fairway don't join smoothly" report). Two outward rings blended green↔fairway turf (a mown
-    // fringe/collar, always LIGHTER-toward-fairway so it never reads as the dark ring GS-green-apron
-    // banished) melt that junction: fairway → collar → fringe → green. Grounded worlds only — void/cetus
-    // edge their green with a glow rim / raised shelf, rainbow rides its own ribbon, so all stay
-    // byte-for-byte. Pure geometry, zero rng.
-    // GS-green-complex: that two-ring collar is now a per-world-width RAMP in course yards, drawn as
-    // accumulating TINTS rather than opaque fills. Two opaque rings wiped the fairway's mowing stripes,
-    // sheen and texture and re-read as a painted ring around the green — the very "stacked art assets"
-    // tell they were added to cure. A tint carries the same green-ward colour walk while the corridor's
-    // groundskeeping shows straight through, so the collar reads as the fairway MOWN DOWN into the
-    // green: fairway → collar → apron → green, one continuous surface.
-    if (groundedFw && arch !== 'derelict' && f.kind === 'green') {
-      prims.push(...turfRampTint(sp, turfPx(proj.scale, greenComplexFor(arch).collarYd), grShade.base, 0.24, 4));
+    // GS-green-blend / GS-green-complex / GS-green-apron-blend: the green's SURROUND — the band the
+    // putting surface is cut down out of — drawn ON TOP of every turf pass and UNDER the surface, so it
+    // rings the green whatever it happens to meet on that side (the green-flare fairway in front, rough
+    // behind, both on the same hole). Two translucent bands walking ground → collar tone → green turf,
+    // each fading to nothing at its outer edge, so the surround has no silhouette of its own and the
+    // groundskeeping underneath reads straight through: it is ground MOWN DOWN into a green, not turf
+    // painted on. The derelict is excluded — it has no grass, and seats its green in a machined deck
+    // bay instead (GS-ship-deck-blend); rainbow returned above, riding its own continuous ribbon. The
+    // void/cetus shelf worlds keep their glow rim and raised edge and take the skirt over the top of
+    // them, which is what the old opaque ramp was doing there anyway. Pure geometry, zero rng.
+    if (arch !== 'derelict' && f.kind === 'green') {
+      prims.push(...styleGreenSurround(sp, collar, grShade.base, arch, proj.scale));
     }
     // GS-ship-deck-blend: the derelict gets NO grass apron (no flaring on a ship), so seat its green
     // into the metal DECK with a machined turf-pad bay instead — the "blend the fairway into the deck"
