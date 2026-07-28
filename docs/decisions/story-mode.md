@@ -520,6 +520,51 @@ Ordered so each ships something playable and nothing lands before its foundation
   assault with no page error, and skips to the Long Rest ending) plus `scripts/battle-preview.mjs`, which
   now shoots the Herald fight phase by phase (open / flak / lance / torpedo / overwhelm → aim → climax).
 
+- **GS-story-battle-portrait** — ✅ *shipped* (the finale is drawn at the orientation the screen has room
+  for). Player report: *"the end fight works really well and I'm really happy with it… except it's a
+  landscape battle when the entire game is in portrait."* Measured on a 390×844 phone, the 1000×600
+  landscape arena meet-fits at **scale 0.39**: a 390×234 strip of fight with ~300px of dead black above and
+  below it, thumb-sized ships and 72-unit weapon triggers letterboxed down to 28px. It was the one screen
+  in the game that wanted the phone sideways, and nothing said so.
+  1. **The orientation lock was considered and rejected.** `screen.orientation.lock` does not exist on iOS
+     Safari, Android Chrome only honours it from inside fullscreen, and the Capacitor shell would need a
+     native plugin — one of three targets. A "please rotate your device" card is the same failure wearing
+     a hat. So the arena TURNS instead, which is the answer `project.ts fitFrame` already gives the hole
+     map (GS-play-fullframe): **draw at the screen's shape.**
+  2. **The camera turns; the FIGHT never leaves design space** (`render/battleFrame.ts`, pure + node-
+     tested). On a taller-than-wide container the whole 1000×600 frame is rotated 90° CCW, so design +x
+     (toward the boss) becomes screen UP: the boss looms at the top, your ship flies at the bottom, its
+     fire rains down — the canonical portrait shmup, at **2.8× the drawn area**. Positions, hitboxes, ship
+     bounds, projectile speeds, spawn patterns, phase timings and the hopeless floor are all untouched, so
+     the fight's balance and its fairness-by-construction are unchanged BY CONSTRUCTION rather than by
+     re-measurement. The frame turns only when turning genuinely buys scale, so landscape, desktop and the
+     5:3 preview rig resolve to the shipped numbers exactly.
+  3. **Every piece of art came along for free**, because it was all drawn facing along design +x — the
+     serpent's maw and the Ark's lance batteries end up pointing DOWN at the player, your ship's nose and
+     thrust flame point UP, the bank-into-the-turn becomes a strafe bank, and the parallax drift runs from
+     the boss toward you. Nothing in the two boss painters changed.
+  4. **The HUD is always upright, so it needs a frame of its own.** In landscape that frame IS the arena
+     box (identical numbers ⇒ byte-for-byte). Turned, it spans the whole safe screen — which hands the
+     readouts the letterbox BANDS the turn opens up, so on a phone the boss bar and the weapon triggers
+     stop covering the playfield instead of overlaying it. Narrow frames stack the shields over the boss
+     bar, centre the triggers and fall back to a glyph-over-name button face rather than running labels off
+     the edge; every bottom caption hangs off ONE `barTop()` so the two orientations cannot disagree.
+     Skip moves to the top corner exactly when the bar goes full-width. Safe-area insets apply to the
+     turned HUD (it now hugs the notch and the home indicator; the letterboxed landscape frame never did).
+  5. **The aim sweep is ONE offset.** `reticleOffset` is what the strike tolerance reads, and the reticle is
+     merely DRAWN on whichever axis crosses the boss's face on screen — so a portrait finisher has provably
+     the same timing window as a landscape one.
+  6. Two seams the turn exposed, both fixed at the source: a full-frame wash (the space gradient, the
+     boss haze, the hit flash, the climax whiteout) now covers the *visible view rect* rather than the
+     arena box, and `paintSerpent` takes an optional `frame` for its own two washes (it was hard-clipping
+     its eldritch haze at design x=1000, drawing a measurable step across the sky at the arena's top edge —
+     `10,25,25` against `7,11,19`). Both default to the shipped behaviour, so the ceremony screens and the
+     landscape fight are untouched.
+  Guarded by `tests/battle-frame.test.ts` (the fit, both inverse mappings, the view-rect cover, the band
+  depths, insets) plus the existing 414×896 finale browser smokes, which now drive the turned path
+  end-to-end for both bosses. Eyes-on: `scripts/battle-preview.mjs` shoots the phone layout beside the
+  landscape one.
+
 **Phase G — Polish**
 - **GS-story-beats** — ✅ *shipped* (the story-round dialogue beats). Campaign NPC scenes threaded through
   the EXISTING generic LORE machinery (`sim/rpg/lore.ts`), so a beat is a DATA ROW and the gate/screen/

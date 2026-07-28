@@ -1100,6 +1100,24 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     identical timings/speeds/counts — only the WEAPON art changes (venom→flak, called lightning→lance
     lock-ons fired FROM the ship, void orbs→torpedoes). A new boss = a new painter + a `herald`-style branch,
     never a forked fight loop. Re-shoot `scripts/battle-preview.mjs`.
+    **AND IT IS DRAWN AT THE ORIENTATION THE SCREEN HAS ROOM FOR** (GS-story-battle-portrait,
+    `render/battleFrame.ts` — the fight's `fitFrame`). The arena is composed in a 1000×600 LANDSCAPE frame
+    and the game is portrait, so on a 390×844 phone it meet-fitted to a **390×234 strip between two slabs of
+    black**. There is no orientation lock worth having (absent on iOS Safari, fullscreen-only on Android, a
+    native plugin in the shell), so on a taller-than-wide container the whole arena TURNS 90° CCW instead:
+    design +x (toward the boss) becomes screen UP, the boss looms at the top, your ship flies at the bottom,
+    its fire rains down — 2.8× the drawn area, and every piece of art comes along for free because it was
+    all drawn facing along +x. **The camera turns; the FIGHT NEVER LEAVES DESIGN SPACE** — positions,
+    hitboxes, bounds, speeds, spawns and phase timings are untouched, so the balance and the
+    fairness-by-construction hold without re-measuring. It turns only when turning buys scale ⇒ landscape /
+    desktop / the 5:3 preview rig are byte-for-byte. **The HUD is ALWAYS UPRIGHT, so it has its own frame**
+    (the arena box in landscape — same numbers; the whole safe screen when turned, which hands it the
+    letterbox BANDS so the bars stop covering the playfield); every bottom caption hangs off one `barTop()`.
+    Two traps a turn exposes: a full-frame wash must cover the VIEW RECT, not the arena box, and a painter
+    that hard-clips its own wash to the design box draws a step across the sky (`paintSerpent` takes an
+    optional `frame`; both default to the shipped behaviour). The aim sweep is ONE offset (`reticleOffset`)
+    that the strike test reads and the reticle is merely DRAWN on whichever axis crosses the boss on screen,
+    so the finisher's timing window is provably orientation-independent. Guarded by `tests/battle-frame.test.ts`.
   - **Intro cinematic** (`docs/decisions/ui-intro.md`) — cosmetic Canvas2D, not in the reducer; degrades
     safely (every frame in try/catch → `finish()`); the many-instance glow uses a cached sprite, never
     per-element `shadowBlur`. The real title boots first; the intro overlays it.

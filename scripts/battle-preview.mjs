@@ -89,6 +89,16 @@ await shot('herald-3-lance', { herald: true, hpFrac: 0.48, shipId: 'ufo-saucer',
 await shot('herald-4-torpedo', { herald: true, hpFrac: 0.22, shipId: 'ufo-saucer', waits: [[3600, '']] });
 await shot('herald-5-overwhelm', { herald: true, hpFrac: 0.055, shipId: 'ufo-saucer', waits: [[3300, ''], [3200, 'aim'], [1500, 'climax']] });
 
+// GS-story-battle-portrait: the same fight on a PHONE, where the arena turns 90° — the boss at the top,
+// your ship at the bottom, and the HUD upright in the bands the turn opens up. Same states, so the two
+// sets can be read side by side.
+await page.setViewportSize({ width: 390, height: 844 });
+await shot('portrait-1-open', { hpFrac: 1, shipId: 'hauler-barge', waits: [[2400, '']] });
+await shot('portrait-2-lightning', { hpFrac: 0.48, shipId: 'hauler-barge', waits: [[3600, '']] });
+await shot('portrait-3-void', { hpFrac: 0.22, shipId: 'hauler-barge', waits: [[3600, '']] });
+await shot('portrait-4-overwhelm', { hpFrac: 0.055, shipId: 'hauler-barge', waits: [[3300, ''], [3200, 'aim'], [1500, 'climax']] });
+await shot('portrait-5-herald', { herald: true, hpFrac: 0.48, shipId: 'ufo-saucer', waits: [[3600, '']] });
+
 console.log('battle preview →', outDir);
 await browser.close();
 srv.close();
