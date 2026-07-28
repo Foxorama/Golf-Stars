@@ -846,6 +846,17 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     PERMANENT (hired ⇒ badge · no read here ⇒ dimmed · none ⇒ reserved placeholder), so the badge — not a
     canvas corner figure — is the caddy everywhere; `playView` takes a measured `caddyAnchor` (`{muzzle,head}`)
     and skips its own figure, absent ⇒ the classic corner figure (replay screen, unchanged).
+  - **THE PAGE IS FULL-BLEED FOR EXACTLY AS LONG AS THE PLAY FRAME IS MOUNTED** (GS-play-bleed-holeout).
+    `.gs-shot--full` is a whole `dvh` tall and `.gs-main--bleed` is what strips the page frame's 16/18px
+    padding + `max-width`, so the two are ONE decision asked twice — disagree and the play screen is inset
+    16px a side, pushed 46px off the bottom, and wearing TWO settings cogs (the global cog returns off
+    full-bleed beside the nav column's own). They disagreed for one beat: `fullBleed` keyed on
+    `!play.done` while `playingBody` mounts the frame on **`anim` FIRST**, and a holed putt sets `done`
+    the instant it is struck — with the ball still rolling on that very map. So the predicate MIRRORS
+    `playingBody`'s order (`!!animatingPlay || !state.play.done`). ⚠️ Any new "is the play screen up?"
+    test must ask the same question in the same order; `done` alone is never it. Guarded by
+    `tests/play-hud-frame.test.ts` (auto-finish holes out in one action, so the whole animation runs with
+    `done` already true).
   - **A READOUT THE MAP ALREADY DRAWS IS NOT A HUD ROW** (GS-hud-bag, `app/clubPicker.ts` + `render/bagArt.ts`).
     The aim panel's power label, spray-odds legend and carry range restated the aim cone — drawn to scale, on
     the map, where the decision is made — for ~140px of an 844px phone, and its club CYCLER was a dozen taps

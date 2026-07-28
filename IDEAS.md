@@ -525,6 +525,17 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-play-bleed-holeout** — the page frame came back while the putt was still rolling
+  (`docs/decisions/ui-intro.md`). Reported from the green: *"the putt make window adds black borders and
+  slides slightly down off the bottom of the screen."* The tell was in the screenshot — TWO settings cogs,
+  which only happens off full-bleed. `fullBleed` was keyed on `!play.done` while `playingBody` mounts the
+  play frame on `anim` FIRST, and a holed putt sets `done` the instant it is struck: for the length of the
+  roll the frame was up while the page had already reverted to the padded between-screens layout, so a
+  `dvh`-tall screen sat inside a padded frame — inset 16px a side (`x: 16`) and 46px taller than the
+  viewport (`scrollHeight` 898 vs 852). One question asked twice in two orders; the predicate now mirrors
+  `playingBody`'s (`!!animatingPlay || !state.play.done`). Guarded in a real browser by
+  `tests/play-hud-frame.test.ts` — auto-finish holes out in one action, so the whole animation runs with
+  `done` already true. Verified red on the unfixed build.
 - **GS-cetus-void-deep** — the glow was right, everything around it was too loud
   (`docs/decisions/render.md`). Play-test follow-up: *"much more vibrant now, but the pillars and the
   space background have been brightened too and the holes don't stand out… the greens look really small."*
