@@ -60,7 +60,7 @@ import {
   n1,
 } from './style/shared';
 import { landHullCourse, lostPlatformsCourse, mergedHazardsFor, derelictBreachesFor } from './style/land';
-import { fairwayEdgeRuns, rainbowRibbon, strokeRun, styleFairways, styleTee } from './style/fairway';
+import { fairwayEdgeRuns, rainbowRibbon, styleFairways, styleTee } from './style/fairway';
 import { styleGreen, styleGreenSurround, greenSlopeArt } from './style/green';
 import {
   styleSandFamily,
@@ -79,6 +79,7 @@ import { styleFlora, archetypeDecor } from './style/flora';
 import { styleShipWalls, styleTornHull } from './style/walls';
 import { styleShipDeck, styleShipBreaches, styleShipPlates, styleShipInterior, jagShipPlatforms, styleShipGreenBlend } from './style/ship';
 import { GROUND_COVER, groundCover, easterEggs } from './style/ground';
+import { worldGlow, glowBloom, glowRim, glowSurfaceEdge } from './style/glow';
 import { BIOME_RELIEF, RAINBOW_RELIEF, biomeRelief } from './style/relief';
 import {
   platformCliffs,
@@ -513,16 +514,14 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // corridor with a glow rim / raised shelf, so they pass no collar and stay byte-for-byte identical.
   const fwCollar = mixHex(fwShade.base, rs.base, 0.72);
   const groundedFw = arch !== 'void' && arch !== 'cetus';
-  // Void islands: a soft outset glow under the cut grass so the platforms read as luminous land
-  // floating in the abyss (the off-fairway IS the void — there's nowhere else to be).
-  const voidGlow = arch === 'void';
-  const glowRings = (sp: Vec[]) => {
-    // Uniform outward OFFSETS, not centroid scales: a scale balloons a long par-4/5 corridor
-    // lengthwise (34% of a 500px ribbon smeared the halo far past the tee/green ends — the
-    // "sausage blob" read), while an offset hugs the actual shape like the green collar does.
-    prims.push({ t: 'poly', pts: offsetPoly(sp, -13), fill: 'rgba(120,130,240,0.10)' });
-    prims.push({ t: 'poly', pts: offsetPoly(sp, -6), fill: 'rgba(120,130,240,0.14)' });
-  };
+  // The luminous worlds (void/cetus) light their own play surfaces: a bloom off the cut turf into
+  // the deep, a neon rim on the silhouette, an inner glow on the lone surfaces (GS-cetus-void-glow,
+  // `style/glow.ts`). A world with no `WORLD_GLOW` row gets nothing here and is byte-for-byte.
+  // Uniform outward OFFSETS, not centroid scales: a scale balloons a long par-4/5 corridor
+  // lengthwise (34% of a 500px ribbon smeared the halo far past the tee/green ends — the
+  // "sausage blob" read), while an offset hugs the actual shape like the green collar does. Sized
+  // in YARDS, so the halo is the same width of ground at the whole-hole map and the putt camera.
+  const glow = rainbow ? undefined : worldGlow(arch);
   // Two-tier raised shelf (GS-cetus-6): armed on a CALM cetus/void stop only (deep stops already sit
   // on extruded island platforms; other worlds are flat parkland by design).
   const calmShelf = (arch === 'cetus' || arch === 'void') && !lostHole && !rainbow;
@@ -541,7 +540,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
       .map((f) => projPoly(f.poly, proj));
     prims.push(...platformCliffs(roadSps, deepen, cliffRng, RAINBOW_CLIFF).prims);
   }
-  if (voidGlow && !rainbow) for (const sp of fairwaySps) glowRings(sp);
+  if (glow) for (const sp of fairwaySps) prims.push(...glowBloom(sp, glow, proj.scale));
   // Rainbow Road: ONE continuous band grid (the main corridor's bbox) shared by the fairway, GREEN and
   // TEE ribbons — so the rainbow bands run seamlessly tee→fairway→green as a single track instead of
   // three separately-phased blobs with mismatched stripe scales at each seam (the "fairway/green don't
@@ -573,11 +572,11 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // caution edge stripe, directional deck chevrons, and the scuffs/scorch of abandonment, clipped to
     // the corridor. Pure geometry, zero rng; gated to the derelict so every other world is untouched.
     if (arch === 'derelict') prims.push(...styleShipDeck(hole, fairwaySps, proj));
-    // Void corridors get a luminous rim on top of the turf (the par-3 islands' "lit platform" read):
-    // without it a long par-4/5 fairway melted into the equally-purple platform margin around it.
-    if (voidGlow) for (const rs of fwRuns) for (const r of rs) prims.push(strokeRun(r, 'rgba(165,175,255,0.5)', 1.6));
-    // Cetus shelf gets a lit cyan rim so the raised edge catches the starlight (void has its own above).
-    if (calmShelf && arch === 'cetus') for (const rs of fwRuns) for (const r of rs) prims.push(strokeRun(r, 'rgba(150,232,255,0.55)', 1.6));
+    // A luminous world's corridor gets its lit rim on top of the turf (the par-3 islands' "lit
+    // platform" read): without it a long par-4/5 fairway melted into the equally-purple platform
+    // margin around it. Traced off `fwRuns` — the fairway system's ONE silhouette — so a split lane
+    // or a broken island segment glows on every piece, not just the first.
+    if (glow) prims.push(...glowRim(fwRuns, glow));
   }
   for (const f of hole.features) {
     if (f.kind === 'fairway') continue; // drawn in the grouped pass above
@@ -590,7 +589,8 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
       if (f.kind === 'green' || f.kind === 'tee') prims.push(...rainbowRibbon(sp, rainbowBandY, rainbowBandH));
       continue;
     }
-    if (voidGlow && f.kind === 'green') glowRings(sp);
+    // The target burns brightest: a wider, stronger halo under the green than the corridor carries.
+    if (glow && (f.kind === 'green' || f.kind === 'tee')) prims.push(...glowBloom(sp, glow, proj.scale, f.kind === 'green'));
     // Raise the green onto the same shelf as the fairway so the play surface reads as one continuous
     // raised mesa (GS-cetus-6) rather than the green sitting back down at rough level.
     if (calmShelf && f.kind === 'green') prims.push(...raisedShelf(sp, proj.scale, shelfLook));
@@ -623,6 +623,11 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // NOT the default tan sand patch — a beach-sand flat on a steel hull was the odd "bunker" look.
     else if (arch === 'derelict' && (f.kind === 'waste' || f.kind === 'sand')) prims.push(...styleShipPlates([f.poly], proj));
     else prims.push(...styleScatter(f.kind, sp, art, arch));
+    // The green is the one surface the eye must find first, so on a luminous world it EMITS: the
+    // neon rim plus an inner glow raking back across the surface, over the mown art. It stands alone
+    // (it is never part of the fairway union), so it can take the closed-ring treatment the corridor
+    // can't (GS-cetus-void-glow).
+    if (glow && f.kind === 'green') prims.push(...glowSurfaceEdge(sp, glow, proj.scale));
   }
 
   // --- 5b2. Rainbow Road surface relief (GS-biome-relief) ---------------------

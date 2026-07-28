@@ -1991,3 +1991,102 @@ at the approach camera (the change is edges ONLY — no area, tone or sheen shif
 close-up. New rig `scripts/fairway-outline-preview.mjs` hunts down the holes that actually have a loose
 fairway polygon and frames it — the whole-hole gallery buries them, which is exactly how a lane with no
 outline shipped in the first place. Guarded by `tests/fairway-silhouette.test.ts`.
+
+---
+
+## GS-cetus-void-glow — the two worlds built to glow were the two that didn't (2026-07-28)
+
+The report: *"Cetus and Void look pretty washed out and lifeless — they need to be dark blue / dark
+purple glows to fit in with the darker space theme."*
+
+Both worlds are the same design idea: **there is no ground.** Off the cut turf is the open deep, and
+what the player is looking at is a lit shape floating in it. That is a lighting problem, and the game
+was not solving it — it was tinting a slab and drawing a line round it.
+
+### Measured first, so "washed out" is a number
+
+Two instruments, both new and both committed:
+
+* `scripts/biome-vibrance.mjs` rasterises one hole per archetype through the real SVG renderer and
+  reports Hasler & Süsstrunk **colourfulness**, mean chroma, saturation, value, and a *glow* figure
+  (how far the brightest 2% of pixels stands above the mean — the luminous headroom a world keeps).
+  It measures the **centre crop of a CALM stop** on purpose: that framing is nearly all playable
+  ground on every world, so the numbers describe the turf rather than the starfield, the OB stakes
+  and the constellation art around it. Measure a *deep* stop and void/cetus flatter themselves —
+  most of the frame is (very colourful) deep space.
+* OKLab chroma on the palette itself, which is the lever actually being turned.
+
+What came back:
+
+| | colourfulness | chroma | | fairway C | green C | rough C |
+|---|---|---|---|---|---|---|
+| cetus | 48.6 | 0.262 | | **0.083** | 0.108 | **0.054** |
+| void | **31.7** | 0.199 | | 0.114 | 0.139 | 0.084 |
+| verdant (reference) | 52.4 | 0.205 | | 0.136 | 0.194 | 0.076 |
+
+Cetus's fairway was the **least chromatic turf of any non-grey world in the game** — a petrol-grey
+slab whose green was barely separable from it. Void was not desaturated so much as *monochrome*: one
+hue (275–292°) at one value, which is what the colourfulness metric punishes and what the eye reads
+as flat. And the entire emissive kit for both worlds was **two flat rgba rings at α 0.10/0.14 in a
+greyish periwinkle**, void-only, sized in fixed pixels — plus, for Cetus, a single hairline rim that
+only appeared on a calm-stop shelf.
+
+### The fix is three things, in this order of importance
+
+**1. A real emissive kit, as a world ROW** (`src/render/style/glow.ts`). `WORLD_GLOW` carries void and
+cetus; a world with no row emits zero glow prims and is byte-for-byte what it was. Three painters:
+
+* `glowBloom` — the outward halo off cut turf, through `turfApron` so alpha grades quadratically to
+  nothing at the outer edge. There is no boundary for the eye to find: it is light falling off, not a
+  ring painted round the turf. Drawn UNDER the surface, so only the spill shows.
+* `glowRim` — the lit edge as **three stacked strokes** (wide+faint, mid, narrow+bright) along the
+  runs `fairwayEdgeRuns` already produces. A neon line is a bright filament with light bleeding off
+  it, and taking GS-fairway-silhouette's runs means a split lane or a broken island segment glows on
+  every piece rather than only the first.
+* `glowSurfaceEdge` — the green's own rim plus an inner glow raking back across the surface. **The
+  target burns brightest**: a wider, stronger halo than the corridor carries, because on a world with
+  no landmarks the green is the one shape the eye must find first.
+
+Two traps worth writing down. The inner glow is concentric **strokes, never nested fills** — a stack
+of filled polygons composites darkest where it overlaps most, which is the interior, i.e. exactly
+backwards, and it would flatten the green's own mow and relief art under a wash. And the inner glow
+is only ever applied to a surface that **stands alone**: on one piece of a multi-part fairway it
+would draw a seam straight down the join where two pieces meet flush, which is the GS-blend bug in
+reverse.
+
+**2. Reach is measured in YARDS.** The old −13/−6 px rings broke GS-green-complex's rule: a halo sized
+in pixels is a plausible bloom on the whole-hole map and a hairline at the putt camera — which is
+precisely where the player is studying the turf.
+
+**3. Chroma, at the same darkness.** The palettes moved onto genuinely saturated hues — Cetus onto an
+ocean blue-cyan, Void off periwinkle and onto a real purple — with **lightness deliberately
+unchanged**. The brief was a *vibrant dark* world, not a brighter one; a glow reads by contrast
+against the deep, so lifting the ambient would have worked against it. The same rotation was applied
+to everything that covers the ground and had drifted off-hue: `BIOME_RELIEF`'s highlight (a
+periwinkle blue on void, a near-white cyan on cetus — the single biggest desaturator on the plateau,
+since relief covers the whole landmass), the cliff strata (the face and the turf it holds up are the
+same rock, lit by the same light), the `ARCHETYPE_SPACE` nebula and shore rim, and the world's accent
+colour on the star map / travel screen and its arrival hero — the splash and the course you land on
+have to be the same place.
+
+### After
+
+| | colourfulness | chroma | sat | | fairway C | green C | rough C |
+|---|---|---|---|---|---|---|---|
+| cetus | 48.6 → **60.7** | 0.262 → **0.354** | 0.662 → **0.834** | | **0.101** | **0.129** | **0.081** |
+| void | 31.7 → **34.9** | 0.199 → **0.238** | 0.584 → **0.685** | | **0.140** | **0.161** | **0.109** |
+
+Cetus goes from mid-pack to second-most-colourful world in the game. Void's colourfulness moves less
+because the metric rewards hue *variety* and void is monochrome by design — but its chroma now sits
+above verdant's and inferno's, so it is no longer desaturated; it is a saturated purple world, which
+is what it was always meant to be.
+
+**Deliberately not done:** the putting surface's readability was not traded for the blend. GS-green-
+complex's lesson holds — a green you cannot pick out at a glance is a fairness bug, whatever it buys
+the art — so the green keeps its own base fill, its collar, and now the strongest glow on the hole,
+and `tests/biome-glow.test.ts` pins a perceptual floor on green-vs-fairway separation.
+
+**Verification:** full suite green, `tsc` clean, gallery re-shot (every other world pixel-identical),
+before/after at the whole-hole, approach and putt cameras. Guarded by `tests/biome-glow.test.ts`
+(row-only-or-nothing, yards-not-pixels, camera-invariant prim counts, silhouette coverage, and a
+chroma floor so the two worlds cannot quietly wash out again).
