@@ -26,6 +26,33 @@
  *     cells — survive it with shields in hand and the spent serpent bares its eye for the golf FINISHER.
  *     Phases key off health, so a maxed arsenal shortens the fight but never skips the gauntlet.
  *
+ *   • IT IS A SET-PIECE, NOT A SKIRMISH (GS-story-battle-epic). The player report: *"given it's the final
+ *     boss battle it should be pretty flashy and epic, and at the moment it is just fine."* Five spectacle
+ *     rules answer it, all render-only — the fight's balance, spawns and fairness are untouched:
+ *       1. THE BOSS ARRIVES. A 2.8s ENTRANCE (`battleIntro.ts`, pure) — it looms up out of the dark, its
+ *          NAME slams on, it ROARS (shockwave · hitstop · frame kick), and only THEN does the HUD wipe in
+ *          and the assault begin. You never used to see the boss arrive, so it never landed as the thing
+ *          five Sigils were spent reaching. Tap skips the entrance (Skip still ends the fight).
+ *       2. HITS BITE. Heavy damage buys HITSTOP (the whole world freezes for a beat — the single loudest
+ *          impact trick there is), the boss FLINCHES back along the shot's own axis, the wound throws
+ *          sparks and shrapnel, and the damage floats off it as a number. Nothing about damage changed.
+ *       3. THE PHASE TURN IS A BEAT. A screen-wide shockwave that visibly BLOWS THE FIELD CLEAR, a wash in
+ *          the phase's own colour, a hitstop, and the title slams instead of fading up.
+ *       4. THE ARENA HAS A FLOOR AND A DEPTH. The dead black middle gains the ROOT the serpent is coiled
+ *          round (Herald: the Warden fleet burning at anchor), two parallax layers of tumbling battle
+ *          debris, and a distant storm that wakes with the phases.
+ *       5. THE BOSS BAR IS A BOSS BAR. A framed plate with the name AND its epithet, a pale CHIP bar that
+ *          drains a beat behind the real one (so you SEE what a nova took), phase notches, and a bar that
+ *          runs hot as it empties.
+ *     WHAT THIS DELIBERATELY DOES NOT DO: re-light the serpent for the turned camera. The player's other
+ *     report — *"because all our graphics are side on it looks pretty weird"* — is real, and the obvious
+ *     lever (rotating `paintSerpent`'s form-shading key light onto the screen's up) was BUILT AND THROWN
+ *     AWAY: the beast is composed lying horizontally, so its dorsal/belly gradient runs across design +y.
+ *     Point that at screen-up (design +x) and you are no longer lighting it from above, you are shading it
+ *     along its own SPINE — the head, which is the focal point, falls into shadow. Shot side by side the
+ *     two are near-indistinguishable. The side-on read is a property of turning a side-on COMPOSITION and
+ *     only a portrait-authored pose fixes it; a light direction cannot.
+ *
  *   • IT IS DRAWN AT THE ORIENTATION THE SCREEN HAS ROOM FOR (GS-story-battle-portrait). The fight is
  *     composed in a 1000×600 LANDSCAPE frame and the rest of the game is portrait, so on a phone it
  *     meet-fitted to a 390×234 strip between two slabs of black. There is no orientation lock worth
@@ -59,6 +86,7 @@ import {
   arenaTopHud,
   type BattleFrame,
 } from './battleFrame';
+import { bossTitle, entryBeat, ENTRY_MS, ENTRY_ROAR_MS } from './battleIntro';
 import {
   FINALE_SERPENT_HP,
   FINALE_PHASES,
@@ -118,6 +146,12 @@ const CLEAN_ZONE = 26;
 const SWEEP_AMP = 220;
 const SWEEP_SPEED = 1.9;
 const WEAPON_BAR_H = 72; // deep triggers — they letterbox down to thumb-size on phones
+// ── spectacle (GS-story-battle-epic) — pure feel; none of it touches damage, spawns or timing ──────────
+const HITSTOP_HEAVY = 105; // ms the world freezes on a heavy hit — the loudest impact trick there is
+const HITSTOP_LIGHT = 34;
+const HITSTOP_PHASE = 150; // …and the phase turn gets the longest one
+const FLINCH_K = 190; // boss recoil spring stiffness
+const FLINCH_DAMP = 12;
 
 /** Serpent attack cadence per phase index (ms between volleys) — pressure rises as it wakes. */
 const PHASE_ATTACK_MS = [2600, 2300, 2100, 1900] as const;
@@ -177,8 +211,13 @@ export function mountStoryBattle(opts: {
     );
 
   // ── battle state ─────────────────────────────────────────────────────────────
-  type Phase = 'assault' | 'overwhelm' | 'aim' | 'climax-win' | 'climax-lose';
-  let phase: Phase = 'assault';
+  // GS-story-battle-epic: the fight OPENS on the entrance — the boss looms out of the dark, names itself
+  // and roars before a single shot is fired. `entry` runs the beat; the assault starts when it ends.
+  type Phase = 'entry' | 'assault' | 'overwhelm' | 'aim' | 'climax-win' | 'climax-lose';
+  let phase: Phase = 'entry';
+  const title = bossTitle(herald);
+  let entryStart = 0;
+  let entryRoared = false;
   const hpMax = FINALE_SERPENT_HP;
   let hp = hpMax * clamp01(opts.startHpFrac ?? 1);
   const hpFloor = won ? 0 : hpMax * FINALE_HOPELESS_FLOOR_FRAC;
@@ -206,6 +245,16 @@ export function mountStoryBattle(opts: {
   let climaxStart = 0;
   let hintUntil = 0; // "tap to fly / tap a weapon" opening hint
   let lastAutoFire = 0; // non-interactive autopilot fire cadence
+  // ── spectacle state (GS-story-battle-epic) ──
+  let stopUntil = 0; // HITSTOP: the world holds still (draw, don't update) — impact you FEEL
+  let animMs = 0; // the art clock, frozen by hitstop, so the boss stops mid-writhe with everything else
+  let hpGhost = hp; // the pale CHIP bar chasing the real one down
+  let barFlash = 0; // the boss bar lit on damage
+  let phaseWash = 0; // the phase turn's full-frame colour wash
+  let phaseWashCol = '120,255,180';
+  let shieldBreakAt = -9e9; // the pip that just shattered
+  /** The boss recoils along the shot's own axis and springs back — a body that takes the hit. */
+  const flinch = { x: 0, y: 0, vx: 0, vy: 0 };
 
   // your ship
   const ship = { x: 180, y: 320, tx: 180, ty: 320, vx: 0, vy: 0 };
@@ -237,6 +286,14 @@ export function mountStoryBattle(opts: {
   const enemyShots: Enemy[] = [];
   type Burst = { x: number; y: number; at: number; col: string; big: boolean };
   const bursts: Burst[] = [];
+  // GS-story-battle-epic: the wound throws SPARKS and shrapnel, the damage floats off as a NUMBER, and a
+  // phase turn sends a SHOCKWAVE across the whole field. All three are drawn in world space.
+  type Spark = { x: number; y: number; vx: number; vy: number; born: number; life: number; col: string; len: number };
+  const sparks: Spark[] = [];
+  type DmgNum = { x: number; y: number; born: number; val: number; col: string; big: boolean };
+  const dmgNums: DmgNum[] = [];
+  type Wave = { x: number; y: number; born: number; life: number; r1: number; col: string; w: number };
+  const waves: Wave[] = [];
 
   let anchors: SerpentAnchors = { eyeX: 730, eyeY: 300, eyeR: 18, browX: 720, browY: 250, headH: 46, headAng: 3 };
   // GS-story-serpent-2: pulled left from 1040 so the great coil behind the skull stays on-canvas —
@@ -283,6 +340,27 @@ export function mountStoryBattle(opts: {
       a: 0.05 + rng() * 0.05,
     })),
   ];
+  // GS-story-battle-epic: the arena's DEPTH rides its OWN seeded stream, so adding scenery cannot shift a
+  // single draw of the stream that spawns the boss's volleys (`rng`) — the fight's pattern is untouched.
+  const drng = mulberry32(0x1d4b07 ^ (herald ? 0x77 : 0x11));
+  /** Tumbling battle wreckage in two parallax layers — the deep is a battlefield, not a backdrop. */
+  type Debris = { x: number; y: number; r: number; spin: number; ang: number; layer: number; k: number };
+  const debris: Debris[] = Array.from({ length: 26 }, (_, i) => ({
+    x: drng() * (DW + 200) - 100,
+    y: drng() * DH,
+    r: 3 + drng() * (i % 5 === 0 ? 13 : 6),
+    spin: (drng() - 0.5) * 0.9,
+    ang: drng() * 6.28,
+    layer: 1 + (i % 2),
+    k: Math.floor(drng() * 4),
+  }));
+  /** The burning Warden fleet at anchor behind the Ark (Herald), or the far watch-lights (Warden). */
+  const farFleet = Array.from({ length: 7 }, () => ({
+    x: 520 + drng() * 460,
+    y: 40 + drng() * 520,
+    s: 0.5 + drng() * 0.8,
+    burn: drng(),
+  }));
 
   function resize(): void {
     if (!ctx) return;
@@ -400,6 +478,12 @@ export function mountStoryBattle(opts: {
   /** A tap: `d` in arena design space (where the ship flies), `h` in upright HUD space (the triggers). */
   function onTap(d: { x: number; y: number }, h: { x: number; y: number }): void {
     if (finished || !interactive) return;
+    // GS-story-battle-epic: a tap during the ENTRANCE skips to the fight (Skip still ends the battle) —
+    // the beat is a showpiece, not a wall, and the second time through you may not want it.
+    if (phase === 'entry') {
+      if (now0) beginAssault(); // …but never before the first frame has set the clock
+      return;
+    }
     if (phase === 'aim' && !struck) {
       if (now0 < lashUntil) return;
       const t = now0 / 1000;
@@ -556,21 +640,85 @@ export function mountStoryBattle(opts: {
   }
 
   // ── damage ───────────────────────────────────────────────────────────────────
+  /** The phase colours — each escalation washes the sky in the weapon it just unlocked, in ITS OWN boss's
+   *  palette. (The first pass washed the Ark's entrance in serpent green, which flattened a cold ivory
+   *  warship to a pale sage smear for a beat.) */
+  const PHASE_WASH = herald
+    ? (['170,205,255', '255,200,140', '200,225,255', '255,170,120'] as const)
+    : (['120,255,180', '150,255,150', '190,220,255', '190,140,255'] as const);
+
+  /**
+   * A ROAR (GS-story-battle-epic) — the boss's set-piece beat, fired on the entrance and on every phase
+   * turn. A shockwave crosses the whole field and visibly BLOWS THE VOLLEYS AWAY (the escalation is felt,
+   * not just captioned), the sky takes the new phase's colour, and the world holds still for a moment.
+   * Pure spectacle: it never spawns, damages, or changes what the next volley will be.
+   */
+  function bossRoar(idx: number, wash = 1): void {
+    const src = herald ? { x: ARK_CX, y: ARK_CY } : { x: anchors.browX, y: anchors.browY };
+    phaseWashCol = PHASE_WASH[Math.min(idx, PHASE_WASH.length - 1)]!;
+    phaseWash = wash;
+    stopUntil = Math.max(stopUntil, now0 + HITSTOP_PHASE);
+    waves.push({ x: src.x, y: src.y, born: now0, life: 1100, r1: 1500, col: phaseWashCol, w: 9 });
+    waves.push({ x: src.x, y: src.y, born: now0 + 120, life: 900, r1: 1100, col: '255,255,255', w: 3 });
+    // the front pushes the field: acid and orbs are thrown outward, then the fight resumes
+    for (const s of enemyShots) {
+      if (s.kind === 'bolt') continue;
+      const a = Math.atan2(s.y - src.y, s.x - src.x);
+      s.vx += Math.cos(a) * 260;
+      s.vy += Math.sin(a) * 260;
+    }
+  }
+
+  /**
+   * GS-story-battle-epic: the WOUND. Sparks + shrapnel thrown back along the shot's own axis, the damage
+   * floating off as a number, the boss flinching, and a HITSTOP scaled to the blow. Zero rng from the
+   * fight's stream (see `drng`) and zero balance — the damage was already applied.
+   */
+  function dressHit(x: number, y: number, w: FinaleWeapon, heavy: boolean): void {
+    // the incoming axis: the wound sprays BACK toward the ship that made it
+    const ax = Math.atan2(ship.y - y, ship.x - x);
+    const n = heavy ? 16 : 8;
+    for (let k = 0; k < n; k++) {
+      const a = ax + (drng() - 0.5) * 2.4;
+      const sp = (heavy ? 190 : 130) * (0.45 + drng());
+      sparks.push({
+        x,
+        y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp,
+        born: now0,
+        life: 320 + drng() * (heavy ? 480 : 260),
+        col: drng() < 0.4 ? '#ffffff' : w.color2,
+        len: heavy ? 9 + drng() * 12 : 5 + drng() * 6,
+      });
+    }
+    dmgNums.push({ x, y, born: now0, val: w.damage, col: w.color2, big: heavy });
+    // recoil: an impulse AWAY from the shooter, sprung back by `flinch`'s damped spring
+    const push = heavy ? 15 : 6;
+    flinch.vx -= Math.cos(ax) * push * 9;
+    flinch.vy -= Math.sin(ax) * push * 9;
+    stopUntil = Math.max(stopUntil, now0 + (heavy ? HITSTOP_HEAVY : HITSTOP_LIGHT));
+    barFlash = 1;
+  }
+
   function landPlayerHit(x: number, y: number, w: FinaleWeapon): void {
     const before = hp;
     hp = Math.max(hpFloor, hp - w.damage);
-    bursts.push({ x, y, at: now0, col: w.color2, big: w.damage >= 30 });
-    if (w.damage >= 30) shake = Math.max(shake, 6);
+    const heavy = w.damage >= 30;
+    bursts.push({ x, y, at: now0, col: w.color2, big: heavy });
+    dressHit(x, y, w, heavy);
+    if (heavy) shake = Math.max(shake, 9);
     // phase turns: the serpent escalates as its health falls (each threshold crossed once)
     while (phaseIdx < FINALE_PHASES.length - 1 && hp <= hpMax * FINALE_PHASES[phaseIdx]!) {
       phaseIdx += 1;
       roar = 1;
-      shake = Math.max(shake, 9);
+      shake = Math.max(shake, 16);
       shield = Math.min(shieldMax, shield + FINALE_PHASE_REGEN); // the breather beat
       const [cap, sub] = phaseLabel(phaseIdx);
       phaseCaption = cap;
       phaseCaptionSub = sub;
       phaseCaptionUntil = now0 + 2600;
+      bossRoar(phaseIdx);
       opts.onPhase?.();
     }
     // the 5% OVERWHELM — the climax barrage (only an armed ship can get here; the floor sits above it)
@@ -583,6 +731,7 @@ export function mountStoryBattle(opts: {
       phaseCaption = herald ? 'THE ARK FIRES EVERYTHING' : 'THE WORLD-EATER UNCOILS';
       phaseCaptionSub = 'an overwhelming barrage — your shields must hold';
       phaseCaptionUntil = now0 + 3000;
+      bossRoar(3);
       opts.onPhase?.();
     }
   }
@@ -593,6 +742,8 @@ export function mountStoryBattle(opts: {
     shield -= 1;
     hitFlash = 1;
     shake = Math.max(shake, 8);
+    shieldBreakAt = now0; // the pip SHATTERS on the HUD — losing a cell has to land
+    stopUntil = Math.max(stopUntil, now0 + HITSTOP_LIGHT);
     opts.onShipHit?.();
     if (shield < 0) {
       phase = 'climax-lose';
@@ -623,6 +774,33 @@ export function mountStoryBattle(opts: {
     hitFlash = Math.max(0, hitFlash - dts * 2.2);
     shake = Math.max(0, shake - dts * 14);
     roar = Math.max(0, roar - dts * 0.9);
+    // ── spectacle (GS-story-battle-epic) ──
+    barFlash = Math.max(0, barFlash - dts * 3.4);
+    phaseWash = Math.max(0, phaseWash - dts * 2.1);
+    // the boss's recoil, a damped spring back to station (never far enough to move the fight)
+    flinch.vx += (-FLINCH_K * flinch.x - FLINCH_DAMP * flinch.vx) * dts;
+    flinch.vy += (-FLINCH_K * flinch.y - FLINCH_DAMP * flinch.vy) * dts;
+    flinch.x = clamp(flinch.x + flinch.vx * dts, -22, 22);
+    flinch.y = clamp(flinch.y + flinch.vy * dts, -22, 22);
+    // the chip bar chases the real one down — a beat behind, so a nova's bite is VISIBLE
+    hpGhost += (hp - hpGhost) * Math.min(1, dts * 3.4);
+    if (hpGhost < hp) hpGhost = hp;
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const s = sparks[i]!;
+      if (now0 - s.born > s.life) {
+        sparks.splice(i, 1);
+        continue;
+      }
+      s.x += s.vx * dts;
+      s.y += s.vy * dts;
+      s.vx *= 1 - Math.min(0.9, dts * 2.2);
+      s.vy *= 1 - Math.min(0.9, dts * 2.2);
+    }
+    for (let i = dmgNums.length - 1; i >= 0; i--) if (now0 - dmgNums[i]!.born > 900) dmgNums.splice(i, 1);
+    for (let i = waves.length - 1; i >= 0; i--) {
+      const w = waves[i]!;
+      if (now0 - w.born > w.life) waves.splice(i, 1);
+    }
 
     // player shots → the serpent
     for (let i = playerShots.length - 1; i >= 0; i--) {
@@ -769,6 +947,157 @@ export function mountStoryBattle(opts: {
   }
 
   // ── drawing ──────────────────────────────────────────────────────────────────
+  /**
+   * THE ROOT (GS-story-battle-epic) — the colossal world-root the whole campaign has been about: what the
+   * serpent is coiled round, and what the Ark's blockade is holding shut. It sweeps across the far deep as
+   * a dark silhouette with a rim of light and a few live seams, so the arena's middle is a PLACE rather
+   * than the black gap between two sprites. Pure geometry off a fixed curve — no rng, no state.
+   */
+  function drawRoot(t: number): void {
+    if (!ctx) return;
+    // A tapering band along a fixed quadratic: it enters from behind the boss and runs out past the player.
+    const P0 = { x: DW + 120, y: 620 };
+    const P1 = { x: 480, y: 180 };
+    const P2 = { x: -140, y: 40 };
+    const N = 24;
+    const pts: { x: number; y: number; nx: number; ny: number; w: number }[] = [];
+    for (let i = 0; i <= N; i++) {
+      const u = i / N;
+      const iv = 1 - u;
+      const x = iv * iv * P0.x + 2 * iv * u * P1.x + u * u * P2.x;
+      const y = iv * iv * P0.y + 2 * iv * u * P1.y + u * u * P2.y;
+      const dx = 2 * iv * (P1.x - P0.x) + 2 * u * (P2.x - P1.x);
+      const dy = 2 * iv * (P1.y - P0.y) + 2 * u * (P2.y - P1.y);
+      const l = Math.hypot(dx, dy) || 1;
+      // narrow where it runs away behind the boss, broad where it passes the player — the taper IS the
+      // depth cue, and it is what stops the silhouette reading as a painted stripe
+      const wob = Math.sin(u * 11.3) * 9 + Math.sin(u * 4.1 + 2.2) * 14;
+      pts.push({ x, y, nx: -dy / l, ny: dx / l, w: 46 + 150 * u + wob });
+    }
+    const edge = (sign: number): void => {
+      for (let i = 0; i <= N; i++) {
+        const p = sign > 0 ? pts[i]! : pts[N - i]!;
+        const x = p.x + p.nx * p.w * sign;
+        const y = p.y + p.ny * p.w * sign;
+        if (i === 0 && sign > 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+    };
+    // It sits FAR back: everything about it is drawn at a fraction of strength, because a backdrop that
+    // competes with the boss is not depth — it is a second subject. (First pass shipped a bright diagonal
+    // that read as a strip of grass laid across the fight.)
+    ctx.save();
+    ctx.globalAlpha = 0.62;
+    ctx.beginPath();
+    edge(1);
+    edge(-1);
+    ctx.closePath();
+    ctx.fillStyle = herald ? 'rgba(4,7,13,0.95)' : 'rgba(4,9,8,0.95)';
+    ctx.fill();
+    // bark strata + live seams: a handful of glowing veins running the length of it
+    ctx.save();
+    ctx.clip();
+    for (let k = -3; k <= 3; k++) {
+      const off = k / 3.4;
+      const live = k % 2 === 0;
+      ctx.beginPath();
+      for (let i = 0; i <= N; i++) {
+        const p = pts[i]!;
+        const wob = Math.sin(i * 0.7 + k * 1.9) * 9;
+        const x = p.x + p.nx * (p.w * off + wob);
+        const y = p.y + p.ny * (p.w * off + wob);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      if (live) {
+        const pulse = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(t * 0.7 + k));
+        ctx.strokeStyle = herald ? `rgba(120,170,225,${0.05 * pulse})` : `rgba(90,220,155,${0.06 * pulse})`;
+        ctx.lineWidth = 3.4;
+      } else {
+        ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+        ctx.lineWidth = 7;
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+    // the rim the boss's own light catches — the silhouette needs ONE lit edge or it is a hole in the sky
+    ctx.beginPath();
+    for (let i = 0; i <= N; i++) {
+      const p = pts[i]!;
+      const x = p.x + p.nx * p.w;
+      const y = p.y + p.ny * p.w;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = herald ? 'rgba(150,195,240,0.12)' : 'rgba(100,225,165,0.12)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /** The far fleet: the Order's blockade burning at anchor (Herald), or distant watch-lights (Warden). */
+  function drawFarFleet(t: number): void {
+    if (!ctx) return;
+    for (const f of farFleet) {
+      const bob = Math.sin(t * 0.3 + f.burn * 6) * 3;
+      ctx.save();
+      ctx.translate(f.x, f.y + bob);
+      ctx.scale(f.s, f.s);
+      ctx.rotate(-0.4);
+      if (herald) {
+        ctx.fillStyle = 'rgba(120,140,175,0.45)';
+        ctx.fillRect(-26, -3, 52, 6);
+        ctx.fillStyle = 'rgba(150,175,215,0.4)';
+        ctx.fillRect(-8, -8, 16, 16);
+        // guttering fires along the hull — the blockade is already paying for this
+        const fl = 0.5 + 0.5 * Math.sin(t * 5 + f.burn * 9);
+        ctx.fillStyle = `rgba(255,170,90,${0.25 + 0.35 * fl * f.burn})`;
+        ctx.beginPath();
+        ctx.arc(10, -2, 3 + fl * 2.5, 0, 6.283);
+        ctx.fill();
+      } else {
+        const tw = 0.4 + 0.6 * Math.sin(t * 1.1 + f.burn * 7);
+        ctx.fillStyle = `rgba(150,230,190,${0.16 * tw})`;
+        ctx.beginPath();
+        ctx.arc(0, 0, 4.5, 0, 6.283);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  /** Tumbling wreckage drifting through the field, two parallax layers — the deep is in motion. */
+  function drawDebris(t: number): void {
+    if (!ctx) return;
+    for (const d of debris) {
+      const drift = (t * 8 * d.layer) % (DW + 200);
+      const x = (((d.x - drift) % (DW + 200)) + DW + 200) % (DW + 200) - 100;
+      const a = d.ang + t * d.spin;
+      ctx.save();
+      ctx.translate(x, d.y);
+      ctx.rotate(a);
+      ctx.fillStyle = d.layer === 1 ? 'rgba(46,56,74,0.5)' : 'rgba(72,86,112,0.6)';
+      ctx.beginPath();
+      if (d.k === 0) {
+        ctx.fillRect(-d.r, -d.r * 0.35, d.r * 2, d.r * 0.7);
+      } else if (d.k === 1) {
+        ctx.moveTo(-d.r, -d.r * 0.6);
+        ctx.lineTo(d.r, -d.r * 0.2);
+        ctx.lineTo(d.r * 0.4, d.r * 0.8);
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        ctx.moveTo(-d.r, 0);
+        ctx.lineTo(-d.r * 0.2, -d.r * 0.8);
+        ctx.lineTo(d.r * 0.9, -d.r * 0.3);
+        ctx.lineTo(d.r * 0.3, d.r * 0.7);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
   function drawSpace(t: number, flash: number): void {
     if (!ctx) return;
     // The deep runs top-of-SCREEN to bottom-of-screen, so its axis follows the turn — and it covers the
@@ -790,18 +1119,51 @@ export function mountStoryBattle(opts: {
       ctx.fillStyle = ng;
       ctx.fillRect(n.x - n.r, n.y - n.r, n.r * 2, n.r * 2);
     }
-    // three parallax star layers, drifting slowly toward the serpent (a battlefield in motion)
+    // three parallax star layers, drifting slowly toward the serpent (a battlefield in motion). During the
+    // ENTRANCE they STREAK: the camera is closing on the boss, and a rushing deep says so (GS-story-battle-epic).
+    const streak = phase === 'entry' ? entryBeat(now0 - entryStart).streak : 0;
     for (const s of stars) {
       const drift = (t * 2.2 * s.layer) % (DW + 40);
       const x = ((s.x - drift) % (DW + 40) + DW + 40) % (DW + 40) - 20;
       const tw = 0.45 + 0.55 * Math.sin(t * 1.6 + s.tw);
       ctx.globalAlpha = (0.16 + s.layer * 0.1) * tw;
       ctx.fillStyle = s.layer === 3 ? '#dfe8ff' : '#aabdd8';
-      ctx.beginPath();
-      ctx.arc(x, s.y, s.r * (0.7 + s.layer * 0.15), 0, 6.283);
-      ctx.fill();
+      const rr = s.r * (0.7 + s.layer * 0.15);
+      if (streak > 0.02) {
+        // the streak runs back down the approach line (design −x), longest on the nearest layer
+        const len = streak * (26 + s.layer * 34);
+        ctx.strokeStyle = s.layer === 3 ? '#dfe8ff' : '#aabdd8';
+        ctx.lineWidth = rr * 1.6;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(x, s.y);
+        ctx.lineTo(x - len, s.y);
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.arc(x, s.y, rr, 0, 6.283);
+        ctx.fill();
+      }
     }
     ctx.globalAlpha = 1;
+    // THE PLACE, behind everything the fight puts in front of it (GS-story-battle-epic)
+    drawRoot(t);
+    drawFarFleet(t);
+    drawDebris(t);
+    // …and a distant storm that wakes with the phases — the far deep answering the boss
+    if (phaseIdx >= 2) {
+      const beat = Math.sin(t * 0.9) * Math.sin(t * 3.7 + 1.3);
+      const strike = Math.max(0, beat - 0.72) / 0.28;
+      if (strike > 0) {
+        const sx = 300 + ((phaseIdx * 211) % 400);
+        const sg = ctx.createRadialGradient(sx, 90, 10, sx, 90, 300);
+        const col = herald ? '190,215,255' : '150,255,200';
+        sg.addColorStop(0, `rgba(${col},${strike * 0.22})`);
+        sg.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = sg;
+        ctx.fillRect(sx - 300, -210, 600, 600);
+      }
+    }
     // a distant ringed world, low and dim — the last inhabited light behind you (depth, star-map family)
     ctx.save();
     ctx.translate(150, 500);
@@ -836,6 +1198,11 @@ export function mountStoryBattle(opts: {
       ctx.fillStyle = `rgba(255,120,80,${flash * 0.32})`;
       fillView();
     }
+    // the phase turn's colour wash — the whole sky takes the boss's escalation (GS-story-battle-epic)
+    if (phaseWash > 0) {
+      ctx.fillStyle = `rgba(${phaseWashCol},${phaseWash * 0.2})`;
+      fillView();
+    }
   }
 
   /** How far the boss has been worn down, 0 → 1 — the serpent's waking level and the Ark's battle damage
@@ -844,6 +1211,23 @@ export function mountStoryBattle(opts: {
 
   /** Paint the boss for this path: the world-serpent (Warden) or the Warden Ark (Herald). ONE anchors
    *  seam, so everything downstream — targeting, the muzzle, the finisher — is boss-agnostic. */
+  /** Which way is UP on the SCREEN, in design units — the turned camera rotates design +x to screen up.
+   *  Anything that has to read as UPRIGHT (a floating damage number and the way it rises) asks this
+   *  rather than assuming the design frame's own vertical. */
+  const screenUp = (): { x: number; y: number } => (view.rotated ? { x: 1, y: 0 } : { x: 0, y: -1 });
+
+  /**
+   * How big the boss is drawn (GS-story-battle-epic). A TURNED frame is the tall one — it has the room,
+   * and the final boss should crowd the sky rather than sit politely in the top third — so portrait gets
+   * a fifth again. Landscape stays at 1, so the shipped landscape fight is unchanged.
+   *
+   * The scale is about a FIXED pivot near the head/bow, so the end the player shoots at (and the maw the
+   * volleys come out of) barely moves: the beast grows AWAY from you, into the deep.
+   */
+  const bossScale = (): number => (view.rotated ? 1.18 : 1);
+  const bossPivot = (): { x: number; y: number } =>
+    herald ? { x: ARK_CX - 130, y: ARK_CY } : { x: SERPENT_CX - 310, y: SERPENT_CY + 42 };
+
   function drawBoss(t: number, focus: number, dim: number): void {
     if (!ctx) return;
     if (dim > 0) ctx.globalAlpha = 1 - dim;
@@ -853,13 +1237,52 @@ export function mountStoryBattle(opts: {
     const windUp = clamp01(1 - (nextAttackAt - now0) / 380);
     const spit = clamp01(1 - (now0 - lastVolleyAt) / 520);
     const rage = fighting ? Math.max(windUp * 0.85, spit) : 0;
-    anchors = herald
-      ? paintWardenArk(ctx, ARK_CX, ARK_CY, tPose, worn(), focus + roar * 0.08, { rage })
+    // GS-story-battle-epic: the ENTRANCE looms the boss up out of the dark (small + faint + set back), and
+    // every hit FLINCHES it along the shot's own axis. Both ride the anchor position, so the aim, the
+    // muzzle and the finisher all track the drawn body — one description of where the boss is.
+    let cx = herald ? ARK_CX : SERPENT_CX;
+    let cy = herald ? ARK_CY : SERPENT_CY;
+    cx += flinch.x;
+    cy += flinch.y;
+    // …and it releases back to 1 as the aim REVEAL pushes in: that framing is already composed around the
+    // bared eye / reactor core, and stacking the portrait boost on top pushes the target off the frame.
+    let s = lerp(bossScale(), 1, clamp01(focus));
+    if (phase === 'entry') {
+      // NB the fade is a VEIL over the whole frame, not `globalAlpha` — `paintWardenArk` resets alpha to 1
+      // mid-hull, so an alpha fade would tear the Ark in half. The dark parting reads better anyway.
+      const b = entryBeat(now0 - entryStart);
+      s *= lerp(0.62, 1, b.loom);
+      cx += (1 - b.loom) * 210; // set back into the dark, off past the boss's own side of the frame
+    }
+    const pv = bossPivot();
+    ctx.save();
+    if (s !== 1) {
+      ctx.translate(pv.x, pv.y);
+      ctx.scale(s, s);
+      ctx.translate(-pv.x, -pv.y);
+    }
+    const raw = herald
+      ? paintWardenArk(ctx, cx, cy, tPose, worn(), focus + roar * 0.08, { rage })
       : // its haze covers the frame WE have, not the ceremony's — a turned camera sees past the design box
-        paintSerpent(ctx, SERPENT_CX, SERPENT_CY, tPose, 1, focus + roar * 0.12, {
+        paintSerpent(ctx, cx, cy, tPose, 1, focus + roar * 0.12, {
           rage,
           frame: designViewRect(view, cssW, cssH),
         });
+    ctx.restore();
+    // The painters return anchors in their OWN pre-scale space, so map them through the same uniform
+    // scale — there is one description of where the boss is, and targeting/muzzle/finisher all read it.
+    anchors =
+      s === 1
+        ? raw
+        : {
+            eyeX: pv.x + (raw.eyeX - pv.x) * s,
+            eyeY: pv.y + (raw.eyeY - pv.y) * s,
+            eyeR: raw.eyeR * s,
+            browX: pv.x + (raw.browX - pv.x) * s,
+            browY: pv.y + (raw.browY - pv.y) * s,
+            headH: raw.headH * s,
+            headAng: raw.headAng,
+          };
     ctx.globalAlpha = 1;
   }
 
@@ -1281,6 +1704,58 @@ export function mountStoryBattle(opts: {
     }
   }
 
+  /**
+   * GS-story-battle-epic — the wound's own particles, plus the roar's shockwave. Drawn in WORLD space so
+   * they sit on the boss wherever the camera put it; the damage NUMBER counter-rotates, because a number
+   * lying on its side is not a number.
+   */
+  function drawImpacts(): void {
+    if (!ctx) return;
+    for (const w of waves) {
+      const age = clamp01((now0 - w.born) / w.life);
+      if (now0 < w.born) continue;
+      const r = w.r1 * (1 - Math.pow(1 - age, 2.4));
+      ctx.strokeStyle = `rgba(${w.col},${(1 - age) * 0.75})`;
+      ctx.lineWidth = w.w * (1 - age * 0.7);
+      ctx.beginPath();
+      ctx.arc(w.x, w.y, r, 0, 6.283);
+      ctx.stroke();
+    }
+    ctx.lineCap = 'round';
+    for (const s of sparks) {
+      const age = clamp01((now0 - s.born) / s.life);
+      const sp = Math.hypot(s.vx, s.vy) || 1;
+      ctx.strokeStyle = s.col;
+      ctx.globalAlpha = (1 - age) * 0.95;
+      ctx.lineWidth = 2.2 * (1 - age * 0.6);
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(s.x - (s.vx / sp) * s.len, s.y - (s.vy / sp) * s.len);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.lineCap = 'butt';
+    for (const d of dmgNums) {
+      const age = clamp01((now0 - d.born) / 900);
+      const rise = 20 + age * 46;
+      // "up" for a floating number is the SCREEN's up, like the glyph itself
+      const u = screenUp();
+      ctx.save();
+      ctx.translate(d.x + u.x * rise, d.y + u.y * rise);
+      if (view.rotated) ctx.rotate(Math.PI / 2);
+      ctx.globalAlpha = clamp01(1 - Math.max(0, age - 0.55) / 0.45);
+      ctx.textAlign = 'center';
+      ctx.font = `800 ${d.big ? 30 : 20}px Georgia, serif`;
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+      ctx.strokeText(String(d.val), 0, 0);
+      ctx.fillStyle = d.col;
+      ctx.fillText(String(d.val), 0, 0);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+
   // ── HUD (always upright — it draws in the HUD frame, never the arena) ────────
   /** The classic side-by-side cluster (shields left, boss bar right) needs a WIDE frame; a turned
    *  portrait frame stacks them into the band above the arena. `wide` reproduces the shipped numbers. */
@@ -1292,39 +1767,53 @@ export function mountStoryBattle(opts: {
     if (!ctx) return;
     const wide = wideHud();
     const x = wide ? 470 : 16;
-    const y = wide ? 34 : 104;
+    const y = wide ? 40 : 112;
     const w = wide ? 470 : view.hudW - 32;
-    const frac = hp / hpMax;
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.font = '800 13px system-ui, sans-serif';
+    const H = 15;
+    const frac = clamp01(hp / hpMax);
+    const ghost = clamp01(hpGhost / hpMax);
+    // the PLATE: the boss's name AND what it is — an ordinary hazard gets a strip, the finale gets billing
     ctx.textAlign = 'left';
-    ctx.fillText(herald ? 'THE WARDEN ARK' : 'JÖRMUNGANDR', x, y - 7);
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.fillRect(x, y, w, 13);
+    ctx.fillStyle = `rgba(255,255,255,${0.85 + barFlash * 0.15})`;
+    ctx.font = '800 15px Georgia, serif';
+    ctx.fillText(title.name, x, y - 16);
+    ctx.fillStyle = 'rgba(178,192,214,0.7)';
+    ctx.font = '600 9.5px system-ui, sans-serif';
+    ctx.fillText(title.epithet, x, y - 4);
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(x, y + 4, w, H);
+    // the CHIP bar — what the last blow took, still draining. A nova's bite is SEEN, not inferred.
+    if (ghost > frac) {
+      ctx.fillStyle = 'rgba(255,236,190,0.55)';
+      ctx.fillRect(x + w * frac, y + 4, w * (ghost - frac), H);
+    }
     const bg = ctx.createLinearGradient(x, 0, x + w, 0);
     bg.addColorStop(0, herald ? '#eaf2ff' : '#8fe0a0');
-    bg.addColorStop(1, herald ? '#ffe08a' : '#4fb87a');
+    bg.addColorStop(1, frac < 0.3 ? (herald ? '#ff9a6a' : '#ff8f5a') : herald ? '#ffe08a' : '#4fb87a');
     ctx.fillStyle = bg;
-    ctx.fillRect(x, y, w * clamp01(frac), 13);
+    ctx.fillRect(x, y + 4, w * frac, H);
+    // a lit crown along the fill — the bar reads as a lamp burning down, not a coloured swatch
+    ctx.fillStyle = `rgba(255,255,255,${0.22 + barFlash * 0.5})`;
+    ctx.fillRect(x, y + 4, w * frac, 3);
     // phase notches — the escalation is READABLE on the bar
     for (const f of FINALE_PHASES) {
       const nx = x + w * f;
       ctx.strokeStyle = hp <= hpMax * f ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.75)';
       ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.moveTo(nx, y - 2);
-      ctx.lineTo(nx, y + 15);
+      ctx.moveTo(nx, y + 1);
+      ctx.lineTo(nx, y + H + 7);
       ctx.stroke();
     }
-    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(x, y, w, 13);
+    ctx.strokeStyle = `rgba(255,255,255,${0.3 + barFlash * 0.45})`;
+    ctx.lineWidth = 1.4;
+    ctx.strokeRect(x, y + 4, w, H);
     // under-gate: the last chunk visibly HOLDS — the honest "not enough gun" read
     if (!won && hp <= hpFloor + 0.5) {
       ctx.fillStyle = '#ff9a6a';
       ctx.font = '700 12.5px system-ui, sans-serif';
       ctx.textAlign = 'right';
-      ctx.fillText(herald ? 'the Ark\u2019s armour HOLDS — not enough gun' : 'its hide HOLDS — not enough gun', x + w, y + 32);
+      ctx.fillText(herald ? 'the Ark\u2019s armour HOLDS — not enough gun' : 'its hide HOLDS — not enough gun', x + w, y + 38);
     }
   }
 
@@ -1353,6 +1842,22 @@ export function mountStoryBattle(opts: {
         ctx.strokeStyle = 'rgba(220,240,255,0.6)';
         ctx.lineWidth = 1;
         ctx.stroke();
+      }
+      // GS-story-battle-epic: the cell you JUST lost shatters where it stood — losing a shield has to land
+      const shatter = clamp01(1 - (now0 - shieldBreakAt) / 460);
+      if (i === shield && shatter > 0) {
+        const cx2 = x + i * (pw + 4) + pw / 2;
+        const cy2 = y + 8;
+        ctx.strokeStyle = `rgba(190,225,255,${shatter * 0.9})`;
+        ctx.lineWidth = 1.6;
+        for (let k = 0; k < 6; k++) {
+          const a = k * 1.047 + 0.4;
+          const r0 = 4 + (1 - shatter) * 12;
+          ctx.beginPath();
+          ctx.moveTo(cx2 + Math.cos(a) * r0, cy2 + Math.sin(a) * r0);
+          ctx.lineTo(cx2 + Math.cos(a) * (r0 + 5), cy2 + Math.sin(a) * (r0 + 5));
+          ctx.stroke();
+        }
       }
     }
   }
@@ -1513,19 +2018,91 @@ export function mountStoryBattle(opts: {
     if (!ctx || now0 > phaseCaptionUntil || !phaseCaption) return;
     // The banner rides the ARENA, not the screen — a turned frame has a HUD band above the arena, and a
     // caption floated up into it would sit on the boss health bar.
-    const top = (wideHud() ? 0 : arenaTopHud(view)) + 108;
+    const top = (wideHud() ? 0 : arenaTopHud(view)) + 118;
     const left = (phaseCaptionUntil - now0) / 2600;
     const a = clamp01(left * 3) * clamp01((1 - left) * 6 + 0.3);
+    // GS-story-battle-epic: the title SLAMS in (over-scale, settling) instead of drifting up — an
+    // escalation caption that fades on reads as a subtitle, not an announcement. It rides a dark scrim so
+    // it stays legible over the boss, and a rule sweeps out under it.
+    const inT = clamp01((1 - left) * 5.5);
+    const sc = 1 + (1 - Math.pow(inT, 0.45)) * 0.5;
+    const cxm = view.hudW / 2;
     ctx.globalAlpha = a;
+    ctx.save();
+    ctx.translate(cxm, top);
+    const scrim = ctx.createLinearGradient(-cxm, 0, cxm, 0);
+    scrim.addColorStop(0, 'rgba(0,0,0,0)');
+    scrim.addColorStop(0.5, 'rgba(2,5,10,0.68)');
+    scrim.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = scrim;
+    ctx.fillRect(-cxm, -30, cxm * 2, 66);
+    ctx.scale(sc, sc);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffd9a0';
     ctx.font = '800 30px Georgia, serif';
-    ctx.fillText(phaseCaption, view.hudW / 2, top + Math.sin(t * 2) * 2);
+    ctx.fillText(phaseCaption, 0, Math.sin(t * 2) * 2);
     if (phaseCaptionSub) {
       ctx.fillStyle = '#cdd8e8';
       ctx.font = '600 15px system-ui, sans-serif';
-      ctx.fillText(phaseCaptionSub, view.hudW / 2, top + 26);
+      ctx.fillText(phaseCaptionSub, 0, 26);
     }
+    ctx.restore();
+    const rule = Math.pow(inT, 0.6) * cxm * 0.86;
+    ctx.strokeStyle = `rgba(255,217,160,${a * 0.7})`;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(cxm - rule, top + 9);
+    ctx.lineTo(cxm + rule, top + 9);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  /**
+   * THE ENTRANCE PLATE (GS-story-battle-epic) — the boss names itself. Drawn in the upright HUD frame so
+   * it reads the same whichever way the arena turned, centred in the frame rather than hung off the
+   * weapon bar (there is no weapon bar yet — the HUD wipes in behind this).
+   */
+  function entryPlate(b: { plate: number; plateAlpha: number; roar: number }): void {
+    if (!ctx || b.plateAlpha <= 0.01) return;
+    const cx = view.hudW / 2;
+    const cy = view.hudH * 0.5;
+    const sc = 1 + (1 - b.plate) * 0.55;
+    ctx.save();
+    ctx.globalAlpha = b.plateAlpha;
+    // a scrim band so the name reads over whatever the boss is doing behind it
+    const scrim = ctx.createLinearGradient(0, cy - 74, 0, cy + 74);
+    scrim.addColorStop(0, 'rgba(0,0,0,0)');
+    scrim.addColorStop(0.5, `rgba(2,5,10,${0.72 * b.plateAlpha})`);
+    scrim.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = scrim;
+    ctx.fillRect(0, cy - 74, view.hudW, 148);
+    ctx.translate(cx, cy);
+    ctx.scale(sc, sc);
+    ctx.textAlign = 'center';
+    // the name, with the roar blowing a glow through it
+    const glow = 0.35 + b.roar * 0.65;
+    ctx.shadowColor = herald ? `rgba(190,225,255,${glow})` : `rgba(140,255,190,${glow})`;
+    ctx.shadowBlur = 18 + b.roar * 26;
+    ctx.fillStyle = '#f6efdc';
+    // one size for both plates: the longer name is the Ark's, and it must not run off a 390px phone
+    const size = Math.min(46, (view.hudW * 0.9) / (title.name.length * 0.56));
+    ctx.font = `800 ${size}px Georgia, serif`;
+    ctx.fillText(title.name, 0, 0);
+    ctx.shadowBlur = 0;
+    // the rules above and below, drawn out from the centre as the plate lands
+    const rule = b.plate * view.hudW * 0.42;
+    ctx.strokeStyle = herald ? 'rgba(200,225,255,0.75)' : 'rgba(150,255,200,0.75)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-rule, -size * 0.86);
+    ctx.lineTo(rule, -size * 0.86);
+    ctx.moveTo(-rule, 20);
+    ctx.lineTo(rule, 20);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(205,216,232,0.92)';
+    ctx.font = '700 12px system-ui, sans-serif';
+    ctx.fillText(title.epithet, 0, 38);
+    ctx.restore();
     ctx.globalAlpha = 1;
   }
 
@@ -1539,26 +2116,122 @@ export function mountStoryBattle(opts: {
     ctx.globalAlpha = 1;
   }
 
+  // ── the entrance (GS-story-battle-epic) ──────────────────────────────────────
+  /** The entrance ends: the assault's clocks start HERE, so every deadline it owns is measured from the
+   *  first volley, not from the mount. */
+  function beginAssault(): void {
+    phase = 'assault';
+    assaultStart = now0;
+    nextAttackAt = now0 + PHASE_ATTACK_MS[phaseIdx]!;
+    hintUntil = now0 + 5200;
+    const [cap, sub] = phaseLabel(phaseIdx);
+    phaseCaption = cap;
+    phaseCaptionSub = sub;
+    phaseCaptionUntil = now0 + 3000;
+  }
+
+  /**
+   * The whole entrance frame. The boss looms up out of a dark that parts around it, the plate lands, and
+   * the HUD wipes in underneath on the way out — so the first assault frame is already fully dressed.
+   * Its frame kick draws from the DECOR stream (`drng`), never the fight's, so the volley pattern the
+   * assault opens with is exactly the one it always had.
+   */
+  function drawEntry(t: number, b: ReturnType<typeof entryBeat>): void {
+    if (!ctx) return;
+    const kick = shake > 0.4 ? shake : 0;
+    const shx = kick ? (drng() - 0.5) * kick : 0;
+    const shy = kick ? (drng() - 0.5) * kick : 0;
+    applyWorld(shx, shy);
+    drawSpace(t, 0);
+    drawBoss(t, 0, 0);
+    drawImpacts();
+    drawShip(t); // you are ON the field for the whole beat — the ship must not pop in at the first volley
+    // the dark it comes OUT of — a veil that parts as it arrives, and a hard white flash on the roar
+    const veil = clamp01(1 - b.loom) * 0.85;
+    if (veil > 0.01) {
+      ctx.fillStyle = `rgba(2,4,9,${veil})`;
+      fillView();
+    }
+    if (b.roar > 0.72) {
+      ctx.fillStyle = `rgba(255,255,255,${((b.roar - 0.72) / 0.28) * 0.34})`;
+      fillView();
+    }
+    // a closing vignette so the eye is pinned on the boss for the whole beat
+    const v = designViewRect(view, cssW, cssH);
+    const vg = ctx.createRadialGradient(
+      v.x + v.w / 2,
+      v.y + v.h / 2,
+      Math.min(v.w, v.h) * 0.28,
+      v.x + v.w / 2,
+      v.y + v.h / 2,
+      Math.max(v.w, v.h) * 0.72,
+    );
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, `rgba(0,0,0,${0.45 + veil * 0.3})`);
+    ctx.fillStyle = vg;
+    fillView();
+
+    applyHud(shx, shy);
+    // the HUD wipes in behind the plate, so the fight opens fully dressed
+    if (b.hudIn > 0.01) {
+      ctx.globalAlpha = b.hudIn;
+      ctx.save();
+      ctx.translate(0, (1 - b.hudIn) * -20);
+      drawHealthBar();
+      drawShieldPips();
+      ctx.restore();
+      ctx.save();
+      ctx.translate(0, (1 - b.hudIn) * 30);
+      drawWeaponBar();
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
+    entryPlate(b);
+    if (interactive && b.plateAlpha < 0.5 && b.loom > 0.9) {
+      prompt('tap to begin', '#ffe6a0', t * 1.2);
+    }
+  }
+
   // ── frame ────────────────────────────────────────────────────────────────────
   function frame(nowMs: number): void {
     if (finished || !ctx) return;
     if (!now0) {
       now0 = nowMs;
       last = nowMs;
-      assaultStart = nowMs;
-      nextAttackAt = nowMs + PHASE_ATTACK_MS[0];
-      hintUntil = nowMs + 5200;
-      const [cap, sub] = phaseLabel(phaseIdx === 0 ? 0 : phaseIdx);
-      phaseCaption = cap;
-      phaseCaptionSub = sub;
-      phaseCaptionUntil = nowMs + 3400;
+      // GS-story-battle-epic: the ENTRANCE runs first — the assault's own clocks are set when it ends.
+      entryStart = nowMs;
+      assaultStart = nowMs + ENTRY_MS;
+      nextAttackAt = assaultStart + PHASE_ATTACK_MS[0];
+      hintUntil = assaultStart + 5200;
     }
     const dt = Math.min(64, nowMs - last);
     last = nowMs;
     now0 = nowMs;
-    const t = (nowMs - assaultStart) / 1000 + 1;
+    // HITSTOP (GS-story-battle-epic): a heavy hit FREEZES the world — we keep drawing, but nothing moves
+    // and the art clock stops with it, so the boss holds mid-writhe instead of gliding through the blow.
+    const frozen = nowMs < stopUntil;
+    if (!frozen) animMs += dt;
+    const t = animMs / 1000 + 1;
 
-    update(dt);
+    // `update` is inert outside the fighting phases (every mover is guarded on `phase`), so the entrance
+    // runs it too — the decays, the recoil spring and the shockwave all tick with one call.
+    if (!frozen) update(dt);
+
+    if (phase === 'entry') {
+      const b = entryBeat(now0 - entryStart);
+      if (!entryRoared && now0 - entryStart >= ENTRY_ROAR_MS) {
+        entryRoared = true;
+        bossRoar(0, 0.4); // the entrance already has the white bloom — a full wash on top greys the frame
+        shake = Math.max(shake, 20);
+        opts.onPhase?.(); // the app's one audio seam — the entrance roar borrows the phase cue
+      }
+      if (now0 - entryStart >= ENTRY_MS) beginAssault();
+      else {
+        drawEntry(t, b);
+        raf = requestAnimationFrame(frame);
+        return;
+      }
+    }
 
     // One shake offset, spent by BOTH passes — the world and the upright HUD rock together, and the
     // private rng is drawn exactly as often as it always was.
@@ -1577,6 +2250,7 @@ export function mountStoryBattle(opts: {
       drawEnemyShots(t);
       drawPlayerShots(t);
       drawBursts();
+      drawImpacts();
       drawShip(t);
       applyHud(shx, shy);
       drawHealthBar();

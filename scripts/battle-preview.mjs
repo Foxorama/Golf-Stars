@@ -74,30 +74,48 @@ async function shot(name, { herald = false, hpFrac = 1, shipId, waits }) {
   await page.evaluate(() => window.__handle?.destroy?.());
 }
 
+// GS-story-battle-epic: every fight now OPENS on the 2.8s entrance (the boss looms out of the dark, names
+// itself, roars, and the HUD wipes in behind the plate), so each assault-state wait carries `ENTRY` on top
+// of the beat it is really waiting for. Keep the two apart — a bare number here is a silent 2.8s error.
+const ENTRY = 2800;
+
+// The ENTRANCE itself, beat by beat — the loom, the plate landing, the roar, the HUD wipe.
+await shot('warden-0-entrance', {
+  hpFrac: 1,
+  shipId: 'hauler-barge',
+  waits: [[700, 'loom'], [600, 'plate'], [700, 'roar'], [900, 'hud']],
+});
+
 // The Warden fight, phase by phase (hauler ship — a mid-fleet ride).
-await shot('warden-1-open', { hpFrac: 1, shipId: 'hauler-barge', waits: [[2400, '']] });
-await shot('warden-2-acid', { hpFrac: 0.74, shipId: 'hauler-barge', waits: [[3400, '']] });
-await shot('warden-3-lightning', { hpFrac: 0.48, shipId: 'hauler-barge', waits: [[3600, '']] });
-await shot('warden-4-void', { hpFrac: 0.22, shipId: 'hauler-barge', waits: [[3600, '']] });
+await shot('warden-1-open', { hpFrac: 1, shipId: 'hauler-barge', waits: [[ENTRY + 2400, '']] });
+await shot('warden-2-acid', { hpFrac: 0.74, shipId: 'hauler-barge', waits: [[ENTRY + 3400, '']] });
+await shot('warden-3-lightning', { hpFrac: 0.48, shipId: 'hauler-barge', waits: [[ENTRY + 3600, '']] });
+await shot('warden-4-void', { hpFrac: 0.22, shipId: 'hauler-barge', waits: [[ENTRY + 3600, '']] });
 // The overwhelm fires as soon as the autopilot's first volley lands below 5% (waits are DELTAS).
-await shot('warden-5-overwhelm', { hpFrac: 0.055, shipId: 'hauler-barge', waits: [[3300, ''], [3200, 'aim'], [1500, 'climax']] });
+await shot('warden-5-overwhelm', { hpFrac: 0.055, shipId: 'hauler-barge', waits: [[ENTRY + 3300, ''], [3200, 'aim'], [1500, 'climax']] });
 // The Herald fight (saucer) — a DIFFERENT boss (GS-story-warden-ark): the Warden Ark's flak, spinal
 // lances and torpedoes, the hull taking visible damage, then the bared reactor core + the climax.
-await shot('herald-1-open', { herald: true, hpFrac: 1, shipId: 'ufo-saucer', waits: [[2600, '']] });
-await shot('herald-2-flak', { herald: true, hpFrac: 0.74, shipId: 'ufo-saucer', waits: [[3400, '']] });
-await shot('herald-3-lance', { herald: true, hpFrac: 0.48, shipId: 'ufo-saucer', waits: [[3600, '']] });
-await shot('herald-4-torpedo', { herald: true, hpFrac: 0.22, shipId: 'ufo-saucer', waits: [[3600, '']] });
-await shot('herald-5-overwhelm', { herald: true, hpFrac: 0.055, shipId: 'ufo-saucer', waits: [[3300, ''], [3200, 'aim'], [1500, 'climax']] });
+await shot('herald-0-entrance', { herald: true, hpFrac: 1, shipId: 'ufo-saucer', waits: [[1300, 'plate'], [1000, 'hud']] });
+await shot('herald-1-open', { herald: true, hpFrac: 1, shipId: 'ufo-saucer', waits: [[ENTRY + 2600, '']] });
+await shot('herald-2-flak', { herald: true, hpFrac: 0.74, shipId: 'ufo-saucer', waits: [[ENTRY + 3400, '']] });
+await shot('herald-3-lance', { herald: true, hpFrac: 0.48, shipId: 'ufo-saucer', waits: [[ENTRY + 3600, '']] });
+await shot('herald-4-torpedo', { herald: true, hpFrac: 0.22, shipId: 'ufo-saucer', waits: [[ENTRY + 3600, '']] });
+await shot('herald-5-overwhelm', { herald: true, hpFrac: 0.055, shipId: 'ufo-saucer', waits: [[ENTRY + 3300, ''], [3200, 'aim'], [1500, 'climax']] });
 
 // GS-story-battle-portrait: the same fight on a PHONE, where the arena turns 90° — the boss at the top,
 // your ship at the bottom, and the HUD upright in the bands the turn opens up. Same states, so the two
 // sets can be read side by side.
 await page.setViewportSize({ width: 390, height: 844 });
-await shot('portrait-1-open', { hpFrac: 1, shipId: 'hauler-barge', waits: [[2400, '']] });
-await shot('portrait-2-lightning', { hpFrac: 0.48, shipId: 'hauler-barge', waits: [[3600, '']] });
-await shot('portrait-3-void', { hpFrac: 0.22, shipId: 'hauler-barge', waits: [[3600, '']] });
-await shot('portrait-4-overwhelm', { hpFrac: 0.055, shipId: 'hauler-barge', waits: [[3300, ''], [3200, 'aim'], [1500, 'climax']] });
-await shot('portrait-5-herald', { herald: true, hpFrac: 0.48, shipId: 'ufo-saucer', waits: [[3600, '']] });
+await shot('portrait-0-entrance', {
+  hpFrac: 1,
+  shipId: 'hauler-barge',
+  waits: [[700, 'loom'], [600, 'plate'], [700, 'roar'], [900, 'hud']],
+});
+await shot('portrait-1-open', { hpFrac: 1, shipId: 'hauler-barge', waits: [[ENTRY + 2400, '']] });
+await shot('portrait-2-lightning', { hpFrac: 0.48, shipId: 'hauler-barge', waits: [[ENTRY + 3600, '']] });
+await shot('portrait-3-void', { hpFrac: 0.22, shipId: 'hauler-barge', waits: [[ENTRY + 3600, '']] });
+await shot('portrait-4-overwhelm', { hpFrac: 0.055, shipId: 'hauler-barge', waits: [[ENTRY + 3300, ''], [3200, 'aim'], [1500, 'climax']] });
+await shot('portrait-5-herald', { herald: true, hpFrac: 0.48, shipId: 'ufo-saucer', waits: [[ENTRY + 3600, '']] });
 
 console.log('battle preview →', outDir);
 await browser.close();

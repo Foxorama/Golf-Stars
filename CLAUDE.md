@@ -1118,6 +1118,26 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     optional `frame`; both default to the shipped behaviour). The aim sweep is ONE offset (`reticleOffset`)
     that the strike test reads and the reticle is merely DRAWN on whichever axis crosses the boss on screen,
     so the finisher's timing window is provably orientation-independent. Guarded by `tests/battle-frame.test.ts`.
+    **AND IT IS A SET-PIECE, NOT A SKIRMISH** (GS-story-battle-epic — *"it should be pretty flashy and epic
+    and at the moment it is just fine"*). Five rules, ALL render-only (no damage, spawn, cooldown, threshold
+    or hitbox moved, so the balance and fairness-by-construction are untouched): the boss **ARRIVES** — a
+    2.8s entrance (`battleIntro.ts`, pure) looms it out of the dark, slams its NAME + epithet on, ROARS, and
+    wipes the HUD in behind the plate (tap skips it; the assault's clocks start when it ENDS); hits **BITE**
+    — hitstop with the ART CLOCK frozen too, a damped-spring flinch along the shot's axis, sparks, and an
+    upright floating damage number; the phase turn is a **BEAT** — ONE `bossRoar()` seam whose shockwave
+    visibly BLOWS THE FIELD CLEAR, plus a colour wash and a title that SLAMS; the arena has a **PLACE** —
+    the root, parallax wreckage, a far fleet, a waking storm; and the bar is a **BOSS BAR** — name +
+    epithet, a pale CHIP bar draining a beat behind, shields that shatter. In portrait the boss is drawn a
+    fifth BIGGER, scaled about a fixed head/bow pivot so the muzzle barely moves — and **the returned
+    anchors are mapped through the same scale**, or targeting/muzzle/finisher become a second description
+    of where the boss is. It releases to 1 as the aim reveal pushes in (that framing is already composed
+    round the bared eye). New decor draws from its OWN stream (`drng`), never the fight's `rng`, so scenery
+    can't shift a volley. ⚠️ Re-lighting the serpent for the turned camera was BUILT AND THROWN AWAY: its
+    form-shading key light runs across design +y, and screen-up is design +x — the beast's own SPINE — so
+    the "fix" shades it lengthwise and drops the head into shadow. **The side-on read is a property of
+    turning a side-on COMPOSITION; only a portrait-authored pose fixes it.** Guarded by
+    `tests/battle-intro.test.ts`; eyes-on `scripts/battle-preview.mjs` (its assault waits carry an explicit
+    `ENTRY` term — a bare number is a silent 2.8s error).
   - **Intro cinematic** (`docs/decisions/ui-intro.md`) — cosmetic Canvas2D, not in the reducer; degrades
     safely (every frame in try/catch → `finish()`); the many-instance glow uses a cached sprite, never
     per-element `shadowBlur`. The real title boots first; the intro overlays it.

@@ -565,6 +565,69 @@ Ordered so each ships something playable and nothing lands before its foundation
   end-to-end for both bosses. Eyes-on: `scripts/battle-preview.mjs` shoots the phone layout beside the
   landscape one.
 
+- **GS-story-battle-epic** — ✅ *shipped* (the finale battle is a set-piece, not a skirmish). Player report,
+  on the freshly-turned portrait fight: *"the portrait style end boss is fine, but because all our graphics
+  are side on it looks pretty weird… given it's the final boss battle campaign it should be pretty flashy
+  and epic, and at the moment it is just fine."* Shot at 390×844 the diagnosis was plain: a small distant
+  boss in the top third, ~40% of the screen empty black between it and the ship, a 13px health strip, and
+  hits that resolved as a 2px ring and a 6px shake. All of it is render-only — **no damage number, spawn
+  pattern, cooldown, phase threshold or hitbox moved**, so the fight's balance and its
+  fairness-by-construction are untouched.
+  1. **THE BOSS ARRIVES.** A 2.8s ENTRANCE (`render/battleIntro.ts` — the timeline and the boss's
+     name/epithet rows, pure and node-tested): the deep streaks past, the boss looms up out of a dark that
+     parts around it, its NAME slams on over a scrim, it ROARS (a shockwave across the whole field, a
+     hitstop, a 20-unit frame kick), and only then does the HUD wipe in underneath and the assault begin.
+     You never used to see the boss ARRIVE, so it never landed as the thing five Sigils were spent
+     reaching. A tap skips the entrance; Skip still ends the fight. The assault's own clocks
+     (`assaultStart`, and every deadline measured off it) start when the entrance ENDS, so the auto and
+     hopeless deadlines mean what they always meant. Reduced motion skips the whole battle at the app
+     layer, as before — the entrance needs no gate of its own.
+  2. **HITS BITE.** HITSTOP — the whole world freezes for 105ms on a heavy hit, 34ms on a light one,
+     150ms on a phase turn — with the ART CLOCK frozen alongside the update, so the boss holds mid-writhe
+     instead of gliding through the blow. Plus a damped-spring FLINCH along the shot's own axis, sparks and
+     shrapnel thrown back toward the ship that fired, and the damage floating off as a number (which
+     counter-rotates: a number lying on its side is not a number).
+  3. **THE PHASE TURN IS A BEAT.** `bossRoar()` is one seam for the entrance and every escalation: a
+     shockwave that visibly BLOWS THE FIELD CLEAR (the live volleys are pushed outward — the escalation is
+     felt, not just captioned), a wash in that phase's own colour, a hitstop, and a title that SLAMS in
+     over a scrim with a rule drawing out under it instead of fading up like a subtitle.
+  4. **THE ARENA HAS A PLACE.** The dead middle gains the ROOT the whole campaign is about — a tapering
+     silhouette sweeping from behind the boss out past the player, with bark strata and a few live seams —
+     plus two parallax layers of tumbling wreckage, a far fleet (the Order's blockade burning at anchor on
+     the Herald road; watch-lights on the Warden's), and a distant storm that wakes at phase 2. The first
+     pass shipped it at full strength and it read as **a bright diagonal strip of grass laid across the
+     fight**: a backdrop that competes with the boss is not depth, it is a second subject. It now draws at
+     0.62 alpha over a near-black fill, and its taper (narrow behind the boss, broad past the player) is
+     what stops the silhouette reading as a painted stripe.
+  5. **THE BOSS BAR IS A BOSS BAR.** A plate carrying the name AND its epithet, a pale CHIP bar draining a
+     beat behind the live one (so a nova's bite is something you SEE, not something you infer), the phase
+     notches, a lit crown along the fill, and a bar that runs hot under 30%. Shield cells shatter where
+     they stood.
+  6. **THE BOSS IS DRAWN A FIFTH BIGGER IN PORTRAIT** — the turned frame is the tall one and the final boss
+     should crowd the sky. The scale is about a fixed pivot at the head/bow, so the end you shoot at (and
+     the maw the volleys leave from) barely moves and the beast grows AWAY into the deep; **the returned
+     anchors are mapped through the same uniform scale**, so targeting, the muzzle and the golf finisher
+     still read ONE description of where the boss is. It releases back to 1 as the aim REVEAL pushes in —
+     that framing is already composed around the bared eye, and stacking the boost on top pushed the
+     target off the frame (caught in the preview, not in play). Landscape stays at 1.
+  - **What this deliberately does NOT do: re-light the serpent for the turned camera.** The "side-on"
+    half of the report is real, and the obvious lever was BUILT AND THROWN AWAY. `paintSerpent`'s form
+    shading is its one non-body-relative element — a key light from above, running across design +y — so
+    the natural fix is to point it at the screen's up. But the beast is composed lying HORIZONTALLY:
+    screen-up is design +x, which is its own SPINE, so the "fix" shades it along its length and drops the
+    head — the focal point — into shadow. Shot side by side the two are near-indistinguishable, and the
+    justification does not survive contact. The side-on read is a property of turning a side-on
+    COMPOSITION; only a portrait-authored pose fixes it, and a light direction never will. Reverted
+    rather than shipped, and `sigilCeremony.ts` is untouched by this pass.
+  - New decor draws from its OWN seeded stream (`drng`), never the fight's `rng` — so adding scenery, and
+    the entrance's own frame kick, cannot shift a single draw of the stream that spawns the boss's
+    volleys. The assault opens on exactly the pattern it always did.
+  Guarded by `tests/battle-intro.test.ts` (both plates, the dials' bounds and monotonicity, the roar's
+  impulse, the beat finishing seated, and a stalled frame landing only further along) plus the existing
+  414×896 finale browser smokes, which now drive the entrance end-to-end for both bosses. Eyes-on:
+  `scripts/battle-preview.mjs`, which shoots the entrance beat by beat in both orientations — its
+  assault-state waits carry an explicit `ENTRY` term, because a bare number there is a silent 2.8s error.
+
 **Phase G — Polish**
 - **GS-story-beats** — ✅ *shipped* (the story-round dialogue beats). Campaign NPC scenes threaded through
   the EXISTING generic LORE machinery (`sim/rpg/lore.ts`), so a beat is a DATA ROW and the gate/screen/
