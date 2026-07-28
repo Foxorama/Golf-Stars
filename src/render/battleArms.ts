@@ -136,10 +136,11 @@ export const SHIP_ARMS: Record<ShipLook['kind'], ShipArms> = {
     trail: 'smoke',
     flashR: 12,
   },
-  // Neon night-bike → twin FAIRING lasers, close together and low. The tightest spacing in the fleet.
+  // Neon night-bike → twin FAIRING lasers, close together. The tightest spacing in the fleet, and a true
+  // symmetric PAIR: straddling the keel, they read the same from the side and from above (no mirroring).
   moto: {
     name: 'FAIRING LASERS',
-    mounts: [{ along: 0.78, across: -0.14 }, { along: 0.78, across: 0.22 }],
+    mounts: [{ along: 0.78, across: -0.2 }, { along: 0.78, across: 0.2 }],
     fire: 'salvo',
     flash: 'spark',
     trail: 'streak',
@@ -190,6 +191,34 @@ export interface ResolvedArms extends ShipArms {
   hot: string;
   /** The cooler halo around it. */
   halo: string;
+}
+
+/** Inside this band of the keel a mount counts as ON the centreline — a nose gun, not a flank gun. */
+export const KEEL_EPS = 0.15;
+
+/**
+ * The mounts as seen FROM ABOVE (GS-story-battle-topdown).
+ *
+ * A side elevation HIDES the far side of the ship, so a row authored against it can legitimately quote
+ * every flank gun once — the wagon's two roof-rack barrels, the saucer's underbeam. Turn the camera and
+ * draw the PLAN hull (`shipTopArt.ts`) and that becomes a ship firing out of its port wing only, which
+ * reads as broken. A vehicle is symmetric about its keel, so from above you see both.
+ *
+ * ONE rule, and it is self-describing: **if every off-centre mount is on the same side, mirror them; if
+ * the row already spans both sides, it has already accounted for the far side and is left alone.** That
+ * lands right for all eleven rows — the wagon's rack doubles to four, the Mothership's three rim emitters
+ * become a ring of six, the Pegasus grows a bolt on each wing — while the shuttle's two wide pylons, the
+ * comet's three-point spray and the Firebird's beak-and-pinions stay exactly as authored. Centreline
+ * mounts (a nose spike) are never doubled.
+ */
+export function planMounts(arms: ShipArms): Hardpoint[] {
+  const flank = arms.mounts.filter((m) => Math.abs(m.across) > KEEL_EPS);
+  if (!flank.length) return arms.mounts;
+  const spansBoth = flank.some((m) => m.across > 0) && flank.some((m) => m.across < 0);
+  if (spansBoth) return arms.mounts;
+  return arms.mounts.flatMap((m) =>
+    Math.abs(m.across) > KEEL_EPS ? [m, { along: m.along, across: -m.across }] : [m],
+  );
 }
 
 /** The default armament for a ship with no known silhouette — the wagon's rack guns (everyone owns it). */

@@ -500,6 +500,15 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
   fresh, planned session.
 
 ## Later
+- **GS-startour-topdown — should the STAR MAP fly the plan-view hull too?** GS-story-battle-topdown built a
+  top-down twin for all 11 silhouettes, and the star map has arguably the same problem in a milder form: it
+  is a CHART (a view from outside/above) with a side-elevation car driving across it, free to point in any
+  direction — a `'nose'` ship rotates to its heading, so it flies "up" the chart showing you its door, which
+  is the exact complaint the battle had. Milder because the map is a stylised chart rather than a scene, and
+  the side art is the established look everywhere else (cards, pads, garage). Cheap to try — `shipTopSVG`
+  has the same signature as `shipSVG` — but it touches the flight loop, the `fly: 'hover'` bank, the thrust
+  plume and the weapon muzzle offsets, so it wants its own PR and a `startour-preview.mjs` before/after.
+  Ask the player first: this one is taste, not a bug.
 - **GS-story-serpent-portrait — a portrait-authored pose for the finale boss.** The remaining half of the
   player's *"because all our graphics are side on it looks pretty weird"*. `paintSerpent` composes the
   beast lying HORIZONTALLY — a side elevation — and the turned finale camera (GS-story-battle-portrait)
@@ -537,6 +546,13 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-story-battle-topdown** — the portrait fight draws the fleet from ABOVE
+  (`docs/decisions/story-mode.md`). Reported: *"the side-on spaceships look really weird in portrait mode,
+  I keep trying to crane my neck sideways."* The case where turning the camera genuinely breaks, unlike the
+  serpent: a snake striking head-first down the screen is a real pose, a car seen through its driver's door
+  while it recedes is not. `shipTopArt.ts` is `shipArt.ts`'s plan-view twin in the IDENTICAL frame, so it is
+  a sprite swap — nothing downstream moves, and landscape keeps the side art. A plan view is symmetric about
+  the keel, so `planMounts` mirrors a one-sided armament (a side elevation hides the far-side gun).
 - **GS-story-battle-arms** — the finale's guns are the SHIP'S guns (`docs/decisions/story-mode.md`).
   Reported: *"we kinda need custom art assets for each spaceship that has a customised weapons display…
   a UFO will need different looking and spaced weapons to the wagon."* Every hull in the fleet fired from

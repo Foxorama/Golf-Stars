@@ -74,6 +74,7 @@
 import { paintSerpent, type SerpentAnchors } from './sigilCeremony';
 import { paintWardenArk, arkBatteryPos } from './wardenArk';
 import { shipSVG } from './shipArt';
+import { shipTopSpriteSVG } from './shipTopArt';
 import { canvasRatio } from './pixelRatio';
 import { safeAreaInsets } from './safeArea';
 import {
@@ -87,7 +88,7 @@ import {
   type BattleFrame,
 } from './battleFrame';
 import { bossTitle, entryBeat, ENTRY_MS, ENTRY_ROAR_MS } from './battleIntro';
-import { shipArmsFor, mountOffset, mountCentroid, mountForShot } from './battleArms';
+import { shipArmsFor, planMounts, mountOffset, mountCentroid, mountForShot } from './battleArms';
 import {
   FINALE_SERPENT_HP,
   FINALE_PHASES,
@@ -202,17 +203,35 @@ export function mountStoryBattle(opts: {
   const SHIP_H = (SHIP_W * 40) / 62;
   // GS-story-battle-arms: THIS HULL'S GUNS — where its barrels sit, how they take turns, what the muzzle
   // and the trail look like, in the ship's own exhaust/canopy colours. One row per silhouette.
-  const arms = shipArmsFor(opts.shipId);
-  const shipImg = new Image();
-  let shipImgReady = false;
-  shipImg.onload = () => {
-    shipImgReady = true;
+  const sideArms = shipArmsFor(opts.shipId);
+  // …and from ABOVE the far-side barrels are visible too (GS-story-battle-topdown), so the turned camera
+  // arms the mirrored set. One resolve each, never per frame.
+  const topArms = { ...sideArms, mounts: planMounts(sideArms) };
+  const arms = (): typeof sideArms => (view.rotated ? topArms : sideArms);
+  // GS-story-battle-topdown: TWO hulls, one frame. The side elevation is right when the arena is
+  // landscape (+x really is across the screen); the moment it turns, +x is "up the screen, away from
+  // you" and a side-on car reads as a thing you have to crane your neck at. So the turned camera draws
+  // the PLAN view instead. Both are authored in the same ±20u right-facing frame, so this is a straight
+  // swap — no size, hit radius, shield, flame or hardpoint changes with it.
+  const mkSprite = (markup: string): { img: HTMLImageElement; ready: () => boolean } => {
+    const img = new Image();
+    let ok = false;
+    img.onload = () => {
+      ok = true;
+    };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup);
+    return { img, ready: () => ok };
   };
-  shipImg.src =
-    'data:image/svg+xml;charset=utf-8,' +
-    encodeURIComponent(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="372" height="240" viewBox="-34 -20 62 40">${shipSVG(opts.shipId, 0, 0, 1)}</svg>`,
-    );
+  const sideSprite = mkSprite(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="372" height="240" viewBox="-34 -20 62 40">${shipSVG(opts.shipId, 0, 0, 1)}</svg>`,
+  );
+  const topSprite = mkSprite(shipTopSpriteSVG(opts.shipId));
+  /** The hull to draw right now — plan view when the arena is turned, falling back to whichever sprite
+   *  has actually decoded (a half-loaded fight draws SOMETHING rather than the placeholder wedge). */
+  const hullSprite = (): { img: HTMLImageElement; ready: () => boolean } => {
+    const want = view.rotated ? topSprite : sideSprite;
+    return want.ready() ? want : sideSprite;
+  };
 
   // ── battle state ─────────────────────────────────────────────────────────────
   // GS-story-battle-epic: the fight OPENS on the entrance — the boss looms out of the dark, names itself
@@ -460,8 +479,8 @@ export function mountStoryBattle(opts: {
    * GS-story-battle-arms.
    */
   function muzzleWorld(i: number): { x: number; y: number } {
-    const m = arms.mounts[i];
-    const o = m ? mountOffset(m, SHIP_W, SHIP_H) : mountCentroid(arms, SHIP_W, SHIP_H);
+    const m = arms().mounts[i];
+    const o = m ? mountOffset(m, SHIP_W, SHIP_H) : mountCentroid(arms(), SHIP_W, SHIP_H);
     const a = shipBank();
     const ca = Math.cos(a);
     const sa = Math.sin(a);
@@ -476,13 +495,13 @@ export function mountStoryBattle(opts: {
     opts.onFire?.(w.style);
     // GS-story-battle-arms: EVERY barrel lights, whatever the pattern — the flash is what shows the player
     // where this hull's guns actually are. Only the projectile's ORIGIN varies with the pattern.
-    for (let m = 0; m < arms.mounts.length; m++) flashes.push({ mount: m, born: now0 });
+    for (let m = 0; m < arms().mounts.length; m++) flashes.push({ mount: m, born: now0 });
     // aim at the serpent's fore-body (between brow and eye — the drawn head is the target)
     const tx = anchors.browX + 24;
     const ty = (anchors.browY + anchors.eyeY) / 2 + 14;
     if (w.style === 'lance') {
       // the star-blessed lance is a near-instant beam — damage lands now
-      const o = muzzleWorld(mountForShot(arms, pulls, 0));
+      const o = muzzleWorld(mountForShot(arms(), pulls, 0));
       beams.push({ x1: o.x, y1: o.y, x2: tx, y2: ty, until: now0 + 340, w });
       landPlayerHit(tx, ty, w);
       pulls += 1;
@@ -493,7 +512,7 @@ export function mountStoryBattle(opts: {
     const count = w.style === 'scatter' ? 5 : 1;
     for (let k = 0; k < count; k++) {
       const spread = w.style === 'scatter' ? (k - (count - 1) / 2) * 0.075 : 0;
-      const o = muzzleWorld(mountForShot(arms, pulls, k));
+      const o = muzzleWorld(mountForShot(arms(), pulls, k));
       const sx = o.x;
       const sy = o.y;
       const dx = tx - sx;
@@ -1425,8 +1444,9 @@ export function mountStoryBattle(opts: {
       ctx.closePath();
       ctx.fill();
     }
-    if (shipImgReady) {
-      ctx.drawImage(shipImg, -SHIP_W * 0.53, -SHIP_H * 0.5, SHIP_W, SHIP_H);
+    const hull = hullSprite();
+    if (hull.ready()) {
+      ctx.drawImage(hull.img, -SHIP_W * 0.53, -SHIP_H * 0.5, SHIP_W, SHIP_H);
     } else {
       // pre-load fallback silhouette (the image resolves within a frame or two)
       ctx.fillStyle = '#cfd8e6';
@@ -1458,18 +1478,18 @@ export function mountStoryBattle(opts: {
         flashes.splice(i, 1);
         continue;
       }
-      const m = arms.mounts[f.mount];
+      const m = arms().mounts[f.mount];
       if (!m) continue;
       const o = mountOffset(m, SHIP_W, SHIP_H);
       const k = 1 - age;
-      const r = arms.flashR * (0.55 + k * 0.75);
+      const r = arms().flashR * (0.55 + k * 0.75);
       ctx.save();
       ctx.translate(o.x, o.y);
       ctx.globalAlpha = k;
       // every shape sits on the same soft bloom, so the mounts read as lit even at the putt-camera end
       const g = ctx.createRadialGradient(0, 0, 1, 0, 0, r * 1.9);
-      g.addColorStop(0, arms.halo);
-      g.addColorStop(0.35, arms.hot);
+      g.addColorStop(0, arms().halo);
+      g.addColorStop(0.35, arms().hot);
       g.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.globalAlpha = k * 0.55;
       ctx.fillStyle = g;
@@ -1477,22 +1497,22 @@ export function mountStoryBattle(opts: {
       ctx.arc(0, 0, r * 1.9, 0, 6.283);
       ctx.fill();
       ctx.globalAlpha = k;
-      if (arms.flash === 'barrel') {
+      if (arms().flash === 'barrel') {
         // a stubby cone off the bore, plus the puff it leaves behind
-        ctx.fillStyle = arms.hot;
+        ctx.fillStyle = arms().hot;
         ctx.beginPath();
         ctx.moveTo(r * 1.5, 0);
         ctx.lineTo(0, -r * 0.5);
         ctx.lineTo(0, r * 0.5);
         ctx.closePath();
         ctx.fill();
-        ctx.fillStyle = arms.halo;
+        ctx.fillStyle = arms().halo;
         ctx.beginPath();
         ctx.arc(r * 0.35, 0, r * 0.3, 0, 6.283);
         ctx.fill();
-      } else if (arms.flash === 'spark') {
+      } else if (arms().flash === 'spark') {
         // a hot needle and a cross-flare — velocity, not volume
-        ctx.strokeStyle = arms.halo;
+        ctx.strokeStyle = arms().halo;
         ctx.lineWidth = 2.4 * k + 0.8;
         ctx.lineCap = 'round';
         ctx.beginPath();
@@ -1502,32 +1522,32 @@ export function mountStoryBattle(opts: {
         ctx.lineTo(r * 0.7, r * 0.7);
         ctx.stroke();
         ctx.lineCap = 'butt';
-      } else if (arms.flash === 'ring') {
+      } else if (arms().flash === 'ring') {
         // an expanding halo: energy leaving an emitter, no bore involved
-        ctx.strokeStyle = arms.hot;
+        ctx.strokeStyle = arms().hot;
         ctx.lineWidth = 3 * k + 0.6;
         ctx.beginPath();
         ctx.arc(0, 0, r * (0.4 + age * 1.5), 0, 6.283);
         ctx.stroke();
-        ctx.strokeStyle = arms.halo;
+        ctx.strokeStyle = arms().halo;
         ctx.lineWidth = 1.4;
         ctx.beginPath();
         ctx.arc(0, 0, r * 0.42, 0, 6.283);
         ctx.stroke();
-      } else if (arms.flash === 'orb') {
+      } else if (arms().flash === 'orb') {
         // plasma pooling and letting go. Kept SMALL and let the bloom do the work — a solid disc at the
         // flash radius covers the hull it is supposed to be mounted on (three of them buried the UFO).
-        ctx.fillStyle = arms.hot;
+        ctx.fillStyle = arms().hot;
         ctx.beginPath();
         ctx.arc(0, 0, r * (0.58 - age * 0.22), 0, 6.283);
         ctx.fill();
-        ctx.fillStyle = arms.halo;
+        ctx.fillStyle = arms().halo;
         ctx.beginPath();
         ctx.arc(0, 0, r * (0.28 - age * 0.12), 0, 6.283);
         ctx.fill();
       } else {
         // 'arc' — forked micro-bolts jumping off the horn
-        ctx.strokeStyle = arms.halo;
+        ctx.strokeStyle = arms().halo;
         ctx.lineWidth = 1.8;
         for (let b = 0; b < 3; b++) {
           const a0 = (b - 1) * 0.55;
@@ -1555,13 +1575,13 @@ export function mountStoryBattle(opts: {
     if (!ctx) return;
     const age = (now0 - s.born) / 1000;
     ctx.save();
-    switch (arms.trail) {
+    switch (arms().trail) {
       case 'dimple': {
         // a wake of little dimpled spheres. They are golf balls. Of course they are.
         for (let k = 1; k <= 3; k++) {
           const d = -12 * k;
           ctx.globalAlpha = 0.5 / k;
-          ctx.fillStyle = arms.halo;
+          ctx.fillStyle = arms().halo;
           ctx.beginPath();
           ctx.arc(d, Math.sin(age * 18 + k) * 1.6, 3.2 - k * 0.6, 0, 6.283);
           ctx.fill();
@@ -1571,7 +1591,7 @@ export function mountStoryBattle(opts: {
       case 'streak': {
         const g = ctx.createLinearGradient(-58, 0, 0, 0);
         g.addColorStop(0, 'rgba(0,0,0,0)');
-        g.addColorStop(1, arms.hot);
+        g.addColorStop(1, arms().hot);
         ctx.globalAlpha = 0.6;
         ctx.fillStyle = g;
         ctx.fillRect(-58, -1.6, 58, 3.2);
@@ -1579,7 +1599,7 @@ export function mountStoryBattle(opts: {
       }
       case 'ripple': {
         // concentric rings shed backwards — a thing that does not have exhaust
-        ctx.strokeStyle = arms.hot;
+        ctx.strokeStyle = arms().hot;
         ctx.lineWidth = 1.5;
         for (let k = 0; k < 3; k++) {
           const u = ((age * 3 + k / 3) % 1);
@@ -1593,7 +1613,7 @@ export function mountStoryBattle(opts: {
       case 'smoke': {
         for (let k = 1; k <= 4; k++) {
           ctx.globalAlpha = 0.32 / k;
-          ctx.fillStyle = arms.halo;
+          ctx.fillStyle = arms().halo;
           ctx.beginPath();
           ctx.arc(-11 * k, Math.sin(age * 6 + k * 1.7) * 2.4, 2.4 + k * 1.5, 0, 6.283);
           ctx.fill();
@@ -1601,7 +1621,7 @@ export function mountStoryBattle(opts: {
         break;
       }
       case 'crackle': {
-        ctx.strokeStyle = arms.hot;
+        ctx.strokeStyle = arms().hot;
         ctx.lineWidth = 1.6;
         ctx.globalAlpha = 0.75;
         ctx.beginPath();
@@ -1618,7 +1638,7 @@ export function mountStoryBattle(opts: {
         for (let k = 1; k <= 5; k++) {
           const u = k / 5;
           ctx.globalAlpha = (1 - u) * 0.8;
-          ctx.fillStyle = k % 2 ? arms.hot : arms.halo;
+          ctx.fillStyle = k % 2 ? arms().hot : arms().halo;
           ctx.beginPath();
           ctx.arc(-k * 10, Math.sin(age * 12 + k * 2.1) * 3 + u * 5, 2.2 - u, 0, 6.283);
           ctx.fill();
@@ -1628,7 +1648,7 @@ export function mountStoryBattle(opts: {
       default: {
         // 'halo' — a ring riding along with the core
         const spin = age * 5;
-        ctx.strokeStyle = arms.hot;
+        ctx.strokeStyle = arms().hot;
         ctx.lineWidth = 2;
         ctx.globalAlpha = 0.7;
         ctx.beginPath();
@@ -1716,7 +1736,7 @@ export function mountStoryBattle(opts: {
       const a = clamp01((b.until - now0) / 340);
       // the SHEATH is the hull's energy, the core stays the lance's own white (GS-story-battle-arms)
       ctx.globalAlpha = 0.3 * a;
-      ctx.strokeStyle = arms.hot;
+      ctx.strokeStyle = arms().hot;
       ctx.lineWidth = 17;
       ctx.beginPath();
       ctx.moveTo(b.x1, b.y1);
@@ -2238,7 +2258,7 @@ export function mountStoryBattle(opts: {
       // (GS-story-battle-arms); the glyph and the name stay the upgrade's, which is what they identify.
       if (ready && interactive) {
         ctx.globalAlpha = 0.2 + 0.2 * Math.sin(now0 / 220 + i);
-        ctx.strokeStyle = arms.hot;
+        ctx.strokeStyle = arms().hot;
         ctx.lineWidth = 1.4;
         roundRect(ctx, x + 2.5, y + 2.5, bw - 5, bh - 5, 8);
         ctx.stroke();
@@ -2249,7 +2269,7 @@ export function mountStoryBattle(opts: {
         ctx.fillStyle = 'rgba(150,164,186,0.75)';
         ctx.font = '700 8.5px system-ui, sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(arms.name, x, y - 5);
+        ctx.fillText(arms().name, x, y - 5);
       }
       x += bw + 10;
     }
