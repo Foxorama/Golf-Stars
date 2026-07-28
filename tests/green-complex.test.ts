@@ -17,7 +17,7 @@ import type { Vec } from '../src/sim/course/contract';
 import { generateCourse } from '../src/sim/course/generate';
 import { holeProjector } from '../src/render/project';
 import { buildScene, type Prim } from '../src/render/style';
-import { mowPattern, turfPx, turfRamp, turfRampTint } from '../src/render/style/shared';
+import { mowPattern, turfPx, turfApron, offsetPoly } from '../src/render/style/shared';
 import { greenComplexFor, styleGreen, styleGreenSurround } from '../src/render/style/green';
 import { ARCHETYPE_TURF, turfShade } from '../src/render/palette';
 import { ART_DEFAULTS } from '../src/render/style/shared';
@@ -71,23 +71,104 @@ describe('turf blend bands are scale-honest (GS-green-complex)', () => {
     expect(turfPx(0, 6)).toBeGreaterThan(0); // a degenerate scale must not produce a zero/NaN band
   });
 
-  it('the ramps grade in EVEN steps — no single tone jump big enough to read as a ring', () => {
-    const ramp = turfRamp(SQUARE, 20, '#3f8c3f', '#5fd45a', 6);
+  it('the ramp grades in EVEN steps — no single tone jump big enough to read as a ring', () => {
+    const ramp = turfApron(SQUARE, 20, '#3f8c3f', 0.2, 6);
     expect(ramp).toHaveLength(6);
     // Widest ring first, each nested inside the last (so every step is drawn over its predecessor).
     const widths = ramp.map((p) => (p.t === 'poly' ? Math.max(...p.pts.map((q) => q[0])) : 0));
     for (let i = 1; i < widths.length; i++) expect(widths[i]!).toBeLessThan(widths[i - 1]!);
   });
 
-  it('the on-fairway collar TINTS (never wipes) the corridor underneath it', () => {
-    const tint = turfRampTint(SQUARE, 12, '#5fd45a', 0.24, 4);
+  it('a blend band TINTS (never wipes) the surface underneath it', () => {
+    const tint = turfApron(SQUARE, 12, '#5fd45a', 0.24, 4);
     expect(tint).toHaveLength(4);
     // Every ring is translucent — an opaque ring would erase the fairway's mow/sheen and re-read as a
     // painted ring around the green, the very tell the collar exists to cure.
     for (const a of alphasOf(tint)) {
       expect(a).toBeGreaterThan(0);
-      expect(a).toBeLessThan(0.3);
+      expect(a).toBeLessThanOrEqual(0.24);
     }
+  });
+});
+
+/**
+ * GS-green-apron-blend — the green's surround is ONE skirt with NO silhouette of its own.
+ *
+ * The surround used to be two unrelated passes: an opaque ramp drawn UNDER the fairway plus a tinted
+ * collar drawn on top of it. Wherever the generator's green FLARE wrapped the green the opaque ramp
+ * was hidden, and wherever it didn't the ramp showed — so the "apron" was never a ring, only a
+ * one-sided crescent of a third colour sitting behind the green. On a world whose ground is not green
+ * that reads as somebody else's turf dropped on the sand.
+ */
+describe('the green surround is a skirt, not a second object (GS-green-apron-blend)', () => {
+  const SURROUND_ARCHES = Object.keys(ARCHETYPE_TURF) as BiomeArchetype[];
+
+  it('every ring is TRANSLUCENT — the ground it lies on reads straight through', () => {
+    for (const arch of SURROUND_ARCHES) {
+      const prims = styleGreenSurround(SQUARE, '#3c9a3a', '#5fd45a', arch, 3);
+      const fills = prims.map((p) => (p.t === 'poly' ? p.fill : ''));
+      for (const f of fills) expect(f, `${arch} surround ring is a tint, never an opaque fill`).toMatch(/^rgba\(/);
+      expect(alphasOf(prims)).toHaveLength(fills.length);
+    }
+  });
+
+  it('the OUTERMOST ring is invisible — the band has no outer edge to find', () => {
+    for (const arch of SURROUND_ARCHES) {
+      const alphas = alphasOf(styleGreenSurround(SQUARE, '#3c9a3a', '#5fd45a', arch, 3));
+      // Each band is emitted widest-first, so the first alpha of each is its outer edge. Under a
+      // perceptual floor there is nothing for the eye to catch where the skirt meets the ground.
+      expect(Math.min(...alphas), `${arch} outer ring`).toBeLessThan(0.025);
+    }
+  });
+
+  it('alpha rises MONOTONICALLY inward within each band, peaking at the surface edge', () => {
+    const apron = alphasOf(turfApron(SQUARE, 20, '#3c9a3a', 0.2, 8));
+    expect(apron).toHaveLength(8);
+    for (let i = 1; i < apron.length; i++) expect(apron[i]!).toBeGreaterThan(apron[i - 1]!);
+    expect(apron.at(-1)).toBeCloseTo(0.2, 6);
+    expect(apron[0]).toBeLessThan(0.01);
+  });
+
+  it('a star green’s concave notch cannot spike the skirt (the tight turf miter)', () => {
+    // A five-point star — the shape family the generator actually emits for a green (r(θ) with a
+    // pin off the centroid). Its inner vertices are reflex, and a generous miter fires there.
+    const star: Vec[] = [];
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      const r = i % 2 === 0 ? 30 : 12;
+      star.push([50 + Math.cos(a) * r, 50 + Math.sin(a) * r]);
+    }
+    const band = 10;
+    const loose = offsetPoly(star, -band); // the default 4× miter — a river band wants sharp corners
+    const tight = offsetPoly(star, -band, 1.2); // what a turf skirt uses
+    const reach = (pts: Vec[]) => Math.max(...pts.map((p) => Math.hypot(p[0] - 50, p[1] - 50)));
+    // The loose miter throws the notch vertices far past the band width; the tight one keeps the
+    // skirt roughly a uniform `band` outside the green wherever you measure it.
+    expect(reach(loose)).toBeGreaterThan(reach(star) + band * 1.5);
+    expect(reach(tight)).toBeLessThanOrEqual(reach(star) + band * 1.25);
+  });
+
+  it('the skirt is drawn OVER the corridor and UNDER the surface — so it rings the whole green', () => {
+    // The regression this pins: drawn under the fairway pass, the surround vanished wherever the
+    // green-flare wrapped the green and showed only where it didn't — a crescent, never a ring.
+    const hole = generateCourse(11, { holes: 4, biome: 'verdant-station', wildness: 0.6 }).holes[0]!;
+    const proj = holeProjector(hole, { width: 900, height: 600, focus: hole.green, viewRadius: 40 });
+    const scene = buildScene(hole, proj, { biome: 'verdant-station', width: 900, height: 600 });
+    const fills: string[] = [];
+    const walk = (list: Prim[]): void => {
+      for (const p of list) {
+        if (p.t === 'clip') walk(p.children);
+        else if (p.t === 'poly' && typeof p.fill === 'string') fills.push(p.fill);
+      }
+    };
+    walk(scene);
+    const fw = turfShade('fairway', 'verdant').base;
+    const gr = turfShade('green', 'verdant').base;
+    // `hexAlpha` of the verdant collar — the apron band's tint.
+    const apronTint = fills.findIndex((f) => f.startsWith('rgba(60,154,58,'));
+    expect(apronTint, 'the green apron tint is in the scene').toBeGreaterThan(-1);
+    expect(apronTint).toBeGreaterThan(fills.lastIndexOf(fw)); // over the corridor…
+    expect(apronTint).toBeLessThan(fills.lastIndexOf(gr)); // …and under the putting surface
   });
 });
 
@@ -138,8 +219,8 @@ describe('the scale-honest bands stay camera-proof', () => {
     const near = styleGreen(SQUARE, ART_DEFAULTS, s, 'verdant', undefined, BOX, 6);
     const wide = styleGreen(SQUARE, ART_DEFAULTS, s, 'verdant', undefined, BOX, 1);
     expect(countPrims(near)).toBe(countPrims(wide));
-    const apronNear = styleGreenSurround(SQUARE, '#3c9a3a', '#356b30', 'verdant', 6);
-    const apronWide = styleGreenSurround(SQUARE, '#3c9a3a', '#356b30', 'verdant', 1);
+    const apronNear = styleGreenSurround(SQUARE, '#3c9a3a', '#5fd45a', 'verdant', 6);
+    const apronWide = styleGreenSurround(SQUARE, '#3c9a3a', '#5fd45a', 'verdant', 1);
     expect(apronNear).toHaveLength(apronWide.length);
     // …and the near camera really does draw a WIDER apron in pixels (the same yards of ground).
     const spanOf = (p: Prim): number => (p.t === 'poly' ? Math.max(...p.pts.map((q) => q[0])) : 0);

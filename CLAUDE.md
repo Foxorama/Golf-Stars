@@ -707,6 +707,24 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     `style/green.ts`: `apronYd`/`collarYd`/`mowBands`) and the green MOWS IN ITS OWN WORLD'S GRAIN off the
     shared `mowPattern` dispatch on the corridor's band grid — greens used to stripe horizontally on every
     world ("most green areas look very similar"). Guarded by `tests/green-complex.test.ts`.
+  - **THE GREEN'S SURROUND IS ONE SKIRT WITH NO SILHOUETTE OF ITS OWN** (GS-green-apron-blend,
+    `styleGreenSurround`). It was TWO passes — an OPAQUE ramp drawn UNDER the fairway plus a tinted collar
+    on top — and once GS-green-flare made the fairway genuinely wrap the green, "under the fairway" meant
+    *hidden on every side the flare reaches*. Measured by rendering 14 worlds with it on and off: the visible
+    apron is never a ring, it is a **one-sided CRESCENT** (0.54% of pixels, at up to 189/765 of contrast), a
+    lump of a third colour behind the green — on desert/links/ocean/metal, a smear of somebody else's turf
+    dropped on the sand. Now ONE band pair drawn **over the turf and under the surface**, so it rings the
+    green whatever it meets (flare in front, rough behind, same hole): ground → apron (world COLLAR tone) →
+    collar (the GREEN's turf) → green. Three rules: **every ring is a TINT, never a fill** (the ground's
+    cover/relief/texture reads through — GS-green-complex's collar lesson, applied outward); **the outermost
+    ring is INVISIBLE** (`turfApron` ramps alpha quadratically from ~0, so there is no outer edge to find —
+    a band that meets the ground on a STEP is an object); and a **tight turf miter** (`offsetPoly`'s optional
+    `miterCap`, 1.2 for turf, default 4 unchanged ⇒ every other caller byte-for-byte) so a star green's
+    reflex notches can't spike the skirt. Apron widths came in ~⅓ — the broad run-off is the FLARE, a real
+    playable feature, and two art passes describing the same yards of approach is what read as stacked
+    stickers. The green's ink dropped 0.5 → 0.34 (the outline now only has to DEFINE), never lower: an
+    unreadable green is a fairness bug. Derelict excluded (deck bay), rainbow rides its ribbon.
+    Eyes-on `scripts/green-apron-preview.mjs`.
   - **The aim-cone overlay is SCALE-HONEST** — every layout reads the projector's px-per-yard and probes the
     sim's OWN flight walks (never fork them, never hard-code px into the sim). The cone's arcs are
     `shotSpread`'s un-shifted carry clamp; wind rides ONLY `expectedCarry` (the aim line), never the arcs.

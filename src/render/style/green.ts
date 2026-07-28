@@ -21,7 +21,7 @@ import {
   hexAlpha,
   mowPattern,
   turfPx,
-  turfRamp,
+  turfApron,
   LIGHT_UL,
 } from './shared';
 
@@ -35,8 +35,9 @@ import {
  * fairway grain (`mowPattern`), so the green is groomed by the same greenkeeper as its corridor.
  */
 export interface GreenComplexLook {
-  /** Mown apron width around the green, in COURSE YARDS (scale-honest via `turfPx`) — the band that
-   *  eases the surface out into the ROUGH, drawn under the fairway pass. */
+  /** Mown apron width around the green, in COURSE YARDS (scale-honest via `turfPx`) — the outer band
+   *  of the surround, tinted toward the world's collar tone over WHATEVER the green meets there
+   *  (approach fairway in front, rough behind) and fading to nothing at its outer edge. */
   apronYd: number;
   /** The COLLAR: the narrow ring of fairway-height grass the surface is cut down out of, in course
    *  yards. Deliberately much narrower than the apron — a collar is a band you can identify, not a
@@ -48,50 +49,83 @@ export interface GreenComplexLook {
   mowBands: number;
 }
 /** Tuned per world's character: a links/desert green runs out into a broad tight-mown apron, a lush
- *  jungle or swamp green is ringed by a narrow abrupt collar, an ice shelf keeps a wide frozen skirt. */
+ *  jungle or swamp green is ringed by a narrow abrupt collar, an ice shelf keeps a wide frozen skirt.
+ *  GS-green-apron-blend pulled the apron widths in by roughly a third: the band is now a translucent
+ *  skirt drawn over the ground rather than an opaque slab, and the BROAD run-off it used to imitate
+ *  is the generator's own fairway FLARE — a real, playable feature. Two art passes describing the
+ *  same eleven yards of approach is what made the hole-end read as stacked stickers. */
 const GREEN_COMPLEX: Record<BiomeArchetype, GreenComplexLook> = {
-  verdant: { apronYd: 7, collarYd: 2.4, mowBands: 6 },
-  desert: { apronYd: 10, collarYd: 3.4, mowBands: 5 }, // firm run-offs — you can putt from off the surface
-  frost: { apronYd: 9, collarYd: 3, mowBands: 7 }, // a broad frozen skirt around the shelf
-  inferno: { apronYd: 5, collarYd: 1.8, mowBands: 5 }, // scorched ground gives up quickly at the edge
-  void: { apronYd: 6, collarYd: 2.2, mowBands: 6 },
-  crystal: { apronYd: 6, collarYd: 2, mowBands: 8 }, // finely faceted
-  tempest: { apronYd: 8, collarYd: 2.6, mowBands: 6 },
-  fungal: { apronYd: 4, collarYd: 1.6, mowBands: 7 }, // the jungle crowds right up to the surface
-  ocean: { apronYd: 9, collarYd: 3.2, mowBands: 6 }, // seaside links run-offs
-  cetus: { apronYd: 6, collarYd: 2.2, mowBands: 6 },
-  swamp: { apronYd: 4, collarYd: 1.6, mowBands: 5 }, // the mire closes in
-  metal: { apronYd: 6, collarYd: 2, mowBands: 5 },
-  derelict: { apronYd: 5, collarYd: 1.8, mowBands: 5 },
-  asgard: { apronYd: 8, collarYd: 2.8, mowBands: 7 },
-  earth: { apronYd: 11, collarYd: 3.6, mowBands: 6 }, // the widest run-offs — a real links green complex
+  verdant: { apronYd: 5, collarYd: 2.4, mowBands: 6 },
+  desert: { apronYd: 6.5, collarYd: 3.4, mowBands: 5 }, // firm run-offs — you can putt from off the surface
+  frost: { apronYd: 6, collarYd: 3, mowBands: 7 }, // a broad frozen skirt around the shelf
+  inferno: { apronYd: 3.5, collarYd: 1.8, mowBands: 5 }, // scorched ground gives up quickly at the edge
+  void: { apronYd: 4, collarYd: 2.2, mowBands: 6 },
+  crystal: { apronYd: 4, collarYd: 2, mowBands: 8 }, // finely faceted
+  tempest: { apronYd: 5.5, collarYd: 2.6, mowBands: 6 },
+  fungal: { apronYd: 3, collarYd: 1.6, mowBands: 7 }, // the jungle crowds right up to the surface
+  ocean: { apronYd: 6, collarYd: 3.2, mowBands: 6 }, // seaside links run-offs
+  cetus: { apronYd: 4, collarYd: 2.2, mowBands: 6 },
+  swamp: { apronYd: 3, collarYd: 1.6, mowBands: 5 }, // the mire closes in
+  metal: { apronYd: 4, collarYd: 2, mowBands: 5 },
+  derelict: { apronYd: 3.5, collarYd: 1.8, mowBands: 5 },
+  asgard: { apronYd: 5.5, collarYd: 2.8, mowBands: 7 },
+  earth: { apronYd: 7, collarYd: 3.6, mowBands: 6 }, // the widest run-offs — a real links green complex
 };
-/** The green-complex look for a world. Exported so the scene builder can size the ON-FAIRWAY collar
- *  from the SAME row the apron uses — one description of how wide this world's green complex runs. */
+/** The green-complex look for a world — one description of how wide this world's green complex runs,
+ *  read by `styleGreenSurround` for both of its bands and by the guard that pins full row coverage. */
 export function greenComplexFor(arch: BiomeArchetype): GreenComplexLook {
   return GREEN_COMPLEX[arch];
 }
 
-/** The green's OUTWARD ease-in apron — a uniform-width OFFSET ramp (not a centroid scale) so a long
- *  ice-shelf or kidney green keeps an even surround instead of ballooning at the ends. Split OUT of
- *  styleGreen (GS-green-apron) so the app can draw it UNDER the fairway pass: it grows past the green
- *  edge, and a green sitting at the end of a fairway ribbon painted it as a dark ring ON TOP of the
- *  bright fairway. Drawn under the fairway it eases the green into the ROUGH (where it belongs) and is
- *  simply covered where the fairway meets the green — the fairway's own collar handles that junction.
- *  GS-green-complex: the two hard rings became a per-world-width ramp in COURSE YARDS, walked in even
- *  steps fringe → collar so the eye can't find a ring edge. */
+/**
+ * The green's OUTWARD surround — the ONE description of how this world's putting surface meets the
+ * ground around it (GS-green-apron-blend).
+ *
+ * It used to be two unrelated passes. An OPAQUE ramp (`turfRamp`, green-collar → half-rough) drawn
+ * UNDER the fairway, plus a separate tinted collar drawn ON TOP of it — which meant the surround was
+ * hidden wherever the fairway flare wrapped the green and showed only where it did not. Measured on a
+ * fourteen-world preview, that is a one-sided CRESCENT: never a ring, always a lump of a third colour
+ * sitting behind the green (0.54% of the frame's pixels, but at up to 189/765 of contrast — a small,
+ * loud, lopsided object). On a world whose ground is not green it read as a smear of somebody else's
+ * turf dropped on the sand. That is the "green aprons look bad, especially in a non-green biome"
+ * report, and it is the opposite of what an apron is for.
+ *
+ * Now it is one skirt, drawn ON TOP of every turf pass and UNDER the putting surface, so it rings the
+ * green whatever it happens to meet — approach fairway in front, rough behind, both on the same hole.
+ * Two translucent bands walk one continuous colour path outward from the surface:
+ *   ground → apron (toward the world's COLLAR tone) → collar (toward the GREEN's own turf) → green.
+ * Both fade to nothing at their outer edge (`turfApron`), so neither band has a silhouette of its own
+ * and the ground's cover/relief/texture read straight through — the surround is ground MOWN DOWN,
+ * not turf painted on. Uniform-width offsets (not centroid scales) so a long ice-shelf or kidney green
+ * keeps an even skirt, at a tight miter so a star green's notches can't spike it.
+ */
 export function styleGreenSurround(
   poly: Vec[],
   collar: string,
-  fringe: string,
+  greenBase: string,
   arch: BiomeArchetype,
   scale = 1,
 ): Prim[] {
-  const apron = turfPx(scale, greenComplexFor(arch).apronYd);
-  return turfRamp(poly, apron, fringe, collar, APRON_STEPS);
+  const look = greenComplexFor(arch);
+  return [
+    ...turfApron(poly, turfPx(scale, look.apronYd), collar, APRON_ALPHA, APRON_STEPS),
+    ...turfApron(poly, turfPx(scale, look.collarYd), greenBase, COLLAR_ALPHA, COLLAR_STEPS),
+  ];
 }
-/** Even tone steps the green's apron / on-fairway collar are walked in. */
-const APRON_STEPS = 6;
+/** Steps each surround band is walked in — enough that no single alpha step reads as a ring. */
+const APRON_STEPS = 8;
+const COLLAR_STEPS = 4;
+/** Peak tint at the green's edge. The apron is deliberately the weaker of the two: it covers the most
+ *  ground and must never build into an opaque halo, while the collar is the narrow band that keeps the
+ *  surface READABLE (a green that dissolves into its corridor is a fairness bug, not a blend win). */
+const APRON_ALPHA = 0.2;
+const COLLAR_ALPHA = 0.3;
+/** The green's own outline (GS-green-apron-blend). It was 0.5 back when the outline WAS the whole
+ *  transition — a hard cartoon line was the only thing separating a bright surface from whatever it
+ *  had been dropped on. With a graded skirt underneath it, the line only has to DEFINE the shape, and
+ *  at 0.5 it re-read as a sticker's die-cut. Softened, not deleted: an arcade golf hole whose green
+ *  you cannot pick out at a glance is a fairness bug, whatever it does for the blend. */
+const GREEN_INK_ALPHA = 0.34;
 
 export function styleGreen(
   poly: Vec[],
@@ -103,9 +137,8 @@ export function styleGreen(
   scale = 1,
 ): Prim[] {
   const c = centroidOf(poly);
-  // The outward fringe/collar rings that ease the green into the land are drawn separately, UNDER the
-  // fairway pass (styleGreenSurround) — so they never paint over the fairway. styleGreen starts at the
-  // green surface itself.
+  // The outward skirt that eases the green into the ground around it is drawn separately
+  // (styleGreenSurround), over the turf and under this pass. styleGreen starts at the surface itself.
   const out: Prim[] = [{ t: 'poly', pts: poly, fill: s.base }];
   // Softened like the fairway's mowTones (GS-mow-blend) — the green used to stripe at FULL
   // light/dark contrast, the harshest cut on the map. A touch stronger than the fairway's blend
@@ -316,7 +349,7 @@ export function styleGreen(
         arrows.push({ t: 'line', a: tip, b: [tip[0] - ar.dir[0] * head - perp[0] * (head * 0.7), tip[1] - ar.dir[1] * head - perp[1] * (head * 0.7)], stroke: col, sw: 1.05, round: true });
       }
       out.push({ t: 'clip', clip: poly, children: arrows });
-      if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: hexAlpha(s.ink, 0.5), sw: 1.1 }); // GS-green-blend: softer edge — the collar ring carries the transition now
+      if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: hexAlpha(s.ink, GREEN_INK_ALPHA), sw: 1.1 }); // GS-green-apron-blend: the skirt carries the transition, so the outline only has to DEFINE
       return out;
     }
     // Fall-line chevrons pointing downhill. GS-putt-depth: a STEEPER green (a harder, breakier stop)
@@ -368,7 +401,7 @@ export function styleGreen(
       ],
     });
   }
-  if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: hexAlpha(s.ink, 0.5), sw: 1.1 }); // GS-green-blend: softer edge — the collar ring carries the transition now
+  if (art.ink) out.push({ t: 'poly', pts: poly, fill: 'none', stroke: hexAlpha(s.ink, GREEN_INK_ALPHA), sw: 1.1 }); // GS-green-apron-blend: the skirt carries the transition, so the outline only has to DEFINE
   return out;
 }
 /** Screen-space green slope ART inputs: the dominant plane's downhill dir + mag (GS-greens-3), and —

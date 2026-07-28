@@ -1831,3 +1831,81 @@ Two constraints on the SVG version:
 while aiming, the SVG's feature positions coincide with the canvas's, and no ids are emitted. Plus the
 size ladder is now asserted at the **measured** cameras, including that the ball keeps growing across
 the putt range and never exceeds the cap.
+
+## GS-green-apron-blend — the apron was never a ring, it was a crescent (2026-07-28)
+
+**The report** (with four in-game screenshots, across four worlds): *"for the holes, the green aprons look
+pretty bad still, especially in a non green themed biome. Affecting basically all biomes."* Followed by
+two questions worth answering separately: **do we need the green apron, is it doing anything?** and **can
+we blend fairway, green apron and green better?**
+
+### Does it do anything? Measured, not guessed
+
+Nothing for PLAY. There is no apron surface in the sim — a ball's lie comes from whichever feature
+polygon contains it, and near the green that is the generator's own **green FLARE** (GS-green-flare), a
+real `fairway` feature. `styleGreenSurround` is pure render.
+
+For the LOOK, the answer was worse than "nothing". Rendering all fourteen worlds at the approach camera
+with the apron on and off and diffing the frames: **0.54% of pixels changed, at up to 189/765 of
+contrast.** Painting that diff mask back over the render showed why — it is never a ring. It is a
+**one-sided crescent** sitting behind the green.
+
+The cause is that the surround was two unrelated passes that had grown apart:
+
+* `styleGreenSurround` — an OPAQUE ramp (`turfRamp`, green-collar → half-rough), drawn **under** the
+  fairway pass. That placement was itself a fix (GS-green-apron: drawn on top, it painted a dark ring
+  across the bright corridor). But once GS-green-flare made the fairway genuinely wrap the green, "under
+  the fairway" means *hidden on every side the flare reaches* — so the apron only ever showed on the
+  sides it didn't.
+* the on-fairway collar — a separate tinted ramp (`turfRampTint`) drawn on top, describing the same
+  junction from the other side.
+
+So the visible "apron" was whatever crescent of an opaque, half-rough-toned ramp escaped from behind the
+green. On a world whose ground is green that is a lump of slightly-wrong green. On desert, links, ocean,
+metal, frost — **a smear of somebody else's turf dropped on the sand**, which is exactly the "especially
+in a non-green biome" half of the report.
+
+Two smaller faults rode along:
+
+* Its outermost ring was still **50% collar**, so however finely the inner steps graded, the band met the
+  ground on a step. A band with an outer step has an outer silhouette, and a silhouette is an object.
+* `offsetPoly`'s miter cap is `4×|d|` — right for a river's channel rings, wrong here. A green is a star
+  r(θ) with reflex vertices, and a 10-yard band spiking 40 yards off one notch is what gave the crescent
+  its lumpy hand-drawn outline.
+
+### The fix: one skirt, no silhouette
+
+The two passes are now ONE, `styleGreenSurround`, drawn **on top of every turf pass and under the putting
+surface** — so it rings the green whatever it meets on that side, approach fairway in front and rough
+behind, on the same hole. Two translucent bands walk one continuous colour path outward from the surface:
+
+    ground → apron (toward the world's COLLAR tone) → collar (toward the GREEN's own turf) → green
+
+Three rules, all machine-checked in `tests/green-complex.test.ts`:
+
+1. **Every ring is a TINT, never a fill.** The ground's own cover, relief and texture read straight
+   through, so the surround is ground MOWN DOWN into a green rather than turf painted onto it. This is
+   GS-green-complex's on-fairway-collar lesson, finally applied outward as well.
+2. **The outermost ring is invisible** (`turfApron`: alpha ramps quadratically from ~0 at the outer edge
+   to the peak at the surface edge). There is no outer boundary for the eye to find, so the band cannot
+   read as a second object however wide it is.
+3. **A tight turf miter** (`offsetPoly`'s new optional `miterCap`, 1.2 for turf; the default stays 4 so
+   every other caller is byte-for-byte). A skirt stays a uniform skirt around a star green.
+
+Apron widths came in by roughly a third (earth 11→7yd, desert 10→6.5, ocean 9→6). The broad run-off the
+old widths were imitating is the fairway FLARE — a real, playable feature. **Two art passes describing the
+same eleven yards of approach is what made the hole-end read as stacked stickers**; the render band's job
+is the collar, not the approach.
+
+The green's own ink outline dropped 0.5 → 0.34 in the same pass. It was 0.5 back when the outline WAS the
+transition; with a graded skirt under it, a half-alpha line re-read as a sticker's die-cut. Softened, not
+deleted — GS-green-complex's lesson stands: a blend that dissolves the green is a fairness bug, not a win,
+so the surface keeps its base fill, its inward edge ease, its own mow grain and a visible outline.
+
+The derelict is excluded outright: it has no grass, and seats its green in a machined deck bay
+(GS-ship-deck-blend). Rainbow Road rides its own continuous ribbon, as before.
+
+**Verification:** full suite green, `npx tsc --noEmit` clean, gallery re-shot, plus
+`scripts/greenblend-preview.mjs` (approach) and `scripts/green-zoom.mjs` (putt) before/after. New rig
+`scripts/green-apron-preview.mjs` frames each world's green plus about a green-radius of surround —
+the zoom the whole question lives at, and the one that produced the crescent diff above.
