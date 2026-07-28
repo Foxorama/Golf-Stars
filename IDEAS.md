@@ -537,6 +537,15 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-story-battle-arms** — the finale's guns are the SHIP'S guns (`docs/decisions/story-mode.md`).
+  Reported: *"we kinda need custom art assets for each spaceship that has a customised weapons display…
+  a UFO will need different looking and spaced weapons to the wagon."* Every hull in the fleet fired from
+  ONE point off the nose with no muzzle flash at all. Now an armament is a ROW keyed by `look.kind`
+  (`battleArms.ts`, the battle twin of the star map's `shipWeapons.ts`): mounts, firing pattern, muzzle
+  flash and trail motif, in the ship's own exhaust colours — roof-rack pairs, nose spikes, rim emitters,
+  wing pylons, mast arcs. THE SPLIT: the upgrade says what a shot DOES (its shape stays, or a five-trigger
+  arsenal stops reading as an arsenal), the hull says where it comes from and how it reads. Zero balance —
+  a mount moves where a shot is born, never how many there are.
 - **GS-story-battle-epic** — the finale battle is a set-piece, not a skirmish
   (`docs/decisions/story-mode.md`). Reported on the freshly-turned portrait fight: *"because all our
   graphics are side on it looks pretty weird… given it's the final boss battle campaign it should be pretty

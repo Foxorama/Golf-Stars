@@ -117,6 +117,16 @@ await shot('portrait-3-void', { hpFrac: 0.22, shipId: 'hauler-barge', waits: [[E
 await shot('portrait-4-overwhelm', { hpFrac: 0.055, shipId: 'hauler-barge', waits: [[ENTRY + 3300, ''], [3200, 'aim'], [1500, 'climax']] });
 await shot('portrait-5-herald', { herald: true, hpFrac: 0.48, shipId: 'ufo-saucer', waits: [[ENTRY + 3600, '']] });
 
+// THE SHIP RAIL (GS-story-battle-arms) — the same fight moment flown by different hulls, so the armaments
+// can be compared side by side: mount count, spacing, muzzle flash and trail motif all change with the
+// silhouette. A muzzle flash lives ~150ms against an ~800ms autopilot cadence, so each hull is sampled in a
+// BURST and the brightest frame is the one to look at — a single wait lands between shots most of the time.
+const ARM_BURST = [[ENTRY + 1500, 'a']];
+for (let i = 0; i < 8; i++) ARM_BURST.push([110, 'b' + i]);
+for (const shipId of ['wagon-classic', 'ufo-mothership', 'racer-redline', 'hauler-barge', 'chopper-thunderbolt', 'comet-rider', 'infinity-ace', 'moto-nitro']) {
+  await shot(`arms-${shipId}`, { hpFrac: 0.6, shipId, waits: ARM_BURST });
+}
+
 console.log('battle preview →', outDir);
 await browser.close();
 srv.close();

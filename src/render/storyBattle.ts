@@ -87,6 +87,7 @@ import {
   type BattleFrame,
 } from './battleFrame';
 import { bossTitle, entryBeat, ENTRY_MS, ENTRY_ROAR_MS } from './battleIntro';
+import { shipArmsFor, mountOffset, mountCentroid, mountForShot } from './battleArms';
 import {
   FINALE_SERPENT_HP,
   FINALE_PHASES,
@@ -199,6 +200,9 @@ export function mountStoryBattle(opts: {
   // ── the fighter: YOUR ship, rasterized from its real SVG art ────────────────
   const SHIP_W = 118; // drawn width in design px (art frame is ~62u wide → ~1.9x)
   const SHIP_H = (SHIP_W * 40) / 62;
+  // GS-story-battle-arms: THIS HULL'S GUNS — where its barrels sit, how they take turns, what the muzzle
+  // and the trail look like, in the ship's own exhaust/canopy colours. One row per silhouette.
+  const arms = shipArmsFor(opts.shipId);
   const shipImg = new Image();
   let shipImgReady = false;
   shipImg.onload = () => {
@@ -294,6 +298,11 @@ export function mountStoryBattle(opts: {
   const dmgNums: DmgNum[] = [];
   type Wave = { x: number; y: number; born: number; life: number; r1: number; col: string; w: number };
   const waves: Wave[] = [];
+  // Muzzle flashes are stored by MOUNT INDEX, never by world position — they are welded to a moving hull,
+  // so the world point is re-derived from the ship's current place and bank every frame (GS-story-battle-arms).
+  type Flash = { mount: number; born: number };
+  const flashes: Flash[] = [];
+  let pulls = 0; // trigger pulls so far — what an `alternate` armament counts to take turns
 
   let anchors: SerpentAnchors = { eyeX: 730, eyeY: 300, eyeR: 18, browX: 720, browY: 250, headH: 46, headAng: 3 };
   // GS-story-serpent-2: pulled left from 1040 so the great coil behind the skull stays on-canvas —
@@ -438,26 +447,55 @@ export function mountStoryBattle(opts: {
     return toHudPoint(view, e.clientX - r.left, e.clientY - r.top);
   }
 
+  /** The hull's bank — ONE definition, so the drawn barrel, its flash and the shot that leaves it agree.
+   *  (`drawShip` rotates the sprite by exactly this; a second copy of the expression is how a muzzle ends
+   *  up floating off the wing.) */
+  const shipBank = (): number => clamp(ship.vy / 900, -0.3, 0.3) * 0.5;
+  /** …and its idle bob, for the same reason: the barrel has to ride the hull it is bolted to. */
+  const shipBob = (): number => Math.sin((animMs / 1000 + 1) * 1.8) * 3;
+
+  /**
+   * Where mount `i` IS, in world design space — the hull-local offset turned by the hull's bank and put on
+   * the ship's current position. `i < 0` means a `converge` armament: the shot leaves the mounts' centre.
+   * GS-story-battle-arms.
+   */
+  function muzzleWorld(i: number): { x: number; y: number } {
+    const m = arms.mounts[i];
+    const o = m ? mountOffset(m, SHIP_W, SHIP_H) : mountCentroid(arms, SHIP_W, SHIP_H);
+    const a = shipBank();
+    const ca = Math.cos(a);
+    const sa = Math.sin(a);
+    return { x: ship.x + o.x * ca - o.y * sa, y: ship.y + shipBob() + o.x * sa + o.y * ca };
+  }
+
   function fireWeapon(i: number): void {
     const w = loadout.weapons[i];
     if (!w || (phase !== 'assault' && phase !== 'overwhelm')) return;
     if (now0 < weaponReadyAt[i]!) return;
     weaponReadyAt[i] = now0 + w.cooldownMs;
     opts.onFire?.(w.style);
-    const sx = ship.x + SHIP_W * 0.42;
-    const sy = ship.y;
+    // GS-story-battle-arms: EVERY barrel lights, whatever the pattern — the flash is what shows the player
+    // where this hull's guns actually are. Only the projectile's ORIGIN varies with the pattern.
+    for (let m = 0; m < arms.mounts.length; m++) flashes.push({ mount: m, born: now0 });
     // aim at the serpent's fore-body (between brow and eye — the drawn head is the target)
     const tx = anchors.browX + 24;
     const ty = (anchors.browY + anchors.eyeY) / 2 + 14;
     if (w.style === 'lance') {
       // the star-blessed lance is a near-instant beam — damage lands now
-      beams.push({ x1: sx, y1: sy, x2: tx, y2: ty, until: now0 + 340, w });
+      const o = muzzleWorld(mountForShot(arms, pulls, 0));
+      beams.push({ x1: o.x, y1: o.y, x2: tx, y2: ty, until: now0 + 340, w });
       landPlayerHit(tx, ty, w);
+      pulls += 1;
       return;
     }
+    // The projectile COUNT is untouched — mounts move where a shot is BORN, never how many there are
+    // (each landing calls `landPlayerHit`, so an extra projectile would be an extra hit's worth of damage).
     const count = w.style === 'scatter' ? 5 : 1;
     for (let k = 0; k < count; k++) {
       const spread = w.style === 'scatter' ? (k - (count - 1) / 2) * 0.075 : 0;
+      const o = muzzleWorld(mountForShot(arms, pulls, k));
+      const sx = o.x;
+      const sy = o.y;
       const dx = tx - sx;
       const dy = ty - sy;
       const base = Math.atan2(dy, dx) + spread;
@@ -473,6 +511,7 @@ export function mountStoryBattle(opts: {
         born: now0,
       });
     }
+    pulls += 1;
   }
 
   /** A tap: `d` in arena design space (where the ship flies), `h` in upright HUD space (the triggers). */
@@ -1335,10 +1374,8 @@ export function mountStoryBattle(opts: {
   function drawShip(t: number): void {
     if (!ctx) return;
     const flicker = now0 < invulnUntil && Math.floor(now0 / 90) % 2 === 0;
-    const bob = Math.sin(t * 1.8) * 3;
-    const bank = clamp(ship.vy / 900, -0.3, 0.3);
     const x = ship.x;
-    const y = ship.y + bob;
+    const y = ship.y + shipBob();
     // tap-destination marker
     if (moveMark > 0) {
       ctx.strokeStyle = `rgba(127,216,255,${moveMark * 0.6})`;
@@ -1369,7 +1406,7 @@ export function mountStoryBattle(opts: {
     }
     ctx.save();
     ctx.translate(x, y);
-    ctx.rotate(bank * 0.5);
+    ctx.rotate(shipBank());
     if (flicker) ctx.globalAlpha = 0.45;
     // thrust flame behind the hull while flying
     const spd = Math.hypot(ship.vx, ship.vy);
@@ -1401,10 +1438,210 @@ export function mountStoryBattle(opts: {
       ctx.closePath();
       ctx.fill();
     }
+    // GS-story-battle-arms: the hull's own MUZZLES, inside the hull transform so they bank with it — the
+    // one moment the player is told where this craft's guns actually are, and how far apart.
+    drawMuzzleFlashes();
     ctx.restore();
   }
 
+  /**
+   * THE MUZZLE FLASH (GS-story-battle-arms) — one per mount, in the hull's local frame (so it is welded to
+   * the barrel through bank, bob and flight), in the ship's own exhaust colour. Five shapes, because a
+   * bored cannon, a railgun tip, an energy emitter, a plasma well and an arc horn do not flare alike.
+   */
+  function drawMuzzleFlashes(): void {
+    if (!ctx) return;
+    for (let i = flashes.length - 1; i >= 0; i--) {
+      const f = flashes[i]!;
+      const age = (now0 - f.born) / 150;
+      if (age >= 1) {
+        flashes.splice(i, 1);
+        continue;
+      }
+      const m = arms.mounts[f.mount];
+      if (!m) continue;
+      const o = mountOffset(m, SHIP_W, SHIP_H);
+      const k = 1 - age;
+      const r = arms.flashR * (0.55 + k * 0.75);
+      ctx.save();
+      ctx.translate(o.x, o.y);
+      ctx.globalAlpha = k;
+      // every shape sits on the same soft bloom, so the mounts read as lit even at the putt-camera end
+      const g = ctx.createRadialGradient(0, 0, 1, 0, 0, r * 1.9);
+      g.addColorStop(0, arms.halo);
+      g.addColorStop(0.35, arms.hot);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalAlpha = k * 0.55;
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 1.9, 0, 6.283);
+      ctx.fill();
+      ctx.globalAlpha = k;
+      if (arms.flash === 'barrel') {
+        // a stubby cone off the bore, plus the puff it leaves behind
+        ctx.fillStyle = arms.hot;
+        ctx.beginPath();
+        ctx.moveTo(r * 1.5, 0);
+        ctx.lineTo(0, -r * 0.5);
+        ctx.lineTo(0, r * 0.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = arms.halo;
+        ctx.beginPath();
+        ctx.arc(r * 0.35, 0, r * 0.3, 0, 6.283);
+        ctx.fill();
+      } else if (arms.flash === 'spark') {
+        // a hot needle and a cross-flare — velocity, not volume
+        ctx.strokeStyle = arms.halo;
+        ctx.lineWidth = 2.4 * k + 0.8;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.2, 0);
+        ctx.lineTo(r * 2.1, 0);
+        ctx.moveTo(r * 0.7, -r * 0.7);
+        ctx.lineTo(r * 0.7, r * 0.7);
+        ctx.stroke();
+        ctx.lineCap = 'butt';
+      } else if (arms.flash === 'ring') {
+        // an expanding halo: energy leaving an emitter, no bore involved
+        ctx.strokeStyle = arms.hot;
+        ctx.lineWidth = 3 * k + 0.6;
+        ctx.beginPath();
+        ctx.arc(0, 0, r * (0.4 + age * 1.5), 0, 6.283);
+        ctx.stroke();
+        ctx.strokeStyle = arms.halo;
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.42, 0, 6.283);
+        ctx.stroke();
+      } else if (arms.flash === 'orb') {
+        // plasma pooling and letting go. Kept SMALL and let the bloom do the work — a solid disc at the
+        // flash radius covers the hull it is supposed to be mounted on (three of them buried the UFO).
+        ctx.fillStyle = arms.hot;
+        ctx.beginPath();
+        ctx.arc(0, 0, r * (0.58 - age * 0.22), 0, 6.283);
+        ctx.fill();
+        ctx.fillStyle = arms.halo;
+        ctx.beginPath();
+        ctx.arc(0, 0, r * (0.28 - age * 0.12), 0, 6.283);
+        ctx.fill();
+      } else {
+        // 'arc' — forked micro-bolts jumping off the horn
+        ctx.strokeStyle = arms.halo;
+        ctx.lineWidth = 1.8;
+        for (let b = 0; b < 3; b++) {
+          const a0 = (b - 1) * 0.55;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(Math.cos(a0) * r * 0.8, Math.sin(a0) * r * 0.8 - r * 0.25);
+          ctx.lineTo(Math.cos(a0) * r * 1.7, Math.sin(a0) * r * 1.7 + r * 0.2);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+
   // ── projectile painters ──────────────────────────────────────────────────────
+  /**
+   * THE HULL'S TRAIL (GS-story-battle-arms) — drawn BEHIND the shot's core, in the shot's own local frame
+   * (so it lies along the flight), in the ship's exhaust colours. The projectile's SHAPE stays the arsenal
+   * upgrade's, because the HUD seats one trigger per upgrade and the player has to be able to tell their
+   * railgun from their nova — the hull's identity rides the wake instead, which is the half of the picture
+   * that was completely bare.
+   */
+  function drawShotTrail(s: { born: number }, t: number): void {
+    if (!ctx) return;
+    const age = (now0 - s.born) / 1000;
+    ctx.save();
+    switch (arms.trail) {
+      case 'dimple': {
+        // a wake of little dimpled spheres. They are golf balls. Of course they are.
+        for (let k = 1; k <= 3; k++) {
+          const d = -12 * k;
+          ctx.globalAlpha = 0.5 / k;
+          ctx.fillStyle = arms.halo;
+          ctx.beginPath();
+          ctx.arc(d, Math.sin(age * 18 + k) * 1.6, 3.2 - k * 0.6, 0, 6.283);
+          ctx.fill();
+        }
+        break;
+      }
+      case 'streak': {
+        const g = ctx.createLinearGradient(-58, 0, 0, 0);
+        g.addColorStop(0, 'rgba(0,0,0,0)');
+        g.addColorStop(1, arms.hot);
+        ctx.globalAlpha = 0.6;
+        ctx.fillStyle = g;
+        ctx.fillRect(-58, -1.6, 58, 3.2);
+        break;
+      }
+      case 'ripple': {
+        // concentric rings shed backwards — a thing that does not have exhaust
+        ctx.strokeStyle = arms.hot;
+        ctx.lineWidth = 1.5;
+        for (let k = 0; k < 3; k++) {
+          const u = ((age * 3 + k / 3) % 1);
+          ctx.globalAlpha = (1 - u) * 0.5;
+          ctx.beginPath();
+          ctx.ellipse(-u * 44, 0, 3 + u * 5, 4 + u * 9, 0, 0, 6.283);
+          ctx.stroke();
+        }
+        break;
+      }
+      case 'smoke': {
+        for (let k = 1; k <= 4; k++) {
+          ctx.globalAlpha = 0.32 / k;
+          ctx.fillStyle = arms.halo;
+          ctx.beginPath();
+          ctx.arc(-11 * k, Math.sin(age * 6 + k * 1.7) * 2.4, 2.4 + k * 1.5, 0, 6.283);
+          ctx.fill();
+        }
+        break;
+      }
+      case 'crackle': {
+        ctx.strokeStyle = arms.hot;
+        ctx.lineWidth = 1.6;
+        ctx.globalAlpha = 0.75;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        for (let k = 1; k <= 5; k++) {
+          // deterministic zig — a hash of the step, never an rng draw (the fight's stream is untouched)
+          const j = Math.sin(k * 12.9898 + Math.floor(age * 26) * 7.233) * 5.5;
+          ctx.lineTo(-k * 9, j);
+        }
+        ctx.stroke();
+        break;
+      }
+      case 'ember': {
+        for (let k = 1; k <= 5; k++) {
+          const u = k / 5;
+          ctx.globalAlpha = (1 - u) * 0.8;
+          ctx.fillStyle = k % 2 ? arms.hot : arms.halo;
+          ctx.beginPath();
+          ctx.arc(-k * 10, Math.sin(age * 12 + k * 2.1) * 3 + u * 5, 2.2 - u, 0, 6.283);
+          ctx.fill();
+        }
+        break;
+      }
+      default: {
+        // 'halo' — a ring riding along with the core
+        const spin = age * 5;
+        ctx.strokeStyle = arms.hot;
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        ctx.ellipse(-6, 0, 11, 4.5 + Math.sin(spin) * 3.5, 0, 0, 6.283);
+        ctx.stroke();
+        break;
+      }
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+    void t;
+  }
+
   function drawPlayerShots(t: number): void {
     if (!ctx) return;
     for (const s of playerShots) {
@@ -1412,6 +1649,7 @@ export function mountStoryBattle(opts: {
       ctx.save();
       ctx.translate(s.x, s.y);
       ctx.rotate(a);
+      drawShotTrail(s, t);
       const w = s.w;
       if (w.style === 'scatter' || w.style === 'pea') {
         ctx.fillStyle = w.color2;
@@ -1476,6 +1714,15 @@ export function mountStoryBattle(opts: {
     }
     for (const b of beams) {
       const a = clamp01((b.until - now0) / 340);
+      // the SHEATH is the hull's energy, the core stays the lance's own white (GS-story-battle-arms)
+      ctx.globalAlpha = 0.3 * a;
+      ctx.strokeStyle = arms.hot;
+      ctx.lineWidth = 17;
+      ctx.beginPath();
+      ctx.moveTo(b.x1, b.y1);
+      ctx.lineTo(b.x2, b.y2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
       ctx.strokeStyle = `rgba(200,236,255,${0.25 * a})`;
       ctx.lineWidth = 11;
       ctx.beginPath();
@@ -1987,12 +2234,22 @@ export function mountStoryBattle(opts: {
         ctx.font = '600 12.5px system-ui, sans-serif';
         ctx.fillText(ready ? `⚡ ${w.damage} dmg` : `${(readyIn / 1000).toFixed(1)}s`, x + 42, y + 50);
       }
-      // ready pulse edge
+      // ready pulse edge — in the HULL's energy colour, so the console reads as THIS ship's console
+      // (GS-story-battle-arms); the glyph and the name stay the upgrade's, which is what they identify.
       if (ready && interactive) {
-        ctx.strokeStyle = `rgba(255,255,255,${0.2 + 0.2 * Math.sin(now0 / 220 + i)})`;
-        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.2 + 0.2 * Math.sin(now0 / 220 + i);
+        ctx.strokeStyle = arms.hot;
+        ctx.lineWidth = 1.4;
         roundRect(ctx, x + 2.5, y + 2.5, bw - 5, bh - 5, 8);
         ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      // …and the hull's armament is NAMED under the rail it arms, once, on the first trigger
+      if (i === 0) {
+        ctx.fillStyle = 'rgba(150,164,186,0.75)';
+        ctx.font = '700 8.5px system-ui, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(arms.name, x, y - 5);
       }
       x += bw + 10;
     }

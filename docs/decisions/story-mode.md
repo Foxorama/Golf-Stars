@@ -628,6 +628,53 @@ Ordered so each ships something playable and nothing lands before its foundation
   `scripts/battle-preview.mjs`, which shoots the entrance beat by beat in both orientations — its
   assault-state waits carry an explicit `ENTRY` term, because a bare number there is a silent 2.8s error.
 
+- **GS-story-battle-arms** — ✅ *shipped* (the finale's guns are the SHIP'S guns). Player report, on the
+  spectacle pass: *"to really sell portrait mode we kinda need custom art assets for each spaceship that
+  has a customised weapons display that is thematically appropriate for the spaceships — like UFO
+  spaceships will need different looking and spaced weapons to the wagons."* Dead right, and the fight was
+  as generic as it gets: **every hull in the fleet fired from ONE point** (`ship.x + SHIP_W*0.42`, dead
+  centre off the nose) with **no muzzle flash at all**. The mythic flying saucer spat golf-ball buckshot
+  out of its snout exactly like the woody estate.
+  1. **An armament is a ROW keyed by `look.kind`** (`render/battleArms.ts`, pure + node-tested) — the
+     battle twin of the star map's `shipWeapons.ts WEAPON_BY_KIND` (GS-star-tour-weapons), so a new craft
+     picks up fitting guns with zero engine edits, and a new `ShipLook['kind']` fails to COMPILE until its
+     guns are decided (the `Record`). A row carries the MOUNTS (hull-local hardpoints), the FIRE pattern,
+     the MUZZLE FLASH shape, the TRAIL motif and a flash size. All 11 kinds have one: the wagon's staggered
+     ROOF RACK pair taking turns · the racer's single NOSE SPIKE · the saucer's UNDERBEAM · the Mothership's
+     three RIM EMITTERS channelling to the dome · the comet's three-point SHARD SPRAY · the hauler's WING
+     PYLONS (the widest spacing in the fleet) · the bike's twin FAIRING LASERS (the tightest) · the
+     chopper's MAST ARC · the Ace's HALO NODES · the Pegasus's WING BOLTS · the Firebird's BEAK & PINIONS.
+  2. **THE SPLIT: the upgrade says what a shot DOES, the hull says where it comes from and how it reads.**
+     The HUD seats one trigger per owned arsenal upgrade (scatter · railgun · nova · lance · wyrmfang), each
+     with its own damage, cooldown and projectile SHAPE — so letting the hull override the shape would make
+     all five triggers fire identical-looking shots and an arsenal would stop reading as an arsenal, a real
+     regression dressed as a feature. The hull supplies the VOICE instead, which is where the difference is
+     actually visible: mounts, spacing, firing pattern, muzzle flash, trail motif, and the energy LIVERY —
+     resolved from the ship's own `look.flame`/`look.glass`, so the colours come free with the ship row too
+     (machine-checked bright enough to read against deep space).
+  3. **ZERO BALANCE.** Mounts move where a projectile is BORN, never how many there are: `landPlayerHit`
+     fires per projectile, so an extra one would be an extra hit's worth of damage. `mountForShot` only
+     *chooses* a mount — `salvo` shares a volley across the barrels, `alternate` takes turns pull to pull
+     (so even a single-shot weapon alternates), `converge` returns −1 and the shot leaves the mounts'
+     centroid. Every shot still converges on the same aim point.
+  4. **ONE definition of where the hull IS.** `shipBank()`/`shipBob()` are single seams the sprite, the
+     barrels, the flashes and the shots all read — a second copy of that expression is exactly how a muzzle
+     ends up floating off a wing. Flashes are stored by MOUNT INDEX, never by world position, so they stay
+     welded to a hull that is flying.
+  5. Two tunings the preview forced: the `orb` flash was a solid disc at the flash radius and **three of
+     them buried the UFO's hull** (it is small now and the bloom does the work), and a single-emitter
+     saucer was labelled `converge`, which is meaningless with one mount — the test caught it, and the row
+     says `alternate` (a no-op at n=1) instead.
+  The trail is the loudest identity cue after the muzzle — dimpled golf-ball wakes for the wagon and comet,
+  a hard streak for the racer and bike, shed rings for the saucers, smoke for the hauler, crackle for the
+  electricals, embers for the Firebird, an orbiting halo for the Ace — and it draws off a deterministic
+  hash, never an rng draw, so the fight's spawn stream is untouched. Guarded by `tests/battle-arms.test.ts`
+  (every silhouette armed, mounts ON the hull, converge needs ≥2 mounts, the fleet measurably varied —
+  including a head-to-head UFO-vs-wagon assertion, since that is the report — every catalogue ship
+  resolving to a visible livery, and the pattern maths). Eyes-on: `scripts/battle-preview.mjs` grew a SHIP
+  RAIL that samples each hull in a burst, because a 150ms flash against an ~800ms autopilot cadence means a
+  single wait lands between shots most of the time.
+
 **Phase G — Polish**
 - **GS-story-beats** — ✅ *shipped* (the story-round dialogue beats). Campaign NPC scenes threaded through
   the EXISTING generic LORE machinery (`sim/rpg/lore.ts`), so a beat is a DATA ROW and the gate/screen/
