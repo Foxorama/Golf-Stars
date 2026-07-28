@@ -79,7 +79,7 @@ export const PARROT_BAR_LINES: readonly ParrotBarLine[] = [
     id: 'greet-mid',
     kind: 'greeting',
     when: (c) => !c.completed && c.chapter === 3,
-    text: "Halfway to the key, and the drinks still taste of ozone and dread. Sit anyway. A captain should know his crew before the hard part.",
+    text: "Halfway to the key, and the drinks still taste of ozone and dread. Sit anyway. A captain should know their crew before the hard part.",
   },
   {
     id: 'greet-warden',
