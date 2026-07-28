@@ -1153,6 +1153,18 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     hull that is flying. Guarded by `tests/battle-arms.test.ts`; eyes-on the preview's SHIP RAIL (which
     samples each hull in a BURST — a 150ms flash against an ~800ms autopilot cadence means one wait lands
     between shots).
+    **AND IN PORTRAIT THE FLEET IS DRAWN FROM ABOVE** (GS-story-battle-topdown, `render/shipTopArt.ts`).
+    This is where turning the camera genuinely BREAKS, unlike the serpent: a snake striking head-first down
+    the screen is a real pose; **a car seen in SIDE ELEVATION while it flies away from you is not a pose at
+    all** — you are looking at the driver's door of a receding thing, and the neck tilts to fix it.
+    `shipArt.ts` stays the side elevation (star map, cards, pads, and the LANDSCAPE fight, byte-for-byte);
+    the plan-view twin is authored in the **IDENTICAL ±20u right-facing frame**, so it is a sprite SWAP —
+    `SHIP_W`/`SHIP_H`, hit radius, shield, flame and every hardpoint are untouched. **A plan view is
+    symmetric about the KEEL**, and that forces `planMounts`: a side elevation HIDES the far-side gun, so a
+    one-sided mount set is MIRRORED (wagon rack → 4, UFO rim → a ring of 6) while a set that already spans
+    both sides is left alone; centreline mounts never double. No SVG ids (document-global) and **no SMIL**
+    — the battle rasterizes into an `<img>`, where animation never runs. Guarded by
+    `tests/ship-top-art.test.ts` + the plan-mount rule in `tests/battle-arms.test.ts`.
   - **Intro cinematic** (`docs/decisions/ui-intro.md`) — cosmetic Canvas2D, not in the reducer; degrades
     safely (every frame in try/catch → `finish()`); the many-instance glow uses a cached sprite, never
     per-element `shadowBlur`. The real title boots first; the intro overlays it.

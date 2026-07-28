@@ -675,6 +675,44 @@ Ordered so each ships something playable and nothing lands before its foundation
   RAIL that samples each hull in a burst, because a 150ms flash against an ~800ms autopilot cadence means a
   single wait lands between shots most of the time.
 
+- **GS-story-battle-topdown** — ✅ *shipped* (the portrait fight draws the fleet FROM ABOVE). Player report:
+  *"the serpent looks pretty good as it dangles from the top of the screen, but the side-on spaceships look
+  really weird in portrait mode. I keep trying to crane my neck sideways."* This is the case where turning
+  the camera genuinely BREAKS — and it is worth stating why it is different from the serpent, which
+  GS-story-battle-epic looked at and deliberately left alone. **A snake striking head-first down the screen
+  is a real pose.** A saloon car seen in *side elevation* while it flies away from you up the screen is not
+  a pose at all: you are looking at the driver's door of a thing that is receding, and the brain tilts the
+  head to fix it. Hence the neck.
+  1. **`shipArt.ts` is a SIDE ELEVATION and stays one.** Wheels underneath, canopy on top, exhaust out the
+     back — right for the star map, the garage cards, the clubhouse pads, and right for the LANDSCAPE fight
+     where +x really is "across the screen". `shipTopArt.ts` is its PLAN-VIEW twin, and the battle picks
+     per orientation, so the landscape fight is byte-for-byte.
+  2. **SAME FRAME, SAME FACING — that is what makes it cheap.** The plan hulls are authored in the identical
+     ±20u right-facing frame (viewBox `-34 -20 62 40`), so it is a straight sprite swap: `SHIP_W`/`SHIP_H`,
+     the hit radius, the shield bubble, the thrust flame and every hardpoint in `battleArms.ts` are
+     untouched. The portrait camera then points the nose UP, which is the canonical portrait shmup.
+  3. **A PLAN VIEW IS SYMMETRIC ABOUT THE KEEL, AND THAT FORCED A RULE.** A side elevation *hides* the far
+     side, so a row can legitimately quote each flank gun once (the wagon's two rack barrels, the saucer's
+     underbeam). Draw the plan hull and that becomes a ship firing out of its port wing only. So
+     `planMounts` mirrors an armament **if every off-centre mount is on the same side**, and leaves alone
+     one that already spans both — which lands right for all eleven rows: the wagon's rack doubles to four,
+     the Mothership's three rim emitters become a ring of six, the Pegasus grows a bolt per wing, while the
+     hauler's wide pylons, the comet's three-point spray and the Firebird's beak-and-pinions stay as
+     authored. Centreline mounts are never doubled. The test caught the one row that straddled the keel
+     asymmetrically (the bike's fairing lasers at −0.14/+0.22, inside the `KEEL_EPS` band on one side only)
+     — authored as a true symmetric pair instead.
+  4. **The silhouette still has to be that ship.** From above a car is mostly roof, so each hull leans on
+     whatever survives the change of angle: the wagon's rack rails and wood panelling, the bikes' wheels
+     in line under wide bars, the discs' full ring of lights (a side view can only show the near arc), the
+     winged ships' whole span, and the **Firebird's phoenix hood decal — which reads better from above than
+     it ever did from the side**, because a hood decal seen edge-on is nothing.
+  5. No SVG `id`s (document-global — the standing rule) and **no SMIL**: the battle rasterizes this into an
+     `<img>`, where animation does not run, so an animated plan hull would be markup that never moves.
+     Machine-checked, along with the frame, full catalogue coverage, genuine difference from the side art,
+     and every coordinate staying inside the viewBox.
+  Guarded by `tests/ship-top-art.test.ts` + the plan-mount rule in `tests/battle-arms.test.ts`. Eyes-on:
+  the preview's SHIP RAIL, which is shot at 390×844 and therefore renders the plan hulls end-to-end.
+
 **Phase G — Polish**
 - **GS-story-beats** — ✅ *shipped* (the story-round dialogue beats). Campaign NPC scenes threaded through
   the EXISTING generic LORE machinery (`sim/rpg/lore.ts`), so a beat is a DATA ROW and the gate/screen/

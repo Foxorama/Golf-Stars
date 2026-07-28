@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SHIP_ARMS, shipArmsFor, mountOffset, mountCentroid, mountForShot } from '../src/render/battleArms';
+import { SHIP_ARMS, shipArmsFor, planMounts, KEEL_EPS, mountOffset, mountCentroid, mountForShot } from '../src/render/battleArms';
 import { SHIPS, DEFAULT_SHIP_ID } from '../src/sim/rpg/ships';
 
 /**
@@ -93,6 +93,34 @@ describe('finale ship armaments', () => {
       expect(c.y).toBeGreaterThanOrEqual(Math.min(...ys) - 1e-9);
       expect(c.y).toBeLessThanOrEqual(Math.max(...ys) + 1e-9);
     }
+  });
+
+  it('seen from above, no hull fires out of one flank only', () => {
+    // GS-story-battle-topdown: the plan hull shows both sides, so a row authored against a side elevation
+    // (which HIDES the far side) has to be mirrored — a ship firing only to port reads as broken.
+    for (const k of KINDS) {
+      const a = SHIP_ARMS[k];
+      const plan = planMounts(a);
+      const flank = plan.filter((m) => Math.abs(m.across) > KEEL_EPS);
+      if (flank.length) {
+        expect(flank.some((m) => m.across > 0), `${k} all to port`).toBe(true);
+        expect(flank.some((m) => m.across < 0), `${k} all to starboard`).toBe(true);
+      }
+      // it only ever ADDS the far side — never drops or moves an authored barrel
+      expect(plan.length).toBeGreaterThanOrEqual(a.mounts.length);
+      for (const m of a.mounts) expect(plan).toContainEqual(m);
+      for (const m of plan) expect(Math.abs(m.across)).toBeLessThanOrEqual(1);
+      // …and it is idempotent: a mirrored set already spans both sides, so re-planning changes nothing
+      expect(planMounts({ ...a, mounts: plan })).toEqual(plan);
+    }
+    // the rows that already account for both sides are left exactly alone
+    for (const k of ['shuttle', 'comet', 'infinity', 'firebird', 'moto'] as const) {
+      expect(planMounts(SHIP_ARMS[k]), k).toEqual(SHIP_ARMS[k].mounts);
+    }
+    // …and the ones the player named grow the way they should
+    expect(planMounts(SHIP_ARMS.wagon)).toHaveLength(4); // a rack rail down each side
+    expect(planMounts(SHIP_ARMS.ufo)).toHaveLength(6); // a full ring of rim emitters
+    expect(planMounts(SHIP_ARMS.racer)).toHaveLength(1); // a centreline nose spike is never doubled
   });
 
   it('the pattern only chooses WHERE a shot is born — never how many there are', () => {
