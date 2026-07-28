@@ -266,4 +266,76 @@ describe('the persistent play HUD frame (GS-hud-frame)', () => {
     },
     60_000,
   );
+
+  it.runIf(chromePath)(
+    'stays full-bleed while a holed ball is still rolling (GS-play-bleed-holeout)',
+    async () => {
+      // The play screen drops the page frame's padding + max-width via `.gs-main--bleed`, and its own
+      // height is a full `dvh`. So the two must agree EXACTLY: a `dvh`-tall screen inside a padded
+      // frame is 46px taller than the viewport and inset 16px each side.
+      //
+      // They disagreed for one beat. `fullBleed` was keyed on `!play.done` while `playingBody` mounts
+      // the frame on `anim` FIRST — and a holed putt sets `done` the instant it is struck, with the
+      // ball still rolling on the frame's own map. Reported from the green as the putt screen "adding
+      // black borders and sliding off the bottom": the page frame popped back in mid-roll, the play
+      // screen grew borders, slid 46px down, and wore TWO settings cogs (the global one returns off
+      // full-bleed, and the frame's nav column already carries its own).
+      //
+      // Auto-finish is the cheap deterministic way in: it holes the ball out in one action, so the
+      // WHOLE animation that follows runs with `play.done` already true.
+      const { chromium } = await import('playwright-core');
+      const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
+      try {
+        const page = await browser.newPage({ viewport: { width: 393, height: 852 } });
+        await page.goto('file://' + dist + '?intro=0&seed=42', { waitUntil: 'load' });
+        await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', {
+          timeout: 8000,
+        });
+        const click = async (t: string) => {
+          await page.locator('button', { hasText: t }).first().click();
+          await page.waitForTimeout(350);
+        };
+        await click('The Voyage');
+        await click('Voyage as Feather');
+        await click('First Tee');
+        await click('Tee Off');
+        await page.waitForSelector('[data-playmode="aim"]', { timeout: 8000 });
+
+        const frame = () =>
+          page.evaluate(() => {
+            const main = document.querySelector('main');
+            const shot = document.querySelector('.gs-shot--full');
+            const r = shot?.getBoundingClientRect();
+            return {
+              // null once the hole-complete card replaces the frame — that card is CORRECTLY padded.
+              mounted: !!document.querySelector('[data-playmode]'),
+              bleed: !!main?.classList.contains('gs-main--bleed'),
+              cogs: document.querySelectorAll('.gs-cog').length,
+              x: r?.left ?? null,
+              overflow: document.scrollingElement!.scrollHeight - window.innerHeight,
+            };
+          });
+
+        await page.locator('button.gs-roundbtn', { hasText: '»' }).first().click();
+
+        let sampled = 0;
+        for (let i = 0; i < 60; i++) {
+          await page.waitForTimeout(90);
+          const f = await frame();
+          if (!f.mounted) break; // the ball is in, the hole card is up — the frame's job is done
+          sampled++;
+          expect(f.bleed, 'the play screen lost `.gs-main--bleed` while the ball was still moving').toBe(true);
+          expect(f.x, 'the play screen was inset by the page frame').toBe(0);
+          expect(f.overflow, 'the play screen was pushed off the bottom of the viewport').toBeLessThanOrEqual(0);
+          // Off full-bleed the global cog returns beside the nav column's own — two cogs is the tell.
+          expect(f.cogs, 'a second settings cog appeared over the play screen').toBe(0);
+        }
+        // A run that never sampled the animation proves nothing.
+        expect(sampled, 'never caught the hole-out animation').toBeGreaterThan(2);
+      } finally {
+        await browser.close();
+      }
+    },
+    90_000,
+  );
 });

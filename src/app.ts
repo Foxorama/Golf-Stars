@@ -3035,8 +3035,16 @@ function render(): void {
   // The interactive play screen (decision / watching / putting — but not the hole-complete card) is
   // full-bleed: the map fills the page, so drop the page frame's padding/max-width for it.
   // The Star Tour star map (GS-star-tour) is full-bleed too — the chart fills the page and pans.
+  //
+  // The predicate MIRRORS `playingBody`'s own order — `anim` first, `done` second — because those two
+  // are the same question asked twice and they must never disagree (GS-play-bleed-holeout). A holed
+  // putt sets `play.done` the instant it is struck, while the ball is still rolling on the frame's own
+  // map: keyed on `done` alone the page frame's 16/18px padding + `max-width` popped back IN mid-roll,
+  // so the play screen grew black borders, slid 46px off the bottom (its height is a full `dvh` inside
+  // a padded frame) and briefly wore TWO settings cogs. The frame is mounted whenever `playingBody`
+  // returns it, so that is exactly when the page must be full-bleed.
   const fullBleed =
-    (state.screen === 'playing' && !!state.play && !state.play.done) ||
+    (state.screen === 'playing' && !!state.play && (!!animatingPlay || !state.play.done)) ||
     state.screen === 'starTour' ||
     state.screen === 'lore' || // GS-lore: the story beat owns the full viewport (its own cinematic backdrop)
     state.screen === 'storyMidBeat' || // GS-story-midround-omen: the mid-round foreshadow shares the lore card

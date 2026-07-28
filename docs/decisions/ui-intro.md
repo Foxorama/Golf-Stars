@@ -825,6 +825,87 @@ fringe) built through the REAL frame builders and the REAL stylesheet lifted out
 
 ---
 
+## GS-play-bleed-holeout: the page frame came back while the putt was still rolling (2026-07-28)
+
+### The report
+
+From the green, with a screenshot: *"the putt make window adds black borders and slides slightly down
+off the bottom of the screen. the other golf screens are all fine, it's just the putt make window."*
+
+The screenshot is precise about which window: the ball is in shot, the pod reads `ROLLING`, the lie
+chip reads `Green`. This is not the putt DECISION screen — it is the putt the player has just **made**,
+mid-roll toward the cup.
+
+### The tell in the picture
+
+Two settings cogs. One in the play frame's own nav column, and a second, larger one overlapping it from
+the top-right corner. That second cog is `render()`'s global `.gs-cog`, and it is emitted for every
+screen **except** the full-bleed ones:
+
+```ts
+const cog = fullBleed || state.screen === 'travel' || state.screen === 'starTour' ? '' : `<button class="gs-cog" …>`;
+```
+
+So `fullBleed` was false while the play screen was on the glass — which explains the rest of the picture
+without needing anything else. `.gs-main--bleed` is what strips the page frame's padding
+(`16px` sides, `18px`/`28px` ends) and its `max-width: 820px`; without it the play screen is inset 16px
+a side (**the black borders**) and offset 18px down. And `.gs-shot--full` is `height: var(--gs-dvh)` —
+a whole viewport — so inside a padded frame the document becomes `dvh + 46px` and the bottom of the HUD
+falls off the screen (**sliding off the bottom**). Measured in Chromium at 393×852: `.gs-shot--full` at
+`x: 16`, `scrollHeight` 898 against an `innerHeight` of 852.
+
+### The cause: one question, asked twice, in two different orders
+
+`playingBody` decides what the playing screen is by asking `anim` **first**:
+
+```ts
+if (anim) { …the full-bleed play frame, mode 'watch'… }
+if (play.done) { …the padded hole-complete card… }
+```
+
+`fullBleed` asked the second question only:
+
+```ts
+(state.screen === 'playing' && !!state.play && !state.play.done) || …
+```
+
+Those agree everywhere except one beat — and it is exactly the beat the player reported. A holed putt
+sets `play.done` **the instant it is struck**, because the sim resolves the whole putt at once; the
+roll the player is watching is the *animation* of a result that already exists. So for the length of
+that animation the frame was mounted (`anim` truthy) while the page had already reverted to the
+between-screens layout.
+
+It was never putt-specific in the code — any hole-out animates with `done` already true, and
+auto-finish reproduces it on a tee shot. It is putt-specific in *play*, because a made putt is how
+almost every hole ends.
+
+### The rule
+
+**The page is full-bleed for exactly as long as the play frame is mounted**, so the predicate mirrors
+`playingBody`'s own order:
+
+```ts
+(state.screen === 'playing' && !!state.play && (!!animatingPlay || !state.play.done)) || …
+```
+
+`animatingPlay` is already computed above this in `render()`, so this costs nothing. The general
+lesson is the one the derelict corridor kept teaching in a different domain: **a second description of
+a committed decision drifts from the first.** `done` is a fact about the SIM; "is the play frame up?"
+is a fact about the VIEW, and only `playingBody` gets to answer it.
+
+### Guard
+
+`tests/play-hud-frame.test.ts`, in a real browser against the built artifact. Getting to a made putt by
+hand takes ~20 shots and a tap on a sweeping pace meter; **auto-finish holes the ball out in one
+action**, so the entire animation that follows runs with `done` already true — a fast, deterministic
+way into the exact state. The test polls the animation and asserts, on every frame it catches, that
+`.gs-main--bleed` is present, that `.gs-shot--full` sits at `x: 0`, that the document does not overflow
+the viewport, and that there is no second cog; then it asserts it actually sampled the animation, so a
+run that raced past the frame can't pass silently. Verified red on the unfixed build
+(`lost .gs-main--bleed while the ball was still moving`) and green on the fix.
+
+---
+
 ## Migrated from CLAUDE.md — System-index bullets (2026-07-23 refactor)
 
 > These are the verbatim terse System-index bullets moved out of `CLAUDE.md` when it was
