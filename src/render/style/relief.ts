@@ -49,12 +49,12 @@ export const BIOME_RELIEF: Record<BiomeArchetype, ReliefLook> = {
   desert: { hi: 'rgba(255,226,150,0.14)', lo: 'rgba(74,46,16,0.21)', strength: 1.15 }, // rolling dunes
   frost: { hi: 'rgba(255,255,255,0.20)', lo: 'rgba(122,160,200,0.22)', strength: 1.2 }, // snow drifts
   inferno: { hi: 'rgba(255,150,70,0.13)', lo: 'rgba(8,4,3,0.30)', strength: 1.15 }, // scorched swells
-  void: { hi: 'rgba(150,140,244,0.16)', lo: 'rgba(6,3,24,0.32)', strength: 1 }, // cosmic rises over the abyss
+  void: { hi: 'rgba(175,131,245,0.17)', lo: 'rgba(9,2,24,0.34)', strength: 1 }, // cosmic VIOLET rises over the abyss (GS-cetus-void-glow: the old highlight was a periwinkle blue, and it covers the whole landmass — it was pulling the world off its own purple)
   crystal: { hi: 'rgba(210,240,255,0.15)', lo: 'rgba(30,44,74,0.26)', strength: 1.1 }, // faceted scree swells
   tempest: { hi: 'rgba(182,198,152,0.12)', lo: 'rgba(10,16,10,0.26)', strength: 1.1 }, // wind-heaped moor
   fungal: { hi: 'rgba(130,240,182,0.13)', lo: 'rgba(6,26,16,0.26)', strength: 1 }, // mossy mounds
   ocean: { hi: 'rgba(255,244,200,0.14)', lo: 'rgba(112,86,48,0.21)', strength: 1.15 }, // beach dunes
-  cetus: { hi: 'rgba(122,232,240,0.15)', lo: 'rgba(5,26,38,0.30)', strength: 1 }, // luminous clifftop swells
+  cetus: { hi: 'rgba(55,194,239,0.16)', lo: 'rgba(2,20,40,0.32)', strength: 1 }, // luminous clifftop swells, lit BLUE off the sea below (GS-cetus-void-glow: the old near-white cyan was the biggest single desaturator on the plateau)
   swamp: { hi: 'rgba(160,200,100,0.11)', lo: 'rgba(6,16,4,0.30)', strength: 0.95 }, // boggy hummocks
   metal: { hi: 'rgba(255,190,120,0.13)', lo: 'rgba(10,6,3,0.30)', strength: 1.15 }, // buckled scrap-plate swells
   derelict: { hi: 'rgba(150,185,215,0.13)', lo: 'rgba(6,9,16,0.34)', strength: 1.1 }, // buckled cold hull-plating swells

@@ -37,12 +37,12 @@ export const BIOME_ROUGH: Record<string, string> = {
   'dust-belt': '#85683a',
   'ice-ring': '#dce9f2',
   'ember-world': '#594238',
-  'void-garden': '#241847',
+  'void-garden': '#310e4d',
   'crystal-spires': '#5a6680',
   'tempest-reach': '#4d5945',
   'spore-jungle': '#3a6446',
   'tidal-archipelago': '#cfba85',
-  'cetus-deep': '#1a3a50',
+  'cetus-deep': '#08355a',
   'toxic-mire': '#4a5a2c',
   'scrap-belt': '#7a4a2c',
   'derelict-ship': '#48535e',
@@ -190,15 +190,20 @@ export const ARCHETYPE_TURF: Record<BiomeArchetype, TurfPalette> = {
     collar: '#5e6b2e',
     rough: { light: '#6b5246', base: '#594238', dark: '#43302a', ink: '#221712' },
   },
-  // Void — cosmic indigo "astroturf" islands, luminous violet-blue greens. The fairway stripes carry
-  // a wider light↔dark spread than other worlds: indigo turf sits so close in value to the indigo
+  // Void — cosmic VIOLET "astroturf" islands, luminous lilac greens. The fairway stripes carry a
+  // wider light↔dark spread than other worlds: indigo turf sits so close in value to the indigo
   // platform/rough that the mowing bands vanished on long par-4/5 corridors (GS-cetus-void-45).
+  // GS-cetus-void-glow pushed the whole world off the greyish periwinkle it had drifted onto and
+  // onto a genuinely PURPLE hue at a much higher chroma (OKLab C: fairway 0.114 → 0.140, green
+  // 0.139 → 0.161, rough 0.084 → 0.109) at the same darkness — the world was reading washed out
+  // because it was monochrome AND desaturated, not because it was dark. Lightness is deliberately
+  // unchanged; the vibrance is bought with saturation and the emissive kit in `style/glow.ts`.
   void: {
-    fairway: { light: '#6a60ba', base: '#443a80', dark: '#241e4a', ink: '#15102e' },
-    green: { light: '#909aec', base: '#6f7ad6', dark: '#5460b4', ink: '#23284f' },
-    tee: { light: '#473f88', base: '#34306a', dark: '#28244e', ink: '#14102b' },
-    collar: '#5a64c0',
-    rough: { light: '#322260', base: '#241847', dark: '#180f30', ink: '#0a0618' },
+    fairway: { light: '#7d55bd', base: '#523088', dark: '#311853', ink: '#1c0d30' },
+    green: { light: '#a291f5', base: '#8272e0', dark: '#6658bb', ink: '#2c2455' },
+    tee: { light: '#5a3f95', base: '#452c74', dark: '#331f56', ink: '#1a0f2c' },
+    collar: '#7a5ecc',
+    rough: { light: '#3f1863', base: '#310e4d', dark: '#210834', ink: '#100419' },
   },
   // Crystal — pale prismatic teal turf and bright cyan-white greens on a crystalline GRAVEL SCREE
   // (GS-ground-cover): a lavender-slate shard-litter field, lifted well clear of the world's
@@ -243,12 +248,17 @@ export const ARCHETYPE_TURF: Record<BiomeArchetype, TurfPalette> = {
   // Cetus — luminous deep-sea CYAN clifftop turf and glowing aqua greens over an abyssal blue ground,
   // darker + more bioluminescent than ocean's bright sea-green, so the plateau reads as land lit from
   // within over a starry sea (the off-cliff abyss is the deep-ocean rough/space).
+  // GS-cetus-void-glow: this was the LEAST chromatic turf of any non-grey world — a petrol-grey
+  // slab (OKLab C 0.083, against verdant's 0.136) whose green was barely distinguishable from its
+  // fairway on the drawn map. Pushed onto a saturated ocean blue-cyan at the same lightness
+  // (fairway C → 0.101, green 0.108 → 0.129, rough 0.054 → 0.081); the glow itself is the emissive
+  // kit in `style/glow.ts`, not a brighter fill.
   cetus: {
-    fairway: { light: '#46a8b8', base: '#2f8294', dark: '#226576', ink: '#0c2c36' },
-    green: { light: '#8af2ee', base: '#5fd8dc', dark: '#46b4bc', ink: '#174d52' },
-    tee: { light: '#3f96a6', base: '#327886', dark: '#275c68', ink: '#0e2e36' },
-    collar: '#3aa0aa',
-    rough: { light: '#254c64', base: '#1a3a50', dark: '#112a3a', ink: '#061420' },
+    fairway: { light: '#2ea6c8', base: '#127f9f', dark: '#0a6180', ink: '#042a3e' },
+    green: { light: '#79f0f2', base: '#2ad6e0', dark: '#12b1bf', ink: '#0a4c56' },
+    tee: { light: '#2894b0', base: '#12758f', dark: '#0b586e', ink: '#04283a' },
+    collar: '#1cb0c2',
+    rough: { light: '#0d4771', base: '#08355a', dark: '#042442', ink: '#021124' },
   },
   // Earth — HOME LINKS (GS-earth): firm, sun-cured Scottish links turf — a golden-sage fescue fairway
   // (drier and more olive-gold than verdant's lush emerald), a true bentgrass putting green, over a
@@ -357,8 +367,10 @@ export const ARCHETYPE_SPACE: Record<BiomeArchetype, SpaceLook> = {
   frost: { base: '#040d17', nebula: 'rgba(80,205,205,0.10)', edge: 'rgba(155,235,228,0.18)' },
   // Inferno — a near-black volcanic void lit by an ember-red nebula, molten-lit shore.
   inferno: { base: '#0f0403', nebula: 'rgba(205,60,30,0.13)', edge: 'rgba(255,125,65,0.20)' },
-  // Void — the abyss: deepest base, violet nebula, luminous indigo shore.
-  void: { base: '#03020a', nebula: 'rgba(150,90,225,0.13)', edge: 'rgba(125,135,245,0.20)' },
+  // Void — the abyss: deepest base, violet nebula, luminous violet shore. GS-cetus-void-glow
+  // saturated all three (the shore rim was a periwinkle BLUE, which is what pulled the world off
+  // its own purple) without lightening the sky — a vibrant dark world, not a brighter one.
+  void: { base: '#040109', nebula: 'rgba(140,55,235,0.15)', edge: 'rgba(170,110,255,0.26)' },
   // Crystal — a cool prismatic dark with an icy-cyan nebula and a bright crystalline shore.
   crystal: { base: '#0a1420', nebula: 'rgba(150,210,230,0.11)', edge: 'rgba(180,235,240,0.20)' },
   // Tempest — a storm-violet dark, electric nebula, lightning-lit shore.
@@ -369,7 +381,9 @@ export const ARCHETYPE_SPACE: Record<BiomeArchetype, SpaceLook> = {
   ocean: { base: '#03101a', nebula: 'rgba(60,180,210,0.11)', edge: 'rgba(120,225,220,0.20)' },
   // Cetus — the star-ocean: an abyssal blue-black sea, a bioluminescent cyan bloom, a glowing
   // cliff-shore where the plateau meets the deep (the surrounding void IS the ocean the whales swim).
-  cetus: { base: '#020a12', nebula: 'rgba(70,190,225,0.13)', edge: 'rgba(120,230,240,0.22)' },
+  // (GS-cetus-void-glow: the bloom deepened to a saturated cobalt — the world's light comes from
+  // BELOW, out of the sea, so the sky it stains should be ocean blue rather than a pale cyan haze.)
+  cetus: { base: '#01080f', nebula: 'rgba(25,120,235,0.15)', edge: 'rgba(95,205,255,0.28)' },
   // Swamp — a fetid green-black gloom lit by a toxic-green miasma nebula, with a sickly chartreuse
   // shore glow where the mire meets the murk.
   swamp: { base: '#0b1206', nebula: 'rgba(120,180,60,0.12)', edge: 'rgba(160,205,90,0.18)' },

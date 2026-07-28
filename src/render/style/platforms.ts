@@ -245,11 +245,13 @@ export interface CliffLook {
   contact: string; // contact shadow tucked under the lip
 }
 export const CETUS_CLIFF: CliffLook = {
-  // A bold TEAL → BLUE → DEEP-BLUE → BLACK plunge (GS-void-cetus-cliffs): the strata were greyed and
-  // read washed-out against the dark deep, flattening the side-on face; saturated + widened so the
-  // clifftop's descent to the abyss pops with the world's cyan identity.
-  strata: ['#4fc6d6', '#2f9ac2', '#2168a0', '#164674', '#0c2a48', '#061826'],
-  deepMix: '#03080f',
+  // A bold TEAL → COBALT → DEEP-BLUE → BLACK plunge (GS-void-cetus-cliffs): the strata were greyed
+  // and read washed-out against the dark deep, flattening the side-on face; saturated + widened so
+  // the clifftop's descent to the abyss pops with the world's cyan identity. GS-cetus-void-glow took
+  // the last of the grey out of the mid bands (the plateau above them is a saturated ocean cyan now,
+  // and a duller face under a brighter top reads as a decal rather than one lit landform).
+  strata: ['#12b4c3', '#0a8db1', '#06659b', '#044378', '#02284f', '#01132a'],
+  deepMix: '#02070d',
   lipA: 'rgba(150,232,255,0.9)',
   lipB: 'rgba(232,252,255,0.7)',
   crackDark: 'rgba(3,9,16,0.5)',
@@ -262,10 +264,12 @@ export const CETUS_CLIFF: CliffLook = {
 export const VOID_CLIFF: CliffLook = {
   // A vivid VIOLET → BLACK asteroid underside (GS-void-cetus-cliffs): the old strata sat as a greyed
   // lavender that washed out against the abyss; pushed toward a saturated cosmic purple descending to
-  // near-black so the floating rock reads as solid, luminous void-stone.
-  strata: ['#6b4fcf', '#5138a6', '#3c277d', '#291a54', '#180d33', '#0a0619'],
-  deepMix: '#050210',
-  lipA: 'rgba(176,126,255,0.85)',
+  // near-black so the floating rock reads as solid, luminous void-stone. GS-cetus-void-glow rotated
+  // them off blue-violet onto the plateau's own purple hue — the face and the turf it holds up are
+  // the same rock, lit by the same light.
+  strata: ['#7e57bc', '#653c9c', '#4f277e', '#39165d', '#23083b', '#10031d'],
+  deepMix: '#04010c',
+  lipA: 'rgba(190,140,255,0.85)',
   lipB: 'rgba(224,205,255,0.72)',
   crackDark: 'rgba(6,3,16,0.55)',
   crackLit: 'rgba(150,110,220,0.24)',

@@ -700,6 +700,29 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     pins the scene's prim count across a pan). Close-then-OPEN, in that order — a flush join weaves for a
     few yards and drawn literally that is a row of dashes. Guarded by `tests/fairway-silhouette.test.ts`;
     eyes-on `scripts/fairway-outline-preview.mjs` (the gallery BURIES loose lanes — that is how it shipped).
+  - **A WORLD WITH NO GROUND LIGHTS ITS OWN PLAY SURFACES, AND THE GLOW IS A ROW** (GS-cetus-void-glow,
+    `style/glow.ts`). Void and Cetus are one design idea — off the cut turf is the open deep, so what the
+    player looks at is a lit shape floating in it. That is a LIGHTING problem, and it was being solved by
+    tinting a slab and drawing a line round it: measured on the drawn map they were the game's LEAST
+    vibrant worlds (Hasler–Süsstrunk colourfulness, centre crop of a calm stop: void **31.7** vs verdant
+    52.4; OKLab turf chroma: cetus fairway **0.083**, the lowest of any non-grey world, vs verdant 0.136),
+    and the whole emissive kit was two flat rgba rings at α 0.10/0.14 in a greyish periwinkle, void-only.
+    `WORLD_GLOW` now carries the two luminous worlds — **no row ⇒ no prims ⇒ byte-for-byte**, a third
+    luminous world is a row and never a `buildScene` edit — with a graded outward BLOOM (`turfApron`, so it
+    fades to nothing and has no outer edge to find), a neon RIM of three stacked strokes along the SAME
+    `fairwayEdgeRuns` the ink uses (so a split lane glows on every piece), and on the GREEN — which burns
+    brightest, because on a landmark-less world it is the shape the eye must find first — a rim plus an
+    inner glow. Two traps: the inner glow is concentric **STROKES, never nested fills** (a stack of fills
+    composites darkest in the INTERIOR, backwards, and it wipes the green's own mow/relief art), and it is
+    only ever applied to a surface that STANDS ALONE (on one piece of a multi-part fairway it seams the
+    flush join — GS-blend in reverse). **Reach is measured in YARDS** (the old fixed −13/−6 px rings broke
+    GS-green-complex's rule: a plausible bloom on the map, a hairline at the putt camera). Chroma was
+    bought at UNCHANGED lightness — a vibrant DARK world, not a brighter one; a glow reads by contrast, so
+    lifting the ambient fights it — and the same hue rotation went to everything covering the ground that
+    had drifted off it (`BIOME_RELIEF` hi, the cliff strata, the space nebula/rim, the star-map accent and
+    the arrival hero: the splash and the course you land on are one place). Cetus 48.6 → **60.7**
+    colourfulness, void chroma 0.199 → **0.238** (now above verdant's). Guarded by `tests/biome-glow.test.ts`;
+    measured by `scripts/biome-vibrance.mjs`.
   - Merges: platforms + hazard families through `render/merge.ts` — platforms `dilateUnion(…,14)` (never a
     mitred outset), sand/liquid families `unionClose` bridging near pairs with a slim neck (GS-hazard-merge,
     render-only, sim penalty polys unchanged). Lost-rough cliffs extrude from the REAL lower silhouette

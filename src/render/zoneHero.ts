@@ -231,9 +231,10 @@ export function zoneHeroSVG(archetype: BiomeArchetype, opts: HeroOpts = {}): str
       inner += `<circle cx="${n1(x)}" cy="${n1(y)}" r="${n1(0.4 + rng() * 0.9)}" fill="rgba(190,244,255,${(0.4 + rng() * 0.4).toFixed(2)})"/>`;
     }
     // The clifftop plateau on the left — a dark luminous-edged landmass the fairway sits on.
-    inner += `<polygon points="0,${n1(oceanY - 4)} ${n1(cliffX * 0.8)},${n1(oceanY - 8)} ${n1(cliffX)},${n1(oceanY + 2)} ${n1(cliffX)},${H} 0,${H}" fill="#102e3a" stroke="rgba(120,230,240,0.35)" stroke-width="1.2"/>`;
-    // The bright fairway ribbon running along the clifftop toward the edge.
-    inner += `<polygon points="${n1(W * 0.04)},${n1(oceanY + 4)} ${n1(cliffX * 0.78)},${n1(oceanY - 2)} ${n1(cliffX * 0.96)},${n1(oceanY + 6)} ${n1(cliffX * 0.74)},${n1(oceanY + 14)} ${n1(W * 0.04)},${n1(oceanY + 20)}" fill="#2f8294"/>`;
+    inner += `<polygon points="0,${n1(oceanY - 4)} ${n1(cliffX * 0.8)},${n1(oceanY - 8)} ${n1(cliffX)},${n1(oceanY + 2)} ${n1(cliffX)},${H} 0,${H}" fill="#08355a" stroke="rgba(120,230,240,0.35)" stroke-width="1.2"/>`;
+    // The bright fairway ribbon running along the clifftop toward the edge (the world's own turf —
+    // the arrival splash and the course you land on must be the same place, GS-cetus-void-glow).
+    inner += `<polygon points="${n1(W * 0.04)},${n1(oceanY + 4)} ${n1(cliffX * 0.78)},${n1(oceanY - 2)} ${n1(cliffX * 0.96)},${n1(oceanY + 6)} ${n1(cliffX * 0.74)},${n1(oceanY + 14)} ${n1(W * 0.04)},${n1(oceanY + 20)}" fill="#127f9f"/>`;
     for (let i = 0; i < 4; i++) {
       inner += `<circle cx="${n1(W * (0.08 + i * 0.09))}" cy="${n1(oceanY + 6 + (rng() - 0.5) * 6)}" r="${n1(1 + rng())}" fill="#7af0ff"/>`;
     }
@@ -403,9 +404,11 @@ export function zoneHeroSVG(archetype: BiomeArchetype, opts: HeroOpts = {}): str
   // The island fairway platform adrift in the void (a glowing slab + flag).
   const ix = W * 0.32;
   const iy = H * 0.74;
-  inner += `<ellipse cx="${n1(ix)}" cy="${n1(iy)}" rx="46" ry="13" fill="rgba(120,130,240,0.18)"/>`;
-  inner += `<polygon points="${n1(ix - 38)},${n1(iy)} ${n1(ix + 38)},${n1(iy)} ${n1(ix + 26)},${n1(iy + 12)} ${n1(ix - 26)},${n1(iy + 12)}" fill="#3a3270" stroke="#5a64c0" stroke-width="1.5"/>`;
-  inner += `<ellipse cx="${n1(ix)}" cy="${n1(iy)}" rx="34" ry="8" fill="#6f7ad6"/>`;
+  // (The slab wears the world's own turf + bloom — the arrival splash and the course you land on
+  // must be the same place, GS-cetus-void-glow.)
+  inner += `<ellipse cx="${n1(ix)}" cy="${n1(iy)}" rx="46" ry="13" fill="rgba(123,63,228,0.24)"/>`;
+  inner += `<polygon points="${n1(ix - 38)},${n1(iy)} ${n1(ix + 38)},${n1(iy)} ${n1(ix + 26)},${n1(iy + 12)} ${n1(ix - 26)},${n1(iy + 12)}" fill="#3e2166" stroke="#7a5ecc" stroke-width="1.5"/>`;
+  inner += `<ellipse cx="${n1(ix)}" cy="${n1(iy)}" rx="34" ry="8" fill="#8272e0"/>`;
   inner += `<line x1="${n1(ix + 6)}" y1="${n1(iy)}" x2="${n1(ix + 6)}" y2="${n1(iy - 16)}" stroke="#e8e8e8" stroke-width="1.5"/>`;
   inner += `<polygon points="${n1(ix + 6)},${n1(iy - 16)} ${n1(ix + 15)},${n1(iy - 13)} ${n1(ix + 6)},${n1(iy - 10)}" fill="#ff3b3b"/>`;
   return frame(W, H, inner, ['#05030c', '#160e2e'], gid);

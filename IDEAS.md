@@ -510,6 +510,19 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-cetus-void-glow** — the two worlds built to glow were the two that didn't
+  (`docs/decisions/render.md`). Void and Cetus share one design idea — off the cut turf is the open deep,
+  so the player is looking at a LIT SHAPE floating in it — and the game was tinting a slab and drawing a
+  line round it. Measured on the drawn map they were the least vibrant worlds in the game (colourfulness:
+  void 31.7 vs verdant 52.4; cetus's fairway the least chromatic turf of any non-grey world at OKLab
+  C 0.083), and the entire emissive kit was two flat rgba rings in a greyish periwinkle, void-only, sized
+  in fixed pixels. Now a `WORLD_GLOW` ROW per luminous world (`style/glow.ts`, no row ⇒ no prims ⇒ every
+  other world byte-for-byte): a graded outward bloom with no outer edge to find, a neon rim of stacked
+  strokes along the SAME silhouette the ink uses, and an inner glow on the green — which burns brightest,
+  because on a landmark-less world it is the shape the eye must find first. Reach in YARDS, chroma bought
+  at UNCHANGED lightness (a vibrant dark world, not a brighter one — a glow reads by contrast). Cetus
+  48.6 → 60.7 colourfulness, void chroma 0.199 → 0.238. New rig `scripts/biome-vibrance.mjs`; guarded by
+  `tests/biome-glow.test.ts` (incl. a chroma floor, so they can't wash out again).
 - **GS-fairway-silhouette** — every piece of fairway is outlined, and nothing is outlined where fairway
   meets fairway (`docs/decisions/render.md`). The ink edge was stamped on the FIRST fairway polygon only —
   a real fix for the green flare slashing its ring back across the corridor, which left every OTHER piece
