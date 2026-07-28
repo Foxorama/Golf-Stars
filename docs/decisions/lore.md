@@ -213,6 +213,60 @@ Two star-map reports from the same session, both about a marker promising someth
   open up — worth a pill), and `storyWorldMarker` ranks an actionable quest above the qualifier flag but a
   pending hint BELOW it: a marker is a call to action, and the live objective always wins the glyph.
 
+## GS-story-neutral-address — the protagonist's gender is the PLAYER's (2026-07-28)
+A play-test report, playing as Bo (they/them): *"got this dialogue screen from Huang-Woo after not
+choosing Huang-Woo in the first two sigil events. Is it intentional that the dialogue is saying 'Big
+Man's' to Bo who is they/them, or is that accidentally misgendering Bo?"* Accidental.
+
+**Why the existing rule didn't cover it.** `storyCast.ts` has carried a misgendering-proof default since
+the cast shipped: every friend speaks in FIRST PERSON, so their own pronouns never need inflecting and
+the UI refers to them by name. That is a real rule and it held — for how a character talks about
+*themselves*. The protagonist, though, is a PICK (Feather she/her · Woo he/she/they · Larry he/him · Bo
+they/them), and nothing covered how a character talks **to you**. Sweeping every player-facing story and
+lore module turned up three, in three different shapes of file:
+
+| Where | Was | Now |
+| --- | --- | --- |
+| `storyBetrayal.ts` — Woo's stage-1 `overlooked` beat | "Go on, get your rest. **Big man's** got a big round." | "**Big name's** got a big round." |
+| `lore.ts` — `story-venoma-herald` beat TITLE | "Welcome, **Sister**" | "Welcome, **Darling**" |
+| `parrotBar.ts` — the Ch.3 bar greeting | "A captain should know **his** crew." | "**their** crew" |
+
+The Woo line lands in a scene specifically about a friend feeling unseen, which is the worst possible
+place to tell the player they're someone else. Venoma's is the Coil taking you in. The Parrot's is a
+different shape again — not address but the **generic masculine**, an indefinite role the player occupies
+carrying "his" as though that were neutral. All three replacements are register-preserving: "big name" is
+what a hype man reaches for anyway, "Darling" is how the Viper already purrs at Woo two modules over, and
+"their crew" reads identically.
+
+**What was NOT changed, and why.** Third-person copy about an NPC is correctly gendered and must stay —
+Voss ("a gaunt man in a coat of shed scale"), Brother Ouros, Sister Ecdysis, characters about themselves
+(Woo's "HYPE MAN", Ecdysis's "somebody's daughter", Aldous's "beat the old man"), the Parrot's
+spirit-brother, and Driver Dan's ship: "the old girl" is the sailor's idiom for a vessel. The 49
+unanchored third-person pronouns in story copy were checked individually; every one resolves to a named
+NPC and none stands in for the player. The Parrot's own line was the near-miss that reads like a player
+reference and isn't — the Parrot IS the captain (the adjacent greeting says "your captain talks"), so it
+was fixed for inclusivity, not because "his" pointed at you.
+
+**The guard, and why it is three passes.** Each bug would have escaped a guard built for the previous one:
+1. **WALK** the betrayal-voice accessors — every golfer plus the generic fallbacks, 200+ lines. Proves
+   what actually RENDERS, and reaches fallback copy no text scan can see.
+2. **Vocative SCAN** of the story/lore modules' comment-stripped source. Bug two was a beat *title*, which
+   no accessor walk touches, and it covers new rows the moment they are written.
+3. **Generic-masculine SCAN** of the whole `sim`/`app`/`render` surface. Bug three lived in the bar, not in
+   a beat — this one is not a story problem, it is a copy problem.
+
+Precision matters more than reach here, because a noisy guard gets deleted. The vocative patterns need
+either an address-shaped adjective ("big man", never "the man") or an honorific in vocative position (end
+of string, or followed by punctuation), so "Brother Ouros" and "a gaunt man in a coat" don't trip; a
+hyphen lookbehind keeps `spirit-brother` and the id `lore-brother` out. The generic-masculine pattern is
+bounded to one sentence and ~90 characters so a later, unrelated pronoun can't reach back. The five
+genuine exceptions are an allowlist where **each entry names whose line it is** — an allowlist entry is a
+claim about a referent, not a mute suppression.
+
+⚠️ When you write a line that speaks TO the player, the question is not "is this word rude" — it is
+"does this word decide something the player already decided". `champion`, `friend`, `mate`, `kid`,
+`big name` all work for every protagonist. Guarded by `tests/neutral-address.test.ts`.
+
 ### Guards
 - `tests/lore.test.ts` — the parrot beat's trigger (fires only for derelict + parrot, once), its
   `effects`, the portrait, and the reducer flow (dismiss grants the Firebird + arms foresight; the boon

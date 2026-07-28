@@ -385,6 +385,19 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     clubhouse deck AND the ship lounge (you can't talk to them anywhere) — their hat lies abandoned on the
     clubhouse floor where they stood, until you face them, corrupted, at the Ch.5 shrine. Pure render +
     predicate; zero sim rng, no save bump. Guards: `tests/story-betrayal.test.ts` + `tests/story-cast.test.ts`.
+  - **THE PROTAGONIST'S GENDER IS THE PLAYER'S, AND NO COPY MAY ASSUME IT** (GS-story-neutral-address).
+    The hero is a PICK — Feather she/her · Woo he/she/they · Larry he/him · Bo they/them — so a line that
+    genders them misgenders somebody. `storyCast.ts`'s first-person rule only covers how a character speaks
+    about THEMSELVES; the gap was how they speak TO YOU, and three shipped: Woo's `overlooked` beat
+    ("Big man's got a big round"), Venoma's Herald welcome TITLED "Welcome, Sister", and the Parrot's bar
+    greeting ("A captain should know his crew"). TWO SHAPES to watch — a gendered **VOCATIVE** aimed at the
+    player, and a **GENERIC MASCULINE** on an indefinite role the player occupies (*a captain*, *a golfer*).
+    Third-person copy ABOUT an NPC is correctly gendered and STAYS (Voss, Brother Ouros, Sister Ecdysis, and
+    Dan's ship "the old girl" — a vessel, not a person). Machine-checked by `tests/neutral-address.test.ts`
+    in three passes: a WALK of the betrayal-voice accessors (what renders, fallbacks included), a vocative
+    SCAN of the story/lore modules' source (a row nobody wired an accessor for — bug two was a beat TITLE),
+    and a generic-masculine SCAN of the WHOLE sim/app/render surface (bug three was in the bar, not a beat).
+    Exceptions are an allowlist that NAMES whose line each one is — if you add one, say who.
 
 - **Putting** — `docs/decisions/putting.md`
   - Manual pace-meter by default; AUTO only via the Penelope Putter caddy (`takePutt(…, control?)`;
