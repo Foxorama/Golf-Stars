@@ -1717,10 +1717,11 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
     // Tapping the meter OR the Putt button captures the pace. Full-bleed: the map fills the screen,
     // the meter + Putt float in a bottom panel.
     // The putt state mounts the SAME frame as the aim state (GS-hud-frame). Row 1 is the adjuster
-    // row the club cycler occupies while aiming — here its ◄/► nudge the AIM instead of the club, so
+    // row the club cycler occupied while aiming — here its ◄/► nudge the AIM instead of the club, so
     // the two most-tapped buttons on the screen never move between states. Row 2 is the gauge slot
     // (the pace meter takes the power bar's place), row 3 the read, and the commit button is last, so
-    // it lands at the same y as ⛳/🏌 in every other state.
+    // it lands at the same y as ⛳/🏌 in every other state. GS-putt-panel restyled all three into the
+    // frame's own language — this is the one state that still carries rows, and it used to look it.
     return playFrameHTML({
       mode: 'putt',
       map: `<div class="gs-bigmap" data-weather="putt">${puttSvg}</div>`,
@@ -1732,8 +1733,13 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
       }),
       rows: [
         puttAimRow(breakYd, puttAim, reads, doubleBreak, fringePutt),
-        `<div id="puttmeter"></div>`,
-        `<div class="gs-legend-line">${puttBreakLine(breakYd, doubleBreak)} <span style="opacity:.7;">· ${fringePutt ? 'from the fringe · ' : ''}aim it off, then tap the meter in the green <b>MAKE</b> band.${puttReadFrac < 0.999 ? ` Your read <b>ends at ${Math.round(puttReadRange)}y</b>.` : ''}</span></div>`,
+        `<div id="puttmeter" class="gs-puttmeter"></div>`,
+        // The NOTE line, not a paragraph (GS-putt-panel). It used to run three lines of prose that
+        // re-taught the controls every single putt — "aim it off, then tap the meter in the green
+        // MAKE band" — which is a tutorial, and the meter now says TAP TO STOP on the thing you tap.
+        // What is left is the READ: the break the map draws but does not number, and where the
+        // caddy's confident line runs out.
+        `<div class="gs-puttnote">${puttBreakLine(breakYd, doubleBreak)}${fringePutt ? ' · from the fringe' : ''}${puttReadFrac < 0.999 ? ` · read ends <b>${Math.round(puttReadRange)}y</b>` : ''}</div>`,
       ],
       commit: `<button class="gs-btn gs-btn--primary" data-putt-commit="1">⛳ Putt</button>`,
       // The caddy keeps its slot on the green even when they have no read here (a distance/guard
@@ -3714,8 +3720,10 @@ function render(): void {
       const puttDist = dist(state.play.ball, pinOf(state.play.hole));
       const band = (skill.manualBand ?? DEFAULT_MANUAL_BAND) * puttBandDistanceFactor(puttDist, skill.puttRange ?? DEFAULT_PUTT_RANGE);
       // Fit the meter to its container so it never overflows a narrow phone (it mounts at a
-      // fixed px width); clamp so it stays usable on tiny and tablet-wide screens alike.
-      const meterW = Math.max(240, Math.min(420, meterEl.clientWidth || 300));
+      // fixed px width); clamp so it stays usable on tiny and tablet-wide screens alike. The floor
+      // is BELOW the panel's real inner width on a 390px phone (~230px) — at 240 the canvas hung a
+      // few pixels over the glass on every phone in the range this game is played on.
+      const meterW = Math.max(200, Math.min(420, meterEl.clientWidth || 300));
       puttMeter = mountPuttMeter(meterEl, {
         width: meterW,
         band,

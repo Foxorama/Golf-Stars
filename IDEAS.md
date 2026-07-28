@@ -132,12 +132,12 @@ threshold, or a trim rather than a drop. Wants its own PR + a balance re-measure
 **GS-hud-frame-2 — the frame's remaining polish** *(follow-on from the shipped frame, small)*
 The persistent frame landed (see Done). Left on the table, all cosmetic and none blocking:
 - The controls panel's TOP edge still rises on the putt state (a pace meter is genuinely taller than a
-  power bar). The floor is fixed, which is what keeps the buttons still — but a designed empty gauge slot
-  on the aim states would make the panel one height everywhere, at the cost of map. Wants eyes-on play
-  before deciding it's worth the pixels.
-- The top info bar is four lines on a par-4 with a shape + width tag. Now that it no longer reflows, the
-  next question is whether it should be two dense lines instead.
+  power bar), and since GS-hud-bag the aim states have NO panel at all, so the step is now from a pill to a
+  full panel. GS-putt-panel took ~40px off that step; the floor is fixed either way, which is what keeps the
+  buttons still. Closing the gap entirely would mean a designed empty gauge slot on the aim states — paid
+  for in map. Wants eyes-on play before deciding it's worth the pixels.
 - Landscape / tablet has had no pass: the frame is phone-portrait tuned.
+  *(The "top info bar is four lines" bullet is retired — GS-hud-compass made it one row of pods.)*
 
 **Deferred out of the 2026-07-25 quick-win batch** (both looked small, both are bigger than they read):
 - **GS-story-briefing-beat** — the first-visit Parrot briefing currently advertises itself with a gold ❗ on
@@ -572,6 +572,18 @@ Terse log — full story in the linked report / `docs/decisions/` / git history.
   tight turf miter so a star green's notches can't spike it. Apron widths in by a third: the broad run-off
   is the FLARE, a real playable feature, and two art passes describing the same yards of approach is what
   read as stacked stickers.
+- **GS-putt-panel** — the putt section joined the screen it lives on (`docs/decisions/ui-intro.md`). After
+  GS-hud-bag emptied the aim panel and GS-hud-compass podded the top bar, the putt was the one state still
+  carrying rows — and it carried them in the deleted screen's chrome: the club cycler's `.gs-clubrow` slabs
+  (a class that had quietly become putt-only), a flat private-palette canvas hard-coding `system-ui`, and
+  THREE LINES of prose re-teaching the controls every putt. Now: the aim is a POD in `.gs-hudx__pod`'s
+  proportions (the caddy credit rides its caption), the ◄/► are round-button-weight nudges, the meter is a
+  lit instrument with a rounded well and a chevron marker, and the note is a caption — because the
+  instruction moved ONTO the meter (`TAP TO STOP`), which is what let the prose go. Panel ~225 → **~185px**.
+  Strictly a repaint: the sweep period, pace mapping and make band are contract-4 balance and are
+  machine-checked unchanged. Two bugs fixed on the way past — the canvas now resolves `--gs-font` (a
+  hard-coded family in a canvas is a label Readable-text can never reach) and its width floor dropped 240 →
+  200, since it had been overhanging the glass on every phone in range.
 - **GS-hud-gear-reads** — the HUD stopped quoting a bare bag (`docs/decisions/ui-intro.md`). The lie chip
   printed the raw LIE TABLE and the wind read printed the raw SKY, so a bunker said "−50% carry · wild" to
   a player whose escape caddy had halved it and a 45%-resist ball was shown the 20mph gale it flies through

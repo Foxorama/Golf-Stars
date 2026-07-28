@@ -891,6 +891,22 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     `tests/hud-gear-reads.test.ts` (expectations derived from the sim's functions, never hard-coded).
     ⚠️ When adding a HUD number, ask which loadout field the sim applies to it — `lieChip` is pure
     (`lie`, `relief`) precisely so the answer is visible in its signature.
+  - **THE PUTT IS THE ONE STATE WITH ROWS, AND IT MUST LOOK LIKE THE SCREEN IT SITS ON**
+    (GS-putt-panel). GS-hud-bag deleted the aim panel's rows, which left the putt panel wearing the
+    club cycler's chrome (`.gs-clubrow`'s heavy slabs — by then a putt-only class), a flat private-palette
+    canvas, and THREE LINES OF PROSE re-teaching the controls every putt, beside a top bar that had just
+    compressed sentences into pods. It now speaks the frame's language: the aim is a POD
+    (`.gs-hudx__pod`'s proportions; the caddy credit rides its caption), the ◄/► are round-button-weight
+    nudges (never commit weight — a nudge must not out-shout ⛳ Putt), the meter is a lit instrument, and
+    the note is a caption. **An instruction printed ON the control it instructs costs no row** — the
+    meter says `TAP TO STOP`, which is what let the prose go. Panel ~225 → ~185px. Three rules: a
+    styling pass may NOT touch the sweep period / pace mapping / make band (contract-4 balance, the
+    harness's, not a repaint's); **a canvas must fetch the tokens itself** (`--gs-font` +
+    `--gs-accent`/`--gs-ink`/`--gs-dim` off its mounted element — a hard-coded family in a canvas is a
+    label Readable-text can never reach, and it carries `role="button"` + a name because it IS a
+    control); and the meter's width floor sits UNDER the panel's real inner width (240 → 200, it was
+    overhanging the glass on every phone). Guarded by `tests/putt-panel.test.ts`; eyes-on
+    `scripts/putt-panel-preview.mjs`.
   - **THE HUD FLOATS OVER THE GOLF, SO THE CAMERA MUST FRAME AROUND IT** (GS-play-hud-space). The camera
     biases the ball as LOW as the control panel allows and no lower (`project.ts clearOfPanelBias`; a low
     ball is what fills the frame with the shot AHEAD, so "just centre it" is the wrong fix), and the putt

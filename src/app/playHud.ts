@@ -34,15 +34,21 @@ function breakText(breakYd: number, dbl: boolean): string {
   return Math.abs(breakYd) < 0.2 ? 'flat' : `breaks ${yds(breakYd)}`;
 }
 
+/** The aim value as the panel prints it — "Straight", or the borrow in yards. */
+const aimValue = (aim: number): string => (Math.abs(aim) < 0.2 ? 'Straight' : yds(aim));
+
 /** The aim readout inside the adjuster row — split out so an aim nudge can update JUST this span
- *  in place (the ◄/► buttons keep their listeners; see puttAimRefresh). It sits in the slot the club
- *  name occupies while aiming (GS-hud-frame), so it must fit one line between the ◄/► buttons: it
- *  carries the AIM alone and the slope read moved to the row below (which is static — the break
- *  doesn't change when you re-aim, only your line through it does). */
+ *  in place (the ◄/► buttons keep their listeners; see puttAimRefresh). It sits between the ◄/►
+ *  buttons and carries the AIM alone; the slope read lives on the note line below (which is static —
+ *  the break doesn't change when you re-aim, only your line through it does).
+ *
+ *  Shape: the instrument cluster's POD (GS-putt-panel) — a big value over a small all-caps caption,
+ *  the same one shape every other number on the play screen is printed in since GS-hud-compass. The
+ *  old row said "Aim **straight**" as a sentence, which was the last inline label on the screen. */
 export function puttAimLabel(breakYd: number, aim: number, dbl = false): string {
   void breakYd;
   void dbl;
-  return `Aim <b>${Math.abs(aim) < 0.2 ? 'straight' : yds(aim)}</b>`;
+  return `<b>${aimValue(aim)}</b><span>your aim</span>`;
 }
 
 /** The slope's read, for the putt panel's read row. Static for the putt — the break is the green's,
@@ -70,29 +76,36 @@ function greenReadReader(): string {
 }
 
 /**
- * The putt screen's ADJUSTER row (GS-greens-3 · GS-hud-frame): the slope's break + ◄/► aim controls
- * (or the caddy's read), built in the SAME `.gs-clubrow` shape the club cycler uses while aiming — so
- * the two most-tapped buttons on the play screen stay in the same place all the way round the hole.
+ * The putt screen's ADJUSTER row (GS-greens-3 · GS-hud-frame · GS-putt-panel): the aim read flanked
+ * by its ◄/► nudges, in the row the club cycler used to occupy while aiming — so the two most-tapped
+ * buttons on the play screen stay in the same place all the way round the hole.
  * `breakYd`/`aim` are signed (+ = right of the line); the player aims to cancel the break.
  * A green-reading caddy (Mystic Mole) has already found the line, so its buttons render disabled
  * rather than disappearing.
+ *
+ * GS-hud-bag took the club cycler off the screen, which left this row as the last thing wearing the
+ * old `.gs-clubrow` chrome — two heavy dark slabs around a sentence, beside a top bar and a commit
+ * pill that had both moved on. It now speaks the same language as the rest of the frame: a pod for
+ * the value, quiet round nudges for the controls, and its own `.gs-putt*` namespace (the play
+ * screen's, never another screen's — see the #353 `.gs-hud` regression).
  */
 export function puttAimRow(breakYd: number, aim: number, reads: boolean, dbl = false, fringe = false): string {
   const toggle = fringe
-    ? `<button class="gs-btn gs-mini" data-putt-toggle="0" title="Chip instead of putting">🏌</button>`
+    ? `<button class="gs-puttnudge gs-puttnudge--alt" data-putt-toggle="0" title="Chip instead of putting" aria-label="Chip instead of putting">🏌</button>`
     : '';
-  if (reads) {
-    return `<div class="gs-clubrow">
-        <button class="gs-btn" disabled aria-hidden="true">◄</button>
-        <span class="gs-clubname gs-clubname--read" id="puttaimlabel">${greenReadReader()} reads <b>${Math.abs(aim) < 0.2 ? 'straight' : yds(aim)}</b></span>
-        <button class="gs-btn" disabled aria-hidden="true">►</button>
-        ${toggle}
-      </div>`;
-  }
-  return `<div class="gs-clubrow">
-      <button class="gs-btn" data-putt-aim="-1" title="Aim left">◄</button>
-      <span class="gs-clubname gs-clubname--read" id="puttaimlabel">${puttAimLabel(breakYd, aim, dbl)}</span>
-      <button class="gs-btn" data-putt-aim="1" title="Aim right">►</button>
+  // A caddy who has read the green owns the line: the nudges stay in place, disabled, and the
+  // caption names whoever found it (GS-story-caddy-read).
+  const label = reads
+    ? `<b>${aimValue(aim)}</b><span>${greenReadReader()} reads</span>`
+    : puttAimLabel(breakYd, aim, dbl);
+  const nudge = (dir: -1 | 1, glyph: string, label2: string): string =>
+    reads
+      ? `<button class="gs-puttnudge" disabled aria-hidden="true">${glyph}</button>`
+      : `<button class="gs-puttnudge" data-putt-aim="${dir}" title="${label2}" aria-label="${label2}">${glyph}</button>`;
+  return `<div class="gs-puttrow">
+      ${nudge(-1, '◄', 'Aim left')}
+      <span class="gs-puttread" id="puttaimlabel">${label}</span>
+      ${nudge(1, '►', 'Aim right')}
       ${toggle}
     </div>`;
 }

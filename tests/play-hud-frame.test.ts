@@ -65,7 +65,7 @@ describe('the persistent play HUD frame (GS-hud-frame)', () => {
       mode,
       map: '<div class="gs-bigmap"></div>',
       top: '<div class="gs-hud gs-hud-top gs-glass"></div>',
-      rows: mode === 'putt' ? ['<div class="gs-clubrow"></div>'] : [],
+      rows: mode === 'putt' ? ['<div class="gs-puttrow"></div>'] : [],
       commit: '<button class="gs-btn gs-btn--primary">go</button>',
       caddyId,
       caddyOffDuty,

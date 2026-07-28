@@ -749,6 +749,82 @@ the attribute and passes on a chip that never changed — strip the tags first.
 
 ---
 
+## GS-putt-panel: the putt section joins the screen it lives on (2026-07-28)
+
+### The report
+
+A play-test screenshot on the green, after GS-hud-bag and GS-hud-compass shipped: *"we updated the
+main club swing section and the top panel, but we haven't updated the putt section down the bottom of
+the putting window yet and it kind of sticks out like a sore thumb now."*
+
+Exactly right, and the reason is structural rather than aesthetic. GS-hud-bag deleted the aim panel's
+rows — the club cycler, the power bar, the spray legend — so on every OTHER play state the bottom of
+the screen is one glass pill. The putt is the one state that legitimately keeps rows (its pace meter
+and break read are the only readouts the map does not draw), and it kept them **in the chrome of the
+screen that no longer exists**:
+
+- the aim line was `.gs-clubrow` — the CLUB CYCLER's shape, two heavy 16px slabs flanking a sentence.
+  Its only remaining user was the putt, i.e. the whole class had become putt-only by accident;
+- the pace meter was a flat, hard-cornered canvas in a private palette and a hard-coded `system-ui`,
+  drawn to the standards of the HUD it was designed beside years earlier;
+- under it ran **three lines of prose** — "Slope breaks 1.9yd left · aim it off, then tap the meter in
+  the green MAKE band. Your read ends at 7y." — a tutorial re-taught on every putt of every round,
+  beside a top bar that had just compressed six rows of sentences into pods.
+
+### The repaint
+
+One language, the frame's own:
+
+- **the aim is a POD** (`.gs-puttread`) — big value over a small all-caps caption, `.gs-hudx__pod`'s
+  proportions exactly, because that is now the shape of every number on the play screen. "Aim
+  **straight**" became **Straight** / `YOUR AIM`; the caddy-read variant keeps its credit in the
+  caption (**1.2yd left** / `🔮 MOLE READS`), so GS-story-caddy-read is untouched;
+- **the nudges are controls, not slabs** (`.gs-puttnudge`) — the weight of the map-nav / aim-mode
+  round buttons, never the commit button's: a nudge is a repeatable adjustment and must not out-shout
+  ⛳ Putt. The fringe's chip toggle is a narrower `--alt` variant, because it is not an aim control and
+  three full-width buttons leave the pod too little room to print "12.4yd right";
+- **the meter is an instrument** — rounded well, cool at the SHORT end and warm at the LONG end so the
+  two ways of missing read as different places, a LIT make band (glow + sheen, clipped to the well so
+  the rounded ends survive), a capsule marker with a chevron that freezes green or red on the tap;
+- **the prose is a caption** (`.gs-puttnote`) — the break the map draws but does not number, and where
+  the read runs out. The instruction moved ONTO the meter as `TAP TO STOP`, which is the whole trick:
+  an instruction printed on the control it instructs costs no row at all.
+
+### Three rules worth keeping
+
+1. **A styling pass may not touch a balance lever.** The sweep period, the pace→x mapping and the make
+   band are contract-4 property (CLAUDE.md explicitly holds the putt meter out of feel passes: slowing
+   the sweep or widening the band is a difficulty change and belongs to the death-spiral harness).
+   Every number reaching `onCommit` is byte-for-byte what it was, and `tests/putt-panel.test.ts`
+   asserts the meter still reads its band, its period and its scale from the sim rather than scaling
+   them locally.
+2. **A canvas is invisible to the stylesheet, so it has to fetch the tokens itself.** The meter now
+   resolves `--gs-font` (plus `--gs-accent`/`--gs-ink`/`--gs-dim`) off its mounted element. A
+   hard-coded `system-ui` in a canvas is a label the Readable-text toggle can never reach — the same
+   class of bug as GS-a11y-readable-text's settings sheet in Times, in the one place CSS cannot fix.
+   It also carries `role="button"` + a name: this canvas is a control, not decoration.
+3. **The meter's width floor must sit UNDER the panel's real inner width.** It was clamped to
+   `max(240, …)` against a ~230px inner panel on a 390px phone, so the canvas hung a few pixels over
+   the glass on every phone in range. 240 → 200.
+
+### What it bought
+
+Panel ~225 → ~185px, i.e. ~40px of green back on the one screen where the player is studying the
+turf, with nothing removed: the break, the read range, the fringe toggle and the caddy credit all
+still print. `.gs-clubrow` / `.gs-clubname` / `.gs-legend-line` are retired — rules nothing emitted.
+
+### Guards
+
+`tests/putt-panel.test.ts` (pure): the pod shape; the surgical-refresh contract (ONE `#puttaimlabel`
+span, so an aim nudge never remounts the meter mid-putt); both nudges mounted and merely disabled for
+a caddy read (GS-hud-frame's no-removal rule); an `aria-label` on every glyph-only control; the prose
+row gone and `TAP TO STOP` present; every emitted class has a rule and the retired ones have neither
+rule nor emitter; the 44px touch target; and the balance + token rules above. Eyes-on:
+`scripts/putt-panel-preview.mjs` — three phone-width columns (plain putt, pinched band, caddy-read
+fringe) built through the REAL frame builders and the REAL stylesheet lifted out of `index.html`.
+
+---
+
 ## Migrated from CLAUDE.md — System-index bullets (2026-07-23 refactor)
 
 > These are the verbatim terse System-index bullets moved out of `CLAUDE.md` when it was
