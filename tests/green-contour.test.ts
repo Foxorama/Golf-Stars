@@ -274,6 +274,68 @@ describe('green roll-out reads the LOCAL contour field (GS-green-contour-2)', ()
     expect(dist(planeOnly.rest, [0, 0])).toBeLessThan(1.5); // rests near the drop, despite the steep plane
   });
 
+  /** The CREEP leg of a resolved roll-out: the chord from where the ball came to rest (`creepFrom`,
+   *  travelled distance) to where gravity left it. This is exactly the stretch `playView` draws as its
+   *  own slow phase after the pause, so it is the vector the player watches. */
+  const creepLeg = (r: { roll: number; rest: Vec; path?: Vec[]; creepFrom?: number }): Vec | undefined => {
+    if (r.creepFrom === undefined || !r.path || r.path.length < 2) return undefined;
+    const total = Math.abs(r.roll);
+    let len = 0;
+    for (let i = 1; i < r.path.length; i++) len += dist(r.path[i - 1]!, r.path[i]!);
+    let left = total > 1e-9 ? len * (r.creepFrom / total) : len;
+    let at: Vec = r.path[0]!;
+    for (let i = 1; i < r.path.length; i++) {
+      const seg = dist(r.path[i - 1]!, r.path[i]!);
+      if (left <= seg || i === r.path.length - 1) {
+        const f = seg > 1e-9 ? Math.min(1, left / seg) : 1;
+        at = [r.path[i - 1]![0] + (r.path[i]![0] - r.path[i - 1]![0]) * f, r.path[i - 1]![1] + (r.path[i]![1] - r.path[i - 1]![1]) * f];
+        break;
+      }
+      left -= seg;
+    }
+    return [r.rest[0] - at[0], r.rest[1] - at[1]];
+  };
+  const angleDeg = (a: Vec, b: Vec): number => {
+    const la = Math.hypot(a[0], a[1]) || 1;
+    const lb = Math.hypot(b[0], b[1]) || 1;
+    const d = Math.max(-1, Math.min(1, (a[0] * b[0] + a[1] * b[1]) / (la * lb)));
+    return (Math.acos(d) * 180) / Math.PI;
+  };
+
+  it('gravity creep runs down the DRAWN fall line — plane + sculpt, never the sculpt alone (GS-creep-fallline)', () => {
+    // WHAT SHEDS THE BALL AND WHICH WAY IT GOES ARE TWO DIFFERENT QUESTIONS. The mound's flank is the
+    // bank the ball cannot rest on (it sheds toward −y); the green's PLANE tilts hard toward +x. Once
+    // the ball is loose, gravity takes it down the surface it is lying on — which is the field the
+    // isolines, the terrace shading, the fall-line arrows, the putt break and the roll curl all sample.
+    // Reading the sculpt ALONE for the direction (the original pass) put the creep 65° away from the
+    // drawn contours on average and outright uphill on one creep in seven.
+    const plane: Vec = [1.2, 0];
+    const drop: Vec = [0, 6]; // the mound's near flank
+    const r = rollOut(pad(mound, plane), drop, [0, 1], 0.5, 'green');
+    const leg = creepLeg(r)!;
+    expect(leg).toBeDefined();
+    expect(Math.hypot(leg[0], leg[1])).toBeGreaterThan(1); // it genuinely crept
+    const restedAt: Vec = [r.rest[0] - leg[0], r.rest[1] - leg[1]];
+    // The DRAWN field and the sculpt-only field point ~65° apart here, so this discriminates.
+    const drawn = greenSlopeAt(restedAt, plane, mound);
+    const sculpt = greenSlopeAt(restedAt, undefined, mound);
+    expect(angleDeg(drawn, sculpt)).toBeGreaterThan(45);
+    expect(angleDeg(leg, drawn)).toBeLessThan(30); // …and the ball follows the picture
+    expect(angleDeg(leg, sculpt)).toBeGreaterThan(45);
+  });
+
+  it('gravity creep needs a downhill to shed the ball TO: where the plane cancels the sculpt, it rests (GS-creep-fallline)', () => {
+    // The sculpt at the drop point sheds toward −y at ~0.56; a plane of exactly that tilting +y leaves
+    // the DRAWN ground flat there. The bank is steep enough to break the ball loose, but there is
+    // nowhere downhill for it to go, so it stays put — the surface field gates the creep too.
+    const r = rollOut(pad(mound, [0, 0.56]), [0, 6], [0, 1], 0.5, 'green');
+    expect(r.creepFrom).toBeUndefined();
+    // …and the pairing rule holds in the other direction: a steep PLANE with no sculpt under the ball
+    // still never sheds it (a green's uniform tilt holds a ball, exactly as before).
+    const farLobe: GreenLobe[] = [{ c: [1000, 1000], r: 4, h: 0.5 }];
+    expect(rollOut(pad(farLobe, [1.2, 0]), [0, 0], [0, 1], 0.5, 'green').creepFrom).toBeUndefined();
+  });
+
   it('gravity creep never carries the ball OFF the green (the collar catches it)', () => {
     // A small green whose downhill flank runs straight off the edge: the creep must stop inside.
     const smallGreen: Hole = {

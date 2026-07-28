@@ -559,6 +559,26 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     derelict bug was. ⚠️ The CURL was investigated and EXONERATED: its per-step bend never overshoots the
     fall line at the shipped constants, so don't "fix" it. A holed Chipinski chip-in still kinks where its
     trickle joins (GS-chipin-roll chose to walk that straight through) — see IDEAS.
+  - **WHAT SHEDS THE BALL AND WHICH WAY IT GOES ARE TWO DIFFERENT QUESTIONS** (GS-creep-fallline). The
+    creep read `greenSlopeAt(p, undefined, lobes)` — the SCULPT with no plane — for its DIRECTION as well
+    as its arming, making it the one thing on a green moving down a hill that is not the hill the player
+    is looking at: the isolines, terrace shading, fall-line arrows, putt break, chip-in bow, roll curl and
+    first-bounce deflect ALL sample plane+lobes. Measured over 832 real creeps
+    (`scripts/creep-census.ts`), the plane's tilt at the rest point averages **0.546** against the
+    sculpt's **0.386**, so the plane usually WINS and the creep ran **60–120° across the drawn contours on
+    33%** of creeps and **outright uphill (≥120°) on 14%**, mean disagreement 65° — up to five yards of
+    slow, deliberate, wrong-way trickle at the putt camera. The report *"sometimes it rolls straight
+    across or against the contours after the backspin and it looks like a proper bug"*: **47% → 0%**, mean
+    2.1°. The arming stays the SCULPT (a green's uniform tilt still holds a ball, so the SET of balls that
+    creep is unchanged — arming on the full field would have every ball on every tilted green trickling);
+    the DIRECTION is the surface (`greenSlopeAt(p, slope, lobes)`), gated by the same `CREEP_MIN` so a
+    plane that CANCELS the sculpt leaves the ball at rest rather than creeping down a flat. Zero rng,
+    zero fixture re-pins; harness 0.6406 → **0.6358** toPar/hole, 8.02% → **7.95%** floor-hits. ⚠️ The
+    census must arm a spin build to see the reported case at all — since GS-backspin-optin a plain wedge
+    never checks, so 0 of 5,870 stock auto shots creep after a backspin. Guarded by
+    `tests/green-contour.test.ts`. **66% of creeps still stop on the 5yd `CREEP_MAX` budget rather than
+    because the ground flattened** (61.7% before, i.e. pre-existing) — the "flow" half of the report, a
+    friction-vs-slope tuning question with its own balance run: `GS-creep-friction` in IDEAS.
   - **BOUNCE AND RUN READ PER CLUB  - **THE RUN-OUT HAS ITS OWN TIME BASE, AND PRETENDING OTHERWISE MADE THE BOUNCE INVISIBLE**
     (GS-landing-real, `runoutTimeScale`). The drawn FLIGHT is **~8× real time** — 750ms for a 250yd
     drive that really takes six seconds — so GS-runout-feel's "no velocity step from strike to rest"

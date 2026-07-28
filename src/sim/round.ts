@@ -204,13 +204,32 @@ const LAND_KICK_MIN = 0.45; // an upslope face can kill at most this much of the
 const LAND_KICK_MAX = 1.6; // a downslope flank can kick on at most this much
 const LAND_DEFLECT_K = 0.5; // how hard the bounce redirects toward the fall line's perp component
 
-/** Gravity CREEP (GS-green-contour-3): the ball cannot REST on a steep piece of the SCULPT — once
- *  the roll energy is spent it trickles on down the LOBE field (the mound/hollow relief; the plane
- *  is the green's uniform tilt, which a ball rests on exactly as before) until the sculpt flattens
- *  below CREEP_MIN, the green's edge catches it (a green-hit never creeps off the putting surface),
- *  or the creep budget is spent — so flanks visibly shed balls and hollows gather them, exactly what
- *  the topo rings say the ground does. */
-const CREEP_MIN = 0.22; // lobe-field steepness below which the ball settles
+/**
+ * Gravity CREEP (GS-green-contour-3): the ball cannot REST on a steep piece of the SCULPT — once the
+ * roll energy is spent it trickles on downhill until the sculpt flattens below `CREEP_MIN`, the green's
+ * edge catches it (a green-hit never creeps off the putting surface), or the creep budget is spent — so
+ * flanks visibly shed balls and hollows gather them, exactly what the topo rings say the ground does.
+ *
+ * WHAT SHEDS THE BALL AND WHICH WAY IT GOES ARE TWO DIFFERENT QUESTIONS (GS-creep-fallline). The
+ * sculpt — the mound/hollow relief — is the local bank that breaks the ball loose; the green's uniform
+ * tilt PLANE holds a ball exactly as before, which is why the arming threshold reads the lobes alone.
+ * But once the ball IS moving, gravity takes it down the surface it is actually lying on, and that is
+ * the whole field: plane + sculpt. The original pass read the lobe field for BOTH, which made the creep
+ * the one thing on a green that disagreed with the ground the player can see — the isolines, the
+ * terrace shading, the fall-line arrows, the putt break and the roll-out curl all sample plane+lobes.
+ * Measured over 832 real creeps (`scripts/creep-census.ts`), the plane's tilt at the rest point
+ * averages 0.546 against the sculpt's 0.386, so the plane usually WINS: the creep ran 60–120° across
+ * the drawn contours on 33% of creeps and outright uphill (≥120°) on another 14%, mean disagreement
+ * 65°, up to 5 yards of slow, deliberate, wrong-way trickle at the putt camera. That is the report
+ * "sometimes it rolls straight across or against the contours after the backspin and it looks like a
+ * proper bug" — and it looked like one because it was one.
+ *
+ * The surface field also has to have a downhill to shed the ball TO: where the plane cancels the
+ * sculpt the drawn ground is flat and the ball belongs at rest, so the same `CREEP_MIN` gates both
+ * samples rather than a second tuning constant. In practice that only ever bites in the cancellation
+ * case, because a green's plane is comfortably steeper than the threshold on its own.
+ */
+const CREEP_MIN = 0.22; // steepness below which the ball settles (of the sculpt, and of the surface)
 const CREEP_STEP = 1.0; // yards per creep step (direction re-read each step, so it curls into hollows)
 const CREEP_MAX = 5; // total creep budget (yards) — a settle, not a second roll-out
 
@@ -534,9 +553,15 @@ export function rollOut(
     let creep = 0;
     let guard2 = 0;
     while (creep < CREEP_MAX - 1e-9 && dist < cap && guard2++ < 12) {
-      const s = greenSlopeAt([px, py], undefined, lobes); // the SCULPT's gradient (no plane)
+      // What SHEDS the ball: the sculpt alone (a green's uniform tilt plane holds a ball as before).
+      const sc = greenSlopeAt([px, py], undefined, lobes); // the SCULPT's gradient (no plane)
+      if (Math.hypot(sc[0], sc[1]) < CREEP_MIN) break;
+      // Which way it GOES: the surface it is lying on — plane + sculpt, the same field the isolines,
+      // the arrows, the putt break and the roll curl read, so the trickle runs down the hill the
+      // player can SEE (GS-creep-fallline).
+      const s = greenSlopeAt([px, py], slope, lobes);
       const m = Math.hypot(s[0], s[1]);
-      if (m < CREEP_MIN) break;
+      if (m < CREEP_MIN) break; // plane cancels sculpt ⇒ the drawn ground is flat here; it rests
       const step = Math.min(CREEP_STEP, CREEP_MAX - creep, cap - dist);
       const nx = px + (s[0] / m) * step;
       const ny = py + (s[1] / m) * step;

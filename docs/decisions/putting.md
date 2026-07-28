@@ -1721,3 +1721,100 @@ Full `npm run check` green (179 files, 2,074 tests). Run-out quality held: invis
 3/40, and run-out durations grew in step with the slower arrivals (a full 7-iron 1017 → 1192ms),
 which is the chain staying continuous rather than a regression. A real shot end to end in the real
 game (`scripts/shot-frames.mjs`, seed 42) passes every check.
+
+---
+
+## GS-creep-fallline — the creep ran down a hill nobody drew (2026-07-28)
+
+**The ask** (playtest): "The ball landing on the green and rolling with backspin and contour plays
+weirdly. In a lot of cases it's perfectly fine and it will backspin, maybe stop for a brief bit and
+then roll down the green contours a bit, could flow slightly better but not the worst thing in the
+world. However sometimes — and frequently enough to do something about — it rolls straight across or
+against the contours after the backspin and it looks like a proper bug."
+
+### The diagnosis
+
+The phase the report describes — *stops for a brief bit, then rolls down the contours* — is the gravity
+CREEP (GS-green-contour-3), drawn as its own pause-then-trickle beat since GS-roll-hairpin. So the
+"good" case and the "bug" case were the SAME code, and the only thing that varied between them was
+which way the ball went. That narrows it to the direction, and the direction had a private field:
+
+```ts
+const s = greenSlopeAt([px, py], undefined, lobes); // the SCULPT's gradient (no plane)
+```
+
+Everything else on a green samples `greenSlopeAt(p, plane, lobes)` — the isolines (`heightFieldAt` with
+the plane), the terrace shading, the fall-line arrow field, the putt break, the chip-in bow, the
+roll-out curl, the first-bounce deflect. The creep read plane-less lobes for **both** the arming
+threshold and the travel direction, which made it the one thing on the putting surface moving down a
+hill that is not the hill the player is looking at. This is the second-description mistake the
+derelict-ship bugs kept being (**there is ONE description of the ground and everything reads it**),
+transplanted onto a green.
+
+The original scope guard is the reason it was written that way, and it is still correct: the plane is
+the green's *uniform tilt*, which holds a ball at rest exactly as it always has — arming on the full
+field would have every ball on every tilted green trickling five yards. But that guard is about **what
+breaks the ball loose**, and it was silently also answering **which way gravity then takes it**.
+
+### The size of it, measured
+
+`scripts/creep-census.ts` plays 40 seeds × 3 holes × all 15 worlds at wildness 1 with a spin build
+armed (`backspinBoost` 0.2 — Fresh-Groove wedges plus a spin card, an ordinary shopped build), reads
+the shipped `ShotLog`, walks each roll path to `creepFrom` exactly as `playView` does, and compares the
+creep's own chord against the drawn fall line at the point the ball came to rest:
+
+| creep vs the DRAWN fall line | before | after |
+|---|---|---|
+| agrees (<30°) | 25.8% | **100%** |
+| 30–60° | 26.8% | 0% |
+| **ACROSS (60–120°)** | **32.8%** | **0%** |
+| **AGAINST (≥120°)** | **14.5%** | **0%** |
+| mean disagreement | 65.4° | **2.1°** |
+
+Why the plane usually won: at the rest point the plane's tilt averages **0.546** against the sculpt's
+**0.386**. So on nearly half of all creeps the ball was drawn sliding sideways across the contour rings,
+or straight up them, for up to five yards — at the putt camera's 7.6–35 px/yd, slowly and deliberately.
+It looked like a bug because it was one.
+
+Note the census had to arm a spin build to see the reported case at all: since GS-backspin-optin a
+plain wedge never checks, so 0 of 5,870 stock auto shots produced a post-backspin creep. The bug is
+not backspin-specific — the same wrong-way trickle fires on a forward approach — but a check leaves the
+ball on the green far more often, and having just watched it travel backwards makes the next wrong-way
+movement much more legible as "a proper bug".
+
+### The fix
+
+Two questions, two fields, in the one loop:
+
+- **What sheds the ball** stays the SCULPT (`greenSlopeAt(p, undefined, lobes) ≥ CREEP_MIN`) — a
+  green's uniform tilt still holds a ball, so the *set* of balls that creep is unchanged.
+- **Which way it goes** is the SURFACE it is lying on (`greenSlopeAt(p, slope, lobes)`) — the field
+  the whole rest of the green already reads.
+
+The surface field is gated by the same `CREEP_MIN` rather than a second constant: where the plane
+cancels the sculpt the drawn ground is flat and the ball belongs at rest. In practice that only bites
+in the cancellation case, because a green's plane clears the threshold on its own.
+
+### Contracts
+
+- **Determinism (1):** zero rng — the creep is a deterministic geometry pass after the energy draw.
+- **auto ≡ interactive (2):** one shared `rollOut`; the interactive helper line (`backspinRoll`) runs
+  the same function, so the drawn read moved with the physics.
+- **No death spiral (4):** toPar/hole **0.6406 → 0.6358**, floor-hits **8.02% → 7.95%** — both the safe
+  direction, both fences unmoved.
+- **The graphic IS the physics (5):** this is the contract the bug broke. The creep now samples the
+  identical call `greenSlopeArt` samples for its arrow field, so the two cannot disagree again.
+
+Full `npm run check` green (185 files, **2,136 tests**) with **zero fixture re-pins** — the creep never
+leaves the green, so a green-hit stays a green-hit and only the putt length moves. Guarded by two new
+blocks in `tests/green-contour.test.ts` (both verified RED against the old code): the creep follows the
+drawn field and not the sculpt-only one on a green where they point 65° apart, and the cancellation
+case rests — paired in the same test with the unchanged rule that a steep plane alone never sheds.
+
+### Known, left alone deliberately
+
+**66% of creeps stop because the 5-yard `CREEP_MAX` budget ran out, not because the ground flattened**
+(61.7% before this change — it is pre-existing, not introduced here). So the ball can halt mid-slope
+for no reason the player can see. That is the "could flow slightly better" half of the report, and it
+is a separate tuning question about friction versus slope with its own balance run: see
+`GS-creep-friction` in IDEAS.
