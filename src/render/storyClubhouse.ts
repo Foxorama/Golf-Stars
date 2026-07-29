@@ -13,6 +13,7 @@
 import { getCharacter, CHARACTERS, type Character } from '../sim/rpg/characters';
 import { golferPreviewSVG } from './apparelArt';
 import { statBar } from './golferCards';
+import type { CampaignTag } from '../sim/rpg/storyRoster';
 
 /** Four feet-anchored floor spots (x%, y%, depth scale) — a gentle arc across the clubhouse floor. Fixed
  *  (no shuffle) so each golfer keeps their place: identity is stable turn to turn. */
@@ -38,9 +39,34 @@ function nameplate(name: string, col: string, active: boolean): string {
       box-shadow:0 0 0 1px #0007,inset 0 0 1px 1px #fff8;"></span>${name}${active ? ' ★' : ''}</span>`;
 }
 
+/**
+ * The CAMPAIGN BADGE over a golfer's head (GS-story-campaign-picker) — "Chp 3" / "Prologue" /
+ * "★ Complete" — so the picker answers "have I got a run going, and with whom?" at a glance, before
+ * you tap anything.
+ *
+ * Passed IN rather than looked up here: the `character` screen is shared with Voyage / Unending /
+ * Star Tour, and a renderer that fetched the roster itself would badge golfers on every mode's picker.
+ * Absent tag ⇒ no badge, which is also exactly what every non-Story caller gets for free.
+ */
+function campaignBadge(tag: CampaignTag): string {
+  const done = tag.kind === 'complete';
+  const bg = done ? 'linear-gradient(180deg,#3b2f10,#241c07)' : 'linear-gradient(180deg,#12212f,#0c1620)';
+  const edge = done ? '#8a6a1e' : '#2c4a63';
+  const ink = done ? '#ffd98a' : '#8fc9ee';
+  return `<span aria-hidden="true" style="position:absolute;left:50%;top:-3.4cqw;transform:translateX(-50%);
+    z-index:2;padding:1px 7px;border-radius:9px;background:${bg};border:1px solid ${edge};
+    box-shadow:0 1px 3px #0009;font-size:clamp(7.5px,1.95cqw,10.5px);font-weight:800;letter-spacing:.02em;
+    color:${ink};white-space:nowrap;">${tag.short}</span>`;
+}
+
 /** One golfer standing in the clubhouse — the figure + nameplate, the whole thing a button that opens their
  *  stats/abilities overlay. Feet anchored at the spot; sized in cqw so it scales with the room. */
-function clubhouseGolferAt(ch: Character, spot: (typeof EARTH_SPOTS)[number], active: boolean): string {
+function clubhouseGolferAt(
+  ch: Character,
+  spot: (typeof EARTH_SPOTS)[number],
+  active: boolean,
+  tag?: CampaignTag,
+): string {
   const action = JSON.stringify({ type: 'storyInspectGolfer', characterId: ch.id });
   const preview = golferPreviewSVG(undefined, undefined, undefined, {
     skin: ch.style.skin,
@@ -56,10 +82,14 @@ function clubhouseGolferAt(ch: Character, spot: (typeof EARTH_SPOTS)[number], ac
   const glow = active
     ? `drop-shadow(0 7px 6px #0008) drop-shadow(0 0 7px ${ch.style.cap}dd)`
     : `drop-shadow(0 6px 5px #0007)`;
+  // The badge carries real information, so it goes in the accessible NAME too — a sighted player reads
+  // "Chp 3" over the figure and a screen-reader player must not have to open the card to learn it.
+  const said = tag ? `, ${tag.label}` : '';
   return `<button class="gs-eclub-golfer${active ? ' gs-eclub-golfer--on' : ''}" data-action='${action}'
-    aria-label="View ${ch.name}'s stats and abilities"
+    aria-label="View ${ch.name}'s stats and abilities${said}"
     style="position:absolute;left:${spot.x}%;top:${spot.y}%;z-index:${z};width:${w}cqw;
       transform:translate(-50%,-100%);transform-origin:bottom center;filter:${glow};">
+    ${tag ? campaignBadge(tag) : ''}
     <span class="gs-eclub-hint">${active ? 'You ★' : 'View ⓘ'}</span>
     <span class="gs-eclub-shadow" style="background:radial-gradient(ellipse at 50% 50%, ${ch.style.cap}66, #0000 70%);"></span>
     ${preview}
@@ -201,9 +231,14 @@ function earthClubhouseArt(): string {
 
 /** The full clubhouse scene: the room + the four golfers (the active one highlighted). Container-query
  *  sized so figures scale with the room. */
-export function earthClubhouseSceneHTML(activeId: string | null): string {
+export function earthClubhouseSceneHTML(
+  activeId: string | null,
+  /** GS-story-campaign-picker: campaign tags by golfer id, for the picker's badges. Omitted everywhere
+   *  else (and by every non-Story caller) ⇒ no badges, byte-for-byte the classic scene. */
+  tags: Record<string, CampaignTag> = {},
+): string {
   const figures = CHARACTERS.map((ch, i) =>
-    clubhouseGolferAt(ch, EARTH_SPOTS[i % EARTH_SPOTS.length]!, ch.id === activeId),
+    clubhouseGolferAt(ch, EARTH_SPOTS[i % EARTH_SPOTS.length]!, ch.id === activeId, tags[ch.id]),
   ).join('');
   // isolation:isolate confines the golfers' high z-indices to this scene's own stacking context, so the
   // fixed stats overlay (z-index 60, a later sibling) always paints ABOVE them — without it the feet-anchored
@@ -224,6 +259,10 @@ export function earthClubhouseSceneHTML(activeId: string | null): string {
 export function golferInspectOverlayHTML(
   characterId: string,
   primary: { label: string; action: object; disabled?: boolean },
+  /** GS-story-campaign-picker: this golfer's campaign state + an optional SECOND action under the
+   *  primary one (the picker's "start over", which is destructive and therefore never the fat button).
+   *  Both optional ⇒ every existing caller renders exactly as before. */
+  extra: { tag?: CampaignTag; secondary?: { label: string; action: object } } = {},
 ): string {
   const ch = getCharacter(characterId);
   if (!ch) return '';
@@ -247,6 +286,15 @@ export function golferInspectOverlayHTML(
   const btn = primary.disabled
     ? `<div class="gs-btn" style="opacity:0.6;cursor:default;text-align:center;">${primary.label}</div>`
     : `<button class="gs-btn" data-action='${JSON.stringify(primary.action)}'>${primary.label}</button>`;
+  // GS-story-campaign-picker: the destructive action is deliberately the GHOST button under the primary
+  // one — continuing is the safe, common choice and should be the fat one under a thumb.
+  const secondaryBtn = extra.secondary
+    ? `<button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify(extra.secondary.action)}'>${extra.secondary.label}</button>`
+    : '';
+  const tagLine = extra.tag
+    ? `<div style="margin-top:5px;font-size:12px;font-weight:800;letter-spacing:.02em;
+        color:${extra.tag.kind === 'complete' ? '#ffd98a' : '#8fc9ee'};">${extra.tag.label}</div>`
+    : '';
   return `${eclubStyle()}
     <div class="gs-eclub-ov" data-action='${JSON.stringify({ type: 'storyCloseInspect' })}'>
       <div class="gs-eclub-card" data-eclub-keep="1" onclick="event.stopPropagation()">
@@ -259,6 +307,7 @@ export function golferInspectOverlayHTML(
                 aria-label="Close" style="background:none;border:0;color:var(--gs-dim,#9aa);font-size:20px;line-height:1;cursor:pointer;padding:2px 4px;">✕</button>
             </div>
             <div style="font-size:12px;color:${cap};font-weight:700;letter-spacing:.02em;margin-top:1px;">${ch.origin} · ${ch.identity}</div>
+            ${tagLine}
             <p style="margin:6px 0 0;font-size:13px;line-height:1.4;color:var(--gs-dim,#9aa);">${ch.blurb}</p>
           </div>
         </div>
@@ -284,7 +333,7 @@ export function golferInspectOverlayHTML(
             background:${cap}14;color:${cap};font-size:12.5px;font-weight:700;cursor:pointer;">
           📖 Read ${ch.shortName}'s story
         </button>
-        <div style="margin-top:10px;">${btn}</div>
+        <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">${btn}${secondaryBtn}</div>
       </div>
     </div>`;
 }

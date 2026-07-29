@@ -85,6 +85,19 @@ This game lives or dies on three axes — put every change through all three bef
   moving the pointer would hijack the Continue of a campaign you left mid-chapter — the pointer moves only
   at `openStory` / campaign creation). `activeCampaign` never returns null while campaigns exist — a boot
   path always has an answer; which one to resume is the PICKER's question. Guarded by `tests/story-roster.test.ts`.
+  **THE GOLFER PICKER IS THE CAMPAIGN PICKER** (GS-story-campaign-picker) — `openStory` ALWAYS opens the Earth
+  clubhouse and each figure wears a campaign TAG (`Chp 3` / `Prologue` / `★ Complete`, and in its accessible
+  NAME); tapping a golfer with a campaign CONTINUES it, one without starts theirs, nothing is overwritten by
+  picking. **Story-Tour-only by construction**: the `character` screen is SHARED with Voyage/Unending/Star
+  Tour, so tags are PASSED IN and a renderer never fetches the roster (absent ⇒ every other mode byte-for-
+  byte). The roster lives in `UiState` so the guard on the DESTRUCTIVE write is in the REDUCER, where no
+  surface can route around it — `selectCharacter` can never overwrite, `storyRestartCampaign` refuses unless
+  `storyOverwriteId` names that golfer, BACK cancels the confirm (tier 0). Confirm copy comes from
+  `campaignOverwriteWarning`, the SAME pure function the guard consults, so it can't promise something milder
+  than the write. **`currentRoster(state)` is the ONE roster read** — it lays the live `state.story` over the
+  boot snapshot, because only the ACTIVE campaign can change while you play; without it the tags would go
+  stale unless ~190 `state.story` writes each remembered to mirror themselves. Guarded by
+  `tests/story-campaign-picker.test.ts`.
   **A backup is a BUNDLE, not a save** (GS-save-transfer, `save/backup.ts` pure · `app/saveTransfer.ts`
   the localStorage/DOM half). Progress lives in THREE blobs (`gs_save` + `gs_story` + `gs_settings`) and
   localStorage is per-ORIGIN, so the website and the Capacitor shell (`https://localhost`) cannot see

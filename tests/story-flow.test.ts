@@ -40,21 +40,30 @@ describe('Story Mode entry flow (GS-story-save wiring)', () => {
     expect(hub.run.loadout.characterId).toBeFalsy();
   });
 
-  it('Continue: with a loaded campaign, openStory goes straight to the hub (no golfer pick)', () => {
+  it('Continue: openStory opens the PICKER, and tapping the saved golfer resumes their campaign', () => {
+    // GS-story-campaign-picker: campaigns are per golfer, so "which campaign?" and "which golfer?" are
+    // one question — Story Tour always opens the picker, and tapping a golfer with a campaign CONTINUES it.
     const story = defaultStoryState('feather-fade');
     const s0 = initState('seed', {}, undefined, story);
     expect(s0.story?.characterId).toBe('feather-fade');
 
-    const hub = reduce(s0, { type: 'openStory' });
+    const picker = reduce(s0, { type: 'openStory' });
+    expect(picker.screen).toBe('character');
+    expect(picker.pendingStoryNew).toBe(true);
+
+    const hub = reduce(picker, { type: 'selectCharacter', characterId: 'feather-fade' });
     expect(hub.screen).toBe('story');
-    expect(hub.pendingStoryNew).toBeFalsy();
-    expect(hub.story).toBe(story);
+    expect(hub.pendingStoryNew).toBe(false);
+    expect(hub.story?.characterId).toBe('feather-fade');
+    expect(hub.story?.chapter).toBe(0);
   });
 
   it('Continue re-presents The Choice if it was skipped (chapter ≥ 4, no path) (GS-story-quality A)', () => {
     // Won Ch.3 (chapter advanced to 4 + persisted) but quit before dismissing The Choice → alignment unset.
+    // The guard is a property of the CAMPAIGN, so it must survive the move onto the picker's resume path.
     const skipped = { ...defaultStoryState('feather-fade'), chapter: 4, trophyIds: ['a', 'b', 'c'] };
-    const resumed = reduce(initState('seed', {}, undefined, skipped), { type: 'openStory' });
+    const picker = reduce(initState('seed', {}, undefined, skipped), { type: 'openStory' });
+    const resumed = reduce(picker, { type: 'storyContinueCampaign', characterId: 'feather-fade' });
     expect(resumed.screen).toBe('storyChoice');
     // choosing there lands in the hub with the path locked in
     const chosen = reduce(resumed, { type: 'chooseAlignment', alignment: 'herald' });
@@ -62,7 +71,8 @@ describe('Story Mode entry flow (GS-story-save wiring)', () => {
     expect(chosen.story?.alignment).toBe('herald');
     // a campaign that HAS a path resumes straight to the hub (no spurious re-present)
     const ok = { ...defaultStoryState('feather-fade'), chapter: 4, alignment: 'warden' as const };
-    expect(reduce(initState('seed', {}, undefined, ok), { type: 'openStory' }).screen).toBe('story');
+    const okPick = reduce(initState('seed', {}, undefined, ok), { type: 'openStory' });
+    expect(reduce(okPick, { type: 'storyContinueCampaign', characterId: 'feather-fade' }).screen).toBe('story');
   });
 
   it('exitStory returns to the title and keeps the campaign in state', () => {

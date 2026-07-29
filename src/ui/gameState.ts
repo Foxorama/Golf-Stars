@@ -20,6 +20,7 @@ import type { ClubUnlockReward } from '../sim/rpg/club-unlock';
 import type { ReputationByCharacter } from '../sim/rpg/factions';
 import type { SeenLore } from '../sim/rpg/lore';
 import type { StoryState } from '../sim/rpg/story';
+import type { CampaignStore } from '../sim/rpg/storyRoster';
 import type { FriendRivalVoice } from '../sim/rpg/storyBetrayal';
 import type { MidroundOmen } from '../sim/rpg/storyMidround';
 import type { TournamentAftermath } from '../sim/rpg/storyAftermath';
@@ -267,10 +268,22 @@ export interface UiState {
    *  `gs_story` save blob (NOT the main `gs_save`), loaded into state at boot if a campaign exists, and
    *  written back by the app after each action. Absent ⇒ no campaign started on this device. */
   story?: StoryState;
-  /** GS-story: the golfer picker is open to begin a NEW campaign (vs picking a golfer for Voyage/Unending/
-   *  Star Tour). `selectCharacter` reads this to create a fresh `StoryState` instead of building a run.
-   *  Transient (never persisted). */
+  /** GS-story-campaign-slots: EVERY campaign the player owns, one per golfer (`gs_story` holds the
+   *  roster; `state.story` is whichever of its slots is currently being played). Hydrated at boot from
+   *  `loadCampaignStore()` and kept in step by the reducer, because the reducer is the only place that
+   *  may decide a DESTRUCTIVE write: `selectCharacter` has to know whether a golfer already has a
+   *  campaign before it creates one over the top, and a guard that lived in the app layer would be one
+   *  the reducer could contradict. */
+  campaigns: CampaignStore;
+  /** GS-story: the golfer picker is open in a STORY TOUR context — the player is choosing whose campaign
+   *  to play (continue a saved one, or begin a golfer's first). Distinguishes it from picking a golfer for
+   *  Voyage/Unending/Star Tour, which share the `character` screen: `selectCharacter` reads this to
+   *  resolve a campaign instead of building a run, and it is what gates the campaign badges so no other
+   *  mode's picker tags its golfers. Transient (never persisted). */
   pendingStoryNew?: boolean;
+  /** GS-story-campaign-picker: the golfer whose "start over" confirmation is raised. Set only when that
+   *  golfer ALREADY has a campaign, so the write it guards is genuinely destructive. Transient. */
+  storyOverwriteId?: string;
   /** GS-story-clubhouse: the golfer whose stats/abilities overlay is open in the Earth clubhouse (picker or
    *  prologue hub). Absent ⇒ no overlay. Transient (never persisted). */
   storyInspectId?: string;
@@ -490,7 +503,16 @@ export type Action =
   | { type: 'openStarTour' } // GS-star-tour: open the free-roam star map course picker
   | { type: 'pickStarTourCourse'; courseId: string; effect?: string } // choose a course + weather → character select
   | { type: 'exitStarTour' } // GS-star-tour: leave the star map back to the title
-  | { type: 'openStory' } // GS-story: enter Story Mode — continue the saved campaign, or pick a golfer for a new one
+  | { type: 'openStory' } // GS-story: enter Story Mode — opens the golfer picker (campaigns are per golfer, so "which campaign" and "which golfer" are one question)
+  // GS-story-campaign-picker: resume the saved campaign of a named golfer, from the picker.
+  | { type: 'storyContinueCampaign'; characterId: string }
+  // GS-story-campaign-picker: ask to START OVER as a golfer who already has a campaign → raises the
+  // confirmation. Refused when there is no campaign, so it can never be a second way to create one.
+  | { type: 'storyRequestRestart'; characterId: string }
+  | { type: 'storyCancelRestart' }
+  // GS-story-campaign-picker: CREATE this golfer's campaign — fresh, or the CONFIRMED replacement of an
+  // existing one (which `storyOverwriteId` must name, or the reducer refuses). Overwrites exactly one slot.
+  | { type: 'storyRestartCampaign'; characterId: string }
   | { type: 'storyNewCampaign' } // GS-story: begin a fresh campaign (pick a golfer) — overwrites the saved one on completion
   | { type: 'exitStory' } // GS-story: leave the Story Mode hub back to the title
   // GS-story-prologue: tee off a Story world round from the hub. `partnerId` (GS-story-qualifier-partner-pick)
