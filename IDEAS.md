@@ -35,6 +35,24 @@ ship). It needs a death-spiral harness run and a call on whether an assist shoul
 (shards? a Stableford asterisk? nothing?) — a design decision, not a mechanical one. Do NOT let it in
 under an accessibility banner without the harness.
 
+**GS-a11y-shot-aim-tell — the shot arrows are shipped, tested, and invisible** *(surfaced 2026-07-30,
+when the author of the feature did not know it existed)*
+Every full shot has aimed on ←/→ and powered on ↑/↓ since GS-a11y-keyboard (`app.ts`, `onPlayKey`),
+guarded by `tests/a11y-keyboard.test.ts` including a real-browser drive. Nothing on screen says so.
+GS-hud-bag deleted the aim panel — correctly, it restated what the cone already draws — and with it
+went the last hint that the shot has an aim at all; the map itself is the affordance, and a map is a
+pointer affordance. The tell was only missed because the game was played on a phone. **A keyboard
+player's first shot looks like a game with one button.**
+The gap is discoverability, not capability, so the fix must not become the readout GS-hud-bag
+removed: a permanent on-screen hint riding every shot forever is the wrong shape. Candidates, none
+costed yet — `aria-keyshortcuts` on the Swing button and the bag (what GS-a11y-putt-arrows did for
+the putt, zero visual cost, reaches exactly the players who need it); a first-run-only hint that
+retires itself once an arrow has been pressed; a line in the settings sheet beside Readable text and
+Reduced motion, where a keyboard player would go looking; or a hint that appears only when a Tab
+press reveals a focus ring, i.e. only for players already driving by keyboard.
+Deliberately **not** bundled with the putt arrows: that was one mechanic reaching parity, this is a
+UI-surface decision with four viable shapes and a rule to respect.
+
 **GS-a11y-charcard-nesting — the golfer card is invalid interactive HTML** *(small, but touches a
 viewport-locked screen)*
 `.gs-charcard` is a `<button>` containing `<p>`, `<div>`, and — since GS-a11y-focus — a focusable

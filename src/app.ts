@@ -924,6 +924,13 @@ let awaitingShotPopup = false;
 let announcedHoleKey: string | null = null;
 /** Removes the previous render's play-screen key listener (GS-a11y-keyboard) — see wireShotGesture. */
 let playKeyCleanup: (() => void) | null = null;
+/**
+ * The putt's twin of `playKeyCleanup` (GS-a11y-putt-arrows). Separate because the two listeners are
+ * mounted by different owners for disjoint states — `wireShotGesture` binds the shot arrows and
+ * early-returns on the putt, so the green needed its own — and both are bound per render, which is
+ * exactly the shape that stacks a listener per frame if the previous one is not removed first.
+ */
+let puttKeyCleanup: (() => void) | null = null;
 let popupTimer = 0;
 // The manual-putt pace meter (a time/DOM side-effect, like the play view) — mounted on the putt
 // screen, torn down on any dispatch.
@@ -2894,6 +2901,12 @@ function render(): void {
     puttMeter.destroy();
     puttMeter = null;
   }
+  // The putt's arrow-key listener is bound per render onto `window` (GS-a11y-putt-arrows), so it is
+  // torn down here with the other per-render mounts — not inside the wiring block, which is skipped
+  // entirely on the renders where the nudges are absent. Left bound, it would keep nudging the aim
+  // of a putt that is no longer on screen, and stack one more listener every frame.
+  puttKeyCleanup?.();
+  puttKeyCleanup = null;
   // Settings → sim bridge (GS-lefty): the pure sim can't read localStorage, so bake the live
   // left-handed setting onto the loadout here. render() runs after every dispatch and after the
   // settings toggle's direct render(), so `loadout.lefty` is always current before the next shot
@@ -3804,6 +3817,43 @@ function render(): void {
       apply(accel);
     });
   });
+  // ←/► on the KEYBOARD drive those same two buttons (GS-a11y-putt-arrows). The shot decision has
+  // aimed on the arrows since GS-a11y-keyboard, but that listener lives in `wireShotGesture`, which
+  // early-returns on the putt — so the one stroke in the game with no pointer-free aim was the one
+  // played on a green, where the read matters most. The nudges are tab-reachable, so this is not
+  // "the only way in"; it is the difference between finding a 4-yard borrow in one held key and in
+  // ten separate tab-and-Enter round trips.
+  //
+  // It synthesises a CLICK on the button rather than touching `selPuttAim` itself. The tap
+  // acceleration, the per-putt step and clamp, the sfx and the surgical refresh are all decided in
+  // that click handler, and a second path into the aim is exactly the kind of second description
+  // this codebase keeps paying for (`wireRoleButtonKeys` already sets this precedent for Enter/Space).
+  if (app.querySelector('[data-putt-aim]')) {
+    const onPuttKey = (e: KeyboardEvent): void => {
+      // Same refusals as the shot handler: never fight the browser's own shortcuts, a text field, or
+      // a raised sheet (structural — `applyOverlayFocus` inerts the page behind one).
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+      if (document.querySelector('#app > [inert]')) return;
+      const dir = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0;
+      if (!dir) return;
+      // Absent when a green-reading caddy owns the line: the nudges render disabled and WITHOUT the
+      // data attribute, so the arrows go quiet exactly where the buttons do (GS-story-caddy-read).
+      const btn = app.querySelector<HTMLElement>(`[data-putt-aim="${dir}"]`);
+      if (!btn) return;
+      // A HELD arrow is the keyboard's OWN auto-repeat, and it must not also collect the tap-streak
+      // bonus — two accelerations compounding slam the aim into its clamp in a few hundred ms.
+      // Clearing the tap clock makes the click handler read each repeat as a fresh single tap (1×),
+      // which is precisely what press-and-hold on the button already does.
+      if (e.repeat) puttAimLastTapMs = 0;
+      e.preventDefault(); // arrows would otherwise scroll the page
+      btn.click();
+    };
+    window.addEventListener('keydown', onPuttKey);
+    puttKeyCleanup = () => window.removeEventListener('keydown', onPuttKey);
+  }
+
   // Fringe/apron (GS-fringe-putt): toggle between the putt meter (⛳) and the normal chip gesture (🏌).
   app.querySelectorAll<HTMLElement>('[data-putt-toggle]').forEach((el) => {
     el.addEventListener('click', () => {
