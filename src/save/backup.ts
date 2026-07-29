@@ -1,7 +1,7 @@
 /**
  * Save transfer (GS-save-transfer) — the ONE portable representation of everything a player owns.
  *
- * `localStorage` is the only copy of a Golf Stars save, and it is scoped to an ORIGIN. The browser
+ * `localStorage` is the only copy of a save, and it is scoped to an ORIGIN. The browser
  * build and the Android shell are two different origins (Capacitor serves from `https://localhost`),
  * so a save made on the website is genuinely invisible to the app and vice versa. Moving between
  * them — or off a phone before an uninstall — needs a file, and this is that file.
@@ -16,6 +16,7 @@
  */
 
 import { migrate, type Save } from './schema';
+import { GAME_TITLE } from '../brand';
 import {
   campaignCount,
   campaignList,
@@ -26,7 +27,12 @@ import {
 import { getCharacter } from '../sim/rpg/characters';
 
 /** Marks a file as ours. A JSON file that doesn't carry this (and isn't a recognisable legacy bare
- *  save) is rejected rather than guessed at. */
+ *  save) is rejected rather than guessed at.
+ *
+ *  **Deliberately NOT renamed with the product** (GS-release-identity). This string is stamped into
+ *  every backup file every player has ever exported; it is an on-disk IDENTIFIER, not a label.
+ *  Renaming it would make every existing backup unreadable — the precise failure this feature
+ *  exists to prevent. `tests/brand.test.ts` pins it. */
 export const BACKUP_KIND = 'golf-stars-backup';
 
 /** Bundle format version — INDEPENDENT of `SAVE_VERSION`. This is the envelope; the save inside it
@@ -34,7 +40,7 @@ export const BACKUP_KIND = 'golf-stars-backup';
  *
  *  v1 → v2 (GS-story-campaign-slots): the single `story` campaign became a `campaigns` ROSTER (one per
  *  golfer). Bumping is the POINT, not a formality: an older build reading a v2 file trips its own
- *  `version > BACKUP_VERSION` check and refuses with "made by a newer version of Golf Stars" — a loud,
+ *  `version > BACKUP_VERSION` check and refuses with "made by a newer version" — a loud,
  *  correct failure. Had we smuggled the roster through the old `story` field instead, that build would
  *  have handed a roster to `migrateStory` and silently restored ONE mangled campaign while reporting
  *  success, which is exactly the class of failure a backup feature exists to prevent. */
@@ -106,7 +112,7 @@ export function parseBackup(json: string): Backup {
     throw new BackupError("That file isn't valid JSON — it may be truncated or not a save file.");
   }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    throw new BackupError("That file doesn't look like a Golf Stars save.");
+    throw new BackupError(`That file doesn't look like a ${GAME_TITLE} save.`);
   }
   const obj = raw as Record<string, unknown>;
 
@@ -114,7 +120,7 @@ export function parseBackup(json: string): Backup {
   if (obj.kind === BACKUP_KIND) {
     if (typeof obj.version !== 'number' || obj.version > BACKUP_VERSION) {
       throw new BackupError(
-        `That backup was made by a newer version of Golf Stars (format ${String(obj.version)}). Update the game, then import it.`,
+        `That backup was made by a newer version of ${GAME_TITLE} (format ${String(obj.version)}). Update the game, then import it.`,
       );
     }
     return {
@@ -142,7 +148,7 @@ export function parseBackup(json: string): Backup {
     };
   }
 
-  throw new BackupError("That file doesn't look like a Golf Stars save.");
+  throw new BackupError(`That file doesn't look like a ${GAME_TITLE} save.`);
 }
 
 function migrateSaveOrThrow(raw: unknown): Save {

@@ -45,11 +45,13 @@ export function currentBackupJSON(): string {
   });
 }
 
-/** A filename a player can tell apart in a Downloads folder — dated, no clock-time precision needed. */
+/** A filename a player can tell apart in a Downloads folder — dated, no clock-time precision needed.
+ *  Cosmetic only: `parseBackup` recognises a file by its `kind` field, never its name, so backups
+ *  exported under the old product name still import (GS-release-identity). */
 export function backupFilename(): string {
   const d = new Date();
   const p = (n: number) => String(n).padStart(2, '0');
-  return `golf-stars-save-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.json`;
+  return `far-carry-save-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.json`;
 }
 
 /** Offer the backup as a file download. Returns false when the environment gives us no way to do it

@@ -8,6 +8,7 @@
  * breadcrumb in a failure report says exactly which phase died.
  */
 import { start } from './app';
+import { GAME_TITLE } from './brand';
 
 function showFatal(err: unknown): void {
   const el = document.getElementById('app');
@@ -15,7 +16,7 @@ function showFatal(err: unknown): void {
   el.setAttribute('data-booted', '1'); // stop the watchdog overwriting this
   const msg = (err && ((err as Error).stack || (err as Error).message)) || String(err);
   el.innerHTML =
-    '<pre style="color:#ff8a8a;white-space:pre-wrap;padding:16px;margin:0;font:12px/1.5 monospace;background:#0b0d12;min-height:var(--gs-vh);">⛳ Golf Stars — boot error:\n' +
+    `<pre style="color:#ff8a8a;white-space:pre-wrap;padding:16px;margin:0;font:12px/1.5 monospace;background:#0b0d12;min-height:var(--gs-vh);">⛳ ${GAME_TITLE} — boot error:\n` +
     String(msg) +
     '</pre>';
 }
