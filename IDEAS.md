@@ -53,6 +53,25 @@ press reveals a focus ring, i.e. only for players already driving by keyboard.
 Deliberately **not** bundled with the putt arrows: that was one mechanic reaching parity, this is a
 UI-surface decision with four viable shapes and a rule to respect.
 
+**GS-sw-version-derive — the service worker's VERSION is the last hand-bump in the release**
+*(surfaced by the 2026-07-30 release-pipeline pass; the one checklist line that pipeline could not
+delete)*
+`public/sw.js` carries `var VERSION = 'fc-pwa-1'` with a `// bump per deploy` comment. Everything
+else in the release now derives from `package.json` — `APP_VERSION` through a Vite `define`, the boot
+watchdog through the `%GS_VERSION%` placeholder, the itch build through the tag/package assertion in
+`.github/workflows/itch.yml`. This is the last constant somebody must remember, and GS-release-identity
+already established that such a constant eventually lies. Forgetting it means returning offline players
+keep the previous snapshot one boot longer — not fatal, which is exactly why it will keep being
+forgotten.
+**Why it is not a quick win.** `public/` files are copied VERBATIM by Vite; substituting into one
+needs a small plugin (the `transformIndexHtml` trick doesn't apply). And this is the highest-risk file
+in the repo: the cache PREFIX is one decision written in three places that cannot share a constant
+(`sw.js` ×2 + index.html's foreign-cache sweep), guarded by `tests/brand.test.ts`, and getting it
+wrong makes the page delete its own offline cache every boot while believing it is tidying up after a
+sibling app. The VERSION suffix is a *separate* string from that prefix and only the suffix should
+move — a pass that conflates them re-creates the exact bug the three-place guard exists to catch.
+Wants its own PR with a test that the built `sw.js` carries the package version.
+
 **GS-a11y-charcard-nesting — the golfer card is invalid interactive HTML** *(small, but touches a
 viewport-locked screen)*
 `.gs-charcard` is a `<button>` containing `<p>`, `<div>`, and — since GS-a11y-focus — a focusable
