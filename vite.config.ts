@@ -1,6 +1,18 @@
 /// <reference types="node" />
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vitest/config';
 import { viteSingleFile } from 'vite-plugin-singlefile';
+
+// The shipped build number, single-sourced from package.json (GS-release-identity). It reaches
+// the app two ways, because the app has two entry points that run at different times:
+//   • `define` → `__APP_VERSION__`, read by `src/brand.ts` once the module bundle evaluates.
+//   • `%GS_VERSION%` in index.html → the BOOT WATCHDOG, which runs *before* any module and is
+//     the one diagnostic that survives a bundle that fails to parse. It cannot import.
+// Read via fs rather than `import pkg from './package.json'` so the config stays a plain ESM
+// module with no import-assertion syntax to trip over.
+const pkgVersion = (
+  JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }
+).version;
 
 // Inline the entire bundle into a single self-contained index.html. GitHub Pages serving
 // of separate hashed assets kept failing (404 / CDN index-asset skew / service-worker
@@ -27,7 +39,19 @@ export default defineConfig({
     emptyOutDir: !HUB, // hub pass appends to dist/, never wipes the game build
     rollupOptions: { input: HUB ? 'test.html' : 'index.html' },
   },
-  plugins: [viteSingleFile()],
+  define: { __APP_VERSION__: JSON.stringify(pkgVersion) },
+  plugins: [
+    viteSingleFile(),
+    {
+      // Stamp the build into index.html's boot watchdog. A placeholder rather than a hand-bumped
+      // literal: the watchdog's whole job is proving WHICH html you actually loaded, and a
+      // constant somebody has to remember to bump is a constant that eventually lies.
+      name: 'gs-version-html',
+      transformIndexHtml(html: string): string {
+        return html.split('%GS_VERSION%').join(pkgVersion);
+      },
+    },
+  ],
   test: {
     globals: true,
     environment: 'node',

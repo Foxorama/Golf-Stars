@@ -10,7 +10,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <title>Golf Stars</title>
+    <title>The Far Carry</title>
     <!-- PWA: installable as an app. The manifest + icons are external files copied verbatim
          into dist/ (NOT inlined by vite-plugin-singlefile) — an install manifest can't be a
          data-URI. Hrefs are relative so they resolve under the Pages subpath (/golf-stars/). -->
@@ -20,10 +20,10 @@
     <link rel="apple-touch-icon" href="icon-180.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Golf Stars" />
+    <meta name="apple-mobile-web-app-title" content="Far Carry" />
     <style>
       /* ───────────────────────────────────────────────────────────────────────
-         Golf Stars — design tokens + component classes (UI polish pass).
+         The Far Carry — design tokens + component classes (UI polish pass).
          The DOM shell (app.ts / cards.ts) is styled freely here; the SVG render
          layer is deterministic and untouched. Tokens live as CSS variables so the
          whole theme shifts from one place; component classes carry the hover/
@@ -352,6 +352,13 @@
       .gs-hero-tag {
         margin: .45em 0 0; font-size: 11px; letter-spacing: .22em; text-transform: uppercase;
         color: var(--gs-dim); text-wrap: balance;
+      }
+      /* The build stamp (GS-release-identity) — deliberately the quietest text on the screen.
+         It has to be READABLE when someone is copying it into a bug report, so it is dimmed
+         and small rather than hidden; `tabular-nums` keeps the digits legible at this size. */
+      .gs-hero-build {
+        margin: .5em 0 0; font-size: 10px; letter-spacing: .14em;
+        color: var(--gs-dim); opacity: .62; font-variant-numeric: tabular-nums;
       }
       .gs-hero-chips { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
       .gs-seclabel {
@@ -3011,17 +3018,23 @@
         // Polyfill globalThis for older module-capable engines that lack it (some mobile
         // WebViews): esbuild does NOT inject it, so any globalThis reference would throw.
         if (typeof globalThis === 'undefined') { try { window.globalThis = window; } catch (e) {} }
-        var BUILD = 'inline-35'; // bump each deploy; proves which HTML you actually loaded
+        // Stamped from package.json at build time by the `gs-version-html` plugin in
+        // vite.config.ts (GS-release-identity) — this used to be a hand-bumped literal, and a
+        // constant somebody has to remember to bump is a constant that eventually lies about
+        // which build the player is looking at. Falls back visibly under the raw dev server,
+        // where no transform has run.
+        var BUILD = '%GS_VERSION%';
+        if (BUILD.charAt(0) === '%') BUILD = 'dev';
         var app = document.getElementById('app');
         var errorShown = false; // once a REAL error is on screen, the timeout must not clobber it
         // Immediate visible marker so you can tell the NEW page loaded at all.
         if (app) {
           app.innerHTML =
             '<pre style="color:#9fd8e6;white-space:pre-wrap;padding:16px;margin:0;' +
-            'font:12px/1.5 monospace;background:#0b0d12;min-height:var(--gs-vh);">⛳ Golf Stars — loading… (build ' +
+            'font:12px/1.5 monospace;background:#0b0d12;min-height:var(--gs-vh);">⛳ The Far Carry — loading… (build ' +
             BUILD + ')</pre>';
         }
-        // Defensive: Golf Stars IS now a PWA, but it shares an origin with other projects
+        // Defensive: The Far Carry IS now a PWA, but it shares an origin with other projects
         // (e.g. a golf-finder PWA) whose root-scoped service worker could intercept and blank
         // this page. So nuke only FOREIGN workers/caches — anything not scoped to our own
         // subpath, and any cache not named `golf-stars-*` — while leaving our own offline
@@ -3043,7 +3056,7 @@
           if (app && app.getAttribute('data-booted') !== '1') {
             app.innerHTML =
               '<pre style="color:' + (isError ? '#ff8a8a' : '#9fd8e6') + ';white-space:pre-wrap;padding:16px;margin:0;' +
-              'font:12px/1.5 monospace;background:#0b0d12;min-height:var(--gs-vh);">⛳ Golf Stars (build ' +
+              'font:12px/1.5 monospace;background:#0b0d12;min-height:var(--gs-vh);">⛳ The Far Carry (build ' +
               BUILD + ') — ' + msg + '</pre>';
           }
         }

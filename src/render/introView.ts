@@ -10,8 +10,9 @@
  *                    nose-up and rockets off the top of the frame on warp streaks and a
  *                    screen-shake.
  *   4. WRITE       — a golf-ball shooting star streaks across the void in the wagon's wake,
- *                    and the stars it left behind settle into the words GOLF STARS, which
- *                    form with a pop, faint constellation links and sparkle glints, then hold.
+ *                    and the stars it left behind settle into the game's wordmark (whatever
+ *                    `brand.ts` holds — the face is fitted to the frame, see `fitTitlePx`),
+ *                    which forms with a pop, faint constellation links and glints, then holds.
  *
  * Thin/imperative by design (this is the "feel" layer you can't unit-test); everything is
  * vector-drawn so there's no art asset to 404. Timings/feel read from `window._gsIntro` so
@@ -22,6 +23,7 @@
 // Backing-store resolution only — a pure, guarded read of the root zoom, so this cinematic
 // stays as self-contained and as un-throwable as it was.
 import { canvasRatio } from './pixelRatio';
+import { GAME_TITLE_UPPER } from '../brand';
 
 interface IntroFeel {
   /** Phase durations (ms) at speed 1. */
@@ -144,7 +146,7 @@ function sparkle(ctx: CanvasRenderingContext2D, x: number, y: number, r: number,
 }
 
 /**
- * A single star making up the GOLF STARS wordmark. Positions are in TEXT-LOCAL space:
+ * A single star making up the title wordmark. Positions are in TEXT-LOCAL space:
  * `lx` measured from the text's left edge, `ly` from its vertical centre — so the caller
  * maps them with the same `tx`/`ty` it lays the title out at. Each star drifts in from a
  * source point (`sx`,`sy`) high above (the rocket's wake) and settles onto its target.
@@ -159,6 +161,35 @@ interface TitleStar {
   sx: number; // source x (text-local), where it flies in from
   sy: number; // source y (text-local), well above the word
   hero: boolean;
+}
+
+/** The wordmark face. One definition so the constellation and its text fallback can't diverge. */
+const titleFontAt = (px: number): string => `800 ${px}px system-ui, "Segoe UI", sans-serif`;
+
+/**
+ * The largest face at which the wordmark still fits `maxW` (GS-release-identity).
+ *
+ * The title is not a fixed-width asset: `system-ui` resolves to a different face on Android,
+ * iOS, Windows and Linux, and the drawn width scales with the LENGTH of whatever string
+ * `brand.ts` holds. `drawTitle` centres on `DW/2` with no clamp, so a wordmark wider than the
+ * design frame simply runs off both edges — which is a rename away at any time, not a
+ * hypothetical. Measure the real face, then shrink only if we must (never grow: 116px is the
+ * composed size, and the phase timings are tuned around stars settling at it).
+ *
+ * Degrades to the base size if canvas measurement is unavailable — the same
+ * never-throw-in-a-cosmetic-intro rule `sampleTitleStars` follows.
+ */
+function fitTitlePx(text: string, basePx: number, maxW: number): number {
+  try {
+    const octx = document.createElement('canvas').getContext('2d');
+    if (!octx) return basePx;
+    octx.font = titleFontAt(basePx);
+    const w = octx.measureText(text).width;
+    if (!(w > 0) || w <= maxW) return basePx;
+    return Math.max(48, Math.floor(basePx * (maxW / w)));
+  } catch {
+    return basePx;
+  }
 }
 
 /**
@@ -356,12 +387,14 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
     light: pebRng() < 0.45,
   }));
 
-  // The GOLF STARS wordmark as a constellation, sampled from the rasterised text. The
-  // stars rain in from the rocket's wake (above) and settle into the letters; if pixel
-  // sampling is unavailable, `titleStars` is empty and drawTitle falls back to glowing text.
-  const TITLE_FONT = '800 116px system-ui, "Segoe UI", sans-serif';
+  // The wordmark as a constellation, sampled from the rasterised text. The stars rain in from
+  // the rocket's wake (above) and settle into the letters; if pixel sampling is unavailable,
+  // `titleStars` is empty and drawTitle falls back to glowing text. The face is FITTED to the
+  // design frame (see fitTitlePx) so the title can be renamed without running off the screen.
+  const TITLE_TEXT = GAME_TITLE_UPPER;
+  const TITLE_FONT = titleFontAt(fitTitlePx(TITLE_TEXT, 116, DW - 96));
   const { stars: titleStars, width: titleW, links: titleLinks } = sampleTitleStars(
-    'GOLF STARS',
+    TITLE_TEXT,
     TITLE_FONT,
     rng,
   );
@@ -1305,7 +1338,7 @@ export function mountIntro(opts: IntroOptions = {}): IntroHandle {
    */
   function drawTitle(reveal: number, glow: number): void {
     if (!ctx) return;
-    const text = 'GOLF STARS';
+    const text = TITLE_TEXT;
     const ty = 250;
     const now = performance.now();
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { GAME_TITLE } from '../src/brand';
 
 /**
  * Guards the BUILT ARTIFACT, not just the source — this is the class of failure that
@@ -113,7 +114,7 @@ describe('build output (real browser)', () => {
         await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', { timeout: 8000 });
         const text = (await page.textContent('#app')) || '';
         expect(errors).toEqual([]);
-        expect(text).toContain('Golf Stars');
+        expect(text).toContain(GAME_TITLE);
         expect(text).toContain('Choose your game'); // the title screen actually rendered
       } finally {
         await browser.close();

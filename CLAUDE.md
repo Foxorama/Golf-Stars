@@ -1,4 +1,20 @@
-# Golf Stars — working notes for Claude
+# The Far Carry (repo: `Golf-Stars`) — working notes for Claude
+
+> **THE PRODUCT NAME IS A LABEL; A PERSISTED STRING IS A CONTRACT** (GS-release-identity,
+> `src/brand.ts`). The game ships as **The Far Carry**; the repo, npm package, module names,
+> `gs_*` localStorage keys, the Capacitor `appId` (`com.foxorama.golfstars`) and — critically —
+> `BACKUP_KIND` (`'golf-stars-backup'`) keep the old spelling ON PURPOSE. Those are stamped into
+> save data and backup files already sitting on players' devices; renaming one to match the
+> product orphans every save in the wild while every round-trip test stays green. Every
+> user-facing surface reads `GAME_TITLE`/`GAME_TITLE_UPPER`/`APP_VERSION` — never a literal, or a
+> future rename half-lands (it was a bare literal in six places). `APP_VERSION` comes from
+> package.json via a Vite `define`; the BOOT WATCHDOG cannot import, so it gets the same version
+> through a `%GS_VERSION%` placeholder substituted by `transformIndexHtml` (it used to be a
+> hand-bumped constant, and a constant somebody must remember to bump eventually lies about which
+> build the player is looking at). The intro cinematic RASTERISES the wordmark, so its length is
+> load-bearing: `fitTitlePx` shrinks the face until it fits the design frame — `THE FAR CARRY`
+> measured **918px against a 904px budget** at the composed 116px, i.e. the fit is not defensive.
+> Guarded by `tests/brand.test.ts`.
 
 A travelling space golf **RPG**. You voyage the galaxy; each stop is a procedurally-generated,
 ever-wilder golf course (rarity-graded loot). Play it, earn rewards, upgrade your bag/ship/perks,

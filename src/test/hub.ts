@@ -1,5 +1,5 @@
 /**
- * Golf Stars — Test & Demo Hub (the page behind test.html; see standards/TEST-HUB-STANDARD.md).
+ * The Far Carry — Test & Demo Hub (the page behind test.html; see standards/TEST-HUB-STANDARD.md).
  *
  * Two faces, one same-origin page:
  *   • DEMO — drives the REAL shipped game in an <iframe> through its public hooks (the `?seed=`
@@ -17,6 +17,7 @@
  */
 
 import { CLUBS } from '../sim/clubs';
+import { GAME_TITLE, GAME_TITLE_UPPER, APP_VERSION } from '../brand';
 import { LIE_INFO } from '../sim/shot';
 import { SHOP_ITEMS, CLUB_ITEMS, ownedCount, itemCap, type ShopItem } from '../sim/rpg/economy';
 import { META_UPGRADES, type MetaUpgrades } from '../sim/rpg/meta';
@@ -481,9 +482,9 @@ function stepper(name: string, desc: string, max: number, get: () => number, set
 // ── mount ──────────────────────────────────────────────────────────────────────────────────
 function mount(): void {
   document.head.append(h('style', { html: css }));
-  document.title = 'Golf Stars — Test Hub';
+  document.title = `${GAME_TITLE} — Test Hub`;
 
-  frame = h('iframe', { src: buildGameUrl(), title: 'Golf Stars (live build)' });
+  frame = h('iframe', { src: buildGameUrl(), title: `${GAME_TITLE} (live build)` });
   segGame = h('button', { class: 'on', onclick: () => setView('game') }, 'Game');
   segLab = h('button', { onclick: () => setView('lab') }, 'Sim Lab');
 
@@ -492,8 +493,8 @@ function mount(): void {
 
   document.body.append(
     h('header', {},
-      h('h1', {}, '⛳ GOLF STARS'),
-      h('span', { class: 'sub' }, 'test & demo hub'),
+      h('h1', {}, `⛳ ${GAME_TITLE_UPPER}`),
+      h('span', { class: 'sub' }, `test & demo hub · v${APP_VERSION}`),
       h('div', { class: 'seg' }, segGame, segLab)),
     h('main', {}, rail, stageEl),
   );

@@ -9,6 +9,7 @@
  */
 
 import type { Action, UiState } from '../ui/game';
+import { GAME_TITLE } from '../brand';
 import { getCharacter } from '../sim/rpg/characters';
 import { rarCol } from '../sim/rpg/loot';
 import { fuelGaugeHTML } from '../render/fuel';
@@ -77,7 +78,7 @@ export function header(): string {
   }
   return `
     <header style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-left:4px solid ${rarCol(state.course.rarity)};border-radius:3px;padding:2px 0 10px 11px;margin-bottom:12px;border-bottom:1px solid var(--gs-line-2);">
-      <h1 style="margin:0;font-size:22px;">⛳ Golf Stars</h1>${who}
+      <h1 style="margin:0;font-size:22px;">⛳ ${GAME_TITLE}</h1>${who}
       <span style="margin-left:auto;font-size:13px;color:var(--gs-dim);">
         Stop <b style="color:var(--gs-ink);">${r.stopIndex + 1}</b> · Dist <b style="color:var(--gs-ink);">${r.distanceFromStart}</b> · Credits <b style="color:var(--gs-warn);">${r.credits}</b> · ${fuelGaugeHTML(r.fuel, tankCapacity(r), { mini: true })}
         · Hcp <b style="color:var(--gs-ink);">${r.loadout.handicap}</b> · Best dist ${state.bestDistance} · Best SF ${state.bestStableford}

@@ -1,11 +1,17 @@
-# Golf Stars
+# The Far Carry
 
 A travelling space golf **RPG**: voyage the galaxy playing ever-wilder, procedurally-generated
 golf courses. Play a course, earn rewards, upgrade your bag/ship/perks, travel further as
 difficulty and absurdity scale.
 
+> **Named `Golf-Stars` in the repo, shipped as _The Far Carry_** (GS-release-identity). The product
+> name lives in `src/brand.ts` and nowhere else; the repo, the npm package, the `gs_*` save keys,
+> the Capacitor `appId` and `BACKUP_KIND` deliberately keep the old spelling, because those are
+> identifiers baked into data on players' devices rather than labels. `tests/brand.test.ts` pins
+> the distinction.
+
 > Deliberately separate from `golf-finder` (a real golf+astronomy tracker). golf-finder's soul is
-> *realism and trust*; Golf Stars' soul is *fantasy, feel, and progression*. The two are
+> *realism and trust*; this game's soul is *fantasy, feel, and progression*. The two are
 > independent — see `CLAUDE.md` and `GOLF-STARS-STARTER-KIT.md`.
 
 ## Status — vertical slice

@@ -15,7 +15,9 @@ import type { CapacitorConfig } from '@capacitor/cli';
  */
 const config: CapacitorConfig = {
   appId: 'com.foxorama.golfstars',
-  appName: 'Golf Stars',
+  // The PRODUCT name (GS-release-identity). `appId` deliberately keeps the old spelling: it is a
+  // permanent package identifier, invisible to players, and renaming it would be a different app.
+  appName: 'The Far Carry',
   webDir: 'dist',
   android: {
     // The game paints its own deep-space background; match it so there is no white flash between
