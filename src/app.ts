@@ -56,6 +56,7 @@ import {
   type UiState,
 } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
+import { checkStorage } from './save/durability';
 import { loadStory, loadCampaignStore, setActiveCampaignId } from './save/storyStore';
 import { defaultSave } from './save/schema';
 import { mountIntro } from './render/introView';
@@ -4338,6 +4339,14 @@ export function start(): void {
       : undefined,
   );
   registerServiceWorker();
+  // Can this browser actually KEEP a save, and will it hold on to it? (GS-save-durability)
+  // Runs after boot() has painted, and re-renders the title if the answer changes what it shows —
+  // the same shape as the install-prompt capture below. The probe itself is synchronous; only the
+  // persistence request is async, and neither is allowed to delay the first frame for a warning
+  // about a game the player has not started yet.
+  void checkStorage().then(() => {
+    if (state?.screen === 'title') render();
+  });
   wireBackButton();
   // Load the native haptic engine now, not on the first swing — a lazy load would drop that buzz
   // while the chunk resolved. No-op in a browser (GS-native-haptics).

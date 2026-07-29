@@ -25,6 +25,7 @@ uploaded.
 | Your settings — sound, motion, text size, aim mode | `localStorage`, key `fc_settings` | So your preferences stick |
 | Whether you dismissed the "install" prompt | `localStorage`, key `fc_installNudge` | So it doesn't nag |
 | Whether you've seen the intro this session | `sessionStorage`, key `fc_introSeen` | So it plays once per session |
+| A one-character test write, removed immediately | `localStorage`, key `fc_probe` | To find out whether this browser will let the game save at all, so it can warn you instead of losing your progress silently |
 
 None of this identifies you. It is game state — shard counts, best scores, which ship you
 fly. You can wipe all of it at any time by clearing site data in your browser, or by
