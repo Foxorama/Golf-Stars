@@ -102,31 +102,67 @@ describe('the crash toast (GS-crash-diagnostics)', () => {
     60_000,
   );
 
+  /**
+   * Replace `navigator.clipboard.writeText` so the copy path is DECIDED by the test.
+   *
+   * The obvious version of this test read the real clipboard back, and it was wrong twice over:
+   * `grantPermissions` applies to a BrowserContext, while `browser.newPage()` makes its own — so
+   * the permission landed on a context the page wasn't in — and even granted, headless clipboard
+   * access is flaky enough to make the suite a coin toss. Stubbing the one API the feature calls
+   * removes the browser's clipboard from the test entirely and lets each branch be asserted
+   * deterministically.
+   */
+  async function stubClipboard(page: Page, outcome: 'resolve' | 'reject'): Promise<void> {
+    await page.evaluate((outcome) => {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          writeText: () => (outcome === 'resolve' ? Promise.resolve() : Promise.reject(new Error('denied'))),
+        },
+      });
+    }, outcome);
+  }
+
   it.runIf(chromePath)(
-    'copies a report carrying the build and the seed, and can be dismissed',
+    'confirms the copy when the clipboard accepts it',
     async () => {
       const { chromium } = await import('playwright-core');
       const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
       try {
-        const context = browser.contexts()[0] ?? (await browser.newContext());
-        await context.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
         const page = await boot(browser);
+        await stubClipboard(page, 'resolve');
         await throwInPage(page, 'COPYABLE_FAULT');
 
         await page.locator('.gs-crash__btn', { hasText: 'Copy details' }).click();
         await page.waitForTimeout(200);
 
-        // Either route is a pass: the clipboard when it's permitted, the manual textarea when the
-        // browser refuses. What must never happen is a button that silently does nothing.
-        const report = await page.evaluate(async () => {
-          const box = document.querySelector('.gs-crash__text') as HTMLTextAreaElement | null;
-          if (box) return box.value;
-          try {
-            return await navigator.clipboard.readText();
-          } catch {
-            return '';
-          }
-        });
+        // The player needs to know it worked; a button that looks inert gets tapped forever.
+        expect(await page.textContent('.gs-crash__bar')).toContain('Copied');
+        // Nothing was copied to a textarea, because the clipboard route succeeded.
+        expect(await page.locator('.gs-crash__text').count()).toBe(0);
+      } finally {
+        await browser.close();
+      }
+    },
+    60_000,
+  );
+
+  it.runIf(chromePath)(
+    'falls back to selectable text when the clipboard refuses, and can be dismissed',
+    async () => {
+      const { chromium } = await import('playwright-core');
+      const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
+      try {
+        const page = await boot(browser);
+        // The branch that matters most: `navigator.clipboard` rejects outside a secure context and
+        // in some WebViews. A Copy button that silently does nothing is worse than no button.
+        await stubClipboard(page, 'reject');
+        await throwInPage(page, 'COPYABLE_FAULT');
+
+        await page.locator('.gs-crash__btn', { hasText: 'Copy details' }).click();
+        await page.waitForSelector('.gs-crash__text', { timeout: 4000 });
+
+        const report = await page.inputValue('.gs-crash__text');
         expect(report).toContain('The Far Carry v');
         expect(report).toContain('COPYABLE_FAULT');
         expect(report, 'the seed is the whole point of this report').toMatch(/seed |no run in progress/);
