@@ -35,6 +35,10 @@ import { worldCaddy, storyCaddyHired, STORY_CADDY_PRICE } from '../sim/rpg/story
 import { shopItem } from '../sim/rpg/economy';
 import { formatToPar, toParColour } from '../sim/rpg/endless';
 import { shipForCharacter } from '../ui/gameCosmetics';
+import { currentRoster } from '../ui/game';
+import { championCampaigns } from '../sim/rpg/storyRoster';
+import type { StoryState } from '../sim/rpg/story';
+import { golferPreviewSVG } from '../render/apparelArt';
 import { getCharacter } from '../sim/rpg/characters';
 import { shipById } from '../sim/rpg/ships';
 import type { CosmeticRarity } from '../sim/rpg/cosmetics';
@@ -132,6 +136,10 @@ export const starTourView = {
   ammo: WEAPON_AMMO_CAP,
   /** Active refuel-tanker sequence, or null. */
   refuel: null as StarTourRefuel | null,
+  /** GS-story-startour-champions: the outcome of the last SERPENT AT THE ROOT replay, or null. App-layer
+   *  view state ONLY — the replay is a memory, so it writes no campaign, no save and no record, and having
+   *  nowhere to put a result is what makes that true by construction rather than by discipline. */
+  serpentResult: null as { won: boolean; strike: 'clean' | 'graze' } | null,
 };
 
 /** Ship cruise speed by RARITY (GS-star-tour-map-improvements): the flown ship's rarity scales its
@@ -224,9 +232,22 @@ const TIER_COL: Record<StarTourWorld['tier'], string> = {
  *  on the star map (GS-star-tour-yggdrasil). */
 const THOR_HAMMER_ID = 'thors-hammer';
 
-/** Whether the hidden Yggdrasil (the World Tree) is revealed on the chart — only once Thor's Hammer is
- *  owned. Drives both the map glyph and whether the realm overlay can open. */
+/** Whether the hidden Yggdrasil (the World Tree) is revealed on the chart. Drives both the map glyph and
+ *  whether the realm overlay can open.
+ *
+ *  TWO keys, and they open DIFFERENT things (GS-story-startour-champions). Thor's Hammer is the classic
+ *  one. A CHAMPION also reveals the tree — the campaign ends at Yggdrasil's root, so a golfer who has
+ *  stood there knows where it is — but the hammer gate inside `playYggdrasilRealm` is untouched, so
+ *  Asgard stays behind the Asgard reward. What a champion gets from the tree is the ROOT: the finale
+ *  replayed as the boss their own path faced. Revealing the tree is not the same as opening every branch
+ *  on it, which is why `asgardOpen()` below is a separate question. */
 export function yggdrasilArmed(): boolean {
+  return championFreeRoam() || state.ownedApparel.includes(THOR_HAMMER_ID);
+}
+
+/** Is the ASGARD branch actually playable? The hammer, and only the hammer — `playYggdrasilRealm` refuses
+ *  without it, so a champion-revealed tree must render Asgard as locked rather than offer a dead button. */
+function asgardOpen(): boolean {
   return state.ownedApparel.includes(THOR_HAMMER_ID);
 }
 
@@ -557,8 +578,11 @@ function dossier(w: StarTourWorld): string {
       : `<span class="gs-st-rec" style="opacity:.7;">Not yet played — chart a course!</span>`
     : (() => {
         const best = bestStrokeFor(state.strokePlayBest, w.id);
+        // GS-story-startour-champions: name a champion's record as one, so an out-of-reach score on a
+        // starting bag reads as explained rather than as a mystery.
+        const by = best?.champion ? ` <span style="color:#ffd97a;">★ champion round</span>` : '';
         return best
-          ? `<span class="gs-st-rec">🏆 Your best: <b style="color:${toParColour(best.toPar)};">${formatToPar(best.toPar)}</b> <span style="opacity:.7;">(${best.strokes} strokes, par ${best.par})</span></span>`
+          ? `<span class="gs-st-rec">🏆 Your best: <b style="color:${toParColour(best.toPar)};">${formatToPar(best.toPar)}</b> <span style="opacity:.7;">(${best.strokes} strokes, par ${best.par})</span>${by}</span>`
           : `<span class="gs-st-rec" style="opacity:.7;">No record yet — set the first!</span>`;
       })();
   const cleared = story && worldCleared(state.story!, w.id);
@@ -635,7 +659,10 @@ function recordsSheet(): string {
     ? board
         .map((r, i) => {
           const spec = staticCourseSpec(r.courseId);
-          return `<div class="gs-st-boardrow"><span class="gs-st-boardrank">${i + 1}</span><span class="gs-st-boardname">${spec?.name ?? r.courseId}</span><span class="gs-st-boardscore" style="color:${toParColour(r.toPar)};">${formatToPar(r.toPar)}</span></div>`;
+          // GS-story-startour-champions: ★ = set by a CHAMPION, with the loadout a finished campaign
+          // carries. Descriptive only — the row is ranked on to-par like every other.
+          const star = r.champion ? ` <span title="Set by a Star Tour champion" style="color:#ffd97a;">★</span>` : '';
+          return `<div class="gs-st-boardrow"><span class="gs-st-boardrank">${i + 1}</span><span class="gs-st-boardname">${spec?.name ?? r.courseId}${star}</span><span class="gs-st-boardscore" style="color:${toParColour(r.toPar)};">${formatToPar(r.toPar)}</span></div>`;
         })
         .join('')
     : `<div class="gs-st-boardempty">Fly to a world and play its 18 to set your first course record.</div>`;
@@ -658,6 +685,19 @@ function recordsSheet(): string {
 function yggdrasilSheet(): string {
   const realms = YGGDRASIL_REALMS.map((r) => {
     if (r.playable) {
+      // A champion can REVEAL the tree without owning Thor's Hammer, and `playYggdrasilRealm` refuses
+      // without it — so say so rather than offer a button that does nothing.
+      if (!asgardOpen()) {
+        return `<div class="gs-st-realm gs-st-realm--locked">
+          <div class="gs-st-realm__head">
+            <span class="gs-st-realm__icon">⚔</span>
+            <b class="gs-st-realm__name">${r.name}</b>
+            <span class="gs-st-realm__badge gs-st-realm__badge--soon">Bifröst sealed</span>
+          </div>
+          <p class="gs-st-realm__blurb">${r.blurb}</p>
+          <p class="gs-st-realm__blurb" style="opacity:.72;">The rainbow bridge answers only to Thor&apos;s Hammer. Win it on Asgard to cross.</p>
+        </div>`;
+      }
       return `<div class="gs-st-realm gs-st-realm--open">
         <div class="gs-st-realm__head">
           <span class="gs-st-realm__icon">⚔</span>
@@ -685,6 +725,63 @@ function yggdrasilSheet(): string {
       </div>
       <p class="gs-st-sheet__blurb">The nine realms hang from the branches of the World Tree. Only Asgard has bloomed — the others await their worlds.</p>
       <div class="gs-st-realms">${realms}</div>
+      ${rootSection()}
+    </div>`;
+}
+
+/**
+ * THE SERPENT AT THE ROOT (GS-story-startour-champions) — a champion's replay of the fight that ended
+ * their campaign, hanging beneath the branches because that is where the campaign ended.
+ *
+ * WHOSE fight is the champion's own `alignment`: a Warden faced Jörmungandr, a Herald the Warden Ark.
+ * The battle already takes all of that as options and has exactly one production call site, so the
+ * replay is a SECOND CALLER of `mountStoryBattle`, never a forked fight.
+ *
+ * It is deliberately NOT a realm — `YGGDRASIL_REALMS` describes places you fly to and play golf on, and
+ * this is a memory you step back into. It is also entirely app-layer: no action, no reducer transition,
+ * nothing written. See `starTourView.serpentResult`.
+ */
+function rootSection(): string {
+  const champ = state.story;
+  if (!championFreeRoam() || !champ) return '';
+  const herald = champ.alignment === 'herald';
+  const bossName = herald ? 'the Warden Ark' : 'Jörmungandr';
+  const flavour = herald
+    ? 'The Order&apos;s capital ship still holds the root in its grip. Break the reactor open again.'
+    : 'The world-serpent coils in the dark below the tree, as it did the day you bared its eye.';
+  return `
+    <div class="gs-st-realm gs-st-realm--root">
+      <div class="gs-st-realm__head">
+        <span class="gs-st-realm__icon">${herald ? '🛰' : '🐍'}</span>
+        <b class="gs-st-realm__name">The Root</b>
+        <span class="gs-st-realm__badge" style="--tc:#ff9a6b;">Memory</span>
+      </div>
+      <p class="gs-st-realm__blurb">${flavour}</p>
+      <p class="gs-st-realm__blurb" style="opacity:.72;">Nothing is at stake — your campaign is already won, and the root remembers it either way.</p>
+      <button class="gs-st-play" data-startour-serpent="1"
+        style="background:linear-gradient(180deg,#2a1410,#180c0b);border-color:#8a4a32;color:#ffc0a0;">⚔ Face ${bossName} again</button>
+    </div>`;
+}
+
+/** The Root replay's outcome card — a beat of feedback on the map, then you fly on. It banks nothing,
+ *  which is exactly why it can say so out loud. */
+function serpentResultSheet(): string {
+  const r = starTourView.serpentResult!;
+  const herald = state.story?.alignment === 'herald';
+  const bossName = herald ? 'the Warden Ark' : 'Jörmungandr';
+  const title = r.won ? (r.strike === 'clean' ? 'Struck clean' : 'Struck home') : 'Driven back';
+  const body = r.won
+    ? `You put ${bossName} down a second time. The root is quiet.`
+    : `${bossName} drove you off the root. It costs you nothing — fly back down whenever you like.`;
+  return `
+    <div class="gs-st-sheet gs-st-sheet--ygg" role="dialog" aria-label="The Root">
+      <button class="gs-st-sheet__close" data-startour-serpent-close="1" aria-label="Close">✕</button>
+      <div class="gs-st-sheet__head">
+        <h2 class="gs-st-sheet__title">${r.won ? '⚔' : '🛡'} ${title}</h2>
+        <span class="gs-st-tier" style="--tc:${r.won ? '#7fe0a2' : '#ff9a6b'};">The Root</span>
+      </div>
+      <p class="gs-st-sheet__blurb">${body}</p>
+      <button class="gs-st-play" data-startour-serpent-close="1">▸ Fly on</button>
     </div>`;
 }
 
@@ -714,7 +811,9 @@ export function starTourScreen(): string {
     // the shipyard visibly changes the ship on the chart (Star Tour proper has no upgrades → bare hull).
     shipWeaponLevel: inStoryTour() && state.story ? ownedCategoryCount(state.story, 'weapon') : 0,
   });
-  const sheet = sel
+  const sheet = starTourView.serpentResult
+    ? serpentResultSheet()
+    : sel
     ? dossier(sel)
     : starTourView.yggdrasilOpen && armed
     ? yggdrasilSheet()
@@ -727,4 +826,74 @@ export function starTourScreen(): string {
       ${stHud()}
       ${sheet}
     </div>`;
+}
+
+/**
+ * CHAMPION SELECT (GS-story-startour-champions) — which finished campaign to free-roam as.
+ *
+ * Only ever mounted with TWO OR MORE champions: one flies straight to the map (there is nothing to
+ * pick), and NONE takes the classic character-first flow — a player who finished the campaign under the
+ * old single-slot save and then started over holds the permanent `starTourUnlocked` flag with an empty
+ * champion roster, and they must still get Star Tour. Champions enrich the mode; they never gate it.
+ *
+ * Each card shows what actually differs between them — the path they walked, the ship they finished in,
+ * the bag they carry — because the choice is "which loadout do I want to fly", not "which face".
+ *
+ * Its OWN class prefix (`.gs-champ*`): never the play HUD's `.gs-hud`, and never the map's `.gs-st*`,
+ * which the star map restyles freely underneath it.
+ */
+export function starTourChampionScreen(): string {
+  const champs = championCampaigns(currentRoster(state));
+  const cards = champs.map((c) => championCard(c)).join('');
+  return `
+    <div class="gs-champ">
+      <header class="gs-champ__head">
+        <h1 class="gs-champ__title">Your champions</h1>
+        <p class="gs-champ__sub">Every golfer who finished the Story Tour still flies. Pick who takes the chart — they carry the bag, gear, caddy and ship they saved the galaxy with.</p>
+      </header>
+      <div class="gs-champ__grid">${cards}</div>
+      <div class="gs-champ__actions">
+        <button class="gs-btn gs-btn--ghost" data-action='{"type":"toTitle"}'>‹ Back</button>
+      </div>
+    </div>`;
+}
+
+/** One champion's card — the whole tile is the button (the phone-first rule the golfer roster follows). */
+function championCard(c: StoryState): string {
+  const ch = getCharacter(c.characterId);
+  const name = ch?.name ?? c.characterId;
+  const ship = shipById(c.equippedShipId);
+  const herald = c.alignment === 'herald';
+  const path = herald ? 'Herald of the Coil' : 'Warden of the Realms';
+  const pathCol = herald ? '#c58cf0' : '#7fe0ff';
+  const figure = golferPreviewSVG(undefined, undefined, undefined, {
+    skin: ch?.style.skin,
+    shirtBase: ch?.style.shirt,
+    capColor: ch?.style.cap,
+    hair: ch?.style.hair,
+    // Ids are DOCUMENT-global and up to four figures mount here at once, so each needs its own prefix.
+    uid: `champ${c.characterId.replace(/[^a-z0-9]/gi, '')}`,
+    w: 92,
+    h: 150,
+  });
+  const caddy = c.activeCaddyId ? shopItem(c.activeCaddyId)?.name : undefined;
+  const stats = [
+    `🎒 ${c.equippedBagIds.length} clubs`,
+    `🚀 ${ship?.name ?? 'Station wagon'}`,
+    caddy ? `🧢 ${caddy}` : undefined,
+    `✦ ${c.credits}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const action = JSON.stringify({ type: 'selectStarTourChampion', characterId: c.characterId });
+  return `
+    <button class="gs-champ__card" data-action='${action}' style="--pc:${pathCol};"
+      aria-label="Fly as ${name}, ${path}">
+      <div class="gs-champ__fig" aria-hidden="true">${figure}</div>
+      <div class="gs-champ__meta">
+        <b class="gs-champ__name">${name}</b>
+        <span class="gs-champ__path">★ ${path}</span>
+        <span class="gs-champ__stats">${stats}</span>
+      </div>
+    </button>`;
 }

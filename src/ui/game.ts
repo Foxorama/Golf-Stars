@@ -40,6 +40,7 @@ import {
   starmartOffer,
   starmartRerollCost,
   STARMART_COST,
+  type Run,
   type RunSnapshot,
 } from '../sim/rpg/run';
 import { effectPatchKind } from '../sim/rpg/effects';
@@ -95,6 +96,7 @@ import type { GearSlot } from '../sim/rpg/story';
 import {
   campaignFor,
   campaignTags,
+  championCampaigns,
   emptyCampaignStore,
   upsertCampaign,
   type CampaignStore,
@@ -220,6 +222,22 @@ export function initState(
  */
 export function currentRoster(state: UiState): CampaignStore {
   return state.story ? upsertCampaign(state.campaigns, state.story) : state.campaigns;
+}
+
+/**
+ * The free-roam Star Tour run flown by a CHAMPION (GS-story-startour-champion): a strokeplay run whose
+ * loadout is the finished campaign's — the equipped bag, gear and active caddy the golfer saved the
+ * galaxy with, folded on in the same order `storyPlayWorld` folds them.
+ *
+ * ONE builder, because there are now two ways in (a lone champion resolved by `openStarTour`, and a
+ * champion chosen off the picker) and they must produce the identical golfer. `DEFAULT_BAG_TIER` with no
+ * meta upgrades is deliberate: the campaign's own bag is laid straight over the top, so the main save's
+ * bag tier and Ascension clubs have nothing to say here — a champion's kit is the campaign's, entirely.
+ */
+function championRun(state: UiState, champion: StoryState): Run {
+  const base = startRun(state.run.seed, STROKEPLAY_FORMAT, {}, champion.characterId, 0, DEFAULT_BAG_TIER, []);
+  const loadout = applyStoryClubEffects(applyStoryCaddy(applyStoryGear({ ...base.loadout, bag: storyBagClubs(champion) }, champion), champion), champion);
+  return { ...base, loadout };
 }
 
 /** The campaign tag per golfer for the STORY picker (`campaignTags` over the live roster). Story Tour
@@ -403,19 +421,32 @@ export function reduce(state: UiState, action: Action): UiState {
       if (!['title', 'gameover', 'strokeResult', 'starTour', 'character', 'clubhouseHall'].includes(state.screen)) return state;
       // GS-story-startour-champion: Star Tour is the REWARD for completing the campaign, so a finished
       // campaign plays free-roam AS the developed champion — the golfer who saved the galaxy, carrying the
-      // bag / gear / active caddy you built up (loaded from the separate `gs_story` save). We skip the
-      // golfer pick (you already ARE your champion) and fly straight to the map. When there's no completed
-      // campaign — only reachable in tests, since the title gates Star Tour on completion — the classic
-      // character-first flow is byte-for-byte unchanged.
-      const champion = state.story?.completed ? state.story : undefined;
+      // bag / gear / active caddy you built up.
+      //
+      // GS-story-startour-champions: campaigns are PER GOLFER, so "the champion" became "the champions".
+      // Read the ROSTER, never `state.story` alone — `state.story` is merely whichever campaign happens to
+      // be loaded, so off it a player with a finished Larry and a half-played Feather would be told they
+      // have no champion at all. Three cases, and the FIRST is a promise:
+      //   0 ⇒ the classic character-first flow, byte-for-byte. `starTourUnlocked` is a PERMANENT main-save
+      //       flag and remains the only gate on the mode: a player who finished the campaign under the old
+      //       single-slot save and then started over holds the unlock with an empty champion roster, and
+      //       they must still get Star Tour. Champions ENRICH the mode; they never gate it.
+      //   1 ⇒ straight to the map as them (you already ARE your champion — nothing to pick).
+      //   2+ ⇒ pick which champion to fly as.
+      const champions = championCampaigns(currentRoster(state));
       const keepGolfer = state.screen === 'strokeResult' && !!state.run.loadout.characterId;
+      // Coming back from a round keeps whoever just played it — you picked them a moment ago, so a second
+      // picker would be asking again for no reason. Applies to champions and ordinary golfers alike.
+      const justPlayed = keepGolfer ? champions.find((c) => c.characterId === state.run.loadout.characterId) : undefined;
+      const champion = champions.length === 1 ? champions[0] : justPlayed;
+      if (!champion && champions.length > 1) {
+        // Leave `run`/`story` alone — the champion's run is built by `selectStarTourChampion`, so nothing
+        // is committed by merely opening the picker.
+        return { ...state, screen: 'starTourChampion', starTourPick: undefined, played: undefined, lastResult: undefined, lastStrokeRecord: undefined, strokeIsRecord: undefined, viewHole: 0 };
+      }
       let run;
       if (champion) {
-        // Build the champion's strokeplay run and fold in the developed Story loadout (the `storyPlayWorld`
-        // pattern): the equipped bag + gear + active caddy, so free-roam plays with everything you earned.
-        const base = startRun(state.run.seed, STROKEPLAY_FORMAT, {}, champion.characterId, 0, DEFAULT_BAG_TIER, []);
-        const loadout = applyStoryClubEffects(applyStoryCaddy(applyStoryGear({ ...base.loadout, bag: storyBagClubs(champion) }, champion), champion), champion);
-        run = { ...base, loadout };
+        run = championRun(state, champion);
       } else if (keepGolfer) {
         run = startRun(state.run.seed, STROKEPLAY_FORMAT, state.metaUpgrades, state.run.loadout.characterId, state.run.ascension, state.run.bagTier, state.run.unlockedClubs);
       } else {
@@ -424,6 +455,11 @@ export function reduce(state: UiState, action: Action): UiState {
       return {
         ...state,
         run,
+        // The chosen champion becomes the LIVE campaign, so the ~190 existing `state.story` readers
+        // (`championFreeRoam`, `tourShipId`, the Root replay) keep working unchanged. Safe because
+        // `writeStory` upserts by `characterId` and deliberately does NOT move `activeId` — free-roaming
+        // as Larry can never hijack the "Continue" of a Feather campaign left mid-chapter.
+        ...(champion ? { story: champion } : {}),
         screen: champion || keepGolfer ? 'starTour' : 'character',
         starTourPick: undefined,
         played: undefined,
@@ -432,6 +468,16 @@ export function reduce(state: UiState, action: Action): UiState {
         strokeIsRecord: undefined,
         viewHole: 0,
       };
+    }
+
+    case 'selectStarTourChampion': {
+      // GS-story-startour-champions: fly free-roam as THIS champion (only reachable from the picker, and
+      // only for a golfer whose campaign is actually finished — so a stale id or a hand-built dispatch
+      // can never promote an unfinished campaign into the free-roam reward).
+      if (state.screen !== 'starTourChampion') return state;
+      const champion = campaignFor(currentRoster(state), action.characterId);
+      if (!champion || !storyComplete(champion)) return state;
+      return { ...state, run: championRun(state, champion), story: champion, screen: 'starTour', starTourPick: undefined, viewHole: 0 };
     }
 
     case 'pickStarTourCourse': {

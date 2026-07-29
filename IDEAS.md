@@ -217,41 +217,23 @@ Three sequential PRs, save work first:
   says outright when a champion goes too. `currentRoster` lays the live campaign over the boot snapshot, so
   the tags can't go stale without ~190 `state.story` writes each remembering to mirror themselves.
   Guarded by `tests/story-campaign-picker.test.ts`; eyes-on `scripts/campaign-picker-preview.mjs`.
-- **GS-story-startour-champions** — ⬅ **NEXT.** Star Tour offers your champions (one per golfer finished),
-  each with the bag/gear/caddy/ship they finished with; a champion ARMS Yggdrasil (Thor's Hammer still gates
-  Asgard itself — the player's call, so the Asgard reward keeps its meaning); and **the Serpent at the root**
-  replays the finale battle as Warden or Coil per that champion's `alignment`. Start by reading
-  `docs/decisions/story-campaign-slots.md` (the roster + picker that PRs 1–2 built underneath this).
-  - **Champion select.** `openStarTour` (`ui/game.ts`) already builds a developed champion — but off
-    `state.story?.completed`, i.e. whichever campaign happens to be loaded. It must read
-    `championCampaigns(currentRoster(state))` instead: **0 champions ⇒ today's character-first flow
-    byte-for-byte, 1 ⇒ straight to the map as now, 2+ ⇒ a champion picker.** The developed-loadout
-    composition (`applyStoryClubEffects(applyStoryCaddy(applyStoryGear(…)))`) is already there and tested —
-    reuse it, don't re-derive it. The chosen champion goes in `state.story` so the ~193 existing
-    `state.story` readers keep working; `championFreeRoam()` + `tourShipId()`
-    (`app/starTourScreens.ts`) already handle that shape.
-  - **NEVER LOCK ANYONE OUT OF A MODE THEY ALREADY EARNED.** `starTourUnlocked` is a PERMANENT main-save
-    flag and stays the gate. A player who completed the campaign under the old single-slot save and then
-    started over has the unlock but NO champion in the roster — they must still get Star Tour, on the
-    classic default-loadout flow. Champions are an enrichment of the mode, never a new gate on it.
-  - **Yggdrasil.** `yggdrasilArmed()` (`app/starTourScreens.ts`) is `ownedApparel.includes('thors-hammer')`;
-    widen it to `champion || hammer`. The hard hammer gate inside `playYggdrasilRealm` (`ui/game.ts`) STAYS —
-    that is what keeps Asgard behind the Asgard reward. The Root is NOT a realm: leave `YGGDRASIL_REALMS`
-    alone and add a bespoke section under it in `yggdrasilSheet()`.
-  - **The replay must not touch campaign state.** No `winFinale`, no `starTourUnlocked`, no persist; the
-    recap returns to the MAP, not the title. `finaleUnlocked` is `keyToOtherRealm && completed !== true` —
-    a finished campaign can't re-enter the real finale, which is exactly why the replay needs its own path
-    rather than a reuse of `openStoryFinale`/`engageStoryFinale`. The battle itself already takes
-    everything as options (`mountStoryBattle`: `won`/`loadout`/`shipId`/`herald`, `app.ts` ~3233) and has
-    ONE production call site, so this is a SECOND CALLER — never a forked fight. Mind the reduced-motion
-    branch, which skips the cinematic and dispatches the result directly; the replay needs its own.
-    `startAsgardRun` + `asgardFromStarTour` is the existing precedent for "launch from the map, return to
-    the map".
-  - **Open question to settle first:** Star Tour records (`strokePlayBest`) are per-COURSE and don't key on
-    loadout, so a champion with a full solar bag and a default-bag golfer write to the same board. That is
-    already true today for a single champion; multi-champion makes it routine. Decide whether the board
-    notes the champion, or leave scoring alone and log it as its own idea — do NOT quietly change record
-    keying as a side effect of this chunk.
+- **GS-story-startour-champions** — ✅ *shipping*: Star Tour offers your CHAMPIONS (one per golfer finished),
+  each flying with the bag/gear/caddy/ship they finished with. `openStarTour` reads
+  `championCampaigns(currentRoster(state))` — never `state.story`, which is only whichever campaign happens
+  to be loaded: **0 ⇒ the classic character-first flow byte-for-byte, 1 ⇒ straight to the map, 2+ ⇒ a
+  champion picker.** The 0 case is a PROMISE, not a fallback — `starTourUnlocked` is permanent and remains
+  the only gate, so a player who finished under the old single-slot save and then started over still gets
+  the mode. A champion ARMS Yggdrasil, but revealing the tree ≠ opening a branch: the hard hammer gate in
+  `playYggdrasilRealm` stays and Asgard reads *Bifröst sealed* rather than offering a button that would be
+  refused. **The Serpent at the Root** replays the finale as that champion's own `alignment` faced it
+  (Warden ⇒ Jörmungandr / Herald ⇒ the Warden Ark) — a SECOND CALLER of `mountStoryBattle`, deliberately NOT
+  a reducer action, so "touches no campaign state" is true by construction rather than by remembering; its
+  own reduced-motion branch, returning to the MAP. Records were settled DELIBERATELY: **describe, don't
+  rank** (save v31) — `StrokePlayRecord.champion` joins `characterId`/`tier` as description, one board per
+  course ranked on to-par alone, because a champion IS the live slot and keeps improving, so there is no
+  stable loadout identity to key a board on. The ★ also fixes a real lie: a champion's run is built on
+  `DEFAULT_BAG_TIER` with the story bag laid over, so `tier` stamped 'common' on a solar bag. Guarded by
+  `tests/startour-champions.test.ts` + a browser layout smoke; story in `docs/decisions/story-campaign-slots.md`.
 
 **GS-story-betrayal — the deep betrayal arc (design in `docs/decisions/story-betrayal-arc.md`)**
 Make the back half almost always DIFFERENT: the other three playable golfers become an aboard-ship CAST you

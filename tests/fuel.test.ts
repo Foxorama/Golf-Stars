@@ -275,7 +275,7 @@ describe('save v17 → v18 (GS-fuel)', () => {
     } as unknown;
     const s = migrate(v17);
     expect(s.version).toBe(SAVE_VERSION);
-    expect(SAVE_VERSION).toBe(30);
+    expect(SAVE_VERSION).toBe(31);
     expect(s.activeRun?.fuel).toBeUndefined(); // the stamp adds nothing…
     expect(resumeRun(s.activeRun!).fuel).toBe(8); // …and resume grants the voyage's fresh tank
   });

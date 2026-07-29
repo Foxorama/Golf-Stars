@@ -868,6 +868,9 @@
       .gs-st-realm__badge--soon { color: #7f93a8; border-color: rgba(127,147,168,.4); }
       .gs-st-realm__blurb { font-size: 12.5px; color: #c3d0df; margin: 7px 0 10px; line-height: 1.45; }
       .gs-st-realm--open .gs-st-play { background: linear-gradient(180deg, #ffe08a, #e0a838); box-shadow: 0 4px 16px rgba(255,210,110,.35); }
+      .gs-st-realm--root { background: rgba(42,20,16,.6); border-color: rgba(255,154,107,.34); }
+      .gs-st-realm--root .gs-st-realm__name { color: #ffc0a0; }
+      .gs-st-realm--root .gs-st-realm__badge { color: #ff9a6b; border-color: rgba(255,154,107,.5); }
       .gs-st-introcard { margin-top: 10px; }
       .gs-st-introcard__row { display: flex; align-items: baseline; justify-content: space-between; }
       .gs-st-introcard__label { font-size: 12px; color: #8aa0b8; }
@@ -900,6 +903,36 @@
       .gs-strres__boardtitle { font: 700 10.5px/1 var(--gs-font); letter-spacing: .12em; text-transform: uppercase; color: #6f92b0; margin-bottom: 8px; }
       .gs-strres__actions { display: flex; gap: 10px; margin-top: 18px; }
       .gs-strres__actions .gs-btn { flex: 1; }
+
+      /* ── Star Tour CHAMPION select (GS-story-startour-champions) ──────────────────
+         Its OWN prefix: never the play HUD's .gs-hud, and never the map's .gs-st*. */
+      .gs-champ { max-width: 620px; margin: 0 auto; padding: 4px 2px 20px; }
+      .gs-champ__head { text-align: center; padding: 10px 4px 14px; }
+      .gs-champ__title { font: 800 22px/1.15 var(--gs-font); color: #eaf4ff; margin: 0 0 6px; }
+      .gs-champ__sub { font-size: 12.5px; line-height: 1.45; color: #9db2c8; margin: 0; overflow-wrap: anywhere; }
+      /* auto-fit + minmax(min(…,100%)) so the roster drops to one column on its own — a breakpoint can't
+         answer "too cramped at large text" (media queries are blind to --gs-uiscale). */
+      .gs-champ__grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
+      .gs-champ__card {
+        display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; text-align: left;
+        padding: 10px 12px 10px 8px; border-radius: 14px; cursor: pointer;
+        background: linear-gradient(180deg, rgba(20,30,46,.92), rgba(12,18,28,.92));
+        border: 1px solid color-mix(in srgb, var(--pc, #7fe0ff) 40%, transparent);
+        box-shadow: 0 4px 18px #0006, inset 0 0 26px color-mix(in srgb, var(--pc, #7fe0ff) 9%, transparent);
+        color: #dbe6f2; font-family: var(--gs-font);
+      }
+      .gs-champ__card:hover { border-color: color-mix(in srgb, var(--pc, #7fe0ff) 72%, transparent); }
+      .gs-champ__fig { flex: 0 0 auto; width: 76px; filter: drop-shadow(0 5px 5px #0008); }
+      .gs-champ__fig svg { display: block; width: 100%; height: auto; }
+      .gs-champ__meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+      .gs-champ__name { font-size: 16px; font-weight: 800; color: #eaf4ff; }
+      .gs-champ__path {
+        font: 700 10px/1.3 var(--gs-font); letter-spacing: .08em; text-transform: uppercase;
+        color: var(--pc, #7fe0ff); overflow-wrap: anywhere;
+      }
+      .gs-champ__stats { font-size: 11.5px; line-height: 1.45; color: #93a8be; overflow-wrap: anywhere; }
+      .gs-champ__actions { display: flex; margin-top: 16px; }
+      .gs-champ__actions .gs-btn { flex: 1; }
 
       /* ── Clubhouse: tap-to-restyle character stage + garage bay + slot picker ─ */
       .gs-cstage {

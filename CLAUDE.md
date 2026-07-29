@@ -98,6 +98,25 @@ This game lives or dies on three axes — put every change through all three bef
   boot snapshot, because only the ACTIVE campaign can change while you play; without it the tags would go
   stale unless ~190 `state.story` writes each remembered to mirror themselves. Guarded by
   `tests/story-campaign-picker.test.ts`.
+  **A STAR TOUR CHAMPION IS A FINISHED SLOT, AND `starTourUnlocked` IS STILL THE ONLY GATE**
+  (GS-story-startour-champions). `openStarTour` reads `championCampaigns(currentRoster(state))` — never
+  `state.story`, which is merely whichever campaign is loaded: **0 ⇒ the classic character-first flow
+  byte-for-byte, 1 ⇒ straight to the map, 2+ ⇒ the `starTourChampion` picker**. The 0 case is a PROMISE, not
+  a fallback: a player who finished under the old single-slot save and then started over holds the permanent
+  unlock with an EMPTY roster, and must still get the mode. Champions ENRICH Star Tour; they never gate it.
+  The pick is written to `state.story` (so the ~190 readers are untouched), which is safe only because
+  `writeStory` doesn't move `activeId`. `championRun` is ONE builder for both entry paths. Yggdrasil is armed
+  by `champion || hammer` — but revealing the tree ≠ opening a branch, so the hard hammer gate in
+  `playYggdrasilRealm` stays and Asgard renders as *Bifröst sealed* rather than as a dead button. **THE ROOT
+  REPLAY IS NOT A REDUCER ACTION** — a second caller of `mountStoryBattle` (Warden ⇒ Jörmungandr / Herald ⇒
+  the Warden Ark, off the champion's `alignment`), landing in `starTourView.serpentResult` and returning to
+  the MAP; having no action to dispatch is what makes "touches no campaign state" true by construction, and
+  it needs its OWN reduced-motion branch because the finale's skips by dispatching `engageStoryFinale`.
+  **RECORDS DESCRIBE, THEY DO NOT RANK** (save v31): `StrokePlayRecord.champion` joins `characterId`/`tier`
+  as description — one board per course, ranked on to-par alone. Loadout-keyed boards are impossible to do
+  honestly (a champion IS the live slot and keeps improving ⇒ no stable loadout identity), and the ★ also
+  fixes a real lie — a champion's run is built on `DEFAULT_BAG_TIER` with the story bag laid over, so `tier`
+  stamped `common` on a solar bag. Guarded by `tests/startour-champions.test.ts`.
   **A backup is a BUNDLE, not a save** (GS-save-transfer, `save/backup.ts` pure · `app/saveTransfer.ts`
   the localStorage/DOM half). Progress lives in THREE blobs (`gs_save` + `gs_story` + `gs_settings`) and
   localStorage is per-ORIGIN, so the website and the Capacitor shell (`https://localhost`) cannot see
