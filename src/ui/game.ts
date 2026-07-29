@@ -93,6 +93,14 @@ import { activeQualifierPlan, qualifierMatchThrough } from '../sim/rpg/storyQual
 import { questBeatFor, questBeatTurnIndex, questOfferBeatFor } from '../sim/rpg/storyQuestBeat';
 import type { GearSlot } from '../sim/rpg/story';
 import {
+  campaignFor,
+  campaignTags,
+  emptyCampaignStore,
+  upsertCampaign,
+  type CampaignStore,
+  type CampaignTag,
+} from '../sim/rpg/storyRoster';
+import {
   autoDecision,
   awaitingPutt,
   beginHole,
@@ -148,6 +156,9 @@ export function initState(
   meta: MetaProgress = {},
   resumable?: RunSnapshot,
   story?: StoryState,
+  /** GS-story-campaign-slots: every campaign the player owns (`loadCampaignStore()`). Optional so every
+   *  existing `initState(seed, meta)` call site — the whole test suite — is unchanged. */
+  campaigns?: CampaignStore,
 ): UiState {
   const metaUpgrades = meta.metaUpgrades ?? {};
   const bagTier = meta.bagTier ?? DEFAULT_BAG_TIER;
@@ -159,6 +170,11 @@ export function initState(
     viewHole: 0,
     resumable,
     ...(story ? { story } : {}),
+    // GS-story-campaign-slots: the whole roster, so the reducer can answer "does this golfer already
+    // have a campaign?" — the question the overwrite confirmation guards a destructive write with.
+    // Boot passes it alongside the active campaign; absent (tests, no storage) ⇒ an empty roster that
+    // still contains the active campaign if there is one, so nothing downstream has to special-case it.
+    campaigns: campaigns ?? (story ? upsertCampaign(emptyCampaignStore(), story) : emptyCampaignStore()),
     bestStableford: meta.bestStableford ?? 0,
     bestDistance: meta.bestDistance ?? 0,
     shards: meta.shards ?? 0,
@@ -191,6 +207,26 @@ export function initState(
     starTourUnlocked: (meta.starTourUnlocked ?? false) || (story ? storyComplete(story) : false),
     priceRefund: meta.priceRefund,
   };
+}
+
+/**
+ * The roster AS IT STANDS RIGHT NOW (GS-story-campaign-picker) — `state.campaigns` with the live
+ * `state.story` laid over its own slot.
+ *
+ * This is what every picker/badge surface must read, and it exists so the roster can never go stale
+ * without 190-odd `state.story` writes each having to remember to mirror themselves. The reason it is
+ * sound is that **only one campaign can change while you play**: the active one, which IS `state.story`.
+ * Every other slot was loaded at boot and nothing can touch it until it becomes the active one.
+ */
+export function currentRoster(state: UiState): CampaignStore {
+  return state.story ? upsertCampaign(state.campaigns, state.story) : state.campaigns;
+}
+
+/** The campaign tag per golfer for the STORY picker (`campaignTags` over the live roster). Story Tour
+ *  only by construction — the `character` screen is shared, so its badges are passed in, never looked
+ *  up by the renderer, or every mode's picker would tag its golfers. */
+export function storyCampaignTags(state: UiState): Record<string, CampaignTag> {
+  return campaignTags(currentRoster(state));
 }
 
 /** The credit cost of the NEXT shop reroll (GS-shop-reroll) — base 30, ×1.6 per reroll this stop. */
@@ -244,18 +280,15 @@ export function reduce(state: UiState, action: Action): UiState {
       // (a Story round is teed off later from the campaign). Branch first so the shared run-building path
       // below is byte-identical for every other mode.
       if (state.pendingStoryNew) {
-        return {
-          ...state,
-          // GS-story-qualifier-formats: stamp the campaign's DRAW-SHEET seed off the boot run seed (the
-          // one sanctioned `Math.random` site, `freshRunSeed`), so every campaign draws its own qualifier
-          // formats/pairings/partners while each remains a pure keyed hash from then on. `defaultStoryState`
-          // stays rng-free (it's sim-pure); the seed is a side-effect-layer value threaded in here.
-          story: { ...defaultStoryState(action.characterId), campaignSeed: `c${state.run.seed}` },
-          pendingStoryNew: false,
-          storyInspectId: undefined,
-          characterLoreId: undefined,
-          screen: 'story',
-        };
+        // GS-story-campaign-picker: campaigns are PER GOLFER, so picking one that already has a campaign
+        // CONTINUES it — the picker is the campaign list. Creating a fresh campaign over the top is a
+        // destructive write and must come through the confirmed `storyRestartCampaign` path instead;
+        // guarding that here rather than in the screen means the confirmation cannot be bypassed by any
+        // surface that dispatches `selectCharacter` (the inspect card, a deep link, a future picker).
+        if (campaignFor(state.campaigns, action.characterId)) {
+          return reduce({ ...state, characterLoreId: undefined }, { type: 'storyContinueCampaign', characterId: action.characterId });
+        }
+        return reduce({ ...state, characterLoreId: undefined }, { type: 'storyRestartCampaign', characterId: action.characterId });
       }
       // Rebuild the run with the golfer's loadout/shape baked in, keeping the format + bag tier
       // chosen at 'start'. Ascension (GS-ascension) is a per-run difficulty picked HERE, alongside
@@ -419,22 +452,82 @@ export function reduce(state: UiState, action: Action): UiState {
       // GS-story: enter Story Mode. If a campaign is loaded (boot read `gs_story` into `state.story`),
       // CONTINUE it — straight to the hub. Otherwise begin a NEW campaign by picking a golfer (the
       // `pendingStoryNew` flag routes `selectCharacter` to create the `StoryState`).
+      // GS-story-campaign-picker: Story Tour ALWAYS opens the golfer picker now — campaigns are per
+      // golfer, so "which campaign?" and "which golfer?" are the same question, and answering it on one
+      // screen is what makes a second campaign discoverable at all. The picker tags each golfer with
+      // their campaign state (`campaignTags`), so you can see who has a run going before you tap.
       if (state.screen !== 'title' && state.screen !== 'gameover' && state.screen !== 'story') return state;
-      if (state.story) {
-        // GS-story-quality (finding A): The Choice is reached only via the transient tournament-result
-        // screen (neither it nor `lastStoryTournament` is persisted), so quitting mid-dismiss after the
-        // Chapter-3 win would silently railroad you onto the default Warden route AND skip the Chapter-4
-        // interlude. If a loaded campaign has advanced past the trunk (chapter ≥ 4) with no path chosen and
-        // the finale not yet won, re-present The Choice instead of dropping into the hub.
-        if (state.story.chapter >= 4 && !state.story.alignment && state.story.completed !== true) {
-          return { ...state, screen: 'storyChoice', storyInspectId: undefined };
-        }
-        // GS-story-quality: normalise a Herald campaign's caddy roster on resume (a save from before the Coil
-        // volunteers shipped still carries Warden caddies) — the Warden friends leave, the Coil takes the bag.
-        const story = applyHeraldCaddies(state.story);
-        return { ...state, story, screen: 'story', storyInspectId: undefined };
+      return {
+        ...state,
+        screen: 'character',
+        pendingStoryNew: true,
+        storyInspectId: undefined,
+        storyOverwriteId: undefined,
+        resumable: state.resumable,
+      };
+    }
+
+    case 'storyContinueCampaign': {
+      // GS-story-campaign-picker: resume a SAVED campaign from the picker. This is the old `openStory`
+      // continue branch, now keyed by golfer instead of by "the one campaign" — every guard it carried
+      // still applies, because they are properties of the campaign, not of how you reached it.
+      if (state.screen !== 'character' && state.screen !== 'title' && state.screen !== 'story') return state;
+      const saved = campaignFor(state.campaigns, action.characterId);
+      if (!saved) return state;
+      const base = { ...state, pendingStoryNew: false, storyInspectId: undefined, storyOverwriteId: undefined };
+      // GS-story-quality (finding A): The Choice is reached only via the transient tournament-result
+      // screen (neither it nor `lastStoryTournament` is persisted), so quitting mid-dismiss after the
+      // Chapter-3 win would silently railroad you onto the default Warden route AND skip the Chapter-4
+      // interlude. If a loaded campaign has advanced past the trunk (chapter ≥ 4) with no path chosen and
+      // the finale not yet won, re-present The Choice instead of dropping into the hub.
+      if (saved.chapter >= 4 && !saved.alignment && saved.completed !== true) {
+        return { ...base, story: saved, screen: 'storyChoice' };
       }
-      return { ...state, screen: 'character', pendingStoryNew: true, storyInspectId: undefined, resumable: state.resumable };
+      // GS-story-quality: normalise a Herald campaign's caddy roster on resume (a save from before the Coil
+      // volunteers shipped still carries Warden caddies) — the Warden friends leave, the Coil takes the bag.
+      const story = applyHeraldCaddies(saved);
+      return { ...base, story, campaigns: upsertCampaign(state.campaigns, story), screen: 'story' };
+    }
+
+    case 'storyRequestRestart': {
+      // GS-story-campaign-picker: the player wants to START OVER as a golfer who already has a campaign.
+      // Raise the confirmation rather than writing — and refuse outright when there is nothing to
+      // overwrite, so this can never become a second, unguarded way to create a campaign.
+      if (state.screen !== 'character' || !state.pendingStoryNew) return state;
+      if (!campaignFor(state.campaigns, action.characterId)) return state;
+      return { ...state, storyOverwriteId: action.characterId };
+    }
+
+    case 'storyCancelRestart': {
+      if (!state.storyOverwriteId) return state;
+      return { ...state, storyOverwriteId: undefined };
+    }
+
+    case 'storyRestartCampaign': {
+      // GS-story-campaign-picker: CREATE a campaign for this golfer — a fresh one for a golfer who has
+      // none, or the confirmed replacement of an existing one. It overwrites exactly ONE slot; every
+      // other golfer's campaign (and their Star Tour champion) is untouched, which is the whole point of
+      // the roster. Only reachable from the picker, and only past the confirmation when there is
+      // something to destroy — `selectCharacter` routes here for a golfer with no campaign, and the
+      // confirm sheet routes here for one with.
+      if (state.screen !== 'character' || !state.pendingStoryNew) return state;
+      const replacing = !!campaignFor(state.campaigns, action.characterId);
+      if (replacing && state.storyOverwriteId !== action.characterId) return state; // unconfirmed ⇒ refuse
+      // GS-story-qualifier-formats: stamp the campaign's DRAW-SHEET seed off the boot run seed (the
+      // one sanctioned `Math.random` site, `freshRunSeed`), so every campaign draws its own qualifier
+      // formats/pairings/partners while each remains a pure keyed hash from then on. `defaultStoryState`
+      // stays rng-free (it's sim-pure); the seed is a side-effect-layer value threaded in here.
+      const story = { ...defaultStoryState(action.characterId), campaignSeed: `c${state.run.seed}` };
+      return {
+        ...state,
+        story,
+        campaigns: upsertCampaign(state.campaigns, story),
+        pendingStoryNew: false,
+        storyInspectId: undefined,
+        storyOverwriteId: undefined,
+        characterLoreId: undefined,
+        screen: 'story',
+      };
     }
 
     case 'storyNewCampaign': {

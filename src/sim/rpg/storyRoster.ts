@@ -178,6 +178,56 @@ export function hasChampion(store: CampaignStore): boolean {
   return championCampaigns(store).length > 0;
 }
 
+/**
+ * The CAMPAIGN TAG shown against a golfer wherever Story Tour asks you to pick one
+ * (GS-story-campaign-picker) — so "do I have a run going, and with whom?" is answered by looking at
+ * the roster instead of remembering it.
+ *
+ * Pure and derived from the campaign itself, so the clubhouse figure's badge, the inspect card's line
+ * and any future surface cannot disagree about what state a campaign is in. `null` = this golfer has
+ * no campaign (nothing to say; picking them simply starts one).
+ *
+ * NOTE this is Story-Tour-only by construction: it takes a roster, and no other mode has one. The
+ * `character` screen is SHARED with Voyage / Unending / Star Tour, so its badges must be passed in
+ * rather than looked up by the renderer — a renderer that fetched the roster itself would tag golfers
+ * on every mode's picker.
+ */
+export interface CampaignTag {
+  kind: 'in-progress' | 'complete';
+  /** Short badge for a crowded surface (the clubhouse figure): `Chp 3` · `Prologue` · `★ Complete`. */
+  short: string;
+  /** The full line for a card with room: `In progress — Chapter 3` · `Complete — Star Tour champion`. */
+  label: string;
+  /** Chapter reached, 0 = the Earth prologue. */
+  chapter: number;
+}
+export function campaignTag(store: CampaignStore, characterId: string): CampaignTag | null {
+  const story = campaignFor(store, characterId);
+  if (!story) return null;
+  if (storyComplete(story)) {
+    return { kind: 'complete', short: '★ Complete', label: 'Complete — Star Tour champion', chapter: story.chapter };
+  }
+  // Chapter 0 is the Earth prologue — "Chapter 0" would read as a bug, so name the thing it actually is.
+  const where = story.chapter <= 0 ? 'Prologue' : `Chapter ${story.chapter}`;
+  return {
+    kind: 'in-progress',
+    short: story.chapter <= 0 ? 'Prologue' : `Chp ${story.chapter}`,
+    label: `In progress — ${where}`,
+    chapter: story.chapter,
+  };
+}
+
+/** Every golfer's tag in one map, for a picker that renders the whole roster at once. Golfers with no
+ *  campaign are simply absent. */
+export function campaignTags(store: CampaignStore): Record<string, CampaignTag> {
+  const out: Record<string, CampaignTag> = {};
+  for (const story of campaignList(store)) {
+    const tag = campaignTag(store, story.characterId);
+    if (tag) out[story.characterId] = tag;
+  }
+  return out;
+}
+
 /** What starting a NEW campaign for this golfer would DESTROY, or `null` when it costs nothing (no
  *  campaign, so nothing to overwrite). The UI turns this into the confirmation; putting it here means
  *  the decision is unit-testable and the screen cannot quietly disagree with what actually happens.

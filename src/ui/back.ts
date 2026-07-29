@@ -173,6 +173,10 @@ export function backIntent(state: UiState, ctx: BackContext = {}): BackIntent {
   // never both live; it is listed first because it is the innermost thing a play-screen back can mean.
   if (ctx.clubPickerOpen) return { kind: 'closeClubPicker' };
   if (ctx.settingsOpen) return { kind: 'closeSettings' };
+  // GS-story-campaign-picker: the start-over confirm sits OVER the golfer inspect card that raised it,
+  // so it is listed first — and like every other confirm, back CANCELS it. A back press must never be
+  // able to destroy a campaign.
+  if (state.storyOverwriteId) return { kind: 'dismiss', action: { type: 'storyCancelRestart' } };
   if (state.characterLoreId) return { kind: 'dismiss', action: { type: 'closeCharacterLore' } };
   if (state.storyInspectId) return { kind: 'dismiss', action: { type: 'storyCloseInspect' } };
   if (state.storyItemInspectId) return { kind: 'dismiss', action: { type: 'storyCloseItem' } };

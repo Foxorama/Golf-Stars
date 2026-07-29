@@ -132,18 +132,71 @@ One consequence is already live and worth knowing: because `writeStory` upserts 
 starting a campaign as a *different* golfer no longer destroys the existing one — it adds a slot. There
 is simply no UI yet that lets you get back to the other one on purpose.
 
-### What the picker will need first: the roster in `UiState`
+---
 
-Recorded here because it is the load-bearing decision of the next chunk and was reached while this one
-was fresh. The reducer is pure and currently sees only `state.story` — the ONE active campaign. So it
-**cannot answer "does this golfer already have a campaign?"**, which is exactly the question the
-overwrite confirmation turns on.
+# The picker (GS-story-campaign-picker)
 
-Gating that in the app layer would put the guard somewhere the reducer can contradict, and the guard
-protects a *destructive* write. `selectCharacter` under `pendingStoryNew` has to refuse to create over
-an existing slot until confirmed **in the reducer**, or the confirmation is decoration over a write
-that happens anyway. So the next chunk starts by adding `campaigns: CampaignStore` to `UiState`
-(hydrated at boot from `loadCampaignStore()`, kept in step by the reducer on create / continue /
-delete); the picker and the confirm then both read one source. `campaignOverwriteWarning` is already
-pure and already machine-checked to agree with what `upsertCampaign` really does, so it drops in
-unchanged — and the same roster is what PR 3's champion select needs, so this is paid once.
+Code: `src/ui/game.ts` (the entry flow + `currentRoster`/`storyCampaignTags`), `src/app/storyScreens.ts`
+(`storyGolferPickerHTML` + the confirm sheet), `src/render/storyClubhouse.ts` (the badges),
+`src/ui/back.ts`. Guards: `tests/story-campaign-picker.test.ts`. Eyes-on:
+`scripts/campaign-picker-preview.mjs`.
+
+## The golfer picker IS the campaign picker
+
+Campaigns are per golfer, so *"which campaign?"* and *"which golfer?"* are the same question — and
+answering it on one screen is what makes a second campaign discoverable at all. `openStory` therefore
+**always** opens the Earth clubhouse now, instead of dropping straight into the hub, and each figure
+wears a **campaign tag**: `Chp 3` · `Prologue` · `★ Complete`. Tapping a golfer who has a campaign
+CONTINUES it; tapping one who doesn't starts theirs. Nothing is overwritten by picking.
+
+Chapter 0 is deliberately never rendered as "Chapter 0" — it is the Earth prologue, and a zero there
+reads as a bug.
+
+The tags are **Story Tour only by construction**. The `character` screen is shared with Voyage,
+Unending and Star Tour, so `campaignTags` takes a roster and the renderer takes the result as an
+argument — a renderer that fetched the roster itself would badge golfers on every mode's picker.
+Absent tags ⇒ no badges, so every other caller is byte-for-byte unchanged.
+
+The badge also goes into the figure's **accessible name** ("…, In progress — Chapter 3"). It carries
+real information; a screen-reader player must not have to open the card to learn it.
+
+## The roster in `UiState`, and why the guard is in the reducer
+
+The reducer is pure and saw only `state.story` — the ONE active campaign — so it could not answer
+*"does this golfer already have a campaign?"*, which is exactly the question the overwrite
+confirmation turns on. Gating that in the app layer would put the guard somewhere the reducer can
+contradict, and **the guard protects a destructive write**.
+
+So `UiState` gained `campaigns: CampaignStore`, hydrated at boot, and the rule lives in the reducer:
+
+- `selectCharacter` under `pendingStoryNew` **can never overwrite** — it resumes an existing campaign
+  and only creates for a golfer who has none;
+- `storyRestartCampaign` **refuses outright** unless `storyOverwriteId` names that same golfer, so a
+  surface that dispatches the create directly — a deep link, a future screen, a stale handler — gets a
+  no-op rather than a silent wipe;
+- and back **cancels** the confirm (tier 0 in `backIntent`, above the inspect card that raised it). A
+  back press must never be able to destroy a campaign.
+
+The sheet's copy is derived from `campaignOverwriteWarning` — the same pure function the reducer's
+guard consults, already machine-checked to agree with what `upsertCampaign` really does — so it cannot
+promise something milder than the write. For a COMPLETED campaign it says outright that the golfer's
+**Star Tour character** goes with it, because that is the consequence a player would not otherwise
+connect, and it adds "no other golfer's campaign is touched", because that is the reassurance the
+roster earns. "Keep it" is the primary button: the safe choice is the fat one under a thumb.
+
+## `currentRoster` — the one thing that stops the roster going stale
+
+`state.campaigns` is a boot snapshot, and campaigns advance as you play. Mirroring every one of the
+~190 `state.story` writes into the roster would be a standing invitation to forget one, so instead
+every picker/badge surface reads:
+
+```ts
+currentRoster(state) = state.story ? upsertCampaign(state.campaigns, state.story) : state.campaigns
+```
+
+This is sound because **only one campaign can change while you play**: the active one, which *is*
+`state.story`. Every other slot was loaded at boot and nothing can touch it until it becomes active.
+
+## Still to come
+
+Star Tour **champion select**, the champion-armed Yggdrasil, and the Serpent-at-the-root finale replay.

@@ -205,23 +205,18 @@ Three sequential PRs, save work first:
   key, so the bundle's blob list is unchanged and nobody loses a campaign); a Star Tour champion IS that
   golfer's completed slot, never a snapshot that can drift; `BACKUP_VERSION` → 2 so an older build refuses a
   roster file loudly rather than restoring one mangled campaign. Guarded by `tests/story-roster.test.ts`.
-- **GS-story-campaign-picker** — Story Tour entry becomes a campaign PICKER (continue any saved golfer, or
-  start a new one), and picking a golfer who already has a campaign CONFIRMS the overwrite — naming what it
-  costs, and saying outright when it also replaces that golfer's Star Tour character (`campaignOverwriteWarning`
-  already returns exactly that, machine-checked to agree with what the write really does).
-  **THE ROSTER HAS TO GO INTO `UiState` FIRST, AND THAT IS THE WHOLE DESIGN OF THIS CHUNK.** The reducer is
-  pure and today sees only `state.story` — the ONE active campaign — so it cannot answer "does this golfer
-  already have a campaign?", which is precisely the question the overwrite confirm turns on. Gating that in
-  the app layer instead would put the guard somewhere the reducer can contradict, and the guard protects a
-  DESTRUCTIVE write: `selectCharacter` under `pendingStoryNew` must refuse to create over an existing slot
-  until confirmed, in the reducer, or the confirmation is decoration. So add `campaigns: CampaignStore` to
-  `UiState` (hydrated at boot from `loadCampaignStore()`, kept in step by the reducer on create/continue/
-  delete), and the picker + confirm both read it. `campaignOverwriteWarning` is already pure and already
-  agrees with `upsertCampaign` by test, so it drops straight in. This also pre-pays PR 3, whose champion
-  select needs the same roster in the reducer. Open question worth one decision before building: whether the
-  picker shows for a SINGLE campaign too (explicit + discoverable, one extra tap on every resume) or only at
-  two or more (zero friction, but a one-campaign player may never discover they can have a second) — the
-  request reads as "when they tap on Story Tour mode it asks for the character they want", i.e. always.
+- **GS-story-campaign-picker** — ✅ *shipped*: the GOLFER picker IS the campaign picker. `openStory` always
+  opens the Earth clubhouse and each figure wears a campaign TAG (`Chp 3` / `Prologue` / `★ Complete`, in the
+  accessible name too); tapping a golfer with a campaign CONTINUES it, one without starts theirs, and nothing
+  is overwritten by picking. Story-Tour-only by construction — the `character` screen is SHARED, so tags are
+  passed IN and a renderer never fetches the roster (absent ⇒ byte-for-byte for every other mode). The roster
+  moved into `UiState` so the guard on the DESTRUCTIVE write lives in the reducer, where no surface can route
+  around it: `selectCharacter` can never overwrite, `storyRestartCampaign` refuses unless `storyOverwriteId`
+  names that golfer, and BACK cancels the confirm. The sheet's copy comes from `campaignOverwriteWarning` —
+  the same pure function the guard consults — so it can't promise something milder than the write, and it
+  says outright when a champion goes too. `currentRoster` lays the live campaign over the boot snapshot, so
+  the tags can't go stale without ~190 `state.story` writes each remembering to mirror themselves.
+  Guarded by `tests/story-campaign-picker.test.ts`; eyes-on `scripts/campaign-picker-preview.mjs`.
 - **GS-story-startour-champions** — Star Tour offers your champions (one per golfer finished), each with the
   bag/gear/caddy/ship they finished with; a champion ARMS Yggdrasil (Thor's Hammer still gates Asgard itself),
   and **the Serpent at the root** replays the finale battle as Warden or Coil per that champion's `alignment`.

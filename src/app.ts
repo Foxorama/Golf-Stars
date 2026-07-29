@@ -53,7 +53,7 @@ import {
   type UiState,
 } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
-import { loadStory, setActiveCampaignId } from './save/storyStore';
+import { loadStory, loadCampaignStore, setActiveCampaignId } from './save/storyStore';
 import { defaultSave } from './save/schema';
 import { mountIntro } from './render/introView';
 import { mountStoryIntro } from './render/storyIntro';
@@ -172,9 +172,12 @@ function boot(): void {
     // GS-story: load the Story Mode campaign from its own `gs_story` blob (null ⇒ no campaign yet), so the
     // title's Story tile can offer Continue and `openStory` can resume straight to the hub.
     const story = loadStory() ?? undefined;
+    // GS-story-campaign-slots: and the WHOLE roster — one campaign per golfer — so the picker can tag
+    // every golfer with their campaign state and the reducer can tell a fresh start from an overwrite.
+    const campaigns = loadCampaignStore();
     // Always land on the title screen; a saved run is offered as "Continue", never
     // auto-resumed — so the format choice is always reachable.
-    setState(initState(seed, meta, save.activeRun, story));
+    setState(initState(seed, meta, save.activeRun, story, campaigns));
     applyDebugParams(); // GS-asgard: test-hub-only `?rainbow=` / `?asgard=` jumps (dormant in the live game)
     // A rotate / desktop window resize changes the play map's frame (GS-play-fullframe). Re-render so
     // the SVG is rebuilt at the new aspect instead of meet-fitting black bands back in. rAF-throttled,

@@ -14,6 +14,8 @@ import { state } from './ctx';
 import { getCharacter } from '../sim/rpg/characters';
 import { shipById } from '../sim/rpg/ships';
 import { earthClubhouseSceneHTML, golferInspectOverlayHTML } from '../render/storyClubhouse';
+import { currentRoster, storyCampaignTags } from '../ui/game';
+import { campaignOverwriteWarning } from '../sim/rpg/storyRoster';
 import { spaceportSceneHTML } from '../render/storySpaceport';
 import { STORY_CHAPTER_COUNT, PROLOGUE_COURSE_ID, worldCleared, type StoryState } from '../sim/rpg/story';
 import { currentTournament, tournamentForChapter, tournamentRival } from '../sim/rpg/storyTournaments';
@@ -130,7 +132,7 @@ function premiseCardHTML(): string {
 function hubFooterHTML(): string {
   return `
     <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'storyNewCampaign' })}'
-      title="Abandon this campaign and start a new one">↺ New campaign</button>
+      title="Switch golfer, or begin a campaign with another — each golfer keeps their own">↺ Switch campaign</button>
     <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStory' })}'>‹ Back to title</button>`;
 }
 
@@ -140,12 +142,37 @@ function hubFooterHTML(): string {
  * stats + abilities, and "Play as" them. Exported for app.ts's render branch.
  */
 export function storyGolferPickerHTML(): string {
-  const overlay = state.storyInspectId
-    ? golferInspectOverlayHTML(state.storyInspectId, {
-        label: `▶ Play as ${getCharacter(state.storyInspectId)?.name ?? 'this golfer'}`,
-        action: { type: 'selectCharacter', characterId: state.storyInspectId },
-      })
+  // GS-story-campaign-picker: campaigns are PER GOLFER, so this screen is also the campaign list. Each
+  // figure wears its campaign tag ("Chp 3" / "★ Complete"), and tapping a golfer CONTINUES their saved
+  // campaign rather than starting over — starting over is the ghost button, behind a confirmation.
+  const tags = storyCampaignTags(state);
+  const inspectId = state.storyInspectId;
+  const tag = inspectId ? tags[inspectId] : undefined;
+  const who = inspectId ? getCharacter(inspectId)?.name ?? 'this golfer' : '';
+  const overlay = inspectId
+    ? golferInspectOverlayHTML(
+        inspectId,
+        tag
+          ? {
+              // A finished campaign is still playable (you can roam and shop on), but "Continue —
+              // Complete" reads as a contradiction; name what they ARE instead.
+              label: tag.kind === 'complete' ? '▶ Continue as champion ★' : `▶ Continue — ${tag.label.replace('In progress — ', '')}`,
+              action: { type: 'storyContinueCampaign', characterId: inspectId },
+            }
+          : { label: `▶ Play as ${who}`, action: { type: 'selectCharacter', characterId: inspectId } },
+        {
+          tag,
+          // Only offered where there is something to restart — and it raises the confirm, never writes.
+          ...(tag ? { secondary: { label: '↺ Start a new campaign', action: { type: 'storyRequestRestart', characterId: inspectId } } } : {}),
+        },
+      )
     : '';
+  const anyCampaign = Object.keys(tags).length > 0;
+  const lede = anyCampaign
+    ? `The clubhouse hums before the final round. <span style="color:var(--gs-ink);">Tap a golfer</span> to
+       continue their campaign — or pick one who hasn’t teed off yet. Every golfer keeps their own.`
+    : `The clubhouse hums before the final round. <span style="color:var(--gs-ink);">Tap a golfer</span> to
+       weigh their game — then choose who tees it up for the Tour.`;
   return `
     <header class="gs-hero gs-storyhub">
       <h1 class="gs-hero-title">🌍 World Tour</h1>
@@ -153,16 +180,52 @@ export function storyGolferPickerHTML(): string {
     </header>
     ${premiseCardHTML()}
     <section style="max-width:620px;margin:2px auto 0;">
-      <div style="text-align:center;color:var(--gs-dim);font-size:13px;line-height:1.5;margin-bottom:8px;">
-        The clubhouse hums before the final round. <span style="color:var(--gs-ink);">Tap a golfer</span> to
-        weigh their game — then choose who tees it up for the Tour.
-      </div>
-      ${earthClubhouseSceneHTML(null)}
+      <div style="text-align:center;color:var(--gs-dim);font-size:13px;line-height:1.5;margin-bottom:8px;">${lede}</div>
+      ${earthClubhouseSceneHTML(null, tags)}
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:14px auto 0;">
       <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStory' })}'>‹ Back to title</button>
     </div>
-    ${overlay}`;
+    ${overlay}
+    ${state.storyOverwriteId ? storyRestartConfirmHTML(state.storyOverwriteId) : ''}`;
+}
+
+/**
+ * The START-OVER confirmation (GS-story-campaign-picker) — the one destructive act in the picker.
+ *
+ * Reuses the shared `.gs-sheet` chrome (as `exitConfirmOverlay` does) rather than minting new global
+ * classes. The copy is derived from `campaignOverwriteWarning`, which is the SAME pure function the
+ * reducer's guard consults and is machine-checked to agree with what `upsertCampaign` really does — so
+ * the sheet can never promise something milder than the write. A COMPLETED campaign says outright that
+ * the Star Tour champion goes with it, because that is the consequence a player would not otherwise
+ * connect. "Keep it" is the primary: the safe choice is the fat button.
+ */
+function storyRestartConfirmHTML(characterId: string): string {
+  const w = campaignOverwriteWarning(currentRoster(state), characterId);
+  if (!w) return '';
+  const who = getCharacter(characterId)?.name ?? 'this golfer';
+  const short = getCharacter(characterId)?.shortName ?? who;
+  const where = w.chapter <= 0 ? 'the prologue' : `chapter ${w.chapter}`;
+  const body = w.champion
+    ? `${who} has already <b>completed</b> the Story Tour. Starting a new campaign replaces that save —
+       and with it <b>${short}’s Star Tour character</b>, along with the bag, gear and ship they finished with.`
+    : `${who} is <b>${w.chapter <= 0 ? 'at' : 'in'} ${where}</b> of a campaign. Starting a new one replaces that save.`;
+  return `
+    <div class="gs-sheet-backdrop" style="align-items:center;z-index:70;">
+      <div class="gs-sheet" style="max-width:380px;text-align:center;">
+        <div style="font-size:30px;margin:2px 0 6px;">${w.champion ? '★' : '↺'}</div>
+        <b style="font-size:18px;">Start over as ${short}?</b>
+        <p style="margin:10px 0 6px;line-height:1.5;color:var(--gs-dim);">${body}</p>
+        <p style="margin:0 0 16px;line-height:1.5;color:var(--gs-dim);font-size:12.5px;">
+          No other golfer’s campaign is touched.</p>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button class="gs-btn gs-btn--primary" data-action='${JSON.stringify({ type: 'storyCancelRestart' })}'
+            style="padding:11px 24px;">Keep ${short}’s campaign</button>
+          <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'storyRestartCampaign', characterId })}'
+            style="padding:10px 24px;">Start a new campaign</button>
+        </div>
+      </div>
+    </div>`;
 }
 
 /**
