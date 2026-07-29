@@ -460,6 +460,11 @@ export function reduce(state: UiState, action: Action): UiState {
       // Shop's "play again" (a cleared world). The bag is the campaign's OWN equipped bag (GS-story-econ):
       // the lean green starter grown by Pro-Shop purchases — not the golfer's normal common bag.
       if ((state.screen !== 'story' && state.screen !== 'starTour' && state.screen !== 'storyShop') || !state.story) return state;
+      // GS-story-venue-services: a Pro Shop opened as a SIGIL-RECAP detour is a detour — the only way off
+      // it is back to the recap. Teeing off from there would strand the major's continuation chain (the
+      // ceremony, The Choice, the aftermath beat, the interlude), which is precisely the beat `back`
+      // swallows on that screen; a shop button must not become the side door back never was.
+      if (state.screen === 'storyShop' && state.storyShopReturn === 'storyTournamentResult') return state;
       const run0 = startRun(state.run.seed, STROKEPLAY_FORMAT, {}, state.story.characterId, 0, DEFAULT_BAG_TIER, []);
       const bag = storyBagClubs(state.story);
       // GS-story-gear: fold the campaign's equipped gear (glove/hat/shoes/ball) effects onto the loadout.
@@ -554,12 +559,24 @@ export function reduce(state: UiState, action: Action): UiState {
       // Guarded to a campaign + a cleared, shoppable world. Records the origin so exiting returns there.
       // GS-story-shop-crossnav: also reachable from the SHIPYARD at the same world (the two services link to
       // each other so you don't fly back to the map between them).
-      if ((state.screen !== 'starTour' && state.screen !== 'storyResult' && state.screen !== 'storyShipyard') || !state.story) return state;
+      // GS-story-venue-services: and from the SIGIL RECAP — a major is played at a world with a Pro Shop, and
+      // the recap used to fly you straight home, so restocking meant a round trip across the galaxy.
+      if (
+        (state.screen !== 'starTour' &&
+          state.screen !== 'storyResult' &&
+          state.screen !== 'storyShipyard' &&
+          state.screen !== 'storyTournamentResult') ||
+        !state.story
+      )
+        return state;
       if (!worldCleared(state.story, action.worldId) || !worldHasShop(action.worldId)) return state;
       // GS-story-shop-routing: the Pro Shop always returns to the STAR MAP (fly on), whether opened from the
       // star-map dossier (revisit), the world-clear RECAP (first-time), or the shipyard cross-link — every
       // origin is one tap from the map, so exiting always lands there (loop-free, no service back-stack).
-      const storyShopReturn: Screen = 'starTour';
+      // The ONE exception is the Sigil recap: that screen is a forward-only beat with a continuation chain
+      // still to run (the ceremony → The Choice / the aftermath / the interlude), so shopping from it is a
+      // DETOUR that hands you back to the recap — never a route that skips the beat.
+      const storyShopReturn: Screen = state.screen === 'storyTournamentResult' ? 'storyTournamentResult' : 'starTour';
       return { ...state, screen: 'storyShop', storyShopWorldId: action.worldId, storyShopReturn, storyItemInspectId: undefined };
     }
 
@@ -575,8 +592,16 @@ export function reduce(state: UiState, action: Action): UiState {
       // the bag by default. Guarded to the world actually hosting THIS caddy so a stray dispatch can't hire.
       if (!state.story) return state;
       // GS-story-shop-crossnav: recruit the world's caddy from its Pro Shop OR its Shipyard too, not only the
-      // star-map dossier / clear recap.
-      if (state.screen !== 'starTour' && state.screen !== 'storyResult' && state.screen !== 'storyShop' && state.screen !== 'storyShipyard') return state;
+      // star-map dossier / clear recap. GS-story-venue-services: three Sigil venues host a friend (Orion
+      // Forge, Hydra Mire, the Ghost Wreck), so the major's recap offers the recruit as well.
+      if (
+        state.screen !== 'starTour' &&
+        state.screen !== 'storyResult' &&
+        state.screen !== 'storyShop' &&
+        state.screen !== 'storyShipyard' &&
+        state.screen !== 'storyTournamentResult'
+      )
+        return state;
       // GS-story-quality (GAP1): a Herald can't recruit the Warden friends they turned against (Dan &
       // Penelope are rivals to crush on the dark path) — the recruit UI is hidden, and a stray dispatch
       // is refused here too.
@@ -839,10 +864,22 @@ export function reduce(state: UiState, action: Action): UiState {
       const wid = action.worldId;
       if (wid) {
         // GS-story-shop-crossnav: also reachable from the PRO SHOP at the same world.
-        if ((state.screen !== 'starTour' && state.screen !== 'storyResult' && state.screen !== 'storyShop') || !state.story) return state;
+        // GS-story-venue-services: and from the SIGIL RECAP, like the Pro Shop.
+        if (
+          (state.screen !== 'starTour' &&
+            state.screen !== 'storyResult' &&
+            state.screen !== 'storyShop' &&
+            state.screen !== 'storyTournamentResult') ||
+          !state.story
+        )
+          return state;
         if (!worldCleared(state.story, wid) || !worldIsShipVendor(wid)) return state;
-        // Return to the map from the map/shop cross-links; the recap origin still returns to the clubhouse.
-        const back: Screen = state.screen === 'storyResult' ? 'story' : 'starTour';
+        // GS-story-shop-routing: the vendor shipyard routes EXACTLY like the Pro Shop at the same world —
+        // out to the STAR MAP from every origin. It used to send the world-clear RECAP home to the
+        // clubhouse instead, so on the handful of vendor worlds the recap's two service buttons landed in
+        // two different places and "leave the shipyard" read as "fly home". The Sigil recap is the same
+        // detour exception the shop makes (its continuation chain still has to run).
+        const back: Screen = state.screen === 'storyTournamentResult' ? 'storyTournamentResult' : 'starTour';
         return { ...state, screen: 'storyShipyard', storyShipyardWorldId: wid, storyShipyardReturn: back, storyItemInspectId: undefined };
       }
       if (state.screen !== 'story' || !state.story) return state;

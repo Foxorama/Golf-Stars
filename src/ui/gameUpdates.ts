@@ -723,6 +723,7 @@ export function resolveStoryTournament(state: UiState, played: PlayedHole[]): Ui
     lastStoryTournament: {
       chapter,
       name: t.name,
+      venueId: t.venueId,
       sigilName: t.sigilName,
       prize: t.prize,
       rivalName,

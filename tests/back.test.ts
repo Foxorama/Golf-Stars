@@ -144,6 +144,17 @@ describe('back policy — tier 1 navigates to the REAL parent', () => {
     const inStory = backIntent({ ...story, story: { ...(story.story ?? {}) } as UiState['story'] });
     expect(inStory.kind === 'navigate' && inStory.action.type).toBe('exitStoryMap');
   });
+
+  it('a star-map SHEET closes before the map does (GS-story-venue-services)', () => {
+    // The world dossier / records board / Yggdrasil realms are raised OVER the chart, so back closes
+    // the sheet. Without this, pressing back at an open dossier flew you home to the clubhouse.
+    const map = on('starTour');
+    expect(backIntent(map, { starMapSheetOpen: true }).kind).toBe('closeStarMapSheet');
+    // and it is guarded to the map — a stale flag can't swallow a back press on another screen
+    expect(backIntent(on('story'), { starMapSheetOpen: true }).kind).toBe('navigate');
+    // the settings sheet is still the outer layer
+    expect(backIntent(map, { starMapSheetOpen: true, settingsOpen: true }).kind).toBe('closeSettings');
+  });
 });
 
 describe('back policy — tier 3 confirms before leaving a run', () => {

@@ -128,6 +128,7 @@ describe('GS-story-aftermath — the reducer flow', () => {
     lastStoryTournament: {
       chapter: 4,
       name: 'The Abyssal Vigil',
+      venueId: 'void2-18',
       sigilName: 'The Abyssal Sigil',
       prize: '',
       rivalName: 'Scorpius "the Silent Sting"',

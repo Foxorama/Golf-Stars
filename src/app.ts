@@ -682,6 +682,15 @@ function dispatch(action: Action): void {
       starTourView.ammo = WEAPON_AMMO_CAP;
       stShots.length = 0;
     }
+    // GS-story-venue-services: leaving a world's SERVICES (Pro Shop / Shipyard) back to the chart lands on
+    // the MAP, not back inside the dossier you came in through. The dossier is a modal sheet over the
+    // chart, so returning with `selectedId` still set re-raised it and every trip to the shop cost a
+    // manual ✕ — the map's own tap-a-world flight already closes it for exactly this reason
+    // (`flyStarTourTo`). The ship, scroll and zoom are deliberately LEFT alone: you come back to where you
+    // parked, just without the sheet in the way.
+    if (action.type === 'exitStoryShop' || action.type === 'exitStoryShipyard') {
+      starTourView.selectedId = null;
+    }
     // Entering/leaving a character's Clubhouse resets the open slot picker to the resting stage.
     if (
       action.type === 'openClubhouse' ||
@@ -4129,7 +4138,8 @@ function shouldPlayIntro(): boolean {
  * a run.
  */
 function handleBack(): boolean {
-  const intent = backIntent(state, { settingsOpen, clubPickerOpen });
+  const starMapSheetOpen = !!starTourView.selectedId || starTourView.recordsOpen || starTourView.yggdrasilOpen;
+  const intent = backIntent(state, { settingsOpen, clubPickerOpen, starMapSheetOpen });
   switch (intent.kind) {
     case 'closeSettings':
       settingsOpen = false;
@@ -4137,6 +4147,12 @@ function handleBack(): boolean {
       return true;
     case 'closeClubPicker':
       clubPickerOpen = false;
+      render();
+      return true;
+    case 'closeStarMapSheet':
+      starTourView.selectedId = null;
+      starTourView.recordsOpen = false;
+      starTourView.yggdrasilOpen = false;
       render();
       return true;
     case 'swallow':

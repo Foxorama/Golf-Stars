@@ -1707,6 +1707,48 @@ shops / stock.
   `tests/story-qualifier-formats.test.ts` (caddy excluded / Warden plans identical) and
   `tests/story-quests.test.ts` (the promise invariant).
 
+## Phase M — venue navigation (GS-story-venue-services)
+
+Three play-test reports, all the same shape: *the campaign moves you somewhere you didn't ask to be, and
+getting back costs a flight across the galaxy.*
+
+- **GS-story-venue-services** — ✅ *shipped* (`app/storyServices.ts`, `game.ts`, `app.ts`, `ui/back.ts`).
+  - **A major's recap flew you home past the shop you just earned the credits for.** Every one of the seven
+    Sigil venues stocks a Pro Shop; one (Sagittarius Core) is a ship vendor; three (Orion Forge, Hydra Mire,
+    the Ghost Wreck) host a recruitable friend. The world-clear recap has offered all of that since
+    GS-story-shop-access — the TOURNAMENT recap offered none of it and cut straight to the clubhouse, so the
+    biggest payday in the campaign was immediately followed by a round trip to spend it. The recap now
+    carries the same footer, off `lastStoryTournament.venueId` (a new payload field — compile-forced, which
+    is how the four test fixtures were found).
+  - **It is a DETOUR, not a route.** `storyTournamentResult` is a forward-only beat with a continuation chain
+    still to run (the Sigil ceremony → The Choice / the aftermath confrontation / the Ch.4 interlude), which
+    is exactly why `backIntent` swallows back there. So the services return to the RECAP
+    (`storyShopReturn: 'storyTournamentResult'`), and the Pro Shop's "↺ Play this world again" is hidden AND
+    refused on that route — a shop button must not become the side door back never was.
+  - **A world's services are described ONCE.** `storyRecapServicesHTML` is the single builder both recaps
+    render, so the two can't drift (the world-clear recap's inline trio + `recapCaddyHTML` are retired into
+    it). Every button is gated by the same predicate the reducer checks, so nothing is offered that a
+    dispatch would refuse.
+  - **The vendor shipyard routed differently from the Pro Shop beside it.** Opened from the world-clear
+    recap it set `storyShipyardReturn: 'story'` while the shop button directly above it flew to the chart —
+    so on the handful of vendor worlds the recap's two services landed in two different places, and "leave
+    the shipyard" meant "fly home". It now follows GS-story-shop-routing exactly: out to the star map from
+    every origin. And a service screen's back button **NAMES where it lands** — `storyServiceBackLabel`
+    reads the stored return screen instead of each screen writing its own claim.
+  - **Coming back to the chart lands on the CHART.** The world dossier is a modal sheet over the map, and
+    returning from a service with `starTourView.selectedId` still set re-raised it — every trip to the shop
+    cost a manual ✕. Cleared on `exitStoryShop`/`exitStoryShipyard` (the map's own tap-a-world flight
+    already does this in `flyStarTourTo`, for the same reason). The ship, scroll and zoom are deliberately
+    left alone: you come back to where you parked, just without the sheet in the way.
+  - **Back closes the sheet before it leaves the map.** `starMapSheetOpen` joins `settingsOpen`/
+    `clubPickerOpen` as a tier-0 `BackContext` flag — pressing back at an open dossier used to fly you to
+    the spaceport clubhouse. Guarded to the `starTour` screen so a stale flag can't swallow a press
+    elsewhere.
+
+  Zero sim rng, no save/`STORY_VERSION` bump, no new `_gs*`/URL hook. Guarded by `tests/story-flow.test.ts`
+  (a new `GS-story-venue-services` block, including "every Sigil venue in the game actually stocks something
+  to spend on") and `tests/back.test.ts`.
+
 ## Open questions / deferred (revisit as chunks land)
 - **A genuinely-new gas-giant BIOME** (play on gas cloud-tops) — the player's optional "if we need to add
   more" ask. Deferred as its OWN focused session: a new `BiomeArchetype` fans out to ~16 compile-forced

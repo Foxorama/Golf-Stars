@@ -14,7 +14,7 @@ import { itemArtSVG } from '../render/itemArt';
 import { loreCardHTML } from '../render/loreCard';
 import { proAvatarSVG } from '../render/golferCards';
 import { roughBaseFor } from '../render/palette';
-import { storyWorldServicesHTML } from './storyServices';
+import { storyWorldServicesHTML, storyServiceBackLabel } from './storyServices';
 import type { BiomeArchetype } from '../sim/course/themes';
 import {
   storyShopStock,
@@ -132,8 +132,15 @@ export function storyShopScreen(): string {
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:16px auto 0;">
       ${storyWorldServicesHTML(story, worldId, 'shop')}
-      <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'storyPlayWorld', courseId: worldId })}'>↺ Play this world again</button>
-      <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStoryShop' })}'>‹ Back to the star chart</button>
+      ${
+        // GS-story-venue-services: hidden on the Sigil-recap detour — teeing off from there would strand
+        // the major's continuation chain (the reducer refuses it too; this keeps the dead button off the
+        // screen rather than relying on the refusal).
+        state.storyShopReturn === 'storyTournamentResult'
+          ? ''
+          : `<button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'storyPlayWorld', courseId: worldId })}'>↺ Play this world again</button>`
+      }
+      <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStoryShop' })}'>${storyServiceBackLabel(state.storyShopReturn)}</button>
     </div>
     ${overlay}
     <style>

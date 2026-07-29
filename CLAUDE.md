@@ -340,6 +340,22 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     is a call to action**: an actionable quest outranks the qualifier flag, a "soon" hint never does, and a
     quest holds NO marker until you have carried that friend's bag (GS-story-quest-soon-marker,
     `questBeatPendingReason`).
+  - **A ROUND RECAP LEAVES YOU AT THE WORLD YOU JUST PLAYED, AND THERE IS ONE DESCRIPTION OF WHAT A WORLD
+    OFFERS** (GS-story-venue-services, `app/storyServices.ts storyRecapServicesHTML` — rendered by BOTH the
+    world-clear recap and the Sigil recap, so they cannot drift; every button is gated by the predicate the
+    reducer checks). Every Sigil venue stocks a Pro Shop, one is a ship vendor, three host a friend — and the
+    major's recap used to cut straight to the clubhouse, so the campaign's biggest payday was followed by a
+    flight back across the galaxy to spend it (machine-checked: no venue may stock nothing). **It is a
+    DETOUR, not a route** — `storyTournamentResult` is a forward-only beat with a chain still to run
+    (ceremony → The Choice / aftermath / interlude), the reason `backIntent` swallows back there, so the
+    services return to the RECAP and the shop's "play again" is hidden AND refused on that route. Everywhere
+    else a world's services route out to the STAR MAP from every origin (GS-story-shop-routing — the vendor
+    shipyard used to send the world-clear recap home to the clubhouse while the shop button above it flew to
+    the chart), and a back button **NAMES where it lands** (`storyServiceBackLabel` reads the stored return
+    screen; a screen may not write its own claim). Returning to the chart lands on the CHART — clear
+    `starTourView.selectedId`, or the dossier sheet you left through re-raises and costs a manual ✕ — and
+    BACK closes an open sheet before it leaves the map (`starMapSheetOpen`, a tier-0 `BackContext` flag
+    beside `settingsOpen`/`clubPickerOpen`). Guarded by `tests/story-flow.test.ts` + `tests/back.test.ts`.
   - **The Story-Tour betrayal is per-character + foreshadowed** (`docs/decisions/story-betrayal-arc.md`).
     `betrayerId(story)` = the friend standing apart in the PARTNER TALLY — team-Sigil picks (weight 2) plus
     every paired qualifying event (weight 1); the bigger gap, top or bottom, names them and `betrayerOddness`
