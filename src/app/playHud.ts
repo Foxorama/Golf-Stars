@@ -98,10 +98,13 @@ export function puttAimRow(breakYd: number, aim: number, reads: boolean, dbl = f
   const label = reads
     ? `<b>${aimValue(aim)}</b><span>${greenReadReader()} reads</span>`
     : puttAimLabel(breakYd, aim, dbl);
+  // `aria-keyshortcuts` announces the arrow binding (GS-a11y-putt-arrows) to the players most likely
+  // to need it, at zero visual cost — the deliberate choice over an on-screen hint, which would be a
+  // readout the map already draws (GS-hud-bag) and would ride on every putt forever.
   const nudge = (dir: -1 | 1, glyph: string, label2: string): string =>
     reads
       ? `<button class="gs-puttnudge" disabled aria-hidden="true">${glyph}</button>`
-      : `<button class="gs-puttnudge" data-putt-aim="${dir}" title="${label2}" aria-label="${label2}">${glyph}</button>`;
+      : `<button class="gs-puttnudge" data-putt-aim="${dir}" title="${label2}" aria-label="${label2}" aria-keyshortcuts="${dir < 0 ? 'ArrowLeft' : 'ArrowRight'}">${glyph}</button>`;
   return `<div class="gs-puttrow">
       ${nudge(-1, '◄', 'Aim left')}
       <span class="gs-puttread" id="puttaimlabel">${label}</span>

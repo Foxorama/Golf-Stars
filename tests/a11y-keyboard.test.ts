@@ -51,6 +51,65 @@ describe('one shot mechanic, two input devices', () => {
   });
 });
 
+/**
+ * The putt aims on the arrows too (GS-a11y-putt-arrows).
+ *
+ * `wireShotGesture` early-returns on the putt, so the shot handler above is absent on a green — the
+ * one stroke in the game with no pointer-free aim was the one where the read matters most. The fix
+ * drives the EXISTING ◄/► buttons rather than reaching into `selPuttAim`, because that click handler
+ * is where the per-putt step, the clamp, the tap acceleration and the surgical refresh are decided.
+ */
+describe('the putt aims on the arrows', () => {
+  const keys = app.slice(app.indexOf('const onPuttKey ='), app.indexOf("window.addEventListener('keydown', onPuttKey)"));
+
+  it('is wired, and only for the two aim directions', () => {
+    expect(keys, 'the putt key handler is missing').not.toBe('');
+    expect(keys).toContain('ArrowLeft');
+    expect(keys).toContain('ArrowRight');
+    // Up/down belong to the pace meter, which owns that axis and is already keyboard-operable. A
+    // second meaning for those keys on a green would be worse than none.
+    expect(keys).not.toContain('ArrowUp');
+    expect(keys).not.toContain('ArrowDown');
+  });
+
+  it('drives the buttons instead of opening a second path into the aim', () => {
+    expect(keys).toMatch(/\[data-putt-aim="\$\{dir\}"\]/);
+    expect(keys).toContain('btn.click()');
+    expect(keys, 'the key handler nudges selPuttAim itself — that is a second description of the aim')
+      .not.toContain('selPuttAim');
+    expect(keys, 'the key handler re-implements the clamp').not.toContain('puttAimMax');
+    expect(keys, 'the key handler re-implements the step').not.toContain('puttAimStep');
+  });
+
+  it('does not compound the keyboard auto-repeat with the tap-streak acceleration', () => {
+    // Both accelerate. Together they cross the whole clamp in a few hundred milliseconds, so a held
+    // arrow resets the tap clock and each repeat lands as a single 1× step (what a held BUTTON does).
+    expect(keys).toMatch(/if \(e\.repeat\) puttAimLastTapMs = 0;/);
+  });
+
+  it('refuses in the same places the shot handler refuses', () => {
+    expect(keys).toMatch(/altKey \|\| e\.ctrlKey \|\| e\.metaKey/);
+    expect(keys).toMatch(/INPUT\|TEXTAREA\|SELECT/);
+    expect(keys).toContain("document.querySelector('#app > [inert]')");
+    expect(keys).toContain('e.preventDefault()');
+  });
+
+  it('goes quiet when a caddy owns the line', () => {
+    // A green-reading caddy renders the nudges disabled and WITHOUT the data attribute, so the
+    // lookup misses and the arrows do nothing — the same silence the buttons have.
+    expect(keys).toMatch(/if \(!btn\) return;/);
+    const hud = readFileSync(resolve(root, 'src/app/playHud.ts'), 'utf8');
+    const row = hud.slice(hud.indexOf('const nudge ='), hud.indexOf('return `<div class="gs-puttrow">'));
+    expect(row).toMatch(/reads\s*\n?\s*\?\s*`<button class="gs-puttnudge" disabled/);
+    expect(row, 'the disabled branch must not carry data-putt-aim').not.toMatch(/disabled[^`]*data-putt-aim/);
+  });
+
+  it('announces the binding to the players most likely to need it', () => {
+    const hud = readFileSync(resolve(root, 'src/app/playHud.ts'), 'utf8');
+    expect(hud).toMatch(/aria-keyshortcuts="\$\{dir < 0 \? 'ArrowLeft' : 'ArrowRight'\}"/);
+  });
+});
+
 describe('the listener does not stack', () => {
   it('the previous render\'s listener is removed BEFORE any early return', () => {
     const fn = app.slice(app.indexOf('function wireShotGesture('), app.indexOf('function wireShotGesture(') + 700);
@@ -60,6 +119,18 @@ describe('the listener does not stack', () => {
     // The early returns are exactly the cases where the decision screen went away (a putt, a popup,
     // another screen) — a listener left bound there would keep nudging an off-screen aim.
     expect(cleanupAt).toBeLessThan(firstReturn);
+  });
+
+  it("the putt listener is torn down by render(), not by its own wiring block", () => {
+    // The wiring block is skipped entirely on renders with no nudges in the DOM — which is most of
+    // them — so a cleanup living inside it would never run on the render that leaves the green.
+    const fn = app.slice(app.indexOf('function render(): void {'));
+    const teardown = fn.indexOf('puttKeyCleanup?.()');
+    const wiring = fn.indexOf("if (app.querySelector('[data-putt-aim]'))");
+    expect(teardown).toBeGreaterThan(-1);
+    expect(wiring).toBeGreaterThan(-1);
+    expect(teardown, 'the teardown must run before the block that re-binds').toBeLessThan(wiring);
+    expect(fn.slice(teardown, teardown + 120)).toContain('puttKeyCleanup = null');
   });
 });
 
