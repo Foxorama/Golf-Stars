@@ -486,7 +486,7 @@ describe('build output (real browser)', () => {
         await page.waitForSelector('[data-gs-storyfinale]', { state: 'detached', timeout: 6000 });
         await page.waitForSelector('.gs-storyres', { timeout: 4000 });
         const txt = await page.evaluate(() => document.getElementById('app')?.textContent ?? '');
-        const done = await page.evaluate(() => JSON.parse(localStorage.getItem('gs_story') || '{}').completed);
+        const done = await page.evaluate(() => JSON.parse(localStorage.getItem('fc_story') || '{}').completed);
         expect(errors, `pageerror: ${errors[0] ?? ''}`).toEqual([]);
         expect(txt).toContain('Star Tour is unlocked');
         expect(done).toBe(true);

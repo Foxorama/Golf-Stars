@@ -1,7 +1,7 @@
 # Story Tour — design & build roadmap (GS-story)
 
 > **Name:** the mode ships **user-facing as "Story Tour"** (the code keeps the `GS-story*` ids +
-> `gs_story` save; title tile / hub / cinematic all read **Story Tour**). **Star Tour is now the
+> `fc_story` save; title tile / hub / cinematic all read **Story Tour**). **Star Tour is now the
 > *reward* mode, unlocked once Story Tour is complete** (`GS-story-startour-unlock`): the title's Star
 > Tour tile is hidden until a campaign exists, then shows **locked** ("Complete Story Tour to free-roam
 > the galaxy") until the story is complete — *play the story, then travel the galaxy.* Voyage/Unending
@@ -12,7 +12,7 @@
 > flag); a returning player mid-completed-campaign has the flag backfilled from `storyComplete` at boot
 > (`initState`) so nobody who already earned it loses it. **Aces cross over** (`GS-story-ace-tally`): a
 > hole-in-one on any Story round (`resolveStoryRound`/`resolveStoryTournament`) ticks the cross-mode
-> `lifetimeAces` shown on the title — the campaign's ECONOMY (credits/ships) stays inside `gs_story`,
+> `lifetimeAces` shown on the title — the campaign's ECONOMY (credits/ships) stays inside `fc_story`,
 > but the lifetime ace stat is global (the ace celebration already reads `lifetimeAces + 1`).
 >
 > **Lore cards everywhere** (`GS-story-lore-cards`): every tappable item / world / relic / ship / gear
@@ -66,7 +66,7 @@ you choose from in the bar/locker (no hire-and-fire).
   meta layer**: a single persistent progression, its own economy, ownership, screens, and save.
 - **Voyage, Unending, Clubhouse, Trade Market are frozen.** They keep their exact current format. No
   chunk may change their behaviour or their save (v29). Story Mode persists to its **own** save
-  namespace (`gs_story`), so the existing blob is never at risk.
+  namespace (`fc_story`), so the existing blob is never at risk.
 - **Every constitution contract still holds.** Determinism/byte-stability, auto≡interactive,
   fairness-by-construction, no-death-spiral, graphic≡physics. Story rounds are ordinary golf rounds
   resolved by the shared engine — new *effect* fields default to no-ops so the seeded suite stays
@@ -97,7 +97,7 @@ seam rather than forking the reducer:
   (a tour course) or generated (a world stop). `playHole`/`takeShot`/`beginHole`/`holeResult` and the
   `'playing'` screen are reused verbatim.
 - **`StoryState` is the new persistent spine.** A single object, persisted under its **own** save key
-  `gs_story` with its own `STORY_VERSION` + `migrateStory()` (separate from `SAVE_VERSION`). It holds
+  `fc_story` with its own `STORY_VERSION` + `migrateStory()` (separate from `SAVE_VERSION`). It holds
   the whole campaign: identity, purse, ownership, equip, progress. Draft shape:
 
   ```
@@ -146,7 +146,7 @@ template (`startAsgardRun`/`resolveAsgard`/`leaveAsgard`, ghost stroke-play); `s
 art; matchplay `BossSpec` + `bossEdgeForRun`; the star-map + ship-weapons feel layer; the intro
 mount/skip plumbing; `standrews-18` (the Earth opening course already exists).
 
-**Net-new:** the `StoryState` persistent spine + `gs_story` save; a single persistent purse; per-world
+**Net-new:** the `StoryState` persistent spine + `fc_story` save; a single persistent purse; per-world
 pro shop gated to story credits; effect-bearing gear + the inventory/locker screens; the caddy
 hire-and-keep roster; ship weapons/engines/upgrades **as owned upgrades with effects** (today they are
 cosmetic star-map feel only); the 5-tournament progression counter + qualifying→final format; the
@@ -158,7 +158,7 @@ space today); Jörmungandr / Cthulhu-corrupted art + lore portraits.
 Ordered so each ships something playable and nothing lands before its foundation. IDs are stable.
 
 **Phase A — Foundation & separation**
-- **GS-story-save** — `StoryState` + `gs_story` save (own version/migrate) + New Game / Continue on the
+- **GS-story-save** — `StoryState` + `fc_story` save (own version/migrate) + New Game / Continue on the
   title (the Star Tour tile becomes **Story Mode**). New game → pick protagonist (once) → boots into a
   minimal story hub with the green bag + station wagon; continue resumes. Voyage/Unending/Clubhouse/
   Trade Market untouched. **The spine — everything hangs off this.**
@@ -1757,7 +1757,7 @@ as a Coil unlocks the Coil ship and a Coil outfit."*
 - **GS-story-champion-cosmetics** — ✅ *shipped* (`sim/rpg/storyChampionCosmetics.ts` pure ·
   `apparel.ts` rows · `render/apparelArt.ts` + `render/golferArt.ts` painters · `ui/game.ts` the grant ·
   `app/storyFinaleScreens.ts` the reveal).
-  - **A finished campaign left nothing behind but a boolean.** Every story payout lands *inside* `gs_story`
+  - **A finished campaign left nothing behind but a boolean.** Every story payout lands *inside* `fc_story`
     (`storyRewards.ts`): the route ship you fly on the campaign's own chart, the gear you swing in its own
     rounds. One campaign per golfer (GS-story-campaign-slots) means starting over on that golfer **erases
     all of it** — and the only thing a completed campaign wrote to the MAIN save was `starTourUnlocked`.

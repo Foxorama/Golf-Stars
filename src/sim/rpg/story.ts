@@ -4,7 +4,7 @@
  * `StoryState` is the SINGLE persistent progression for the standalone Story Mode campaign: identity,
  * a single credit purse, ownership (clubs/ships/gear/ship-upgrades/caddies), what's equipped, and story
  * progress (chapter, unlocked/cleared worlds, per-world best, trophies, seen beats). It persists to its
- * OWN save namespace (`gs_story`, see `src/app/storyPersist.ts`) with its OWN `STORY_VERSION` +
+ * OWN save namespace (`fc_story`, see `src/app/storyPersist.ts`) with its OWN `STORY_VERSION` +
  * `migrateStory()` — deliberately SEPARATE from the main `SAVE_VERSION` blob so Voyage/Unending's save is
  * never at risk. See `docs/decisions/story-mode.md` for the full design + chunk roadmap.
  *

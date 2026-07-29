@@ -2,7 +2,7 @@
  * The Story-Tour CAMPAIGN ROSTER (GS-story-campaign-slots) — one campaign PER GOLFER, not one campaign
  * full stop.
  *
- * Story Tour used to hold a SINGLE `StoryState` in `gs_story`. Picking a golfer for a new campaign
+ * Story Tour used to hold a SINGLE `StoryState` in `fc_story`. Picking a golfer for a new campaign
  * overwrote it the instant you tapped a card — so a finished Feather Fade campaign, and with it the
  * developed champion that Star Tour free-roams as (`GS-story-startour-champion`), evaporated the
  * moment you fancied a run as Larry. That is the bug this module exists to close.
@@ -30,7 +30,7 @@ import { migrateStory, storyComplete, type StoryState } from './story';
  *  Bump only when the CONTAINER's shape changes, and add a step to `migrateCampaignStore`. */
 export const CAMPAIGN_STORE_VERSION = 1;
 
-/** Every campaign the player owns, keyed by protagonist. Persists to `gs_story` (the same key the old
+/** Every campaign the player owns, keyed by protagonist. Persists to `fc_story` (the same key the old
  *  single campaign used — see `migrateCampaignStore` for why that is safe). */
 export interface CampaignStore {
   version: number;
@@ -49,7 +49,7 @@ export function emptyCampaignStore(): CampaignStore {
 }
 
 /**
- * Read ANY persisted `gs_story` blob as a roster. Never throws — the worst case is an empty roster.
+ * Read ANY persisted `fc_story` blob as a roster. Never throws — the worst case is an empty roster.
  *
  * Accepts three shapes, and the middle one is the whole reason this function is careful:
  *  1. a ROSTER (`{ campaigns: {...} }`) — migrate each campaign through `migrateStory`;

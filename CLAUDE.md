@@ -1,11 +1,21 @@
 # The Far Carry (repo: `Golf-Stars`) — working notes for Claude
 
-> **THE PRODUCT NAME IS A LABEL; A PERSISTED STRING IS A CONTRACT** (GS-release-identity,
-> `src/brand.ts`). The game ships as **The Far Carry**; the repo, npm package, module names,
-> `gs_*` localStorage keys, the Capacitor `appId` (`com.foxorama.golfstars`) and — critically —
-> `BACKUP_KIND` (`'golf-stars-backup'`) keep the old spelling ON PURPOSE. Those are stamped into
-> save data and backup files already sitting on players' devices; renaming one to match the
-> product orphans every save in the wild while every round-trip test stays green. Every
+> **THE PRODUCT NAME IS A LABEL; A PERSISTED STRING IS A CONTRACT — AND THE RENAME BEAT THE
+> CONTRACT BY ONE RELEASE** (GS-release-identity, `src/brand.ts` · `src/save/legacyKeys.ts`). The
+> game ships as **The Far Carry**, and the persisted names moved WITH it, once, pre-launch:
+> `fc_save`/`fc_story`/`fc_settings`, `BACKUP_KIND` = `'far-carry-backup'`, the `far-carry-`
+> service-worker cache prefix. That was free only because nobody was holding the contract yet —
+> **after launch it is not, and this must never happen again.** Every read path ACCEPTS the old
+> spelling (`legacyKeyFor`, `LEGACY_BACKUP_KIND`) so the handful of pre-rename devices lose
+> nothing; every write is canonical. Old input, new output — the same shape `migrateCampaignStore`
+> and the v1→v2 bundle fold already use. Nothing new may join `legacyKeys.ts`: a second legacy
+> namespace means the rename happened twice, which is a decision to revisit, not a case to handle.
+> The repo, npm package, module names and the Capacitor `appId` (`com.foxorama.golfstars`, a
+> PERMANENT package identifier) deliberately keep the old spelling — they are invisible to players.
+> ⚠️ **The SW cache prefix is ONE decision written in THREE places that cannot share a constant**
+> (`public/sw.js` ×2 + index.html's foreign-cache sweep, which runs before any module): disagree and
+> the page DELETES ITS OWN offline cache every boot while believing it is tidying up after a sibling
+> app. Every
 > user-facing surface reads `GAME_TITLE`/`GAME_TITLE_UPPER`/`APP_VERSION` — never a literal, or a
 > future rename half-lands (it was a bare literal in six places). `APP_VERSION` comes from
 > package.json via a Vite `define`; the BOOT WATCHDOG cannot import, so it gets the same version
@@ -87,7 +97,7 @@ This game lives or dies on three axes — put every change through all three bef
   (localStorage is the only copy). Current schema is **v30**; bump + add a migration when you
   persist a new field. Loadouts are rebuilt from perk *ids* (`loadoutFromPerks`), so most
   run-state changes need NO save bump.
-  **`gs_story` holds ONE CAMPAIGN PER GOLFER** (GS-story-campaign-slots, `sim/rpg/storyRoster.ts` pure ·
+  **`fc_story` holds ONE CAMPAIGN PER GOLFER** (GS-story-campaign-slots, `sim/rpg/storyRoster.ts` pure ·
   `save/storyStore.ts` the localStorage half): a `CampaignStore` = `{version, campaigns: Record<characterId,
   StoryState>, activeId?}`. One slot per golfer is the ONE decision the whole feature falls out of — four
   golfers ⇒ four campaigns that can't touch each other, a **Star Tour champion IS that golfer's completed
@@ -138,7 +148,7 @@ This game lives or dies on three axes — put every change through all three bef
   stamped `common` on a solar bag. Guarded by `tests/startour-champions.test.ts`.
   **FINISHING A CAMPAIGN IS THE ONE PAYOUT THAT OUTLIVES THE SLOT, AND THE ALIGNMENT IS ITS WHOLE KEY**
   (GS-story-champion-cosmetics, `sim/rpg/storyChampionCosmetics.ts`). Every other story reward lands INSIDE
-  `gs_story` (`storyRewards.ts`), so one campaign per golfer means starting over ERASES it — and a completed
+  `fc_story` (`storyRewards.ts`), so one campaign per golfer means starting over ERASES it — and a completed
   campaign wrote just one thing to the main save: `starTourUnlocked`. `CHAMPION_COSMETICS` is a
   `Record<StoryAlignment, …>` the finale win applies to the GLOBAL `ownedShips`/`ownedApparel`: Warden ⇒ the
   Radiant Warden Cruiser + the **Warden Vigil** outfit, Herald ⇒ the Coil Wyrm-Ship + the **Coil Shroud**.
@@ -156,7 +166,7 @@ This game lives or dies on three axes — put every change through all three bef
   **EVERY ROOT ENCOUNTER COUNTS, AND THE TALLY LIVES WHERE A GOLFER PICK CANNOT ERASE IT**
   (GS-startour-serpent-trophy, save v32, `sim/rpg/serpentTrophy.ts`). The champion's Root replay banked
   NOTHING — right for campaign state, wrong for the player's own history. `serpentBouts`/`serpentWins` are
-  now a lifetime pair on the MAIN save (beside `lifetimeAces`, never `gs_story`: one campaign per golfer
+  now a lifetime pair on the MAIN save (beside `lifetimeAces`, never `fc_story`: one campaign per golfer
   means a slot can be started over, and a thousand-fight grind a golfer pick could erase is one nobody
   would run). At **1,000 wins** the secret **Beaten into Submission** hangs THE WORLD SERPENT in the global
   garage — the `aceShipUnlock` idiom (idempotent, additive, same array ref when nothing is new, so the
@@ -172,7 +182,7 @@ This game lives or dies on three axes — put every change through all three bef
   market CARD shows only x ∈ [−25,+25], so an over-long hull loses the SKULL (hence one `scale(0.86)` wrap).
   Guarded by `tests/serpent-trophy.test.ts`.
   **A backup is a BUNDLE, not a save** (GS-save-transfer, `save/backup.ts` pure · `app/saveTransfer.ts`
-  the localStorage/DOM half). Progress lives in THREE blobs (`gs_save` + `gs_story` + `gs_settings`) and
+  the localStorage/DOM half). Progress lives in THREE blobs (`fc_save` + `fc_story` + `fc_settings`) and
   localStorage is per-ORIGIN, so the website and the Capacitor shell (`https://localhost`) cannot see
   each other's saves — export/import is the only bridge, and the only way off a device before an
   uninstall. **A new persisted blob must join the bundle or it is silently lost.** `parseBackup`
@@ -1062,7 +1072,7 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     font family**: every `font-family` AND every `font:` shorthand resolves the token, or the Readable-text
     toggle can't reach it — which is exactly how the settings sheet shipped in **Times New Roman** (the
     stack sat on `.gs-main`; overlays are SIBLINGS of `<main>`, so the family lives on `body`). Defaults are
-    inert (`0em`/`1`) ⇒ the untoggled game is byte-for-byte, and `gs_settings` merges over defaults ⇒ no save
+    inert (`0em`/`1`) ⇒ the untoggled game is byte-for-byte, and `fc_settings` merges over defaults ⇒ no save
     bump. Two rules make the zoom safe, both machine-checked: **no raw `100vh`/`100dvh`** (use `--gs-vh`/
     `--gs-dvh`, which divide by the scale — a viewport-locked box inside a zoomed root measures one screen of
     ZOOMED units and put the Swing button 185px below the fold), and **no canvas computes its own

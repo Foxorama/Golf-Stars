@@ -24,7 +24,7 @@ export const installView = { deferred: null as (Event & { prompt?: () => void })
 
 function installDismissed(): boolean {
   try {
-    return localStorage.getItem('gs_installNudge') === 'dismissed';
+    return localStorage.getItem('fc_installNudge') === 'dismissed';
   } catch {
     return false;
   }

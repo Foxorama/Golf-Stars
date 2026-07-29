@@ -64,7 +64,7 @@ describe('save transfer in a browser (GS-save-transfer)', () => {
 
         // Seed a DIFFERENT save so we can tell the import actually replaced something.
         await page.evaluate(() => {
-          localStorage.setItem('gs_save', JSON.stringify({ version: 1, shards: 1, bestStableford: 2 }));
+          localStorage.setItem('fc_save', JSON.stringify({ version: 1, shards: 1, bestStableford: 2 }));
         });
 
         // Open settings from the cog that rides every screen.
@@ -86,7 +86,7 @@ describe('save transfer in a browser (GS-save-transfer)', () => {
         const summary = (await page.textContent('.gs-savebox')) ?? '';
         expect(summary, 'the confirm step must show what is in the file').toContain('8,675');
         expect(summary).toContain('No Story Tour');
-        const beforeConfirm = await page.evaluate(() => localStorage.getItem('gs_save'));
+        const beforeConfirm = await page.evaluate(() => localStorage.getItem('fc_save'));
         expect(
           JSON.parse(beforeConfirm!).shards,
           'nothing may be written before the player confirms',
@@ -95,13 +95,13 @@ describe('save transfer in a browser (GS-save-transfer)', () => {
         // Confirm → applied, then the app reloads to rebuild state from the restored blobs.
         await page.locator('[data-save-transfer="apply"]').click();
         await page.waitForFunction(
-          () => JSON.parse(localStorage.getItem('gs_save') || '{}').shards === 8675,
+          () => JSON.parse(localStorage.getItem('fc_save') || '{}').shards === 8675,
           { timeout: 8000 },
         );
         await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', {
           timeout: 8000,
         });
-        const after = JSON.parse((await page.evaluate(() => localStorage.getItem('gs_save')))!);
+        const after = JSON.parse((await page.evaluate(() => localStorage.getItem('fc_save')))!);
         expect(after.shards).toBe(8675);
         expect(after.bestStableford).toBe(41);
         expect(errors).toEqual([]);
@@ -124,7 +124,7 @@ describe('save transfer in a browser (GS-save-transfer)', () => {
           timeout: 8000,
         });
         await page.evaluate(() => {
-          localStorage.setItem('gs_save', JSON.stringify({ version: 1, shards: 555 }));
+          localStorage.setItem('fc_save', JSON.stringify({ version: 1, shards: 555 }));
         });
         await page.locator('[data-open-settings]').first().click();
         await page.waitForSelector('.gs-settings', { timeout: 4000 });
@@ -139,7 +139,7 @@ describe('save transfer in a browser (GS-save-transfer)', () => {
         expect(msg.length, 'the refusal must explain itself').toBeGreaterThan(20);
         // No confirm card, and the existing save is untouched — a bad file must never reach it.
         expect(await page.locator('.gs-savebox').count()).toBe(0);
-        const still = JSON.parse((await page.evaluate(() => localStorage.getItem('gs_save')))!);
+        const still = JSON.parse((await page.evaluate(() => localStorage.getItem('fc_save')))!);
         expect(still.shards, 'a refused import must not touch the existing save').toBe(555);
       } finally {
         await browser.close();

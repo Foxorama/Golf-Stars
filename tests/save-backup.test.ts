@@ -43,7 +43,7 @@ describe('backup format (GS-save-transfer)', () => {
   });
 
   it('carries the Story Tour campaign — the whole reason a backup is a BUNDLE, not a save', () => {
-    // Exporting `gs_save` alone would silently drop a player's entire campaign, which is precisely
+    // Exporting `fc_save` alone would silently drop a player's entire campaign, which is precisely
     // the "worked, but lost half your stuff" failure a backup feature exists to prevent.
     const story = { ...defaultStoryState(), chapter: 4 };
     expect(parseBackup(bundle({ campaigns: roster(story) })).campaigns.campaigns[story.characterId]?.chapter).toBe(4);

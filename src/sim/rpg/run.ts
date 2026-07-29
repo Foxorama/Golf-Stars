@@ -168,7 +168,7 @@ export interface Run {
   /** GS-story-prologue: this strokeplay run is a STORY MODE world round (launched from the campaign hub),
    *  so it resolves back INTO the `StoryState` (record the clear, pay credits, advance the chapter) instead
    *  of the Star-Tour record recap, and is never written to the MAIN-save `resumable` (the campaign has its
-   *  own `gs_story` save). A run-lifetime flag (not snapshotted — a mid-round quit replays the world). */
+   *  own `fc_story` save). A run-lifetime flag (not snapshotted — a mid-round quit replays the world). */
   storyRound?: boolean;
   /** GS-story-tournament: this story round is a chapter's GALAXY TOURNAMENT (the chapter number), played at
    *  the venue against the rival for a Sigil. Set alongside `storyRound`; resolved by `resolveStoryTournament`

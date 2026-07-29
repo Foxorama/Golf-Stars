@@ -58,7 +58,7 @@ export type Screen =
   // GS-story-startour-champions: which CHAMPION to free-roam as, when more than one campaign is finished.
   // Only ever reached with 2+ champions — one flies straight to the map, none takes the classic flow.
   | 'starTourChampion'
-  // GS-story: the standalone Story Mode campaign HUB (its own persistent progression, `gs_story` save) and
+  // GS-story: the standalone Story Mode campaign HUB (its own persistent progression, `fc_story` save) and
   // the recap shown after clearing a world round (the prologue's victory grows into it). The star-map
   // navigator REUSES the Star Tour `starTour` screen in a story context (GS-story-map).
   | 'story'
@@ -224,12 +224,12 @@ export interface UiState {
    *  adds the just-shown beat's id. */
   seenLore: SeenLore;
   /** The PERMANENT Star Tour unlock (GS-story-startour-unlock): true once the Story Tour finale has been
-   *  won at least once. Persisted on the MAIN save (not the campaign's `gs_story`), so beginning a fresh
+   *  won at least once. Persisted on the MAIN save (not the campaign's `fc_story`), so beginning a fresh
    *  campaign — which resets that campaign's own `completed` flag — never relocks the free-roam reward.
    *  The title gate shows the live Star Tour tile when this is set OR the current campaign is complete. */
   starTourUnlocked: boolean;
   /** The LIFETIME ROOT TALLY (GS-startour-serpent-trophy): every Star Tour encounter with the serpent at
-   *  the root, resolved. Persisted on the MAIN save (never `gs_story` — a slot can be started over, and
+   *  the root, resolved. Persisted on the MAIN save (never `fc_story` — a slot can be started over, and
    *  a thousand-fight grind that a golfer pick could erase is one nobody would run). `serpentWins` is the
    *  key to the secret **Beaten into Submission** ship; `serpentBouts` is the honest denominator. */
   serpentBouts: number;
@@ -274,10 +274,10 @@ export interface UiState {
    *  reads this to return to the star map instead of a travel screen. Transient (never persisted). */
   asgardFromStarTour?: boolean;
   /** GS-story: the active Story Mode campaign, when the player is in Story Mode. Persisted to its OWN
-   *  `gs_story` save blob (NOT the main `gs_save`), loaded into state at boot if a campaign exists, and
+   *  `fc_story` save blob (NOT the main `fc_save`), loaded into state at boot if a campaign exists, and
    *  written back by the app after each action. Absent ⇒ no campaign started on this device. */
   story?: StoryState;
-  /** GS-story-campaign-slots: EVERY campaign the player owns, one per golfer (`gs_story` holds the
+  /** GS-story-campaign-slots: EVERY campaign the player owns, one per golfer (`fc_story` holds the
    *  roster; `state.story` is whichever of its slots is currently being played). Hydrated at boot from
    *  `loadCampaignStore()` and kept in step by the reducer, because the reducer is the only place that
    *  may decide a DESTRUCTIVE write: `selectCharacter` has to know whether a golfer already has a

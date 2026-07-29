@@ -27,7 +27,7 @@ import { defaultStoryState } from '../src/sim/rpg/story';
  * world serpent to the bridle: it becomes a ship.
  *
  * Two things need machine-checking above the arithmetic. First, the grind must be UNLOSABLE by anything
- * other than deleting the save — it lives beside `lifetimeAces`, never in `gs_story`, which one campaign
+ * other than deleting the save — it lives beside `lifetimeAces`, never in `fc_story`, which one campaign
  * per golfer can overwrite. Second, and the reason this file exists at all: making the replay dispatch an
  * action retires the "there is no action, so it cannot touch the campaign" guarantee, so the replacement
  * guarantee — the action touches the tally and `ownedShips` and NOTHING else — has to be asserted.

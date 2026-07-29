@@ -7,7 +7,7 @@
  * them — or off a phone before an uninstall — needs a file, and this is that file.
  *
  * A backup is a BUNDLE, not a save, because a save is not all of it: the campaign lives in its own
- * `gs_story` blob and the preferences in `gs_settings`. Exporting `gs_save` alone would silently
+ * `fc_story` blob and the preferences in `fc_settings`. Exporting `fc_save` alone would silently
  * drop a player's whole Story Tour progress, which is the kind of "worked, but lost half your stuff"
  * failure a backup feature exists to prevent.
  *
@@ -27,13 +27,19 @@ import {
 import { getCharacter } from '../sim/rpg/characters';
 
 /** Marks a file as ours. A JSON file that doesn't carry this (and isn't a recognisable legacy bare
- *  save) is rejected rather than guessed at.
+ *  save, or a pre-rename bundle) is rejected rather than guessed at.
  *
- *  **Deliberately NOT renamed with the product** (GS-release-identity). This string is stamped into
- *  every backup file every player has ever exported; it is an on-disk IDENTIFIER, not a label.
- *  Renaming it would make every existing backup unreadable — the precise failure this feature
- *  exists to prevent. `tests/brand.test.ts` pins it. */
-export const BACKUP_KIND = 'golf-stars-backup';
+ *  Renamed with the product PRE-LAUNCH (GS-release-identity): a player who opens their backup file
+ *  should see the game they are playing, and the only moment that change is cheap is before there
+ *  are real players. It is still an on-disk IDENTIFIER, so the rename is one-way — `parseBackup`
+ *  ACCEPTS `LEGACY_BACKUP_KIND` and every writer emits this one, which is the same
+ *  old-input/new-output shape `migrateCampaignStore` and the v1→v2 bundle fold already use.
+ *  Never rename it again once the game is public. `tests/brand.test.ts` pins both. */
+export const BACKUP_KIND = 'far-carry-backup';
+
+/** The pre-rename marker. Read-only: recognised on import so a backup exported before the rename
+ *  still restores, never written. Nothing else should ever join it — see `save/legacyKeys.ts`. */
+export const LEGACY_BACKUP_KIND = 'golf-stars-backup';
 
 /** Bundle format version — INDEPENDENT of `SAVE_VERSION`. This is the envelope; the save inside it
  *  carries its own version and is migrated by the existing `migrate()` chain on import.
@@ -99,8 +105,9 @@ export function buildBackup(parts: BackupParts): string {
  * report success. An import must refuse rather than guess.
  *
  * Accepts two shapes:
- *  - a bundle (`kind: 'golf-stars-backup'`), v1 or v2 — a v1 file's single `story` campaign is folded
- *    into a one-slot roster, so every backup ever written by this game still restores its campaign;
+ *  - a bundle (`kind: 'far-carry-backup'`, or the pre-rename `'golf-stars-backup'`), v1 or v2 — a v1
+ *    file's single `story` campaign is folded into a one-slot roster, so every backup ever written by
+ *    this game, under either name, still restores its campaign;
  *  - a BARE save object — what `exportSave()` has always emitted — so a file written by any older
  *    build still restores. It carries no campaign, which is honest: there wasn't one in the file.
  */
@@ -116,8 +123,9 @@ export function parseBackup(json: string): Backup {
   }
   const obj = raw as Record<string, unknown>;
 
-  // A bundle written by this feature.
-  if (obj.kind === BACKUP_KIND) {
+  // A bundle written by this feature — under the current marker, or the pre-rename one. Both are
+  // byte-identical apart from `kind`, so they take the same path and are re-stamped on the way out.
+  if (obj.kind === BACKUP_KIND || obj.kind === LEGACY_BACKUP_KIND) {
     if (typeof obj.version !== 'number' || obj.version > BACKUP_VERSION) {
       throw new BackupError(
         `That backup was made by a newer version of ${GAME_TITLE} (format ${String(obj.version)}). Update the game, then import it.`,
@@ -130,7 +138,7 @@ export function parseBackup(json: string): Backup {
       save: migrateSaveOrThrow(obj.save),
       // v1 carried ONE campaign under `story`; v2 carries the roster under `campaigns`. Both land in
       // the same place — `migrateCampaignStore` adopts a bare `StoryState` as a one-slot roster, which
-      // is the identical code path a pre-roster `gs_story` blob takes on load.
+      // is the identical code path a pre-roster story blob takes on load.
       campaigns: migrateCampaignsOrEmpty(obj.campaigns ?? obj.story),
       settings: plainObjectOrNull(obj.settings),
     };

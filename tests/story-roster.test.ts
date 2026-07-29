@@ -1,7 +1,7 @@
 /**
  * The Story-Tour CAMPAIGN ROSTER (GS-story-campaign-slots) — one campaign per golfer.
  *
- * What makes this worth guarding: `gs_story` used to hold ONE `StoryState`, and this change turns it
+ * What makes this worth guarding: `fc_story` used to hold ONE `StoryState`, and this change turns it
  * into a container. Every player upgrading the game is holding the old shape. So the assertion this
  * file exists for is the very first one below — **a pre-roster campaign is adopted, never dropped** —
  * and the rest of it defends the ways a container can quietly lose a slot: an upsert that rebuilds the
@@ -67,7 +67,7 @@ function richCampaign(characterId = 'feather-fade'): StoryState {
 
 describe('legacy adoption — nobody loses the campaign they already have', () => {
   it('adopts a pre-roster bare StoryState as a one-slot roster', () => {
-    // THE line this file exists for. Every player upgrading the game has this shape in `gs_story`.
+    // THE line this file exists for. Every player upgrading the game has this shape in `fc_story`.
     const legacy = richCampaign('huang-woo-hook');
     const store = migrateCampaignStore(legacy);
     expect(campaignCount(store)).toBe(1);

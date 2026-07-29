@@ -153,7 +153,7 @@ breakpoint.
 - **No raw `100vh`/`100dvh`.** Use `--gs-vh` / `--gs-dvh`.
 - **No canvas computes its own `devicePixelRatio`.** Use `canvasRatio()`.
 - **Defaults are inert**: `--gs-track`/`--gs-wordspace` are `0em` and `--gs-uiscale` is `1`, so the
-  untoggled game renders exactly as before. No save bump — `gs_settings` merges over defaults.
+  untoggled game renders exactly as before. No save bump — `fc_settings` merges over defaults.
 
 Guarded by `tests/accessibility.test.ts`.
 

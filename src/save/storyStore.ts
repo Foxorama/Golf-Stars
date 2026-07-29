@@ -1,6 +1,6 @@
 /**
  * Story Mode persistence (GS-story-save wiring; GS-story-campaign-slots roster) — the campaigns live in
- * their OWN localStorage key (`gs_story`), entirely SEPARATE from the main `gs_save` blob, so
+ * their OWN localStorage key (`fc_story`), entirely SEPARATE from the main `fc_save` blob, so
  * Voyage/Unending's save is never touched by Story Mode (and vice-versa). Same degrade-safe contract as
  * `save/storage.ts`: everything no-ops when localStorage is unavailable (Node/tests, private mode), and a
  * corrupt blob loads as an EMPTY ROSTER rather than crashing.
@@ -28,8 +28,9 @@ import {
   type CampaignStore,
 } from '../sim/rpg/storyRoster';
 import { type StoryState } from '../sim/rpg/story';
+import { legacyKeyFor } from './legacyKeys';
 
-export const STORY_KEY = 'gs_story';
+export const STORY_KEY = 'fc_story';
 
 function store(): Storage | null {
   try {
@@ -43,7 +44,7 @@ function store(): Storage | null {
  *  `null` = not yet read this session. */
 let cache: CampaignStore | null = null;
 
-/** Drop the cache — call after anything writes `gs_story` from outside this module (backup import), or
+/** Drop the cache — call after anything writes `fc_story` from outside this module (backup import), or
  *  the next `writeCampaign` would resurrect the pre-import roster from memory. */
 export function invalidateCampaignCache(): void {
   cache = null;
@@ -56,7 +57,9 @@ export function loadCampaignStore(): CampaignStore {
   if (!s) return emptyCampaignStore();
   let raw: string | null = null;
   try {
-    raw = s.getItem(STORY_KEY);
+    // Falls back to the pre-rename key so a device that played under the old name keeps its
+    // campaigns (GS-release-identity); the next write lands on the current key.
+    raw = s.getItem(STORY_KEY) ?? s.getItem(legacyKeyFor(STORY_KEY));
   } catch {
     return emptyCampaignStore();
   }

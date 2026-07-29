@@ -212,7 +212,7 @@ export const SHIPS: readonly Ship[] = [
     look: { kind: 'pegasus', body: '#b8823a', glass: '#f2e6c4', flame: '#ffd873', accent: '#e6b93f', bling: 2 },
   },
   // --- Story-Tour ROUTE ships (GS-story-route-rewards): earned by winning your path's Chapter-4 major.
-  // `secret` (hidden from the Trade Market until owned) + free — the campaign grants them to `gs_story`
+  // `secret` (hidden from the Trade Market until owned) + free — the campaign grants them to `fc_story`
   // ownership, so they never surface in the main-save market. Reuse existing hulls with a route palette.
   {
     id: 'warden-cruiser',

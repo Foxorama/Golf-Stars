@@ -25,7 +25,7 @@ import {
 /**
  * GS-story-champion-cosmetics: the reward panel on a winning finale — the permanent, GLOBAL set the ending
  * just hung in the Trade Market wardrobe + garage, named piece by piece. Every OTHER campaign reward lives
- * inside `gs_story` and dies with the slot, so this is the one payout worth showing on the way out.
+ * inside `fc_story` and dies with the slot, so this is the one payout worth showing on the way out.
  *
  * It lists only what was genuinely NEW (`championUnlocked`, computed by the reducer's grant): finishing the
  * same path a second time reveals nothing and the panel disappears entirely, because a "reward" you already
