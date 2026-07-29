@@ -1344,6 +1344,29 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
   type-check, so a green suite says nothing about `tsc` (missing required args, unused vars, wrong
   types) — that's exactly how #347 shipped "green" and failed CI at the typecheck step. A green
   vitest run ≠ type-clean ≠ builds.
+- **READ THE SKIPPED COUNT, NOT THE PASSED COUNT — A SKIPPED TEST IS NOT A PASSING ONE**
+  (GS-browser-test-gate). Nine files drive the BUILT artifact through playwright-core and are the
+  ONLY guard over DOM/CSS/layout/focus/deep-links; the pure-sim suite is blind to all of it. They
+  gate on `it.runIf(chromePath)`, so with no browser found they report **skipped** and vitest still
+  says green. Each file used to carry its OWN copy of the lookup and the copies had DRIFTED: five
+  checked `CHROME_PATH`, four searched Linux-only Playwright cache dirs. `tests/build.test.ts` was
+  in the second group, so its **50 tests were skipping EVERYWHERE — CI included, for months**. The
+  tell was visible all along and read past every time: local and CI both reported exactly 60
+  skipped. If it had merely been a Windows gap, CI's number would have been lower.
+  **There is now ONE lookup, `tests/chromium.ts`** — `CHROME_PATH` → Playwright caches → system
+  Chrome/Edge/macOS — always verifying the BINARY, never a directory (a `chromium-*` dir can exist
+  without one; testing the dir made `runIf` lie and hard-fail CI instead of skipping cleanly). It
+  needs no env var on any normal machine: **2344 passed / 0 skipped** locally, against the 2271/72
+  that used to read as green. A new browser test imports `chromePath` from there — **never
+  re-derive it**, that is the second description this whole entry is about.
+  ⚠️ **The 50 dead tests were hiding a stale assertion**: the finale test read
+  `fc_story.completed`, but that blob is a ROSTER (`{campaigns:{id:StoryState}}`) since
+  GS-story-campaign-slots, so it had been comparing `undefined` to `true`. A dead test rots without
+  telling you.
+  ⚠️ A browser test must not depend on the real CLIPBOARD: `grantPermissions` applies to a
+  BrowserContext and `browser.newPage()` makes its OWN, so the grant lands on a context the page
+  isn't in (and headless clipboard access is flaky even when granted). Stub
+  `navigator.clipboard.writeText` to resolve/reject and assert each branch instead.
 - **CSS classes / DOM ids are GLOBAL; the app is split across many `src/app/*` + `src/render/*`
   modules that can't see each other's names.** New screen chrome gets its OWN class prefix (the
   bridge HUD is `.gs-bhud*`, NOT the play screen's `.gs-hud`). Before adding a `.gs-foo {` rule, grep

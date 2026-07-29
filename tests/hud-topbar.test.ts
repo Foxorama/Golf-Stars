@@ -13,25 +13,14 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { windRead } from '../src/app/playHud';
 import { windCompassSVG, windKindColour } from '../src/render/windCompass';
 import type { Hole } from '../src/sim/course/contract';
+import { findChromium as findChromiumShared } from './chromium';
 
 const dist = resolve(__dirname, '../dist/index.html');
-const chromePath = (() => {
-  for (const p of [
-    process.env.CHROME_PATH,
-    '/opt/pw-browsers/chromium',
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/google-chrome',
-  ]) {
-    if (p && existsSync(p)) return p;
-  }
-  return null;
-})();
+const chromePath = findChromiumShared();
 
 /** A hole whose tee→green line is bearing 0 (`bearing` is `atan2(dx, dy)`, so +y is 0°), with a wind
  *  we choose — the fixture the whole read is measured against. */

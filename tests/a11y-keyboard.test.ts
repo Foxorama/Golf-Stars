@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { findChromium as findChromiumShared } from './chromium';
 
 /**
  * Keyboard play guards (GS-a11y-keyboard).
@@ -65,27 +66,7 @@ describe('the listener does not stack', () => {
 // --- real browser: arrows actually move the aim and the power ---------------------
 const dist = resolve(root, 'dist/index.html');
 
-function findChromium(): string | null {
-  const bases = [
-    process.env.PLAYWRIGHT_BROWSERS_PATH,
-    '/opt/pw-browsers',
-    process.env.HOME ? `${process.env.HOME}/.cache/ms-playwright` : undefined,
-  ].filter(Boolean) as string[];
-  for (const base of bases) {
-    let dirs: string[];
-    try {
-      dirs = readdirSync(base).filter((x) => x.startsWith('chromium-') && !x.includes('headless'));
-    } catch {
-      continue;
-    }
-    for (const d of dirs) {
-      const bin = `${base}/${d}/chrome-linux/chrome`;
-      if (existsSync(bin)) return bin;
-    }
-  }
-  return null;
-}
-const chromePath = findChromium();
+const chromePath = findChromiumShared();
 
 describe('arrow keys drive the shot (real browser)', () => {
   it.runIf(chromePath)(

@@ -10,23 +10,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Page } from 'playwright-core';
+import { findChromium as findChromiumShared } from './chromium';
 
 const dist = resolve(__dirname, '../dist/index.html');
-const chromePath = (() => {
-  for (const p of [
-    process.env.CHROME_PATH,
-    '/opt/pw-browsers/chromium',
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/google-chrome',
-  ]) {
-    if (p && existsSync(p)) return p;
-  }
-  return null;
-})();
+const chromePath = findChromiumShared();
 
 /** Boot the built game to the title screen. A crash on the title is the simplest case to drive,
  *  and the toast is mounted outside `#app` so it behaves identically on every screen. */

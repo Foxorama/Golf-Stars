@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { effectiveViewport, isTightFit, TIGHT_H, TIGHT_W } from '../src/app/viewportFit';
 import { UI_SCALES } from '../src/settings';
+import { findChromium as findChromiumShared } from './chromium';
 
 /**
  * The accessibility settings have to survive a PHONE (GS-a11y-sheet-scroll · GS-a11y-tight-fit).
@@ -30,27 +30,7 @@ import { UI_SCALES } from '../src/settings';
 
 const dist = resolve(__dirname, '../dist/index.html');
 
-function findChromium(): string | null {
-  const bases = [
-    process.env.PLAYWRIGHT_BROWSERS_PATH,
-    '/opt/pw-browsers',
-    process.env.HOME ? `${process.env.HOME}/.cache/ms-playwright` : undefined,
-  ].filter(Boolean) as string[];
-  for (const base of bases) {
-    let dirs: string[];
-    try {
-      dirs = readdirSync(base).filter((x) => x.startsWith('chromium-') && !x.includes('headless'));
-    } catch {
-      continue;
-    }
-    for (const d of dirs) {
-      const bin = `${base}/${d}/chrome-linux/chrome`;
-      if (existsSync(bin)) return bin;
-    }
-  }
-  return null;
-}
-const chromePath = findChromium();
+const chromePath = findChromiumShared();
 
 const TOP_SCALE = UI_SCALES[UI_SCALES.length - 1]!;
 
