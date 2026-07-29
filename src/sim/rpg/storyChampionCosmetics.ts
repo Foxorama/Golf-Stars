@@ -1,7 +1,7 @@
 /**
  * Champion cosmetics — what FINISHING a Story-Tour campaign hangs in your wardrobe (GS-story-champion-cosmetics).
  *
- * The campaign already pays out along the way, but every one of those rewards lands INSIDE `gs_story` (see
+ * The campaign already pays out along the way, but every one of those rewards lands INSIDE `fc_story` (see
  * `storyRewards.ts`): a route ship you fly on the campaign's own star chart, gear you swing in the campaign's
  * own rounds. Start a second campaign and none of it exists. So the only thing a finished campaign left
  * behind on the MAIN save was a boolean — `starTourUnlocked`.

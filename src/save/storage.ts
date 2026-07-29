@@ -1,12 +1,13 @@
 /**
  * Persistence: localStorage is the ONLY copy, so export/import-to-JSON is not optional
- * (lesson from golf-finder). Keys are namespaced `gs_*`. Everything degrades safely when
+ * (lesson from golf-finder). Keys are namespaced `fc_*`. Everything degrades safely when
  * `localStorage` is unavailable (Node/tests, private mode) — the sim never depends on it.
  */
 
 import { defaultSave, migrate, type Save } from './schema';
+import { legacyKeyFor } from './legacyKeys';
 
-export const SAVE_KEY = 'gs_save';
+export const SAVE_KEY = 'fc_save';
 
 function store(): Storage | null {
   try {
@@ -20,7 +21,7 @@ function store(): Storage | null {
 export function loadSave(): Save {
   const s = store();
   if (!s) return defaultSave();
-  const raw = s.getItem(SAVE_KEY);
+  const raw = s.getItem(SAVE_KEY) ?? s.getItem(legacyKeyFor(SAVE_KEY));
   if (!raw) return defaultSave();
   try {
     return migrate(JSON.parse(raw));
@@ -46,7 +47,7 @@ export function writeSave(save: Save): boolean {
 //
 // This file used to carry a `downloadSave` / `importAndStore` pair. They were never wired to any UI,
 // and both were wrong for the job by the time one was needed: `downloadSave` wrote the MAIN SAVE
-// only, which would have silently dropped a player's whole Story Tour campaign (`gs_story` is a
+// only, which would have silently dropped a player's whole Story Tour campaign (`fc_story` is a
 // separate blob), and `importAndStore` went through `importSave`, which swallows its errors and
 // returns `defaultSave()` — so a wrong file would have reported success while wiping a real save.
 // Removed rather than left lying around: a plausible-looking helper that quietly loses data is worse

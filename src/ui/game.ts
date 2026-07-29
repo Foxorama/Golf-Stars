@@ -527,7 +527,7 @@ export function reduce(state: UiState, action: Action): UiState {
     }
 
     case 'openStory': {
-      // GS-story: enter Story Mode. If a campaign is loaded (boot read `gs_story` into `state.story`),
+      // GS-story: enter Story Mode. If a campaign is loaded (boot read `fc_story` into `state.story`),
       // CONTINUE it — straight to the hub. Otherwise begin a NEW campaign by picking a golfer (the
       // `pendingStoryNew` flag routes `selectCharacter` to create the `StoryState`).
       // GS-story-campaign-picker: Story Tour ALWAYS opens the golfer picker now — campaigns are per
@@ -1309,7 +1309,7 @@ export function reduce(state: UiState, action: Action): UiState {
       const story = won ? winFinale(state.story) : state.story;
       // GS-story-champion-cosmetics: the ending hangs the path's set in the GLOBAL wardrobe — the route ship
       // you flew that road plus its three-piece outfit, keyed on the alignment you finished on. Every other
-      // campaign reward lives inside `gs_story` and dies with the slot; this is the one that outlives it, so
+      // campaign reward lives inside `fc_story` and dies with the slot; this is the one that outlives it, so
       // it goes on the main save beside `starTourUnlocked`. Idempotent and purely additive (same array refs
       // when nothing is new), so re-winning is a no-op and the other path's set is only ever ADDED later.
       const champ = won

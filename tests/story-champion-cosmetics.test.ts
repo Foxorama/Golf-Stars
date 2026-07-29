@@ -2,7 +2,7 @@
  * GS-story-champion-cosmetics — finishing the Story Tour hangs the path's set in the GLOBAL wardrobe.
  *
  * The promise this file defends: **a finished campaign leaves something behind that outlives the slot.**
- * Every other story reward lands inside `gs_story` (`storyRewards.ts`), so it dies the moment that golfer's
+ * Every other story reward lands inside `fc_story` (`storyRewards.ts`), so it dies the moment that golfer's
  * campaign is overwritten (one campaign per golfer — GS-story-campaign-slots). The champion set is the
  * exception, and it goes on the MAIN save beside `starTourUnlocked`.
  *

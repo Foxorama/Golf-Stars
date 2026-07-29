@@ -172,7 +172,7 @@ function boot(): void {
     stage('loaded');
     const meta = metaFromSave(save);
     const seed = seedFromUrl() ?? freshRunSeed();
-    // GS-story: load the Story Mode campaign from its own `gs_story` blob (null ⇒ no campaign yet), so the
+    // GS-story: load the Story Mode campaign from its own `fc_story` blob (null ⇒ no campaign yet), so the
     // title's Story tile can offer Continue and `openStory` can resume straight to the hub.
     const story = loadStory() ?? undefined;
     // GS-story-campaign-slots: and the WHOLE roster — one campaign per golfer — so the picker can tag
@@ -756,8 +756,8 @@ function dispatch(action: Action): void {
       haptic(HAPTICS.bad);
     }
     persist();
-    persistStory(); // GS-story: write the campaign to its own gs_story blob when one is active
-    // GS-story-campaign-slots: `gs_story` holds a campaign PER GOLFER, so it also has to remember which
+    persistStory(); // GS-story: write the campaign to its own fc_story blob when one is active
+    // GS-story-campaign-slots: `fc_story` holds a campaign PER GOLFER, so it also has to remember which
     // one "Continue" resumes. The pointer moves only where the player has unambiguously chosen a
     // campaign — entering Story Tour, or creating one — and never on the write-after-every-action,
     // because Star Tour persists the champion it free-roams as and must not hijack a campaign you left
@@ -3649,7 +3649,7 @@ function render(): void {
       }
       installView.deferred = null;
       try {
-        localStorage.setItem('gs_installNudge', 'dismissed');
+        localStorage.setItem('fc_installNudge', 'dismissed');
       } catch {
         /* ignore */
       }
@@ -4210,7 +4210,7 @@ function shouldPlayIntro(): boolean {
     if (q === '1') return true;
     if (q === '0') return false;
     if (reducedMotion()) return false;
-    if (sessionStorage.getItem('gs_introSeen') === '1') return false;
+    if (sessionStorage.getItem('fc_introSeen') === '1') return false;
   } catch {
     return false;
   }
@@ -4335,7 +4335,7 @@ export function start(): void {
   }
   if (!shouldPlayIntro()) return;
   try {
-    sessionStorage.setItem('gs_introSeen', '1');
+    sessionStorage.setItem('fc_introSeen', '1');
   } catch {
     /* ignore */
   }

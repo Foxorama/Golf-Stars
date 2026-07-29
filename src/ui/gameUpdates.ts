@@ -378,7 +378,7 @@ export function resolveStrokePlay(state: UiState, played: PlayedHole[]): UiState
  * (which banks a course record and lands on the record recap), a Story round records the world clear on the
  * `StoryState` — pay credits, keep the best score for the revisit chase, and advance the chapter if this was
  * the prologue (Earth) — then lands on the Story recap (`storyResult`). The campaign's ECONOMY (shards/ships)
- * is a separate progression (`gs_story`), but a hole-in-one still ticks the cross-mode lifetime ace tally
+ * is a separate progression (`fc_story`), but a hole-in-one still ticks the cross-mode lifetime ace tally
  * shown on the title (GS-story-ace-tally). The pure transition lives in `story.ts completeStoryRound`; this
  * wraps it with the round scoring + screen/state plumbing.
  */
@@ -507,7 +507,7 @@ export function resolveStoryRound(state: UiState, played: PlayedHole[]): UiState
     story,
     // GS-story-ace-tally: a hole-in-one on a Story round still counts toward the cross-mode lifetime ace
     // tally shown on the title (the ace celebration already reads `state.lifetimeAces + 1`). The campaign's
-    // OTHER progression (credits/best) stays inside `gs_story`; these global stats cross over.
+    // OTHER progression (credits/best) stays inside `fc_story`; these global stats cross over.
     lifetimeAces: state.lifetimeAces + aces,
     // GS-ace-ship: the Comet Rider is GLOBAL ownership like every other ship, and the ace takeover tells
     // the player to "fly it on any golfer from the Clubhouse" — which reads `state.ownedShips`. Granting

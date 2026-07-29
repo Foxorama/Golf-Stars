@@ -68,7 +68,7 @@ async function phone(
   await page.evaluate(
     ([s, r]) =>
       localStorage.setItem(
-        'gs_settings',
+        'fc_settings',
         JSON.stringify({
           sound: false, music: false, haptics: false, reducedMotion: true, leftHanded: false,
           fastShots: true, lastAscension: 0, aimMode: 'auto', readableFont: r, uiScale: s,
@@ -97,7 +97,7 @@ describe('effective viewport (pure)', () => {
 
   it('an unknown scale is snapped onto the ladder, never taken at face value', () => {
     // effectiveViewport clamps through the same ladder the setting does, so a hand-edited
-    // `gs_settings` carrying uiScale: 9 cannot report a 43-unit-wide viewport.
+    // `fc_settings` carrying uiScale: 9 cannot report a 43-unit-wide viewport.
     expect(effectiveViewport(390, 844, 9).w).toBeGreaterThan(200);
   });
 

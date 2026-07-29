@@ -10,7 +10,7 @@
  * The tally is a LIFETIME, CROSS-CAMPAIGN pair on the main save, exactly like `lifetimeAces`:
  *   - `bouts` — every root encounter resolved, won or lost. The honest denominator.
  *   - `wins`  — every one you took. The achievement's key.
- * It lives on the main save (never `gs_story`) BECAUSE one campaign per golfer means a slot can be
+ * It lives on the main save (never `fc_story`) BECAUSE one campaign per golfer means a slot can be
  * started over — a grind that could be erased by picking a golfer is not a grind anyone would do.
  *
  * **BEATEN INTO SUBMISSION** is the secret achievement at `SERPENT_TROPHY_WINS` wins: the world
@@ -33,7 +33,7 @@ export const SERPENT_SHIP_ID = 'world-serpent';
  *  pays out is the last thing in the game to earn, so the number is the point. */
 export const SERPENT_TROPHY_WINS = 1000;
 
-/** The player's lifetime record at the root. Persisted on the MAIN save (v32), never on `gs_story`. */
+/** The player's lifetime record at the root. Persisted on the MAIN save (v32), never on `fc_story`. */
 export interface SerpentTally {
   /** Every root encounter resolved — won, lost, or repelled. */
   bouts: number;

@@ -9,7 +9,7 @@
 >
 > **Guardrails (unchanged):** content-as-data, no engine fork (reuse `match.ts`), determinism +
 > auto≡interactive (new levers default to no-ops so Voyage/Unending stay byte-identical), Story persists
-> only to `gs_story` (own `STORY_VERSION`). Each bullet ships as ONE focused, tested, auto-merged PR.
+> only to `fc_story` (own `STORY_VERSION`). Each bullet ships as ONE focused, tested, auto-merged PR.
 
 ## The player brief (confirmed)
 

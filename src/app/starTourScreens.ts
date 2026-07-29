@@ -140,7 +140,7 @@ export const starTourView = {
   refuel: null as StarTourRefuel | null,
   /** GS-story-startour-champions: the outcome of the last SERPENT AT THE ROOT replay, or null. Still
    *  app-layer view state — the replay writes no CAMPAIGN and no record, so nothing here can reach
-   *  `gs_story`. GS-startour-serpent-trophy adds the two facts a card about a COUNTED bout has to show:
+   *  `fc_story`. GS-startour-serpent-trophy adds the two facts a card about a COUNTED bout has to show:
    *  the lifetime win total after it (`wins`, read back off the reducer) and whether THIS bout is the one
    *  that earned the secret world-serpent hull (`trophy` — so re-winning past the bar reveals nothing). */
   serpentResult: null as

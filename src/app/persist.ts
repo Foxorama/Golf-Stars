@@ -60,8 +60,8 @@ export function metaFromSave(save: Save) {
   };
 }
 
-/** GS-story: write the active Story Mode campaign to its OWN `gs_story` blob (separate from the main save),
- *  when one is present. A no-op with no campaign, so Voyage/Unending sessions never touch `gs_story`. */
+/** GS-story: write the active Story Mode campaign to its OWN `fc_story` blob (separate from the main save),
+ *  when one is present. A no-op with no campaign, so Voyage/Unending sessions never touch `fc_story`. */
 export function persistStory(): void {
   if (state.story) writeStory(state.story);
 }
@@ -114,7 +114,7 @@ export function persist(): void {
     // SUSPENDED real run (the Asgard attempt is forfeited, the Rainbow Ball intact), so persist the
     // parked snapshot instead of the ephemeral tournament run.
     // A Story Mode world round (GS-story-prologue) is NEVER the main-save resumable — the campaign has its
-    // own `gs_story` save, and a mid-round quit replays the world — so pass the parked snapshot through,
+    // own `fc_story` save, and a mid-round quit replays the world — so pass the parked snapshot through,
     // exactly like the Asgard tournament run.
     activeRun:
       state.run.status === 'active' && state.run.formatId === ASGARD_FORMAT

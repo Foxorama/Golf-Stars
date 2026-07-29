@@ -2,36 +2,94 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { GAME_TITLE, GAME_TITLE_UPPER, APP_VERSION } from '../src/brand';
-import { BACKUP_KIND } from '../src/save/backup';
+import { BACKUP_KIND, LEGACY_BACKUP_KIND, buildBackup, parseBackup } from '../src/save/backup';
 import { SAVE_KEY } from '../src/save/storage';
 import { STORY_KEY } from '../src/save/storyStore';
+import { SETTINGS_KEY } from '../src/settings';
+import { legacyKeyFor } from '../src/save/legacyKeys';
+import { emptyCampaignStore } from '../src/sim/rpg/storyRoster';
+import { defaultSave } from '../src/save/schema';
 
 /**
  * Product identity guards (GS-release-identity).
  *
- * A rename is the classic half-landed change: most surfaces move, one keeps shipping the old
- * name, and — far worse — somebody helpfully renames a PERSISTED IDENTIFIER along with the
- * label and orphans every save on every player's device. These tests pin both halves: the
- * name is single-sourced, and the identifiers are frozen.
+ * A rename is the classic half-landed change: most surfaces move and one keeps shipping the old
+ * name. The persisted names moved WITH the product here — once, pre-launch, while it was still
+ * free — so these tests pin the harder half: the new spelling is canonical on WRITE, the old one
+ * is still accepted on READ, and the service-worker cache prefix agrees across the three files
+ * that each spell it out separately.
  */
 
 const src = (p: string): string => readFileSync(resolve(__dirname, '..', p), 'utf8');
 
-describe('persisted identifiers survive a rename', () => {
-  // THE load-bearing assertion in this file. `BACKUP_KIND` is stamped into every backup file
-  // any player has ever exported; `parseBackup` recognises a file by it and rejects anything
-  // else. Renaming it to match a new product name makes every existing backup unreadable
-  // while every test that only round-trips NEW files stays green.
-  it('BACKUP_KIND is frozen at its original value, whatever the product is called', () => {
-    expect(BACKUP_KIND).toBe('golf-stars-backup');
+describe('persisted identifiers renamed forward, with the old spelling still readable', () => {
+  it('the canonical keys are the fc_ namespace', () => {
+    expect(SAVE_KEY).toBe('fc_save');
+    expect(STORY_KEY).toBe('fc_story');
+    expect(SETTINGS_KEY).toBe('fc_settings');
+    expect(BACKUP_KIND).toBe('far-carry-backup');
   });
 
-  // The save keys are the same class of promise: they address data already sitting in
-  // localStorage on real devices. Asserted on the exported constants, not a source grep —
-  // the constant IS the contract, and a grep would pass on a stale comment.
-  it('the localStorage keys keep their gs_ namespace', () => {
-    expect(SAVE_KEY).toBe('gs_save');
-    expect(STORY_KEY).toBe('gs_story');
+  it('legacyKeyFor maps every current key back to its pre-rename spelling', () => {
+    expect(legacyKeyFor(SAVE_KEY)).toBe('gs_save');
+    expect(legacyKeyFor(STORY_KEY)).toBe('gs_story');
+    expect(legacyKeyFor(SETTINGS_KEY)).toBe('gs_settings');
+    // A key outside the namespace is passed through untouched rather than mangled.
+    expect(legacyKeyFor('unprefixed')).toBe('unprefixed');
+  });
+
+  // Every loader must consult the fallback, or a pre-rename device silently starts from scratch
+  // while the save it had is still sitting in localStorage under the old key.
+  it('every persisted-blob loader falls back to the legacy key', () => {
+    for (const f of ['src/save/storage.ts', 'src/save/storyStore.ts', 'src/settings.ts', 'src/app/saveTransfer.ts']) {
+      expect(src(f), `${f} must read through legacyKeyFor`).toContain('legacyKeyFor');
+    }
+  });
+
+  // THE load-bearing assertion. A backup exported before the rename must still restore — the
+  // marker is how `parseBackup` recognises a file at all, so dropping the old one turns every
+  // pre-rename backup into "that file doesn't look like a save" while new-file round-trips stay green.
+  it('imports a pre-rename backup bundle', () => {
+    const legacy = JSON.parse(
+      buildBackup({ save: defaultSave(), campaigns: emptyCampaignStore(), settings: null, exportedAt: '' }),
+    ) as Record<string, unknown>;
+    legacy.kind = LEGACY_BACKUP_KIND;
+
+    const parsed = parseBackup(JSON.stringify(legacy));
+    // Accepted on the way in, and re-stamped canonical on the way out — old input, new output.
+    expect(parsed.kind).toBe(BACKUP_KIND);
+  });
+
+  it('a file carrying neither marker is still refused', () => {
+    // No numeric `version` on purpose: that is how `parseBackup` recognises a legacy BARE save
+    // (`exportSave` output), which is a third accepted shape and would swallow this fixture.
+    expect(() => parseBackup(JSON.stringify({ kind: 'someone-elses-game', data: 1 }))).toThrow();
+  });
+
+  // The rename is one-way and one-time. A second entry here would mean it happened twice.
+  it('legacyKeys.ts carries exactly one legacy namespace', () => {
+    const matches = src('src/save/legacyKeys.ts').match(/^const \w+_PREFIX/gm) ?? [];
+    expect(matches.length).toBe(2); // LEGACY_PREFIX + CURRENT_PREFIX, no more
+  });
+});
+
+describe('the service-worker cache prefix agrees across all three files', () => {
+  // These cannot share a constant: sw.js is standalone, and index.html's sweep runs before any
+  // module. index.html DELETES every cache not carrying the prefix, so a disagreement makes the
+  // page nuke its own offline snapshot on every boot — silently, and only when offline.
+  const PREFIX = 'far-carry-';
+
+  it('sw.js names and retires caches under the prefix', () => {
+    const sw = src('public/sw.js');
+    expect(sw).toContain(`var CACHE = '${PREFIX}'`);
+    expect(sw).toContain(`k.indexOf('${PREFIX}') === 0`);
+    expect(sw, 'the pre-rename prefix must be gone').not.toContain("'golf-stars-'");
+  });
+
+  it("index.html's foreign-cache sweep spares exactly that prefix", () => {
+    const html = src('index.html');
+    expect(html).toContain(`k.indexOf('${PREFIX}') !== 0`);
+    expect(html).not.toContain("k.indexOf('golf-stars-')");
   });
 });
 

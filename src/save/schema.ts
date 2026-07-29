@@ -458,7 +458,7 @@ export type SaveV29 = Omit<SaveV28, 'version'> & {
 /** v30 adds the PERMANENT Star Tour unlock (GS-story-startour-unlock): once the Story Tour finale has
  *  been won even once, the free-roam records chase stays available forever — starting a NEW campaign
  *  (which resets the campaign's own `completed` flag) no longer relocks it. Distinct from `strokePlayBest`
- *  (the records) and the campaign save (`gs_story`); this lives on the main save so it outlives any single
+ *  (the records) and the campaign save (`fc_story`); this lives on the main save so it outlives any single
  *  campaign. Seeded false for existing saves and backfilled from a live completed campaign at boot. */
 export type SaveV30 = Omit<SaveV29, 'version'> & {
   version: 30;
@@ -479,7 +479,7 @@ export type SaveV31 = Omit<SaveV30, 'version'> & {
 /** v32 adds the LIFETIME ROOT TALLY (GS-startour-serpent-trophy): every Star Tour encounter with the
  *  serpent at the root of Yggdrasil now counts — `serpentBouts` (every one resolved) and `serpentWins`
  *  (every one taken), the key to the secret **Beaten into Submission** achievement at 1,000 wins. It
- *  lives on the MAIN save rather than `gs_story` on purpose: one campaign per golfer means a slot can
+ *  lives on the MAIN save rather than `fc_story` on purpose: one campaign per golfer means a slot can
  *  be started over, and a thousand-fight grind that a golfer pick could erase is one nobody would run.
  *  Seeded at 0 for existing saves — the count is earned in play, never granted retroactively (a player
  *  who has already replayed the root a hundred times starts from zero, which is the same rule every
@@ -937,7 +937,7 @@ function v28ToV29(s: SaveV28): SaveV29 {
  *  flag is set true the moment the Story Tour finale is first won, and — unlike the campaign's own
  *  `completed` flag (wiped when a NEW campaign begins) — it survives forever, so starting a fresh
  *  campaign never relocks the free-roam reward. A returning player mid-completed-campaign has the flag
- *  seeded at boot from their live `gs_story` (`storyComplete`), so nobody who already earned it loses it. */
+ *  seeded at boot from their live `fc_story` (`storyComplete`), so nobody who already earned it loses it. */
 function v29ToV30(s: SaveV29): SaveV30 {
   return { ...s, version: 30, starTourUnlocked: false };
 }

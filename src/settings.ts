@@ -5,12 +5,13 @@
  * instead of waiting for a tap. Read by `app.ts` (and the audio/haptic helpers); never by the
  * pure sim, so determinism is untouched.
  *
- * Persistence lives here (a side-effect, like the save in main.ts), keyed `gs_settings` to share
- * the namespace convention with the save (`gs_*`). All access is guarded so a private-mode /
+ * Persistence lives here (a side-effect, like the save in main.ts), keyed `fc_settings` to share
+ * the namespace convention with the save (`fc_*`). All access is guarded so a private-mode /
  * disabled-storage browser degrades to the defaults rather than throwing.
  */
 
 import type { AimMode } from './sim/rpg/play';
+import { legacyKeyFor } from './save/legacyKeys';
 
 export interface Settings {
   /** Master sound on/off (assetless WebAudio SFX). */
@@ -44,7 +45,8 @@ export interface Settings {
   aimMode: AimMode;
 }
 
-const KEY = 'gs_settings';
+export const SETTINGS_KEY = 'fc_settings';
+const KEY = SETTINGS_KEY;
 
 function prefersReducedMotion(): boolean {
   try {
@@ -88,7 +90,8 @@ export function getSettings(): Settings {
   if (cache) return cache;
   const d = defaults();
   try {
-    const raw = localStorage.getItem(KEY);
+    // Pre-rename fallback (GS-release-identity) — a player's preferences survive the rename.
+    const raw = localStorage.getItem(KEY) ?? localStorage.getItem(legacyKeyFor(KEY));
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<Settings>;
       // Merge over defaults so a newly-added field is filled in for old saves.

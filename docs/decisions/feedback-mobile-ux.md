@@ -20,7 +20,7 @@ URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub gu
   madeCut) gated on the `haptics` setting + guarded (absent on desktop/iOS) — so the game is readable
   with sound off.
 - **Settings (`src/settings.ts` + a bottom-sheet overlay).** Player-owned prefs persisted to
-  localStorage `gs_settings` (NOT reducer state): `sound`, `haptics`, `fastShots`, `swingGesture`,
+  localStorage `fc_settings` (NOT reducer state): `sound`, `haptics`, `fastShots`, `swingGesture`,
   `leftHanded`, `reducedMotion` (seeded from the OS preference). Reachable via ⚙ on the title + the
   play-screen map controls; toggles re-render live.
 - **Left-handed mode is a true MIRROR, not a cosmetic flip (GS-lefty).** A left-handed golfer is the
@@ -78,7 +78,7 @@ URL param (dev knobs ride the existing `_gsFeel` sub-fields), so the test-hub gu
   loot colours so `celebrations.ts` stays free of sim imports.
 - **Daily Challenge + install nudge.** A title button starts a run on a date-derived string seed
   (`daily-YYYY-MM-DD`, reuses string-seed support — no new param); `beforeinstallprompt` is captured and
-  offered as an in-app "Install app" button (dismiss persists in `gs_installNudge`).
+  offered as an in-app "Install app" button (dismiss persists in `fc_installNudge`).
 - **Mobile hygiene (`index.html` CSS).** `viewport-fit=cover` + `env(safe-area-inset-*)` (mirrored into
   the `.gs-shot` height math) clear the notch/home-indicator; `touch-action:manipulation` +
   `user-select:none` on controls kill tap-delay/double-tap-zoom/stray selection; responsive putt meter +

@@ -1,7 +1,7 @@
 /**
  * Save transfer, app layer (GS-save-transfer) — the browser/DOM half of `save/backup.ts`.
  *
- * Reads the three persisted blobs (`gs_save` / `gs_story` / `gs_settings`) into a bundle, and writes
+ * Reads the three persisted blobs (`fc_save` / `fc_story` / `fc_settings`) into a bundle, and writes
  * a bundle back. Nothing here is pure: it touches `localStorage`, the clipboard and an `<a download>`,
  * which is exactly why the FORMAT lives in `save/backup.ts` and only the plumbing lives here.
  *
@@ -16,8 +16,11 @@ import { loadSave, writeSave } from '../save/storage';
 import { loadCampaignStore, writeCampaignStore, clearStory, invalidateCampaignCache } from '../save/storyStore';
 import { buildBackup, type Backup } from '../save/backup';
 import { campaignCount } from '../sim/rpg/storyRoster';
-
-const SETTINGS_KEY = 'gs_settings';
+// The key comes from `settings.ts`, which OWNS it. This module used to declare its own copy of the
+// literal, so the rename (GS-release-identity) had two places to land and only one obvious one —
+// exactly the second-description bug this codebase keeps paying for. Import, never re-spell.
+import { SETTINGS_KEY } from '../settings';
+import { legacyKeyFor } from '../save/legacyKeys';
 
 function store(): Storage | null {
   try {
@@ -32,7 +35,8 @@ function store(): Storage | null {
 export function currentBackupJSON(): string {
   let settings: Record<string, unknown> | null = null;
   try {
-    const raw = store()?.getItem(SETTINGS_KEY);
+    const s = store();
+    const raw = s?.getItem(SETTINGS_KEY) ?? s?.getItem(legacyKeyFor(SETTINGS_KEY));
     if (raw) settings = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     /* preferences are the optional part of the bundle — never fail an export over them */

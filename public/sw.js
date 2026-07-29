@@ -9,11 +9,17 @@
  * deploy always wins the moment the device is online — caching buys offline play, not staleness.
  *
  * Scope is the app's own subpath (registered with a relative URL), so this worker can only ever
- * touch Golf Stars — it cannot intercept a sibling app (e.g. golf-finder) on the shared origin.
- * The cache name is prefixed `golf-stars-` so the page's foreign-worker guard leaves it alone.
+ * touch this game — it cannot intercept a sibling app (e.g. golf-finder) on the shared origin.
+ *
+ * THE CACHE PREFIX IS ONE DECISION WRITTEN IN THREE PLACES, and they must agree
+ * (GS-release-identity): here, in the retire-old-versions sweep in `activate` below, and in
+ * index.html's foreign-cache cleanup — which DELETES any cache not carrying this prefix. Change
+ * one and the page cheerfully nukes its own offline snapshot on every boot. There is no way to
+ * share a constant (this file is standalone, and the page's guard runs before any module), so
+ * `tests/brand.test.ts` asserts all three spell it the same.
  */
-var VERSION = 'gs-pwa-4'; // bump per deploy to retire the previous offline snapshot
-var CACHE = 'golf-stars-' + VERSION;
+var VERSION = 'fc-pwa-1'; // bump per deploy to retire the previous offline snapshot
+var CACHE = 'far-carry-' + VERSION;
 
 // The app is a single inlined index.html plus the install assets — precache the shell so a
 // cold offline launch works on the very next visit.
@@ -41,7 +47,7 @@ self.addEventListener('activate', function (e) {
         return Promise.all(
           keys.map(function (k) {
             // Drop OUR previous-version caches; never touch a sibling app's caches.
-            if (k.indexOf('golf-stars-') === 0 && k !== CACHE) return caches.delete(k);
+            if (k.indexOf('far-carry-') === 0 && k !== CACHE) return caches.delete(k);
             return undefined;
           }),
         );

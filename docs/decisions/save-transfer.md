@@ -26,11 +26,11 @@ Progress is spread over three localStorage blobs:
 
 | key | what | written by |
 |---|---|---|
-| `gs_save` | the main save — shards, unlocks, ascension, the resumable run | `save/storage.ts` |
-| `gs_story` | the Story Tour campaign, deliberately separate | `save/storyStore.ts` |
-| `gs_settings` | preferences | `settings.ts` |
+| `fc_save` | the main save — shards, unlocks, ascension, the resumable run | `save/storage.ts` |
+| `fc_story` | the Story Tour campaign, deliberately separate | `save/storyStore.ts` |
+| `fc_settings` | preferences | `settings.ts` |
 
-Exporting `gs_save` alone — which is what the pre-existing `downloadSave` did — would have silently
+Exporting `fc_save` alone — which is what the pre-existing `downloadSave` did — would have silently
 dropped a player's entire Story Tour campaign. "It worked, and you lost half your stuff" is precisely
 the failure a backup feature exists to prevent, so the file is an envelope:
 
@@ -40,7 +40,7 @@ the failure a backup feature exists to prevent, so the file is an envelope:
 ```
 
 > **Superseded at `version: 2`** (GS-story-campaign-slots, `story-campaign-slots.md`): `story` — one
-> campaign — became `campaigns`, the per-golfer roster `gs_story` now holds. A v1 file's single
+> campaign — became `campaigns`, the per-golfer roster `fc_story` now holds. A v1 file's single
 > campaign folds into a one-slot roster on read, so everything written under the shape above still
 > restores. The bump is deliberate: it makes an older build **refuse** a v2 file loudly instead of
 > handing the roster to `migrateStory` and silently restoring one mangled campaign.
@@ -75,7 +75,7 @@ file — what `exportSave` has always emitted — is still accepted, and reports
 no campaign.
 
 A campaign that won't migrate is the one thing dropped rather than fatal: the main save is the bulk
-of a player's progress, and refusing the whole import over an odd `gs_story` is the worse trade. The
+of a player's progress, and refusing the whole import over an odd `fc_story` is the worse trade. The
 confirm summary says what actually came through.
 
 ## Two steps, always
@@ -83,7 +83,7 @@ confirm summary says what actually came through.
 Import replaces everything, so picking a file only **parses and summarises** it — shards, best score,
 ascension, ship/cosmetic counts, whether a run is in progress, and which chapter the campaign is at.
 Nothing is written until a second, explicitly-worded tap. The browser test asserts this directly:
-after the file is chosen and before the confirm, `gs_save` is byte-for-byte what it was.
+after the file is chosen and before the confirm, `fc_save` is byte-for-byte what it was.
 
 The summary is also how a player catches the *quiet* mistake — picking the wrong file. An empty
 restore looks obviously empty in that list before it costs anything.

@@ -3037,8 +3037,14 @@
         // Defensive: The Far Carry IS now a PWA, but it shares an origin with other projects
         // (e.g. a golf-finder PWA) whose root-scoped service worker could intercept and blank
         // this page. So nuke only FOREIGN workers/caches — anything not scoped to our own
-        // subpath, and any cache not named `golf-stars-*` — while leaving our own offline
+        // subpath, and any cache not named `far-carry-*` — while leaving our own offline
         // worker intact. (Our worker registers from the app module; see app.ts.)
+        //
+        // THIS PREFIX MUST MATCH public/sw.js (GS-release-identity). It is the same decision
+        // written in three places and they cannot share a constant — this script runs before any
+        // module, and sw.js is standalone. Disagree, and the page deletes its OWN cache every
+        // boot while believing it is tidying up after a sibling app. Pinned by tests/brand.test.ts.
+        // (The pre-rename `golf-stars-*` caches are correctly swept as foreign by this very rule.)
         try {
           var ourScope = new URL('./', location.href).href; // e.g. https://host/golf-stars/
           if (navigator.serviceWorker) {
@@ -3048,7 +3054,7 @@
           }
           if (window.caches && caches.keys) {
             caches.keys().then(function (ks) {
-              ks.forEach(function (k) { if (k.indexOf('golf-stars-') !== 0) caches.delete(k); });
+              ks.forEach(function (k) { if (k.indexOf('far-carry-') !== 0) caches.delete(k); });
             }).catch(function () {});
           }
         } catch (e) {}

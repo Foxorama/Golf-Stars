@@ -1,13 +1,13 @@
 # Story-Tour campaign slots — one campaign per golfer (GS-story-campaign-slots, 2026-07-29)
 
-Rule in `CLAUDE.md` → *Versioned saves from v1* (the `gs_story` bullet). Code:
+Rule in `CLAUDE.md` → *Versioned saves from v1* (the `fc_story` bullet). Code:
 `src/sim/rpg/storyRoster.ts` (pure), `src/save/storyStore.ts` (the one localStorage key),
 `src/save/backup.ts` + `src/app/saveTransfer.ts` (the bundle), `src/app.ts` (the active pointer).
 Guards: `tests/story-roster.test.ts`, `tests/save-backup.test.ts`, `tests/story-flow.test.ts`.
 
 ## The bug
 
-`gs_story` held a **single** `StoryState`. `openStory` with no campaign routed to character select,
+`fc_story` held a **single** `StoryState`. `openStory` with no campaign routed to character select,
 and `selectCharacter` under `pendingStoryNew` did this:
 
 ```ts
@@ -110,7 +110,7 @@ build would instead have handed a container to `migrateStory`, restored **one ma
 reported success — exactly the class of silent data loss a backup feature exists to prevent.
 
 Reading is generous in the other direction: a **v1 bundle's single `story` folds into a one-slot
-roster** through the same code path a pre-roster `gs_story` blob takes, so every backup file a player
+roster** through the same code path a pre-roster `fc_story` blob takes, so every backup file a player
 already holds still restores its campaign, champion flag and all.
 
 Import **replaces** the roster wholesale rather than merging. A merge would have to invent an answer
@@ -255,7 +255,7 @@ one production call site, so this is a **second caller, never a forked fight**.
 
 **It was not a reducer action, and that was the design** — until GS-startour-serpent-trophy gave it one
 (see below), which *moved* the guarantee rather than dropping it. A replay must not touch campaign state
-— no `winFinale`, no `starTourUnlocked`, no persist of `gs_story` — and having *no action to dispatch*
+— no `winFinale`, no `starTourUnlocked`, no persist of `fc_story` — and having *no action to dispatch*
 made that true by construction rather than by remembering. The outcome lands in
 `starTourView.serpentResult` (app-layer view state, never persisted) and the recap returns to the
 **map**, not the title. It needs its own path
@@ -305,7 +305,7 @@ every resolved bout at the root now increments a lifetime pair on the **main sav
 (every one, won or lost) and `serpentWins` — and a thousand victories break the beast to the bridle:
 **The World Serpent** becomes a ship.
 
-**Why the main save and not `gs_story`.** One campaign per golfer means a slot can be started over at any
+**Why the main save and not `fc_story`.** One campaign per golfer means a slot can be started over at any
 time (that is the whole of GS-story-campaign-slots). A thousand-fight grind that a golfer pick could erase
 is a grind nobody would ever run. It sits beside `lifetimeAces`, which is the same kind of fact.
 

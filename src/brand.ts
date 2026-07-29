@@ -6,12 +6,23 @@
  * exactly how a rename half-lands: five surfaces move and the sixth keeps shipping the old
  * name for a year. Every user-facing surface reads these constants instead.
  *
- * **NOT rename targets, deliberately.** The `gs_*` localStorage keys, the npm package name,
- * the Capacitor `appId`, and — critically — `BACKUP_KIND` in `save/backup.ts` are
- * IDENTIFIERS baked into data that already exists on players' devices. Renaming one orphans
- * every save or backup file in the wild. A product name is a label; an identifier is a
- * contract, and the two happening to have been the same string is a coincidence, not a rule.
- * `tests/brand.test.ts` machine-checks that distinction.
+ * **IDENTIFIERS MOVED TOO — ONCE, BEFORE LAUNCH, AND NEVER AGAIN.** The persisted names went
+ * with the product: `fc_save`/`fc_story`/`fc_settings`, `BACKUP_KIND` = `far-carry-backup`, and
+ * the `far-carry-` service-worker cache prefix. A player who opens their backup file or their
+ * devtools should see the game they are playing, and pre-launch is the only moment that costs
+ * nothing — after launch it would mean migrating real players' data instead of three test
+ * devices. Every read path still ACCEPTS the old spelling (`save/legacyKeys.ts`,
+ * `LEGACY_BACKUP_KIND`) so the devices that played under the old name lose nothing; writes are
+ * always canonical. Old input, new output — the shape `migrateCampaignStore` and the v1→v2
+ * bundle fold already use.
+ *
+ * **Once the game is public this stops being free.** A persisted string is a contract with data
+ * that exists; a product name is a label. They are the same string today only because the rename
+ * landed before anyone was holding the contract.
+ *
+ * Still NOT rename targets: the npm package name, the repo, and the Capacitor `appId`
+ * (`com.foxorama.golfstars` — a permanent package identifier; renaming it would be a different
+ * app). `tests/brand.test.ts` machine-checks all of it.
  */
 
 /**
