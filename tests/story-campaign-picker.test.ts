@@ -220,6 +220,51 @@ describe('the picker screen renders the campaign state', () => {
   });
 });
 
+describe('leaving the picker', () => {
+  /** The action carried by the picker's own "Back to title" button, as the DOM would dispatch it. */
+  function backButtonAction(s: UiState): Parameters<typeof reduce>[1] {
+    setState(s);
+    const html = storyGolferPickerHTML();
+    // The ghost button in the footer div, under the clubhouse scene.
+    const m = /gs-btn--ghost" data-action='([^']+)'>‹ Back to title</.exec(html);
+    expect(m, 'the picker renders a "Back to title" button').toBeTruthy();
+    return JSON.parse(m?.[1] ?? 'null');
+  }
+
+  it('the back button agrees with `backIntent`, and actually leaves', () => {
+    // The picker is screen `character`, so its back action is the CHARACTER screen's — not the story
+    // HUB's `exitStory`, which is guarded to `screen === 'story'` and was therefore a NO-OP here: the
+    // reducer handed back the same state and the button did nothing at all.
+    const s = picker(booted({ ...defaultStoryState(FEATHER), chapter: 3 }));
+    const action = backButtonAction(s);
+    // One decision, two devices: the on-screen button and the hardware BACK must ask for the same thing.
+    expect(backIntent(s)).toEqual({ kind: 'navigate', action });
+
+    const left = reduce(s, action);
+    expect(left).not.toBe(s); // a back button that returns the same state is a dead button
+    expect(left.screen).toBe('title');
+  });
+
+  it('leaves no picker state behind — the next Voyage opens the ORDINARY roster', () => {
+    // `pendingStoryNew` is what makes screen `character` render the clubhouse picker. Carried onto the
+    // title it would dress Voyage's character select as the Story clubhouse, and picking a golfer there
+    // would create a CAMPAIGN instead of starting the run.
+    const s = reduce(picker(booted({ ...defaultStoryState(FEATHER), chapter: 3 })), { type: 'storyRequestRestart', characterId: FEATHER });
+    const title = reduce({ ...s, storyInspectId: FEATHER }, { type: 'toTitle' });
+    expect(title.screen).toBe('title');
+    expect(title.pendingStoryNew).toBeFalsy();
+    expect(title.storyInspectId).toBeUndefined();
+    expect(title.storyOverwriteId).toBeUndefined();
+
+    const voyage = reduce(title, { type: 'start', format: 'voyage' });
+    expect(voyage.pendingStoryNew).toBeFalsy();
+    const picked = reduce(voyage, { type: 'selectCharacter', characterId: LARRY });
+    expect(picked.screen).not.toBe('story'); // a run, not a campaign
+    expect(picked.run.loadout.characterId).toBe(LARRY);
+    expect(campaignFor(currentRoster(picked), LARRY)).toBeFalsy();
+  });
+});
+
 describe('the badges are Story Tour only', () => {
   it('a non-story character pick is untouched by the campaign machinery', () => {
     // The `character` screen is SHARED with Voyage / Unending / Star Tour. `pendingStoryNew` is what

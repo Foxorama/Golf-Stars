@@ -2393,6 +2393,14 @@ export function reduce(state: UiState, action: Action): UiState {
         // The back-button confirm (GS-android-back) is what usually dispatches this; clear it so the
         // card can never survive onto the title screen.
         pendingExit: undefined,
+        // …and the same for the Story golfer/campaign picker's own state. `toTitle` is the ONE way off
+        // that screen (its back button, hardware BACK, the settings sheet's escape hatch all land here),
+        // and `pendingStoryNew` is what makes screen `character` render the clubhouse picker instead of
+        // the ordinary roster. Left set, the next `start` would open Voyage's character select wearing
+        // the Story clubhouse — and picking a golfer there creates a CAMPAIGN instead of starting the run.
+        pendingStoryNew: false,
+        storyInspectId: undefined,
+        storyOverwriteId: undefined,
         viewHole: 0,
       };
     }
