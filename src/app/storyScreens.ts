@@ -184,7 +184,12 @@ export function storyGolferPickerHTML(): string {
       ${earthClubhouseSceneHTML(null, tags)}
     </section>
     <div style="display:flex;flex-direction:column;gap:10px;max-width:520px;margin:14px auto 0;">
-      <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'exitStory' })}'>‹ Back to title</button>
+      <!-- The picker is screen \`character\`, NOT \`story\` — so its back button is the CHARACTER screen's
+           back action (\`toTitle\`, exactly what \`backIntent\` answers here and what the sibling
+           \`starTourChampion\` picker uses). \`exitStory\` is the story HUB's action and is guarded to that
+           screen, so dispatching it from here was a no-op: the reducer returned the same state and the
+           button did nothing. -->
+      <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'toTitle' })}'>‹ Back to title</button>
     </div>
     ${overlay}
     ${state.storyOverwriteId ? storyRestartConfirmHTML(state.storyOverwriteId) : ''}`;

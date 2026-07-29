@@ -1424,6 +1424,19 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
   data-loss warning — `toTitle` already parks the run as `resumable`; `exitPrompt` says the true
   thing instead (strokeplay resumes on the hole, other formats replay the stop) and a test forbids
   the word "lose". Reuses `.gs-sheet` chrome ⇒ zero new global CSS.
+  **AN ON-SCREEN BACK BUTTON DISPATCHES WHAT `backIntent` ANSWERS FOR ITS SCREEN** (GS-story-back-dead) —
+  every navigation action is `state.screen`-guarded, so a button carrying a NEIGHBOUR screen's action is
+  not a wrong destination, it is a **DEAD BUTTON**: the reducer returns the same state and nothing at all
+  happens. The trap is a module that renders TWO screens — `storyScreens.ts` serves the story HUB *and*
+  the golfer picker (screen `character`), and the picker shipped with the hub's `exitStory`, which is
+  guarded to `screen === 'story'`. Every other back action's module name matches its guarded screen; when
+  one doesn't, check it. And **`toTitle` must leave no screen-local state behind** — it is the single exit
+  from the picker (its button, hardware BACK, and the settings sheet's escape hatch all land there), so it
+  clears `pendingStoryNew`/`storyInspectId`/`storyOverwriteId` beside `pendingExit`; carried onto the
+  title, `pendingStoryNew` would dress the NEXT Voyage's character select as the Story clubhouse and turn
+  picking a golfer into creating a campaign. Guarded by `tests/story-campaign-picker.test.ts` (the button's
+  own `data-action` is parsed out of the rendered HTML, compared to `backIntent`, and reduced — a back
+  action that returns the same state fails).
 
 ## Do NOT carry from golf-finder
 GPS/geolocation, OSM/Overpass, weather APIs, real astronomy/star catalogs, the day course-finder,
