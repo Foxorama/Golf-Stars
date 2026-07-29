@@ -104,6 +104,10 @@ function screenIntent(state: UiState): BackIntent {
     case 'clubhouse':
       // Back to the HALL, not the title — `clubhouse` is one golfer's stage inside it.
       return { kind: 'navigate', action: { type: 'clubhouseBackToHall' } };
+    case 'starTourChampion':
+      // A pick, not a beat — nothing has been committed by opening it (the champion's run is built on
+      // select), so back simply leaves the mode. Same parent as `character`, its sibling picker.
+      return { kind: 'navigate', action: { type: 'toTitle' } };
     case 'starTour':
       // One screen, two contexts (GS-story-map reuses the Star Tour map inside a campaign). The
       // reducer discriminates on `state.story` exactly like `exitStoryMap`'s own guard does.

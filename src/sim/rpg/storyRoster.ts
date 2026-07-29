@@ -171,6 +171,20 @@ export function isChampion(store: CampaignStore, characterId: string): boolean {
   return !!s && storyComplete(s);
 }
 
+/**
+ * Is a round being played AS a champion — the loaded campaign is finished AND it belongs to the golfer
+ * holding the club? (GS-story-startour-champions.)
+ *
+ * Both halves matter. A completed campaign can be loaded while a DIFFERENT golfer plays (Story Tour
+ * itself never does that, but the star map is entered from several places), and stamping that round as
+ * a champion's would put a ★ on a record set with a starting bag. This is what `resolveStrokePlay` banks
+ * into `StrokePlayRecord.champion`, and it is pure so the answer is testable rather than inferred from
+ * whichever screen happened to be up.
+ */
+export function championRound(story: StoryState | null | undefined, characterId: string | undefined): boolean {
+  return !!story && !!characterId && story.characterId === characterId && storyComplete(story);
+}
+
 /** Has ANY campaign been completed? (The roster's own answer to "is Star Tour earned" — the main save's
  *  permanent `starTourUnlocked` flag is still the gate, so a player who completed the campaign under
  *  the old single-slot save and then started over keeps their unlock.) */

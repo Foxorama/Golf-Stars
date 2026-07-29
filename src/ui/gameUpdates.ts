@@ -25,6 +25,7 @@ import {
 } from '../sim/rpg/run';
 import { addEndlessRecord, endlessUnlocksCrossed } from '../sim/rpg/endless';
 import { addStrokeRecord, isNewCourseRecord, type StrokePlayRecord } from '../sim/rpg/strokePlay';
+import { championRound } from '../sim/rpg/storyRoster';
 import { playTotals } from '../sim/score';
 import { archetypeFor } from '../sim/course/themes';
 import { namedCaddyOwned, aceCount } from '../sim/rpg/economy';
@@ -329,6 +330,13 @@ export function asgardFieldEdge(state: UiState): number {
 export function resolveStrokePlay(state: UiState, played: PlayedHole[]): UiState {
   const run = state.run;
   const totals = playTotals(played.map((p) => p.record));
+  // GS-story-startour-champions: mark a round played by a CHAMPION — a finished Story Tour protagonist
+  // free-roaming with the bag / gear / caddy they saved the galaxy with. Purely DESCRIPTIVE: the board is
+  // still one per course, still ranked on to-par alone. It exists because a champion's run is built on
+  // `DEFAULT_BAG_TIER` and then has the developed Story bag laid over it, so `tier` below says 'common'
+  // about a golfer swinging a solar bag — without this the board doesn't merely omit the fact, it
+  // misstates it. See `StrokePlayRecord.champion` for why the board describes rather than stratifies.
+  const champion = championRound(state.story, run.loadout.characterId);
   const record: StrokePlayRecord = {
     courseId: run.staticCourseId ?? 'unknown',
     characterId: run.loadout.characterId ?? '',
@@ -338,6 +346,7 @@ export function resolveStrokePlay(state: UiState, played: PlayedHole[]): UiState
     toPar: totals.toPar,
     effect: run.staticEffect ?? 'none',
     seed: run.seed,
+    ...(champion ? { champion: true } : {}),
   };
   const strokeIsRecord = isNewCourseRecord(state.strokePlayBest, record);
   const strokePlayBest = addStrokeRecord(state.strokePlayBest, record);

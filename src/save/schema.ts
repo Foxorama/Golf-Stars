@@ -18,7 +18,7 @@ import type { CosmeticRarity } from '../sim/rpg/cosmetics';
 import { CHARACTERS } from '../sim/rpg/characters';
 import type { ReputationByCharacter } from '../sim/rpg/factions';
 
-export const SAVE_VERSION = 30;
+export const SAVE_VERSION = 31;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -466,8 +466,18 @@ export type SaveV30 = Omit<SaveV29, 'version'> & {
   starTourUnlocked: boolean;
 };
 
+/** v31 stamps the STAR TOUR CHAMPION mark (GS-story-startour-champions) onto banked course records: a
+ *  `StrokePlayRecord` now carries an optional `champion` flag saying the round was played by a finished
+ *  Story Tour protagonist with the loadout they finished with. It is DESCRIPTIVE — ranking, board keying
+ *  and `isBetterStroke` are all untouched — so the migration is a pure version stamp. Old records simply
+ *  lack the flag, which reads as "we don't know", the honest answer for a round banked before the mark
+ *  existed. */
+export type SaveV31 = Omit<SaveV30, 'version'> & {
+  version: 31;
+};
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV30;
+export type Save = SaveV31;
 
 export function defaultSave(): Save {
   return {
@@ -914,6 +924,13 @@ function v29ToV30(s: SaveV29): SaveV30 {
   return { ...s, version: 30, starTourUnlocked: false };
 }
 
+/** v30 → v31: a pure version stamp. `StrokePlayRecord.champion` is optional and purely descriptive, so
+ *  every existing record stays exactly as banked — unmarked, which is the honest reading of a round
+ *  played before the game recorded whether a champion set it. Nothing about ranking changes. */
+function v30ToV31(s: SaveV30): SaveV31 {
+  return { ...s, version: 31 };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -951,6 +968,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 27) s = v27ToV28(s as unknown as SaveV27) as unknown as typeof s;
   if (s.version === 28) s = v28ToV29(s as unknown as SaveV28) as unknown as typeof s;
   if (s.version === 29) s = v29ToV30(s as unknown as SaveV29) as unknown as typeof s;
+  if (s.version === 30) s = v30ToV31(s as unknown as SaveV30) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
@@ -958,7 +976,7 @@ export function migrate(raw: unknown): Save {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v14 = s as unknown as Partial<SaveV30>;
+  const v14 = s as unknown as Partial<SaveV31>;
   const ownedShips = v14.ownedShips && v14.ownedShips.length ? v14.ownedShips : [DEFAULT_SHIP_ID];
   const ownedApparel = v14.ownedApparel ?? [];
   const bagTier: BagTier = v14.bagTier ?? 'common';

@@ -28,6 +28,8 @@ import { holeGateArmed, snapshotRun, currentCourse } from './sim/rpg/run';
 import { shopOffer, starmartOffer } from './sim/rpg/runShop';
 import { shopItem } from './sim/rpg/economy';
 import { CHARACTERS, characterShotMods, getCharacter } from './sim/rpg/characters';
+import { defaultStoryState } from './sim/rpg/story';
+import { upsertCampaign } from './sim/rpg/storyRoster';
 import { characterLoreCardHTML } from './render/characterLore';
 import { endlessMilestonesCrossed, endlessMilestoneShards, endlessSetGateOverPar, endlessSetLabel, endlessUnlocksCrossed } from './sim/rpg/endless';
 import { liveLeaderboard } from './sim/rpg/league';
@@ -95,7 +97,7 @@ import { MARKET_SECTION_IDS, marketView, tradeMarketScreen } from './app/marketS
 import { clubhouseHallScreen, clubhouseScreen, clubhouseView, type ClubSlot } from './app/clubhouseScreens';
 import { travelScreen, travelView } from './app/travelScreens';
 import { asgardMapScreen, asgardResultScreen, asgardLiveBoardHTML } from './app/asgardScreens';
-import { starTourScreen, starTourView, starTourWorlds, starTourShipSpeedMult, starTourShipHovers, starTourFuelHTML, STAR_TOUR_FUEL_CAP, starTourAmmoHTML, WEAPON_AMMO_CAP, yggdrasilArmed, tourShipId } from './app/starTourScreens';
+import { starTourScreen, starTourChampionScreen, starTourView, starTourWorlds, starTourShipSpeedMult, starTourShipHovers, starTourFuelHTML, STAR_TOUR_FUEL_CAP, starTourAmmoHTML, WEAPON_AMMO_CAP, yggdrasilArmed, tourShipId } from './app/starTourScreens';
 import { tourWeaponFor, shotInnerSVG, type WeaponStyle } from './render/shipWeapons';
 import { strokeResultScreen, strokePlayProgressHTML } from './app/strokeResultScreens';
 import { storyHubScreen, storyResultScreen, storyGolferPickerHTML } from './app/storyScreens';
@@ -273,6 +275,14 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       // GS-star-tour-2: character select comes first, then the star map — mount it via the real
       // transitions (openStarTour → pick a golfer → land on the map).
       return reduce(reduce(title, { type: 'openStarTour' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
+    case 'champions': {
+      // GS-story-startour-champions: the CHAMPION picker, which only exists with 2+ finished campaigns.
+      // Seed the ROSTER (save data, not a screen) and then let the REAL `openStarTour` transition decide
+      // where that lands — so the branch under test is the reducer's own, never a hand-mounted screen.
+      const champs = CHARACTERS.slice(0, 2).map((c) => ({ ...defaultStoryState(c.id), completed: true }));
+      const campaigns = champs.reduce((store, c) => upsertCampaign(store, c), title.campaigns);
+      return reduce({ ...title, campaigns, starTourUnlocked: true }, { type: 'openStarTour' });
+    }
     case 'strokeresult': {
       // GS-star-tour: mount the round recap the honest way — golfer → map → pick a course → auto-play +
       // resolve it exactly as the reducer's own `play` path does, so the deep-link can't paper over a
@@ -665,6 +675,7 @@ function dispatch(action: Action): void {
       starTourView.qualifierPartnerBy = {};
       starTourView.recordsOpen = false;
       starTourView.yggdrasilOpen = false;
+      starTourView.serpentResult = null;
       starTourView.centred = false;
       starTourView.shipX = null;
       starTourView.shipY = null;
@@ -3013,6 +3024,9 @@ function render(): void {
       ? asgardResultScreen()
       : state.screen === 'starTour'
       ? starTourScreen()
+      : state.screen === 'starTourChampion'
+      ? // GS-story-startour-champions: which finished campaign flies the chart (2+ champions only).
+        starTourChampionScreen()
       : state.screen === 'strokeResult'
       ? strokeResultScreen()
       : state.screen === 'story'
@@ -3445,6 +3459,53 @@ function render(): void {
   app.querySelectorAll<HTMLElement>('[data-startour-ygg]').forEach((el) => {
     el.addEventListener('click', () => {
       starTourView.yggdrasilOpen = el.getAttribute('data-startour-ygg') === '1';
+      sfx.click();
+      render();
+    });
+  });
+  // GS-story-startour-champions: THE SERPENT AT THE ROOT — a champion replays the fight that ended their
+  // campaign, as the boss their own `alignment` faced (Warden ⇒ Jörmungandr, Herald ⇒ the Warden Ark).
+  //
+  // This is a SECOND CALLER of `mountStoryBattle`, never a forked fight: the overlay already takes
+  // won/loadout/shipId/herald as options. It is deliberately NOT a reducer action — a replay must not
+  // touch campaign state (no `winFinale`, no `starTourUnlocked`, no persist), and having no action to
+  // dispatch is what makes that true by construction rather than by remembering. `finaleUnlocked` is
+  // `keyToOtherRealm && !completed`, so a finished campaign could not re-enter the real finale anyway,
+  // which is exactly why the replay needs its own path.
+  app.querySelectorAll<HTMLElement>('[data-startour-serpent]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const champ = state.story;
+      if (!champ || champ.completed !== true) return;
+      resumeAudio();
+      const won = finaleResult(champ).won;
+      const finish = (strike: 'clean' | 'graze', outcome: 'won' | 'lost'): void => {
+        starTourView.serpentResult = { won: won && outcome === 'won', strike };
+        starTourView.yggdrasilOpen = false;
+        render(); // back to the MAP with an outcome card — never the title, and nothing banked
+      };
+      if (reducedMotion()) {
+        // The replay's own reduced-motion branch (the finale's dispatches an `engageStoryFinale`, which
+        // is precisely the campaign write this must not do): skip the fight, report the gate verdict.
+        finish('clean', won ? 'won' : 'lost');
+        return;
+      }
+      mountStoryBattle({
+        won,
+        loadout: finaleLoadout(champ),
+        shipId: champ.equippedShipId,
+        interactive: true,
+        herald: champ.alignment === 'herald',
+        onFire: (style) => sfx.redirectFire(style === 'scatter' || style === 'pea' ? 'boomerang' : 'laser', 480),
+        onShipHit: () => sfx.penalty(),
+        onPhase: () => sfx.scan(),
+        onDone: finish,
+      });
+    });
+  });
+  // …and dismiss its outcome card, leaving you on the chart.
+  app.querySelectorAll<HTMLElement>('[data-startour-serpent-close]').forEach((el) => {
+    el.addEventListener('click', () => {
+      starTourView.serpentResult = null;
       sfx.click();
       render();
     });
@@ -4152,7 +4213,8 @@ function shouldPlayIntro(): boolean {
  * a run.
  */
 function handleBack(): boolean {
-  const starMapSheetOpen = !!starTourView.selectedId || starTourView.recordsOpen || starTourView.yggdrasilOpen;
+  const starMapSheetOpen =
+    !!starTourView.selectedId || starTourView.recordsOpen || starTourView.yggdrasilOpen || !!starTourView.serpentResult;
   const intent = backIntent(state, { settingsOpen, clubPickerOpen, starMapSheetOpen });
   switch (intent.kind) {
     case 'closeSettings':
@@ -4167,6 +4229,7 @@ function handleBack(): boolean {
       starTourView.selectedId = null;
       starTourView.recordsOpen = false;
       starTourView.yggdrasilOpen = false;
+      starTourView.serpentResult = null;
       render();
       return true;
     case 'swallow':

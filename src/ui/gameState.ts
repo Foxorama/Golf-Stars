@@ -55,6 +55,9 @@ export type Screen =
   // GS-star-tour: the free-roam star map course picker, then the stroke-play round's record recap.
   | 'starTour'
   | 'strokeResult'
+  // GS-story-startour-champions: which CHAMPION to free-roam as, when more than one campaign is finished.
+  // Only ever reached with 2+ champions — one flies straight to the map, none takes the classic flow.
+  | 'starTourChampion'
   // GS-story: the standalone Story Mode campaign HUB (its own persistent progression, `gs_story` save) and
   // the recap shown after clearing a world round (the prologue's victory grows into it). The star-map
   // navigator REUSES the Star Tour `starTour` screen in a story context (GS-story-map).
@@ -502,6 +505,7 @@ export type Action =
   | { type: 'leaveAsgard' } // GS-asgard: leave the Golden Realm (win or lose) and resume the suspended run
   | { type: 'openStarTour' } // GS-star-tour: open the free-roam star map course picker
   | { type: 'pickStarTourCourse'; courseId: string; effect?: string } // choose a course + weather → character select
+  | { type: 'selectStarTourChampion'; characterId: string } // GS-story-startour-champions: free-roam as this finished campaign's protagonist
   | { type: 'exitStarTour' } // GS-star-tour: leave the star map back to the title
   | { type: 'openStory' } // GS-story: enter Story Mode — opens the golfer picker (campaigns are per golfer, so "which campaign" and "which golfer" are one question)
   // GS-story-campaign-picker: resume the saved campaign of a named golfer, from the picker.

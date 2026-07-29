@@ -197,6 +197,89 @@ currentRoster(state) = state.story ? upsertCampaign(state.campaigns, state.story
 This is sound because **only one campaign can change while you play**: the active one, which *is*
 `state.story`. Every other slot was loaded at boot and nothing can touch it until it becomes active.
 
-## Still to come
+---
 
-Star Tour **champion select**, the champion-armed Yggdrasil, and the Serpent-at-the-root finale replay.
+# Champions (GS-story-startour-champions)
+
+Code: `src/ui/game.ts` (`openStarTour` / `selectStarTourChampion` / `championRun`),
+`src/sim/rpg/storyRoster.ts` (`championCampaigns` / `championRound`),
+`src/app/starTourScreens.ts` (the picker, `yggdrasilArmed`, the Root), `src/app.ts` (the replay's battle
+mount), `src/sim/rpg/strokePlay.ts` + `src/save/schema.ts` v31 (the record mark). Guards:
+`tests/startour-champions.test.ts` + a browser layout smoke in `tests/build.test.ts`.
+
+## The promise that outranks the feature
+
+> **`starTourUnlocked` is a PERMANENT main-save flag and it remains the ONLY gate on Star Tour.**
+
+A player who completed the campaign under the old single-slot save and then started over holds that flag
+with an **empty champion roster** — the fresh campaign wiped its own `completed` flag, and there is no
+record anywhere that they ever finished. They must still get Star Tour, on the classic default-loadout
+flow. Champions are an *enrichment* of the mode; they are never a new gate on it. Written down here
+because it is the one thing in this feature that is invisible until it is broken, and it is guarded by
+the first `describe` in the test file rather than buried among the champion assertions.
+
+## Champion select reads the ROSTER, never `state.story`
+
+`openStarTour` used to resolve the champion as `state.story?.completed ? state.story : undefined`. With
+one campaign that was the same question; with a roster it is a different one. `state.story` is merely
+*whichever campaign happens to be loaded*, so a player with a finished Larry and a half-played Feather
+would be told they have no champion at all. It now reads `championCampaigns(currentRoster(state))`:
+
+- **0** ⇒ the classic character-first flow, byte-for-byte (see the promise above);
+- **1** ⇒ straight to the map as them — there is nothing to pick;
+- **2+** ⇒ the `starTourChampion` picker.
+
+The chosen champion is written to `state.story`, so the ~190 existing `state.story` readers
+(`championFreeRoam`, `tourShipId`, the Root) keep working untouched. That is safe precisely because of
+the store's second trap: `writeStory` upserts by `characterId` and **does not move `activeId`**, so
+free-roaming as Larry can never hijack the Continue of a Feather campaign left mid-chapter.
+
+`championRun` is ONE builder for both entry paths, so a lone champion and a picked one are the identical
+golfer. `selectStarTourChampion` refuses a golfer whose campaign is unfinished or absent — the guard is
+in the reducer, like the picker's overwrite guard, so no surface can route around it.
+
+## Yggdrasil: revealing the tree ≠ opening every branch
+
+`yggdrasilArmed()` is now `champion || hammer` — the campaign ends at Yggdrasil's root, so a golfer who
+has stood there knows where it is. The **hard hammer gate inside `playYggdrasilRealm` is untouched**,
+which is what keeps Asgard behind the Asgard reward. That makes the two questions genuinely different,
+so there are two functions: a champion-revealed tree renders Asgard as *Bifröst sealed* rather than
+offering a button that `playYggdrasilRealm` would silently refuse.
+
+## The Serpent at the Root
+
+A champion's replay of the fight that ended their campaign, hanging beneath the branches because that is
+where the campaign ended. The boss is the champion's own `alignment`: Warden ⇒ Jörmungandr, Herald ⇒ the
+Warden Ark. `mountStoryBattle` already takes `won`/`loadout`/`shipId`/`herald` as options and had exactly
+one production call site, so this is a **second caller, never a forked fight**.
+
+**It is not a reducer action, and that is the design.** A replay must not touch campaign state — no
+`winFinale`, no `starTourUnlocked`, no persist — and having *no action to dispatch* makes that true by
+construction rather than by remembering. The outcome lands in `starTourView.serpentResult` (app-layer
+view state, never persisted) and the recap returns to the **map**, not the title. It needs its own path
+rather than a reuse of `openStoryFinale`/`engageStoryFinale` for a structural reason as well:
+`finaleUnlocked` is `keyToOtherRealm && completed !== true`, so a finished campaign cannot re-enter the
+real finale at all. It also needs its own **reduced-motion branch** — the finale's skips the cinematic by
+dispatching `engageStoryFinale`, which is precisely the campaign write this must not do.
+
+The Root is deliberately **not** a `YGGDRASIL_REALMS` row: that table describes places you fly to and
+play golf on, and this is a memory you step back into.
+
+## Records: describe, don't rank (save v31)
+
+The open question this feature had to settle. `strokePlayBest` is per-COURSE and does not key on loadout,
+so a champion with a full solar bag writes to the same board as a default-bag golfer. **Ranking is left
+alone**, and a `champion` flag joins `characterId` and `tier` as description — the standing those two
+already had (`tier` is documented as *"not part of the ranking"*).
+
+Keying the board on the loadout was rejected because it cannot be done honestly. A champion **is** the
+live campaign slot, deliberately, so that one who keeps shopping after the finale keeps improving — which
+means there is **no stable loadout identity to key a board on**. You would be ranking a player against a
+bag they no longer own. Splitting the board champion/non-champion was rejected for the same reason plus a
+worse one: it fragments a record chase whose whole point is one best per course.
+
+There was also a plain bug to fix while deciding it. A champion's run is built on `DEFAULT_BAG_TIER` with
+the developed Story bag laid over the top, so `tier` stamps `common` on a golfer swinging a solar bag —
+the board was not merely omitting the fact, it was **misstating** it. The ★ is what makes an out-of-reach
+score read as explained rather than as a mystery. Old records simply lack the flag, which is the honest
+"we don't know" for a round banked before the game recorded it; the migration is a pure version stamp.

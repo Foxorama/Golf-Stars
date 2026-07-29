@@ -25,8 +25,26 @@ export interface StrokePlayRecord {
   courseId: string;
   /** Which golfer played the round (character id). */
   characterId: string;
-  /** The starting club set the round began on (a difficulty/category tag; not part of the ranking). */
+  /** The starting club set the round began on (a difficulty/category tag; not part of the ranking).
+   *  MEANINGLESS on a champion round — see `champion`, which is the tag that applies there. */
   tier: BagTier;
+  /**
+   * The round was played by a STAR TOUR CHAMPION (GS-story-startour-champions) — a finished Story Tour
+   * protagonist carrying the bag / gear / caddy they saved the galaxy with, rather than a golfer on a
+   * starting club set.
+   *
+   * DESCRIPTIVE, NOT PART OF THE RANKING — the same standing this record's `characterId` and `tier`
+   * already have. There is one board per course and a champion's −9 sits on it beside everyone else's.
+   * The alternative — keying the board on the loadout — cannot be done honestly: a champion IS the live
+   * campaign slot (`docs/decisions/story-campaign-slots.md`), deliberately so that a champion who keeps
+   * shopping after the finale keeps improving, which means there is no stable loadout identity to key a
+   * board on. You would be ranking a player against a bag they no longer own. So the board DESCRIBES the
+   * round instead, and a ★ says why a score is out of reach of a starting bag.
+   *
+   * Absent on every record banked before this shipped, which reads as "we don't know" — the honest
+   * answer, since a pre-champion round left no trace of what was in the bag.
+   */
+  champion?: boolean;
   /** Total gross strokes over the 18 holes. */
   strokes: number;
   /** Total par of the course. */

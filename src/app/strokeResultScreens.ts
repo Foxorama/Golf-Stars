@@ -79,7 +79,10 @@ export function strokeResultScreen(): string {
     .map((r, i) => {
       const s = staticCourseSpec(r.courseId);
       const here = r.courseId === rec.courseId && r.toPar === rec.toPar;
-      return `<div class="gs-st-boardrow${here ? ' gs-st-boardrow--you' : ''}"><span class="gs-st-boardrank">${i + 1}</span><span class="gs-st-boardname">${s?.name ?? r.courseId}</span><span class="gs-st-boardscore" style="color:${toParColour(r.toPar)};">${formatToPar(r.toPar)}</span></div>`;
+      // GS-story-startour-champions: ★ = set by a champion's developed loadout (descriptive; the board is
+      // ranked on to-par alone, one board per course).
+      const star = r.champion ? ` <span title="Set by a Star Tour champion" style="color:#ffd97a;">★</span>` : '';
+      return `<div class="gs-st-boardrow${here ? ' gs-st-boardrow--you' : ''}"><span class="gs-st-boardrank">${i + 1}</span><span class="gs-st-boardname">${s?.name ?? r.courseId}${star}</span><span class="gs-st-boardscore" style="color:${toParColour(r.toPar)};">${formatToPar(r.toPar)}</span></div>`;
     })
     .join('');
 

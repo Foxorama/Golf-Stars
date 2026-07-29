@@ -575,6 +575,44 @@ describe('build output (real browser)', () => {
     60_000,
   );
 
+  // CHAMPION SELECT (GS-story-startour-champions). A new screen, so a browser layout smoke test — the pure
+  // sim suite is blind to CSS/DOM, and champion select is only reachable with 2+ finished campaigns, which
+  // no reducer test can render. `?screen=champions` seeds that roster and lets the REAL `openStarTour`
+  // transition decide where it lands. Guards that the roster mounts, fits the phone without a horizontal
+  // blowout, and that its cards are real tap targets.
+  it.runIf(chromePath)(
+    'Star Tour champion select mounts and fits the phone',
+    async () => {
+      const { chromium } = await import('playwright-core');
+      const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
+      try {
+        const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+        const errors: string[] = [];
+        page.on('pageerror', (e) => errors.push(e.message));
+        await page.goto('file://' + dist + '?screen=champions&intro=0&seed=42', { waitUntil: 'load' });
+        await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', { timeout: 8000 });
+        const cards = await page.$$('.gs-champ__card');
+        expect(cards.length, 'both champions offered').toBe(2);
+        // Every card is a real, named, non-trivial tap target — and the page never scrolls sideways.
+        const fit = await page.evaluate(() => ({
+          overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          minH: Math.min(...[...document.querySelectorAll('.gs-champ__card')].map((e) => e.getBoundingClientRect().height)),
+          named: [...document.querySelectorAll('.gs-champ__card')].every((e) => !!e.getAttribute('aria-label')),
+        }));
+        expect(fit.overflowX, 'no horizontal blowout').toBeLessThanOrEqual(1);
+        expect(fit.minH, 'cards are tappable').toBeGreaterThanOrEqual(44);
+        expect(fit.named, 'every card has an accessible name').toBe(true);
+        // Tapping one flies as that champion — the map mounts.
+        await cards[0]!.click();
+        await page.waitForSelector('.gs-startour', { timeout: 4000 });
+        expect(errors, `pageerror: ${errors[0] ?? ''}`).toEqual([]);
+      } finally {
+        await browser.close();
+      }
+    },
+    60_000,
+  );
+
   // ANIMATED DECOR VIEW-INVARIANCE (GS-decor-view-states). The derelict's drifting hull junk/sections (and
   // weather, the Cetus river) are drawn independently on the aim/putt overlay AND the watch play view. When
   // any element is anchored to the SCREEN instead of the WORLD — as the big ship SECTIONS once were
