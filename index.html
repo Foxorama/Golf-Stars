@@ -1220,6 +1220,29 @@
          translucent overlay, so nothing competes with the map for space. The page frame
          (.gs-main) drops its padding for this screen via .gs-main--bleed. */
       .gs-main--bleed { padding: 0; max-width: none; }
+      /* THE PLAY SCREEN KEEPS A PORTRAIT FRAME WHEREVER IT IS NOT PHONE-PORTRAIT
+         (GS-play-desktop-frame). `mapFrame()` grows the 360×640 design frame to the CONTAINER's
+         aspect (GS-play-fullframe) so the map never letterboxes — exactly right on a phone, and
+         exactly wrong on a desktop, where a wide container yields a wide camera and every shot
+         reads as over-zoomed. Capping the container is the whole fix: the camera then frames the
+         same shot it frames on a phone.
+
+         Keyed on ASPECT, never width. A phone held in landscape is as wrong for a portrait-tuned
+         camera as a 1440px monitor is, and a width query cannot tell those apart. The threshold
+         sits above the squarest real phone in portrait (iPhone SE, 0.5625) so every portrait phone
+         — and the 390×844 the browser layout tests run at — is untouched, byte-for-byte.
+
+         Safe because the play screen is SELF-CONTAINED: `.gs-shot--full` is `position: relative`
+         and `.gs-bigmap`/`.gs-hud` are `position: absolute` INSIDE it, so capping this one
+         container carries the map, the HUD and the controls with it. Nothing on this screen is
+         fixed to the viewport, so nothing can fall out of step with the frame. */
+      @media (min-aspect-ratio: 3 / 4) {
+        .gs-main--bleed {
+          max-width: calc(var(--gs-vh) * 0.52);
+          max-width: calc(var(--gs-dvh) * 0.52);
+          margin-inline: auto;
+        }
+      }
       .gs-main--wide { max-width: 1180px; }
       /* Character-select locks to the viewport on phones (GS-select-onescreen): the page frame becomes a
          flex column of exactly one screen height, so the roster grid inside fills the space under the

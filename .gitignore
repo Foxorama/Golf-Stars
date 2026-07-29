@@ -5,6 +5,16 @@ dist-ssr
 .DS_Store
 .vite
 
+# SIGNING KEYS — never commit. This repo is public, and the Android upload key is PERMANENT:
+# Android refuses to update a package whose signature changed, so a leaked or lost key strands
+# every existing install forever with no recovery. The key reaches CI as the
+# `ANDROID_KEYSTORE_BASE64` secret (see .github/workflows/android.yml), never as a file in git.
+# Generate it OUTSIDE this folder as well — these patterns are the second line of defence, not the first.
+*.jks
+*.keystore
+keystore.properties
+key.properties
+
 # Art: keep regenerable prompt logs, ignore the heavy generated source images.
 art/generated/
 
