@@ -54,6 +54,8 @@ export function metaFromSave(save: Save) {
     strokePlayBest: save.strokePlayBest,
     seenLore: save.seenLore,
     starTourUnlocked: save.starTourUnlocked,
+    serpentBouts: save.serpentBouts,
+    serpentWins: save.serpentWins,
     priceRefund: save.priceRefund,
   };
 }
@@ -97,6 +99,10 @@ export function persist(): void {
     // GS-story-startour-unlock: the permanent Star Tour unlock — set on the first finale win, never
     // cleared (a new campaign resets the campaign's own `completed`, but this outlives it).
     starTourUnlocked: state.starTourUnlocked,
+    // GS-startour-serpent-trophy: the lifetime root tally — every Star Tour encounter with the serpent
+    // at the root, and the win count the secret world-serpent hull is earned on.
+    serpentBouts: state.serpentBouts,
+    serpentWins: state.serpentWins,
     // The one-off Trade Market price-cut notice (GS-trade-rebalance): persisted while pending so a
     // reload before dismissal still shows it; cleared to undefined once the player closes it.
     priceRefund: state.priceRefund,

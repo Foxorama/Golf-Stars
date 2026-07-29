@@ -175,11 +175,11 @@ describe('records DESCRIBE a champion round, they do not rank it apart', () => {
     expect(rec(-4).champion).toBeUndefined();
   });
 
-  it('the save migrates to v31 without disturbing a banked record', () => {
+  it('a v30 save migrates to the current version without disturbing a banked record', () => {
     const old = { version: 30, strokePlayBest: { 'verdant-18': rec(-4) } } as unknown;
     const s = migrate(old);
     expect(s.version).toBe(SAVE_VERSION);
-    expect(s.version).toBe(31);
+    expect(s.version).toBeGreaterThanOrEqual(31); // v31 stamped the champion mark; later bumps ride over it
     expect(s.strokePlayBest['verdant-18']).toEqual(rec(-4)); // unmarked, unmoved
   });
 });

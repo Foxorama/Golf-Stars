@@ -67,6 +67,17 @@ const SHIP_HUD: Record<string, Partial<HudTheme>> = {
   // redline carbon dash, recoloured to the Trans Am's phoenix gold on jet black (no new CSS/chrome).
   firebird: { variant: 'racer', accent: '#f2b53a', accent2: '#3a2f10', glow: 'rgba(240,180,60,0.30)', ink: '#ffe9b0' },
 
+  // The WORLD SERPENT (GS-startour-serpent-trophy) — the thousand-victory grail. It sits in the Mythic
+  // set, so it inherits the grand saucer bridge's SHAPE; the livery is the beast's own venom-light on
+  // abyssal green with gold eye-fire, so the deck reads as the inside of the thing you broke.
+  'world-serpent': {
+    variant: 'mythic',
+    accent: '#7cff9f',
+    accent2: '#16543f',
+    glow: 'rgba(70,220,140,0.30)',
+    ink: '#d8ffe8',
+  },
+
   // The INFINITY ACE (GS-infinity-hud) — the hole-150 Unending grail, the reference bespoke reskin: a
   // living-aurora ring (gold→emerald→aquamarine→violet, the ship's own palette), a phoenix-wing canopy,
   // pulsing corner brackets, and an ∞ crest at the frame crown. Its four base colours are the golden-

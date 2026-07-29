@@ -30,7 +30,8 @@ export type WeaponStyle =
   | 'plasma' // a pulsing plasma orb (the mothership)
   | 'lightning' // a forked bolt (the chopper / Pegasus Bifröst)
   | 'nova' // an aurora/black-hole nova, expanding rings (the Infinity Ace)
-  | 'fireball'; // a phoenix flame blob (the Firebird)
+  | 'fireball' // a phoenix flame blob (the Firebird)
+  | 'venom'; // a spat gobbet of venom trailing a corrosive mist (the World Serpent)
 
 export interface Weapon {
   /** Short name on the fire button + its title. */
@@ -77,6 +78,8 @@ const WEAPON_BY_KIND: Record<ShipLook['kind'], Weapon> = {
   pegasus: { name: 'BIFRÖST', style: 'lightning', count: 1, spread: 0, speed: 2, life: 17, color: '#fff0c8', color2: '#ffd36b', sound: 'laser' },
   // The Firebird → a PHOENIX fireball.
   firebird: { name: 'PHOENIX', style: 'fireball', count: 1, spread: 0, speed: 13, life: 38, color: '#ff7a1a', color2: '#ffca4a', sound: 'kinetic' },
+  // The World Serpent → it SPITS. Two gobbets of venom on a lazy spread, trailing corrosive mist.
+  serpent: { name: 'VENOM', style: 'venom', count: 2, spread: 12, speed: 14, life: 40, color: '#7cff9f', color2: '#eafff2', sound: 'kinetic' },
 };
 
 /** The default gun for a ship with no known silhouette (the wagon's scatter — everyone owns the wagon). */
@@ -193,6 +196,16 @@ export function shotInnerSVG(style: WeaponStyle | 'flash' | 'pellet', c1: string
         <circle r="4.4" fill="${c1}"/>
         <circle r="2.2" fill="#1a1030"/>
         <circle r="1" fill="#ffffff"/>`;
+    case 'venom':
+      // A spat gobbet of venom: a heavy leading droplet with a whipping tail, wrapped in a corrosive
+      // mist that boils along behind it. Drips shed off the underside as it flies.
+      return `<path d="M-26,0 C-16,-4.4 -16,4.4 -26,0 Z" fill="${c1}" opacity="0.4">${flick('0.15s')}</path>
+        <ellipse cx="-11" cy="0" rx="13" ry="3.6" fill="${c1}" opacity="0.3">${flick('0.22s')}</ellipse>
+        <path d="M9,0 C6,-5.4 -6,-3.6 -12,0 C-6,3.6 6,5.4 9,0 Z" fill="${c1}" opacity="0.85"/>
+        <ellipse cx="3.4" cy="0" rx="4.6" ry="3.2" fill="${c2}"/>
+        <circle cx="4.6" cy="-0.6" r="1.5" fill="#ffffff" opacity="0.9"/>
+        <circle cx="-7" cy="3.4" r="1.3" fill="${c1}" opacity="0.7"><animate attributeName="cy" values="3.4;6.4" dur="0.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.7;0" dur="0.5s" repeatCount="indefinite"/></circle>
+        <circle cx="-14" cy="2.6" r="1" fill="${c1}" opacity="0.6"><animate attributeName="cy" values="2.6;5.6" dur="0.7s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.6;0" dur="0.7s" repeatCount="indefinite"/></circle>`;
     case 'fireball':
       return `<path d="M-20,0 C-30,-5 -26,5 -20,0 Z" fill="${c1}" opacity="0.5">${flick('0.13s')}</path>
         <ellipse cx="-8" cy="0" rx="12" ry="4" fill="${c1}" opacity="0.4"/>

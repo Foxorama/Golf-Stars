@@ -41,6 +41,8 @@ import type { StoryState } from '../sim/rpg/story';
 import { golferPreviewSVG } from '../render/apparelArt';
 import { getCharacter } from '../sim/rpg/characters';
 import { shipById } from '../sim/rpg/ships';
+import { SERPENT_SHIP_ID } from '../sim/rpg/serpentTrophy';
+import { shipCardSVG } from '../render/shipArt';
 import type { CosmeticRarity } from '../sim/rpg/cosmetics';
 import { hudThemeForShip, hudThemeVars } from '../render/hudTheme';
 import { hudChromeFor } from '../render/hudChrome';
@@ -136,10 +138,14 @@ export const starTourView = {
   ammo: WEAPON_AMMO_CAP,
   /** Active refuel-tanker sequence, or null. */
   refuel: null as StarTourRefuel | null,
-  /** GS-story-startour-champions: the outcome of the last SERPENT AT THE ROOT replay, or null. App-layer
-   *  view state ONLY — the replay is a memory, so it writes no campaign, no save and no record, and having
-   *  nowhere to put a result is what makes that true by construction rather than by discipline. */
-  serpentResult: null as { won: boolean; strike: 'clean' | 'graze' } | null,
+  /** GS-story-startour-champions: the outcome of the last SERPENT AT THE ROOT replay, or null. Still
+   *  app-layer view state — the replay writes no CAMPAIGN and no record, so nothing here can reach
+   *  `gs_story`. GS-startour-serpent-trophy adds the two facts a card about a COUNTED bout has to show:
+   *  the lifetime win total after it (`wins`, read back off the reducer) and whether THIS bout is the one
+   *  that earned the secret world-serpent hull (`trophy` — so re-winning past the bar reveals nothing). */
+  serpentResult: null as
+    | { won: boolean; strike: 'clean' | 'graze'; wins: number; trophy: boolean }
+    | null,
 };
 
 /** Ship cruise speed by RARITY (GS-star-tour-map-improvements): the flown ship's rarity scales its
@@ -738,8 +744,9 @@ function yggdrasilSheet(): string {
  * replay is a SECOND CALLER of `mountStoryBattle`, never a forked fight.
  *
  * It is deliberately NOT a realm — `YGGDRASIL_REALMS` describes places you fly to and play golf on, and
- * this is a memory you step back into. It is also entirely app-layer: no action, no reducer transition,
- * nothing written. See `starTourView.serpentResult`.
+ * this is a memory you step back into. It writes no CAMPAIGN state (GS-startour-serpent-trophy moved
+ * that guarantee from "there is no action" to "the action provably touches no campaign field"), but the
+ * bout itself is now counted on the main save. See `starTourView.serpentResult` + `serpentTrophy.ts`.
  */
 function rootSection(): string {
   const champ = state.story;
@@ -749,6 +756,15 @@ function rootSection(): string {
   const flavour = herald
     ? 'The Order&apos;s capital ship still holds the root in its grip. Break the reactor open again.'
     : 'The world-serpent coils in the dark below the tree, as it did the day you bared its eye.';
+  // GS-startour-serpent-trophy: the lifetime ledger. It shows the COUNT and never the target — the
+  // trophy is a secret achievement, so the readout must be able to grow without announcing what it is
+  // growing toward. Once the grail is in the garage it says so, because then there is nothing to spoil.
+  const owned = state.ownedShips.includes(SERPENT_SHIP_ID);
+  const ledger = state.serpentBouts
+    ? `<p class="gs-st-realm__blurb" style="opacity:.72;">Root ledger — <b style="color:#7fe0a2;">${state.serpentWins}</b> won of ${state.serpentBouts} fought.${
+        owned ? ' <b style="color:#ffd76b;">The serpent answers to you now.</b>' : ''
+      }</p>`
+    : '';
   return `
     <div class="gs-st-realm gs-st-realm--root">
       <div class="gs-st-realm__head">
@@ -757,7 +773,8 @@ function rootSection(): string {
         <span class="gs-st-realm__badge" style="--tc:#ff9a6b;">Memory</span>
       </div>
       <p class="gs-st-realm__blurb">${flavour}</p>
-      <p class="gs-st-realm__blurb" style="opacity:.72;">Nothing is at stake — your campaign is already won, and the root remembers it either way.</p>
+      <p class="gs-st-realm__blurb" style="opacity:.72;">Your campaign is already won, and the root remembers it either way — but every visit is counted.</p>
+      ${ledger}
       <button class="gs-st-play" data-startour-serpent="1"
         style="background:linear-gradient(180deg,#2a1410,#180c0b);border-color:#8a4a32;color:#ffc0a0;">⚔ Face ${bossName} again</button>
     </div>`;
@@ -771,8 +788,23 @@ function serpentResultSheet(): string {
   const bossName = herald ? 'the Warden Ark' : 'Jörmungandr';
   const title = r.won ? (r.strike === 'clean' ? 'Struck clean' : 'Struck home') : 'Driven back';
   const body = r.won
-    ? `You put ${bossName} down a second time. The root is quiet.`
+    ? `You put ${bossName} down again. The root is quiet.`
     : `${bossName} drove you off the root. It costs you nothing — fly back down whenever you like.`;
+  // GS-startour-serpent-trophy: the running ledger, and — on the ONE bout that earned it — the secret.
+  const tally = `<p class="gs-st-sheet__blurb" style="opacity:.72;">Root ledger — <b style="color:#7fe0a2;">${r.wins}</b> won.</p>`;
+  const trophy = r.trophy
+    ? `<div class="gs-st-realm gs-st-realm--root" style="border-color:#7cff9f;background:linear-gradient(180deg,#0a2a1e,#06140f);">
+        <div class="gs-st-realm__head">
+          <span class="gs-st-realm__icon">🐍</span>
+          <b class="gs-st-realm__name" style="color:#eafff2;">BEATEN INTO SUBMISSION</b>
+          <span class="gs-st-realm__badge" style="--tc:#ffd76b;">Secret</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          ${shipCardSVG(SERPENT_SHIP_ID, 120, 76)}
+          <p class="gs-st-realm__blurb" style="margin:0;">A thousand times you have broken it at the root. It stops fighting. <b style="color:#7cff9f;">The World Serpent</b> is yours to fly — park it in any golfer&apos;s Clubhouse garage.</p>
+        </div>
+      </div>`
+    : '';
   return `
     <div class="gs-st-sheet gs-st-sheet--ygg" role="dialog" aria-label="The Root">
       <button class="gs-st-sheet__close" data-startour-serpent-close="1" aria-label="Close">✕</button>
@@ -781,6 +813,8 @@ function serpentResultSheet(): string {
         <span class="gs-st-tier" style="--tc:${r.won ? '#7fe0a2' : '#ff9a6b'};">The Root</span>
       </div>
       <p class="gs-st-sheet__blurb">${body}</p>
+      ${tally}
+      ${trophy}
       <button class="gs-st-play" data-startour-serpent-close="1">▸ Fly on</button>
     </div>`;
 }

@@ -57,6 +57,7 @@ import {
 } from '../sim/rpg/match';
 import { bagSet, bagTierRank, canBuyBagSet, DEFAULT_BAG_TIER, type BagTier } from '../sim/rpg/bag';
 import { canBuyShip, shipById, DEFAULT_SHIP_ID } from '../sim/rpg/ships';
+import { recordSerpentBout, serpentTrophyUnlock } from '../sim/rpg/serpentTrophy';
 import { apparelById, canBuyApparel } from '../sim/rpg/apparel';
 import { getCharacter, characterShotMods } from '../sim/rpg/characters';
 import { shopItem, ownedCount, itemCap, canBuy, namedCaddyOwned } from '../sim/rpg/economy';
@@ -208,6 +209,9 @@ export function initState(
     // campaign at boot so a returning player who finished the story BEFORE this flag existed keeps the
     // reward the moment they start a new campaign (the flag then persists on the next save write).
     starTourUnlocked: (meta.starTourUnlocked ?? false) || (story ? storyComplete(story) : false),
+    // GS-startour-serpent-trophy: the lifetime root tally, straight off the main save.
+    serpentBouts: meta.serpentBouts ?? 0,
+    serpentWins: meta.serpentWins ?? 0,
     priceRefund: meta.priceRefund,
   };
 }
@@ -493,6 +497,33 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'exitStarTour': {
       if (state.screen !== 'starTour') return state;
       return { ...state, screen: 'title', starTourPick: undefined };
+    }
+
+    case 'serpentBout': {
+      // GS-startour-serpent-trophy: one resolved encounter at the root of Yggdrasil (the champion's
+      // replay of the fight that ended their campaign). Every one counts — that is the whole feature —
+      // and at `SERPENT_TROPHY_WINS` victories the world serpent itself is hung in the global garage.
+      //
+      // GS-story-startour-champions made the replay reducer-LESS so that "it touches no campaign state"
+      // was true by construction. Counting is a main-save fact, not a campaign one, so the guarantee
+      // does not go away — it MOVES: this case reads and writes the lifetime tally + `ownedShips` and
+      // NOTHING else, leaving `state.story` / `state.campaigns` referentially identical. That is now an
+      // assertion in `tests/serpent-trophy.test.ts` rather than an absence of code, which is a weaker
+      // guarantee honestly stated and a stronger one than "remember not to".
+      //
+      // The screen is deliberately NOT checked: the replay lives on the star map but resolves through a
+      // full-screen battle overlay, and refusing a bout because the underlying screen moved would throw
+      // away a fight the player actually finished.
+      const tally = recordSerpentBout({ bouts: state.serpentBouts, wins: state.serpentWins }, action.won);
+      const ownedShips = serpentTrophyUnlock(state.ownedShips, tally.wins);
+      return {
+        ...state,
+        serpentBouts: tally.bouts,
+        serpentWins: tally.wins,
+        // Referentially unchanged unless the grail was just earned (the `aceShipUnlock` idiom), so a
+        // bout 1,001 writes the same array back and announces nothing.
+        ...(ownedShips !== state.ownedShips ? { ownedShips } : {}),
+      };
     }
 
     case 'openStory': {

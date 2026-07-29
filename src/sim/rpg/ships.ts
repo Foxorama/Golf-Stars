@@ -16,12 +16,28 @@
  */
 
 import { COSMETIC_RARITY, type CosmeticRarity } from './cosmetics';
+import { SERPENT_SHIP_ID } from './serpentTrophy';
 
 /** The vector look the ship drawer renders (a base shape family + palette + bling). */
 export interface ShipLook {
   /** Base silhouette the drawer builds. `ufo` is the mythic flying saucer (animated); `infinity` is
    *  the hole-150 Unending-Universe grail (GS-unending) — the most animated craft in the fleet. */
-  kind: 'wagon' | 'racer' | 'saucer' | 'comet' | 'shuttle' | 'ufo' | 'moto' | 'chopper' | 'infinity' | 'pegasus' | 'firebird';
+  kind:
+    | 'wagon'
+    | 'racer'
+    | 'saucer'
+    | 'comet'
+    | 'shuttle'
+    | 'ufo'
+    | 'moto'
+    | 'chopper'
+    | 'infinity'
+    | 'pegasus'
+    | 'firebird'
+    /** The world serpent flown as a hull (GS-startour-serpent-trophy) — the 1,000-win root trophy. A
+     *  bespoke kind, so it is compile-forced through every `Record<ShipLook['kind'],…>` (guns, plan
+     *  view, cabin): the grail the longest grind in the game pays out is not a recoloured wagon. */
+    | 'serpent';
   /** Flight ORIENTATION on the star map (GS-ship-fly-orient). `'nose'` (default) — a craft with a clear
    *  front + tail exhaust (all the cars/cruisers): the hull rotates so its nose points ALONG the flight.
    *  `'hover'` — a nose-LESS hovering craft (flying saucer / disc / orb): the hull stays UPRIGHT (never
@@ -266,6 +282,24 @@ export const SHIPS: readonly Ship[] = [
     unlockHoles: 150,
     secret: true,
     look: { kind: 'infinity', body: '#f2c94c', glass: '#eafff6', flame: '#7fffd4', accent: '#4fe08a', bling: 3, flag: '∞' },
+  },
+  {
+    // BEATEN INTO SUBMISSION (GS-startour-serpent-trophy) — the world serpent itself, broken to the
+    // bridle after a THOUSAND victories at the root and flown as a ship. `secret` + free: never sold,
+    // hidden from the Trade Market until owned, granted by the reducer when the tally clears the bar.
+    // Kept LAST so the ships tests' first-mythic assertions (the Mothership) are undisturbed.
+    id: SERPENT_SHIP_ID,
+    name: 'The World Serpent',
+    set: 'Mythic',
+    rarity: 'mythic',
+    blurb:
+      'Jörmungandr broken to the bridle — a living leviathan of star-scale and venom-light, jaws spread wide at the bow, coils burning across the dark. Beaten into submission a thousand times over.',
+    cost: 0, // priceless — earned only by wearing the root down (1,000 victories)
+    secret: true,
+    // `bling` is deliberately 1, not the grail-tier 3: the shared sparkle spots are authored for a
+    // compact hull and land mid-COIL on a beast this long, where six white stars bury the scale work.
+    // The serpent brings its own light (venom running the spine, circling spirit-motes, a lit maw).
+    look: { kind: 'serpent', body: '#123c33', glass: '#9dffce', flame: '#7cff9f', accent: '#ffd76b', bling: 1 },
   },
 ];
 

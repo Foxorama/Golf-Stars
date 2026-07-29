@@ -235,6 +235,20 @@ Three sequential PRs, save work first:
   stable loadout identity to key a board on. The ★ also fixes a real lie: a champion's run is built on
   `DEFAULT_BAG_TIER` with the story bag laid over, so `tier` stamped 'common' on a solar bag. Guarded by
   `tests/startour-champions.test.ts` + a browser layout smoke; story in `docs/decisions/story-campaign-slots.md`.
+- **GS-startour-serpent-trophy** — ✅ *shipped*: **BEATEN INTO SUBMISSION**, the secret achievement at the
+  root. Every Star Tour encounter with the serpent now COUNTS (`serpentBouts`/`serpentWins`, save v32) —
+  the replay used to bank nothing at all, which made a repeatable fight a screensaver — and **1,000
+  victories** break the beast to the bridle: **The World Serpent** becomes a flyable hull, a bespoke
+  `ShipLook['kind']` with its own guns (FANGS), star-map weapon (VENOM), living wyrm cabin and venom-light
+  bridge. The tally lives on the MAIN save beside `lifetimeAces`, never in `gs_story` — one campaign per
+  golfer means a slot can be started over, and a grind a golfer pick could erase is one nobody would run.
+  Which boss you face is deliberately not part of the key (one fight, one place); reduced motion counts too
+  (gating the last cosmetic behind watching a battle animation is what `accessibility.md` forbids); and the
+  ledger shows the COUNT but never the target, because a secret has to be able to grow without announcing
+  itself. Making it count needed the replay's first reducer action, so the "touches no campaign state"
+  guarantee MOVED from structural to asserted — `serpentBout` leaves `story`/`campaigns`/`run`/
+  `strokePlayBest` referentially identical, checked on object identity. Guarded by
+  `tests/serpent-trophy.test.ts`.
 
 **GS-story-betrayal — the deep betrayal arc (design in `docs/decisions/story-betrayal-arc.md`)**
 Make the back half almost always DIFFERENT: the other three playable golfers become an aboard-ship CAST you

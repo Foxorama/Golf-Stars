@@ -173,6 +173,17 @@ export const SHIP_ARMS: Record<ShipLook['kind'], ShipArms> = {
     trail: 'crackle',
     flashR: 13,
   },
+  // The World Serpent → it BITES. Both fangs, spread wide either side of the maw, thrown together —
+  // and because the pair genuinely spans the keel, `planMounts` leaves it alone: from above the beast
+  // bites with both sides, which is the only way a jaw has ever worked.
+  serpent: {
+    name: 'FANGS',
+    mounts: [{ along: 0.86, across: -0.42 }, { along: 0.86, across: 0.42 }],
+    fire: 'salvo',
+    flash: 'orb',
+    trail: 'ripple',
+    flashR: 14,
+  },
   // The Firebird → the BEAK and both PINIONS, all at once.
   firebird: {
     name: 'BEAK & PINIONS',

@@ -45,6 +45,7 @@ import { tournamentAftermath } from './sim/rpg/storyAftermath';
 import { tournamentForChapter } from './sim/rpg/storyTournaments';
 import { questBeatFor, questOfferBeatFor } from './sim/rpg/storyQuestBeat';
 import { ACE_SHIP_ID } from './sim/rpg/ships';
+import { SERPENT_SHIP_ID } from './sim/rpg/serpentTrophy';
 import { bagTierRank, type BagTier } from './sim/rpg/bag';
 import { endlessScoreCard } from './render/endlessCards';
 import {
@@ -3479,9 +3480,22 @@ function render(): void {
       resumeAudio();
       const won = finaleResult(champ).won;
       const finish = (strike: 'clean' | 'graze', outcome: 'won' | 'lost'): void => {
-        starTourView.serpentResult = { won: won && outcome === 'won', strike };
+        const tookIt = won && outcome === 'won';
+        // GS-startour-serpent-trophy: EVERY encounter counts now. The bout goes to the reducer (which
+        // touches the lifetime tally + `ownedShips` and nothing else — never the campaign), so the
+        // thousand-win world-serpent hull is earned here and persisted like any other action.
+        const hadTrophy = state.ownedShips.includes(SERPENT_SHIP_ID);
+        dispatch({ type: 'serpentBout', won: tookIt });
+        starTourView.serpentResult = {
+          won: tookIt,
+          strike,
+          wins: state.serpentWins,
+          // Read AFTER the dispatch: the grail is announced only on the bout that actually earned it,
+          // so re-winning past 1,000 reveals nothing (the ace-ship reveal rule).
+          trophy: !hadTrophy && state.ownedShips.includes(SERPENT_SHIP_ID),
+        };
         starTourView.yggdrasilOpen = false;
-        render(); // back to the MAP with an outcome card — never the title, and nothing banked
+        render(); // back to the MAP with an outcome card — the campaign itself is still untouched
       };
       if (reducedMotion()) {
         // The replay's own reduced-motion branch (the finale's dispatches an `engageStoryFinale`, which

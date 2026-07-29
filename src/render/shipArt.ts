@@ -394,6 +394,187 @@ function shipBody(look: ShipLook): string {
           <circle cx="12.4" cy="-0.5" r="0.5" fill="#050608"/>
         </g>`;
     }
+    case 'serpent': {
+      // THE WORLD SERPENT (GS-startour-serpent-trophy) — the thousand-victory grail, and the only ship
+      // in the fleet that is ALIVE. Jörmungandr broken to the bridle: a leviathan coiled through the
+      // dark, jaws spread at the bow, venom-light running the length of its scales, spirit-lights
+      // circling the coils.
+      //
+      // The body is ONE spine, stroked at stacked widths so it TAPERS from the skull to the tail — a
+      // serpent is a curve, not a chassis, and a filled outline could never keep the taper honest
+      // across an S-bend. Everything that dresses it hangs off the SAME curve: the aura is that stroke
+      // blown out and dimmed; the venom-light is that stroke DASHED with a marching offset (so the
+      // light follows the coils exactly instead of sliding across them); and every fin, scute and
+      // scale row is placed at a sampled point and ROTATED to the body's own local heading there —
+      // which is what stops the dorsal ridge reading as a row of fir trees stood on a green road.
+      const spine = 'M-30,8 C-25,9.4 -24,1 -19,-1 C-14,-3 -10,2 -5,3 C0,4 3,-1 8,-3 C11,-4.2 13,-5 15.5,-5.4';
+      const neck = 'M-19,-1 C-14,-3 -10,2 -5,3 C0,4 3,-1 8,-3 C11,-4.2 13,-5 15.5,-5.4';
+      const shimmer = (dur: string, lo = 0.55, hi = 1) =>
+        `<animate attributeName="opacity" values="${lo};${hi};${lo}" dur="${dur}" repeatCount="indefinite"/>`;
+      // Sampled centres along the spine, tail first. Head-ward samples are the fat end of the taper.
+      const pts: [number, number][] = [
+        [-28.5, 8.4], [-25, 6.6], [-21.5, 1.8], [-18.5, -1.2], [-15, -2.2],
+        [-11.5, -0.4], [-8, 1.6], [-4, 2.9], [0, 3.6], [3.5, 2],
+        [7, -1], [10.5, -3.6], [13.5, -4.8],
+      ];
+      // Body half-width at sample i (the taper the stacked strokes draw) and the local heading there.
+      const halfAt = (i: number) => 1.2 + (i / (pts.length - 1)) * 3.4;
+      const at = (i: number): [number, number] => pts[Math.max(0, Math.min(pts.length - 1, i))]!;
+      const degAt = (i: number) => {
+        const a = at(i - 1);
+        const b = at(i + 1);
+        return (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI;
+      };
+      /** Place a fragment ON the body at sample i, rotated to the body's heading (so "up" is the back). */
+      const onBody = (i: number, inner: string) =>
+        `<g transform="translate(${at(i)[0]} ${at(i)[1]}) rotate(${degAt(i).toFixed(1)})">${inner}</g>`;
+      // The dorsal ridge: swept fins rooted IN the back, leaning toward the tail, tallest amidships.
+      const ridge = pts
+        .slice(3, 12)
+        .map((_, k) => {
+          const i = k + 3;
+          const t = halfAt(i);
+          const h = 2.6 + Math.sin((k / 8) * Math.PI) * 2.8;
+          return onBody(
+            i,
+            `<path d="M2.4,${(-t + 0.8).toFixed(1)} Q0.4,${(-t - h * 0.6).toFixed(1)} -2.6,${(-t - h).toFixed(1)} Q-1.4,${(-t - h * 0.35).toFixed(1)} -2.8,${(-t + 0.6).toFixed(1)} Z" fill="${flame}" opacity="0.92">${shimmer(`${(1.5 + k * 0.17).toFixed(1)}s`, 0.55)}</path>`,
+          );
+        })
+        .join('');
+      // Belly plating + a chevron scale row up the back, both lying along the body. The plates ride the
+      // OUTER edge of the belly, not the middle — a scute drawn near the centreline reads as a dashed
+      // road marking down a green ribbon, which is what the first pass looked like.
+      const skin = pts
+        .map((_, i) => {
+          const t = halfAt(i);
+          return onBody(
+            i,
+            `<rect x="-1.6" y="${(t - 0.9).toFixed(1)}" width="3.2" height="1.1" rx="0.5" fill="${accent}" opacity="0.42"/>
+             <path d="M-1.6,${(-t + 2.2).toFixed(1)} L0,${(-t + 0.9).toFixed(1)} L1.6,${(-t + 2.2).toFixed(1)}" fill="none" stroke="${glass}" stroke-width="0.55" opacity="0.4"/>`,
+          );
+        })
+        .join('');
+      // Spirit-lights circling the coils (the Infinity Ace's orbiting motif, in the beast's own light).
+      const motes = [0, 1, 2]
+        .map(
+          (i) => `
+        <g><animateTransform attributeName="transform" type="rotate" from="${i * 120}" to="${i * 120 + 360}" dur="4.4s" repeatCount="indefinite"/>
+          <circle cx="0" cy="-17" r="1.2" fill="${glass}">${shimmer(`${(1.1 + i * 0.3).toFixed(1)}s`, 0.3)}</circle>
+        </g>`,
+        )
+        .join('');
+      // ONE scale wrap, and it is load-bearing: a serpent is authored LONG (it spans ~59 units against a
+      // saucer's 44), and the market/garage card only ever shows about x ∈ [−25, +25] of the frame. At
+      // full size that crops the SKULL — the one part of this hull that says what it is — while cropping
+      // a wagon merely trims its exhaust. Scaling the whole beast puts the jaws back inside the card and
+      // still leaves it the longest thing in the fleet.
+      return `<g transform="scale(0.86)">
+        <!-- the wake: shed star-scale streaming off the tail -->
+        <g stroke="none">
+          <path d="M-27,7.4 L-33,3.4 L-30.2,7 L-33.6,9.2 L-28,9.8 Z" fill="${flame}" opacity="0.8">${shimmer('0.9s', 0.4)}</path>
+          <path d="M-27.4,7.8 L-32,5.8 L-29.8,7.6 L-32.6,9 Z" fill="${glass}" opacity="0.85"/>
+        </g>
+        ${motes}
+        <!-- venom aura: the spine blown out and dimmed, breathing -->
+        <path d="${spine}" fill="none" stroke="${flame}" stroke-width="14" stroke-linecap="round" opacity="0.12">
+          <animate attributeName="opacity" values="0.08;0.2;0.08" dur="2.6s" repeatCount="indefinite"/>
+        </path>
+        <!-- the body: one curve, stacked widths — the taper from skull to tail -->
+        <g fill="none" stroke-linecap="round">
+          <path d="${spine}" stroke="#07130f" stroke-width="10"/>
+          <path d="${neck}" stroke="#07130f" stroke-width="11.4"/>
+          <path d="${spine}" stroke="${body}" stroke-width="8"/>
+          <path d="${neck}" stroke="${body}" stroke-width="9.4"/>
+          <!-- dorsal sheen along the top of the coil -->
+          <path d="${spine}" stroke="${glass}" stroke-width="1.5" opacity="0.3"/>
+          <!-- the venom-light RUNNING down the scales: a dashed stroke marching along the spine -->
+          <path d="${spine}" stroke="${flame}" stroke-width="2.4" stroke-dasharray="4 26" opacity="0.85">
+            <animate attributeName="stroke-dashoffset" values="0;-60" dur="2.2s" repeatCount="indefinite"/>
+          </path>
+          <path d="${spine}" stroke="#eafff2" stroke-width="1" stroke-dasharray="2.4 27.6" opacity="0.9">
+            <animate attributeName="stroke-dashoffset" values="0;-60" dur="2.2s" repeatCount="indefinite"/>
+          </path>
+        </g>
+        <g stroke="none">${skin}</g>
+        ${ridge}
+        <!-- webbed pectoral fin, translucent and slowly fanning -->
+        <g>
+          <animateTransform attributeName="transform" type="rotate" values="-5 -4 2.9;6 -4 2.9;-5 -4 2.9" dur="2.8s" repeatCount="indefinite"/>
+          <path d="M-4,2.9 Q-10,10.6 -15,10 Q-10,7.2 -7.4,2.6 Z" fill="${glass}" opacity="0.45"/>
+          <g stroke="${glass}" stroke-width="0.55" opacity="0.6" fill="none">
+            <path d="M-5,3.8 L-10.6,9.2"/><path d="M-6.6,3.4 L-13,9.6"/>
+          </g>
+        </g>
+        <!-- ── THE SKULL: crowned, jaws spread, the venom lit in its throat ── -->
+        <!-- neck frill behind the jaw hinge -->
+        <g stroke="none">
+          <path d="M11,-8.8 Q4,-13.6 -1,-12.4 Q5,-10.4 8.4,-6.6 Z" fill="${flame}" opacity="0.55">${shimmer('2.4s', 0.35)}</path>
+          <path d="M11.4,-2.6 Q5,0.8 0.6,-0.6 Q6.4,-1.6 9.6,-3.6 Z" fill="${flame}" opacity="0.4"/>
+        </g>
+        <!-- crown horns, swept back over the skull -->
+        <g stroke="#07130f" stroke-width="0.8" stroke-linejoin="round">
+          <path d="M13.6,-9.6 Q6,-16.4 -1,-15.2 Q6.6,-12.6 10.6,-8 Z" fill="${accent}"/>
+          <path d="M15,-9 Q10,-14 4.4,-13.6 Q9.6,-11 12.4,-7.2 Z" fill="${flame}" opacity="0.9"/>
+        </g>
+        <!-- the gullet, dark behind the fangs, with venom pooling in it. The whole skull is authored to
+             finish by x≈25.5: the drawn frame stops at x=28, and the first pass ran the jaws out to
+             28.4 — where a market/garage card clips them clean off, taking the entire reason the ship
+             reads as a serpent with them. -->
+        <g stroke="none">
+          <!-- the throat, behind everything: the dark the venom is lit against -->
+          <path d="M17.6,-8.4 L25.4,-11.4 L25,-1.4 L18,-4.6 Z" fill="#04120d"/>
+        </g>
+        <!-- The skull is EDGED IN ITS OWN VENOM-LIGHT, not in the body's near-black ink. A serpent flies
+             against open space, and jaws filled in the hull green and outlined in #07130f simply vanish
+             into the dark — the first pass drew a fully-detailed head that read as a blunt stump. -->
+        <g stroke="${flame}" stroke-width="0.9" stroke-linejoin="round" stroke-opacity="0.75">
+          <!-- skull + snout -->
+          <path d="M9,-9.4 Q14.8,-11.2 18.6,-9.4 L20.8,-8.6 L19.2,-5.8 Q14.4,-4.6 8.8,-4.8 Z" fill="${body}"/>
+          <!-- upper jaw, thrown open -->
+          <path d="M18,-9.2 L25.6,-12 L25.8,-8.8 L19,-6.4 Z" fill="${body}"/>
+          <!-- lower jaw, hinged wide -->
+          <path d="M18.2,-4.8 L25,-1 L25.6,-4 L19.4,-5.4 Z" fill="${body}"/>
+          <!-- brow plate over the eye -->
+          <path d="M9.8,-9.2 Q14,-10.4 17.4,-9 L16,-7.2 Q12.4,-8 9.6,-7.6 Z" fill="${accent}" opacity="0.55"/>
+        </g>
+        <!-- lit facets on the jaw plates, so they catch the light instead of reading as flat silhouette -->
+        <g stroke="none" fill="${glass}" opacity="0.22">
+          <path d="M18.6,-9.4 L25.2,-11.8 L25.4,-10.4 L19,-8.2 Z"/>
+          <path d="M18.8,-4.9 L24.6,-1.6 L24.8,-2.9 L19.4,-5.2 Z"/>
+        </g>
+        <!-- the MAW: venom light filling the wedge the open jaws leave. Drawn AFTER the jaws, in the gap
+             between their facing edges — under them it is simply invisible, which is how the first pass
+             managed to draw a lit mouth nobody could see. -->
+        <g stroke="none">
+          <path d="M19.2,-5.7 L25.7,-9.6 L25.4,-1.5 Z" fill="${flame}" opacity="0.9">${shimmer('0.8s', 0.5)}</path>
+          <path d="M19.3,-5.7 L22.6,-7.7 L22.4,-3.4 Z" fill="#eafff2" opacity="0.85">${shimmer('0.55s', 0.5)}</path>
+        </g>
+        <!-- fangs: hanging off the upper jaw's lower edge, standing off the lower jaw's upper edge -->
+        <g stroke="none" fill="#f2fff6">
+          <path d="M20.6,-6.9 L22,-4.3 L21.7,-7.3 Z"/>
+          <path d="M23.8,-8.1 L25,-5.5 L24.8,-8.6 Z"/>
+          <path d="M21.4,-5.1 L22.4,-7.4 L22.5,-5.2 Z"/>
+          <path d="M24.2,-4.3 L25,-6.5 L25.2,-4.2 Z"/>
+        </g>
+        <!-- a lit ridge along the top of the upper jaw, so the skull reads against the dark -->
+        <path d="M18.2,-9.3 L25.6,-12" fill="none" stroke="${glass}" stroke-width="0.8" opacity="0.55"/>
+        <!-- the eye: gold fire with a serpent's slit, never quite still -->
+        <g stroke="none">
+          <circle cx="13" cy="-7.2" r="2.3" fill="${accent}">${shimmer('1.7s', 0.7)}</circle>
+          <ellipse cx="13" cy="-7.2" rx="0.7" ry="1.9" fill="#1a0b06"/>
+          <circle cx="12.2" cy="-8" r="0.55" fill="#fff8d8"/>
+        </g>
+        <!-- barbels streaming off the jaw, swaying -->
+        <g fill="none" stroke="${glass}" stroke-width="0.9" stroke-linecap="round" opacity="0.8">
+          <g><animateTransform attributeName="transform" type="rotate" values="-4 18 -9;5 18 -9;-4 18 -9" dur="2.3s" repeatCount="indefinite"/>
+            <path d="M18.2,-9.4 Q12,-14.6 4,-14"/>
+          </g>
+          <g><animateTransform attributeName="transform" type="rotate" values="5 18 -4;-4 18 -4;5 18 -4" dur="2.6s" repeatCount="indefinite"/>
+            <path d="M18.2,-4.4 Q12,-0.4 5,-1.4"/>
+          </g>
+        </g>
+      </g>`;
+    }
     case 'shuttle':
       // A rugged hauler barge.
       return `
