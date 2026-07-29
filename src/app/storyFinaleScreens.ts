@@ -10,6 +10,9 @@
 import { state } from './ctx';
 import { getCharacter } from '../sim/rpg/characters';
 import { betrayerName } from '../sim/rpg/storyBetrayal';
+import { apparelById } from '../sim/rpg/apparel';
+import { shipById } from '../sim/rpg/ships';
+import { championCosmeticsFor } from '../sim/rpg/storyChampionCosmetics';
 import {
   finaleResult,
   finaleLoadout,
@@ -18,6 +21,37 @@ import {
   FINALE_SURVIVE_NEED,
   FINALE_OVERWHELM_HITS,
 } from '../sim/rpg/storyFinale';
+
+/**
+ * GS-story-champion-cosmetics: the reward panel on a winning finale — the permanent, GLOBAL set the ending
+ * just hung in the Trade Market wardrobe + garage, named piece by piece. Every OTHER campaign reward lives
+ * inside `gs_story` and dies with the slot, so this is the one payout worth showing on the way out.
+ *
+ * It lists only what was genuinely NEW (`championUnlocked`, computed by the reducer's grant): finishing the
+ * same path a second time reveals nothing and the panel disappears entirely, because a "reward" you already
+ * own is not a reward. The names come from the live catalogues, so a row rename can never desync the copy.
+ */
+function championRewardHTML(): string {
+  const r = state.lastStoryFinale;
+  const fresh = r?.championUnlocked ?? [];
+  if (!r?.won || !fresh.length) return '';
+  const set = championCosmeticsFor(state.story?.alignment);
+  const rows = fresh
+    .map((id) => {
+      const ship = shipById(id);
+      if (ship) return `<li><b>🚀 ${ship.name}</b> — yours to fly in every mode.</li>`;
+      const worn = apparelById(id);
+      return worn ? `<li><b>👕 ${worn.name}</b> — ${worn.slot}.</li>` : '';
+    })
+    .filter(Boolean)
+    .join('');
+  return `
+    <div style="margin:14px auto 0;padding:12px 14px;max-width:460px;text-align:left;border:1px solid var(--gs-line);border-radius:12px;background:rgba(255,255,255,0.04);">
+      <p style="margin:0 0 6px;color:var(--gs-gold);text-align:center;"><b>🏆 ${set ? set.title : 'Champion'} — unlocked forever</b></p>
+      <ul style="margin:0;padding-left:20px;line-height:1.7;">${rows}</ul>
+      <p style="margin:8px 0 0;font-size:13px;opacity:0.85;">Equip them on any golfer in the Clubhouse — they outlive this campaign, and every campaign after it.</p>
+    </div>`;
+}
 
 /** A readiness gate row — its rating vs the threshold, met or short. */
 function gateRow(label: string, have: number, need: number, hint: string): string {
@@ -211,6 +245,7 @@ export function storyFinaleResultScreen(): string {
         ${strikeLine}
         ${body}
         <p style="color:var(--gs-gold);"><b>★ Story Tour complete — Star Tour is unlocked on the title.</b></p>
+        ${championRewardHTML()}
       </section>
       <div style="max-width:420px;margin:18px auto 0;">
         <button class="gs-btn" data-action='${JSON.stringify({ type: 'storyFinaleContinue' })}'>Roll the credits ›</button>

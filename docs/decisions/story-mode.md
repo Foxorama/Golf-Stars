@@ -1749,6 +1749,52 @@ getting back costs a flight across the galaxy.*
   (a new `GS-story-venue-services` block, including "every Sigil venue in the game actually stocks something
   to spend on") and `tests/back.test.ts`.
 
+## Phase N — the champion's trophy (GS-story-champion-cosmetics)
+
+*The player's ask: "completing as a Warden unlocks the Warden cosmetic ship and a Warden outfit; completing
+as a Coil unlocks the Coil ship and a Coil outfit."*
+
+- **GS-story-champion-cosmetics** — ✅ *shipped* (`sim/rpg/storyChampionCosmetics.ts` pure ·
+  `apparel.ts` rows · `render/apparelArt.ts` + `render/golferArt.ts` painters · `ui/game.ts` the grant ·
+  `app/storyFinaleScreens.ts` the reveal).
+  - **A finished campaign left nothing behind but a boolean.** Every story payout lands *inside* `gs_story`
+    (`storyRewards.ts`): the route ship you fly on the campaign's own chart, the gear you swing in its own
+    rounds. One campaign per golfer (GS-story-campaign-slots) means starting over on that golfer **erases
+    all of it** — and the only thing a completed campaign wrote to the MAIN save was `starTourUnlocked`.
+    Beating the World-Eater deserved a trophy you keep.
+  - **The alignment you finished on is the whole key.** `CHAMPION_COSMETICS` is a
+    `Record<StoryAlignment, …>` — Warden ⇒ the **Radiant Warden Cruiser** + the three-piece **Warden Vigil**
+    outfit; Herald ⇒ the **Coil Wyrm-Ship** + the three-piece **Coil Shroud**. One campaign can only ever
+    hang ONE of them, which is what makes a second run down the other road worth flying. A new path would be
+    a new ROW, never a reducer edit.
+  - **The ship is the one you already earned on that road, not a new hull.** `warden-cruiser` / `wyrm-ship`
+    are already `secret`, `cost: 0` rows in `ships.ts`, granted at the Chapter-4 major to the *campaign's*
+    garage. Granting the same id GLOBALLY is the honest reading of "you keep it" — the hull you flew to the
+    root is now yours to fly anywhere. A second near-identical grail hull would have been a worse story and
+    five more compile-forced `Record<ShipLook['kind'], …>` tables (`shipArt`/`shipTopArt`/`shipWeapons`/
+    `battleArms`/`shipInteriorArt`) for no gain.
+  - **The outfits are genuinely new, and they speak the paths' existing visual language** — no invented
+    palette. Warden white-gold is lifted from the cruiser row + `render/wardenArk.ts` (`HULL_LIT #f4f8ff` /
+    `GOLD #ffe08a` / `GLASS #bfe9ff`); the Coil's violet + venom from the DEFECTOR costume
+    (`storyBetrayal.ts` `COIL_ROBE`/`COIL_HOOD`/`COIL_ACCENT`), and the Coil Hood/Shroud reuse that
+    costume's own cobra-hood, serpent-circlet, open-robe-panel and ouroboros-clasp vocabulary — worn now by
+    CHOICE rather than draped over you. So a champion reads as the order they served everywhere they
+    already appear.
+  - **The grant is IDEMPOTENT and purely ADDITIVE**, and returns the same array references when nothing is
+    new (the `aceShipUnlock` / `resolveAsgard` idiom) — so re-winning is a no-op, and winning the other path
+    later only ever ADDS. Nothing a player owns is ever taken away. A **loss grants nothing**, including the
+    deliberately-costless `repelled` case, and a gate-lost ship can never win so it can never earn either.
+  - **The recap announces only what was NEW.** `lastStoryFinale.championUnlocked` carries the ids that were
+    not already owned, so finishing the same path twice shows no reveal panel — a "reward" you already own is
+    not a reward. Piece names come from the live catalogues, so a row rename can't desync the copy.
+  - **No save bump.** These are catalogue ids dropped into the `ownedShips`/`ownedApparel` pools that already
+    exist, and `schema.ts sanitize()` already drops ids it can't resolve. Purely cosmetic — nothing touches
+    the sim, so no balance or fairness implications. No `STORY_VERSION` bump, no new `_gs*`/URL hook.
+  - Catalogue ordering: the six rows are kept LAST in `APPAREL` so the per-slot `.find(mythic)` invariant in
+    `tests/apparel.test.ts` keeps resolving to the 300-shard piece that is actually for sale — the same
+    reason the Thor block sits where it does. Guarded by `tests/story-champion-cosmetics.test.ts`; eyes-on
+    `scripts/champion-outfit-preview.mjs`.
+
 ## Open questions / deferred (revisit as chunks land)
 - **A genuinely-new gas-giant BIOME** (play on gas cloud-tops) — the player's optional "if we need to add
   more" ask. Deferred as its OWN focused session: a new `BiomeArchetype` fans out to ~16 compile-forced

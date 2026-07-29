@@ -117,6 +117,23 @@ This game lives or dies on three axes — put every change through all three bef
   honestly (a champion IS the live slot and keeps improving ⇒ no stable loadout identity), and the ★ also
   fixes a real lie — a champion's run is built on `DEFAULT_BAG_TIER` with the story bag laid over, so `tier`
   stamped `common` on a solar bag. Guarded by `tests/startour-champions.test.ts`.
+  **FINISHING A CAMPAIGN IS THE ONE PAYOUT THAT OUTLIVES THE SLOT, AND THE ALIGNMENT IS ITS WHOLE KEY**
+  (GS-story-champion-cosmetics, `sim/rpg/storyChampionCosmetics.ts`). Every other story reward lands INSIDE
+  `gs_story` (`storyRewards.ts`), so one campaign per golfer means starting over ERASES it — and a completed
+  campaign wrote just one thing to the main save: `starTourUnlocked`. `CHAMPION_COSMETICS` is a
+  `Record<StoryAlignment, …>` the finale win applies to the GLOBAL `ownedShips`/`ownedApparel`: Warden ⇒ the
+  Radiant Warden Cruiser + the **Warden Vigil** outfit, Herald ⇒ the Coil Wyrm-Ship + the **Coil Shroud**.
+  One campaign can only ever hang ONE set — the other costs a second run, which is the point of The Choice.
+  **The ship is the one already earned on that road** (`warden-cruiser`/`wyrm-ship`, already `secret`/free
+  rows granted to the CAMPAIGN's garage at the Ch.4 major): granting the same id globally is "you keep it",
+  and a bespoke grail hull would cost five compile-forced `Record<ShipLook['kind'],…>` tables for a worse
+  story. The outfits are new but INVENT NO PALETTE — Warden white-gold off `wardenArk.ts`, and the Coil
+  pieces reuse the DEFECTOR costume's own cobra hood / serpent circlet / open robe panels / ouroboros clasp
+  (`storyBetrayal.ts`), worn now by choice. **Idempotent + purely additive** (same array refs when nothing
+  is new — the `aceShipUnlock` idiom), a loss grants nothing (incl. `repelled`), and the recap announces
+  ONLY genuinely-new ids so re-winning reveals nothing. NO save bump (ids into pools that already exist;
+  `sanitize` drops unknowns). New rows sit LAST in `APPAREL` so the per-slot `.find(mythic)` invariant still
+  resolves to the for-sale 300-shard piece. Guarded by `tests/story-champion-cosmetics.test.ts`.
   **A backup is a BUNDLE, not a save** (GS-save-transfer, `save/backup.ts` pure · `app/saveTransfer.ts`
   the localStorage/DOM half). Progress lives in THREE blobs (`gs_save` + `gs_story` + `gs_settings`) and
   localStorage is per-ORIGIN, so the website and the Capacitor shell (`https://localhost`) cannot see

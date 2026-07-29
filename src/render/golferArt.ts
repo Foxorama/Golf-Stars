@@ -315,6 +315,99 @@ export function drawGolfer(
     ctx.lineTo(9.2, -44.6);
     ctx.stroke();
   }
+  // Warden's Mantle (GS-story-champion-cosmetics 'wardenMantle'): a gold shoulder mantle across the top of
+  // the vestment, gold seams down the body, and the FAIRWAY CREST at the breast — a ring with a line
+  // running into it. Mirrors the wardrobe SVG (`apparelArt.ts shirtDetail 'wardenMantle'`).
+  if (look.shirtStyle?.shape === 'wardenMantle') {
+    const gold = look.shirtStyle.accent ?? '#ffe08a';
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.92;
+    ctx.fillStyle = gold; // the shoulder mantle
+    ctx.beginPath();
+    ctx.moveTo(-6, -50);
+    ctx.quadraticCurveTo(5, -44.6, 16, -50);
+    ctx.lineTo(15, -47);
+    ctx.quadraticCurveTo(5, -41.6, -5, -47);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.55; // gold seams down the vestment
+    ctx.strokeStyle = gold;
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(-2.4, -45);
+    ctx.lineTo(-2, -32);
+    ctx.moveTo(12.4, -45);
+    ctx.lineTo(12, -32);
+    ctx.stroke();
+    ctx.restore();
+    // The Fairway crest — the hole, and the fairway running into it.
+    ctx.strokeStyle = gold;
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.arc(5, -41, 3, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.lineWidth = 0.9;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-1.4, -36.4);
+    ctx.quadraticCurveTo(2.4, -39.6, 3.6, -40.4);
+    ctx.stroke();
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.55;
+    ctx.fillStyle = gold;
+    ctx.beginPath();
+    ctx.arc(5, -41, 1.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  // Coil Shroud (GS-story-champion-cosmetics 'coilShroud'): two open serpent-robe panels down the outer
+  // sides, scale rows on the cuirass showing between them, and the OUROBOROS clasp at the throat. Mirrors
+  // the wardrobe SVG (`apparelArt.ts shirtDetail 'coilShroud'`).
+  if (look.shirtStyle?.shape === 'coilShroud') {
+    const venom = look.shirtStyle.accent ?? '#7fe0a0';
+    const robeDark = mixHex(look.shirtStyle.color, '#000000', 0.3);
+    // Open robe panels — drawn down the OUTER edges so the cuirass reads down the centre.
+    ctx.fillStyle = robeDark;
+    ctx.strokeStyle = '#0c1116';
+    ctx.lineWidth = 0.7;
+    for (const [x0, x1] of [[-7.5, -0.4], [17.5, 10.4]] as [number, number][]) {
+      ctx.beginPath();
+      ctx.moveTo(x0, -50.4);
+      ctx.quadraticCurveTo(x0 + (x0 < 5 ? -1.4 : 1.4), -42, x0 + (x0 < 5 ? 1.6 : -1.6), -32);
+      ctx.lineTo(x1, -32);
+      ctx.lineTo(x1 + (x0 < 5 ? -1.2 : 1.2), -49.4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.5; // scale rows on the exposed cuirass
+    ctx.strokeStyle = venom;
+    ctx.lineWidth = 0.6;
+    for (const y of [-45, -41.6, -38.2, -34.8]) {
+      ctx.beginPath();
+      ctx.moveTo(1, y);
+      ctx.quadraticCurveTo(3, y + 2.2, 5, y);
+      ctx.quadraticCurveTo(7, y + 2.2, 9, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // The ouroboros clasp at the throat — the serpent taking its own tail.
+    ctx.strokeStyle = venom;
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.arc(5, -48.4, 2.6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(5, -48.4, 1.6, Math.PI * 1.55, Math.PI * 1.2);
+    ctx.stroke();
+    ctx.fillStyle = venom;
+    ctx.beginPath();
+    ctx.arc(5.2, -50.1, 0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
   // Punched Galaxy warplate (GS-punched-galaxy 'riftplate'): a glowing star-core on the chest with
   // galaxy-crack energy forking out of it + a dark shoulder plate, so the cosmic cuirass reads at swing
   // size. Mirrors the wardrobe SVG (`apparelArt.ts shirtDetail 'riftplate'`).
@@ -1319,6 +1412,120 @@ function drawHat(ctx: CanvasRenderingContext2D, hx: number, hy: number, r: numbe
       ctx.fill();
       break;
     }
+    case 'wardenHalo': {
+      // The Warden's Halo (GS-story-champion-cosmetics): a white-gold circlet across the brow rising to a
+      // small Fairway point, under a standing ring of held starlight floating clear of the head. Mirrors
+      // the wardrobe SVG (`apparelArt.ts hatGlyph 'wardenHalo'`); authored against the canonical r=7 head
+      // and scaled by s, so it fits whatever head it sits on.
+      const s = r / 7;
+      const P = (x: number, y: number): [number, number] => [hx + x * s, hy + y * s];
+      // The halo ring — an open ellipse seen near edge-on, never a filled disc (which reads as a hat).
+      ctx.save();
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1.5 * s;
+      ctx.beginPath();
+      ctx.ellipse(...P(0, -12.6), 8.2 * s, 2.5 * s, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 0.5 * s;
+      ctx.stroke();
+      ctx.restore();
+      // Circlet across the brow — a thick pale band with a gold line laid over it.
+      const arc = (col: string, w: number): void => {
+        ctx.strokeStyle = col;
+        ctx.lineWidth = w * s;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        let p = P(-7, -4.4);
+        ctx.moveTo(p[0], p[1]);
+        const c = P(0, -10.4);
+        p = P(7, -4.4);
+        ctx.quadraticCurveTo(c[0], c[1], p[0], p[1]);
+        ctx.stroke();
+      };
+      arc(color, 3.4);
+      arc(accent, 1.2);
+      // The Fairway point front-and-centre.
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      let p = P(0, -9.6);
+      ctx.moveTo(p[0], p[1]);
+      p = P(1.7, -7.2); ctx.lineTo(p[0], p[1]);
+      p = P(0, -6.2); ctx.lineTo(p[0], p[1]);
+      p = P(-1.7, -7.2); ctx.lineTo(p[0], p[1]);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'coilHood': {
+      // The Coil Hood (GS-story-champion-cosmetics): a flared cobra hood behind the head with an accent
+      // rib and two eye spots, under a serpent circlet with a rising cobra crest — the defector costume's
+      // own vocabulary (`golferPreviewSVG`'s `coilGarb`), worn now by choice. Mirrors the wardrobe SVG
+      // (`apparelArt.ts hatGlyph 'coilHood'`); authored against the canonical r=7 head, scaled by s.
+      const s = r / 7;
+      const P = (x: number, y: number): [number, number] => [hx + x * s, hy + y * s];
+      const q = (x0: number, y0: number, cx0: number, cy0: number, x1: number, y1: number): void => {
+        const a = P(x0, y0); const c = P(cx0, cy0); const b = P(x1, y1);
+        ctx.moveTo(a[0], a[1]);
+        ctx.quadraticCurveTo(c[0], c[1], b[0], b[1]);
+      };
+      // The flared hood, drawn FIRST so the head sits in front of it.
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#0c1116';
+      ctx.lineWidth = 1 * s;
+      ctx.beginPath();
+      let p = P(0, -11.4);
+      ctx.moveTo(p[0], p[1]);
+      let c1 = P(-14, -6.4); let e = P(-11, 3.4);
+      ctx.quadraticCurveTo(c1[0], c1[1], e[0], e[1]);
+      c1 = P(-5.6, 1); e = P(0, 0.2);
+      ctx.quadraticCurveTo(c1[0], c1[1], e[0], e[1]);
+      c1 = P(5.6, 1); e = P(11, 3.4);
+      ctx.quadraticCurveTo(c1[0], c1[1], e[0], e[1]);
+      c1 = P(14, -6.4); e = P(0, -11.4);
+      ctx.quadraticCurveTo(c1[0], c1[1], e[0], e[1]);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      // Hood eye spots.
+      ctx.save();
+      ctx.globalAlpha = (ctx.globalAlpha || 1) * 0.5;
+      ctx.fillStyle = accent;
+      for (const d of [-1, 1]) {
+        ctx.beginPath();
+        p = P(d * 5.6, -2.6);
+        ctx.arc(p[0], p[1], 1.2 * s, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+      // Serpent circlet across the brow + the rising cobra crest.
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = mixHex(color, '#000000', 0.35);
+      ctx.lineWidth = 3 * s;
+      ctx.beginPath();
+      q(-6.8, -3.2, 0, -8.4, 6.8, -3.2);
+      ctx.stroke();
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1 * s;
+      ctx.beginPath();
+      q(-6.8, -3.2, 0, -8.4, 6.8, -3.2);
+      ctx.stroke();
+      ctx.lineWidth = 1.5 * s;
+      ctx.beginPath();
+      p = P(0, -5);
+      ctx.moveTo(p[0], p[1]);
+      c1 = P(-1.4, -7.8); e = P(0, -9.2);
+      ctx.quadraticCurveTo(c1[0], c1[1], e[0], e[1]);
+      c1 = P(1.7, -10.6); e = P(0.7, -12.4);
+      ctx.quadraticCurveTo(c1[0], c1[1], e[0], e[1]);
+      ctx.stroke();
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      p = P(0.7, -12.4);
+      ctx.arc(p[0], p[1], 1.1 * s, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
     case 'baggy':
       // The baggy green (GS-unending): a soft crown that slouches back off the brow, over a short
       // front brim, with a gold emblem dot. Mirrors the wardrobe SVG's slouched silhouette.
@@ -1707,6 +1914,98 @@ function drawPants(ctx: CanvasRenderingContext2D, look: ApparelLook, skin: strin
       ctx.lineTo(hip[0] - 2, hip[1] + 8);
       ctx.closePath();
       ctx.fill();
+      break;
+    }
+    case 'wardenRaiment': {
+      // The Warden's Raiment (GS-story-champion-cosmetics): pale vestment legs with a gold seam down each,
+      // gilded shin guards over the lower leg, and softly draped robe tassets off the hip — a vestment cut,
+      // longer and rounder than the Valkyrie war-skirt. Mirrors `apparelArt.ts pantsGlyph 'wardenRaiment'`.
+      legs(color, 6.5);
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.55; // gold seam down each leg
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      for (const [fx, fy] of feet) {
+        ctx.moveTo(hip[0] + (fx - hip[0]) * 0.25, hip[1] + (fy - hip[1]) * 0.25);
+        ctx.lineTo(hip[0] + (fx - hip[0]) * 0.72, hip[1] + (fy - hip[1]) * 0.72);
+      }
+      ctx.stroke();
+      ctx.restore();
+      ctx.strokeStyle = accent; // gilded shin guards
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (const [fx, fy] of feet) {
+        ctx.moveTo(hip[0] + (fx - hip[0]) * 0.68, hip[1] + (fy - hip[1]) * 0.68);
+        ctx.lineTo(fx, fy);
+      }
+      ctx.stroke();
+      // Draped robe tassets off the hip — a rounded hem, not the armoured point.
+      ctx.fillStyle = accent;
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.9;
+      ctx.beginPath();
+      ctx.moveTo(hip[0] - 6, hip[1]);
+      ctx.lineTo(hip[0] + 8, hip[1]);
+      ctx.quadraticCurveTo(hip[0] + 6, hip[1] + 7, hip[0] + 3, hip[1] + 9.5);
+      ctx.lineTo(hip[0] - 2, hip[1] + 9.5);
+      ctx.quadraticCurveTo(hip[0] - 5, hip[1] + 7, hip[0] - 6, hip[1]);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      break;
+    }
+    case 'coilScales': {
+      // Coil Scales (GS-story-champion-cosmetics): shed serpent scale grown to fit — a dark ridge down
+      // each leg with venom scale rows stacked along it, and a fanged cuff at each ankle. Mirrors
+      // `apparelArt.ts pantsGlyph 'coilScales'`.
+      legs(color, 6.5);
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.85; // the ridged spine down each leg
+      ctx.strokeStyle = mixHex(color, '#000000', 0.3);
+      ctx.lineWidth = 1.6;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (const [fx, fy] of feet) {
+        ctx.moveTo(hip[0] + (fx - hip[0]) * 0.12, hip[1] + (fy - hip[1]) * 0.12);
+        ctx.lineTo(fx, fy);
+      }
+      ctx.stroke();
+      ctx.restore();
+      // Scale rows, fading down the leg.
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 0.7;
+      for (let i = 0; i < 5; i++) {
+        const fr = 0.16 + i * 0.17;
+        ctx.save();
+        ctx.globalAlpha = alpha * (0.65 - i * 0.06);
+        ctx.beginPath();
+        for (const [fx, fy] of feet) {
+          const lx = hip[0] + (fx - hip[0]) * fr;
+          const ly = hip[1] + (fy - hip[1]) * fr;
+          const w = 2.4 - i * 0.2;
+          ctx.moveTo(lx - w, ly);
+          ctx.quadraticCurveTo(lx, ly + 2, lx + w, ly);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+      // Fanged cuff at each ankle.
+      ctx.fillStyle = accent;
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.9;
+      for (const [fx, fy] of feet) {
+        ctx.beginPath();
+        ctx.moveTo(fx - 2.6, fy - 2.6);
+        ctx.lineTo(fx + 2.6, fy - 2.6);
+        ctx.lineTo(fx + 1.4, fy);
+        ctx.lineTo(fx, fy - 1.5);
+        ctx.lineTo(fx - 1.4, fy);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
       break;
     }
     case 'trousers':

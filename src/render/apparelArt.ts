@@ -261,6 +261,44 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
         <circle cx="0" cy="-6.1" r="1" fill="${accent}" stroke="#0c1116" stroke-width="0.5"/>`;
       break;
     }
+    case 'wardenHalo': {
+      // The Warden's Halo (GS-story-champion-cosmetics): a white-gold circlet hugging the brow, rising to
+      // a small Fairway point front-and-centre, under a standing RING of held starlight floating clear of
+      // the head — the Wardens keep the lights on, so the champion wears one. The ring is drawn as an open
+      // ellipse (a ring seen near edge-on) with a soft outer echo, never a filled disc, which would read as
+      // a hat. Mirrors the canvas `drawHat 'wardenHalo'`.
+      const gold = look.accent ?? '#ffe08a';
+      g = `<ellipse cx="0" cy="-12.6" rx="8.2" ry="2.5" fill="none" stroke="${gold}" stroke-width="1.5" opacity="0.95"/>
+        <ellipse cx="0" cy="-12.6" rx="8.2" ry="2.5" fill="none" stroke="#ffffff" stroke-width="0.5" opacity="0.85"/>
+        <ellipse cx="0" cy="-12.6" rx="10" ry="3.4" fill="none" stroke="${gold}" stroke-width="0.8" opacity="0.3">
+          <animate attributeName="opacity" values="0.15;0.45;0.15" dur="2.8s" repeatCount="indefinite"/></ellipse>
+        <path d="M-7,-4.4 Q0,-10.4 7,-4.4" fill="none" stroke="${color}" stroke-width="3.4" stroke-linecap="round"/>
+        <path d="M-7,-4.4 Q0,-10.4 7,-4.4" fill="none" stroke="${gold}" stroke-width="1.2" stroke-linecap="round" opacity="0.95"/>
+        <path d="M0,-9.6 L1.7,-7.2 L0,-6.2 L-1.7,-7.2 Z" fill="${gold}" stroke="#0c1116" stroke-width="0.5" stroke-linejoin="round"/>
+        <circle cx="0" cy="-7.6" r="0.7" fill="#ffffff" opacity="0.9"/>`;
+      break;
+    }
+    case 'coilHood': {
+      // The Coil Hood (GS-story-champion-cosmetics): the DEFECTOR costume's own vocabulary — a flared
+      // cobra hood behind the head with an accent rib and two eye spots, under a serpent circlet with a
+      // rising cobra crest — worn now by choice rather than draped over you (`golferPreviewSVG`'s
+      // `coilGarb`). Authored against the canonical r=7 head, so it fits any figure. Mirrors the canvas
+      // `drawHat 'coilHood'`.
+      const venom = look.accent ?? '#7fe0a0';
+      const hoodDark = shade(color, -0.35);
+      g = `<path d="M0,-11.4 Q-14,-6.4 -11,3.4 Q-5.6,1 0,0.2 Q5.6,1 11,3.4 Q14,-6.4 0,-11.4 Z" fill="${color}" ${ink}/>
+        <path d="M-10.4,2.2 Q-12.6,-5.4 0,-9.8 Q12.6,-5.4 10.4,2.2" fill="none" stroke="${venom}" stroke-width="0.9" opacity="0.7"/>
+        <circle cx="-5.6" cy="-2.6" r="1.2" fill="${venom}" opacity="0.5"/>
+        <circle cx="5.6" cy="-2.6" r="1.2" fill="${venom}" opacity="0.5"/>
+        <path d="M-6.8,-3.2 Q0,-8.4 6.8,-3.2" fill="none" stroke="${hoodDark}" stroke-width="3" stroke-linecap="round"/>
+        <path d="M-6.8,-3.2 Q0,-8.4 6.8,-3.2" fill="none" stroke="${venom}" stroke-width="1" stroke-linecap="round" opacity="0.9"/>
+        <g transform="translate(0 -6.4)">
+          <path d="M0,1.4 Q-1.4,-1.4 0,-2.8 Q1.7,-4.2 0.7,-6" fill="none" stroke="${venom}" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M0.7,-6 q1.7,-0.4 2,1.1 q-0.9,0.9 -2,0.4 z" fill="${venom}" stroke="#0c1116" stroke-width="0.5" stroke-linejoin="round"/>
+          <circle cx="1.8" cy="-5.5" r="0.35" fill="#0a0410"/>
+        </g>`;
+      break;
+    }
     case 'baggy':
       // The baggy green (GS-unending): a soft, slouched crown that droops over one side, stitched
       // panel seams, a short brim, and a gold-thread emblem front and centre.
@@ -359,6 +397,67 @@ function shirtDetail(
             <path d="M-6,${(b - 10).toFixed(1)} Q0,${(b - 7).toFixed(1)} 6,${(b - 10).toFixed(1)}"/>
             <path d="M-5,${(b - 5).toFixed(1)} Q0,${(b - 2.5).toFixed(1)} 5,${(b - 5).toFixed(1)}"/></g>
           <g fill="${gold}" opacity="0.85"><circle cx="0" cy="${(b - 13).toFixed(1)}" r="0.8"/><circle cx="0" cy="${(b - 8).toFixed(1)}" r="0.8"/></g>`;
+      }
+      break;
+    }
+    case 'wardenMantle': {
+      // The Warden's Mantle (GS-story-champion-cosmetics): a shoulder mantle across the top of the
+      // vestment, gold seams running down from it, and the FAIRWAY CREST at the breast — a gold ring
+      // (the hole) with a straight line running into it (the fairway), the Wardens' whole creed as a
+      // sigil. Mirrors the canvas `drawGolfer`'s 'wardenMantle' branch.
+      const gold = look.accent ?? '#ffe08a';
+      const ink = 'stroke="#0c1116" stroke-width="0.7" stroke-linejoin="round"';
+      detail = `<path d="M-11.5,-9 Q0,-3.4 11.5,-9 L10.5,-5.6 Q0,0.4 -10.5,-5.6 Z" fill="${gold}" ${ink} opacity="0.92"/>
+        <g fill="none" stroke="${gold}" stroke-width="0.7" opacity="0.6"><path d="M-8,-4 L-8.6,8"/><path d="M8,-4 L8.6,8"/></g>
+        <g transform="translate(0 1.4)">
+          <circle r="3" fill="none" stroke="${gold}" stroke-width="1.1"/>
+          <circle r="1.1" fill="${gold}" opacity="0.55"/>
+          <path d="M-6.4,4.6 Q-2.6,1.4 -1.4,0.6" fill="none" stroke="${gold}" stroke-width="0.9" stroke-linecap="round"/>
+        </g>`;
+      if (worn) {
+        // Worn: the vestment runs long — the gold seams and a hem band carry to the bottom of the torso,
+        // and two starlight motes ride the chest, so the robe reads as a full garment (GS-worn-coverage).
+        const b = worn.bottom;
+        detail += `<g fill="none" stroke="${gold}" stroke-width="0.7" opacity="0.5">
+            <path d="M-8.6,8 L-8.4,${(b - 2).toFixed(1)}"/><path d="M8.6,8 L8.4,${(b - 2).toFixed(1)}"/>
+            <path d="M-8,${(b - 3).toFixed(1)} L8,${(b - 3).toFixed(1)}"/></g>
+          <g fill="#fff" opacity="0.8"><circle cx="-4.6" cy="${(b - 9).toFixed(1)}" r="0.6"/><circle cx="4.6" cy="${(b - 13).toFixed(1)}" r="0.5"/></g>`;
+      }
+      break;
+    }
+    case 'coilShroud': {
+      // The Coil Shroud (GS-story-champion-cosmetics): the two OPEN robe panels of the defector costume
+      // hanging down the outer sides, a scaled cuirass showing between them, and the OUROBOROS clasp at
+      // the throat — the serpent swallowing its own tail, the Coil's sigil. Mirrors the canvas
+      // `drawGolfer`'s 'coilShroud' branch.
+      const venom = look.accent ?? '#7fe0a0';
+      const robeDark = shade(look.color, -0.3);
+      const ink = 'stroke="#0c1116" stroke-width="0.7" stroke-linejoin="round"';
+      const panel = (o: 1 | -1): string =>
+        `<path d="M${o * 12.5},-9.4 Q${o * 14},-1 ${o * 11},9 L${o * 5},9 L${o * 6.4},-8.4 Z" fill="${robeDark}" ${ink}/>` +
+        `<path d="M${o * 6.2},-7.4 L${o * 5.2},8" fill="none" stroke="${venom}" stroke-width="0.8" stroke-linecap="round" opacity="0.85"/>`;
+      // Scale rows down the exposed centre — the cuirass under the open robe.
+      const scales = [-4, -0.6, 2.8, 6.2]
+        .map((y) => `<path d="M-4,${y} Q-2,${y + 2.2} 0,${y} Q2,${y + 2.2} 4,${y}" fill="none" stroke="${venom}" stroke-width="0.6" opacity="0.5"/>`)
+        .join('');
+      detail = `${panel(-1)}${panel(1)}${scales}
+        <g transform="translate(0 -7.4)">
+          <circle r="2.6" fill="${robeDark}" stroke="${venom}" stroke-width="0.9"/>
+          <path d="M0,-1.6 A 1.6 1.6 0 1 1 -1.1,1.15" fill="none" stroke="${venom}" stroke-width="0.9" stroke-linecap="round"/>
+          <circle cx="0.2" cy="-1.7" r="0.4" fill="${venom}"/>
+        </g>`;
+      if (worn) {
+        // Worn: the robe panels reach mid-shin and the scale rows carry down the whole cuirass, so the
+        // shroud reads as a full garment rather than a bib (GS-worn-coverage).
+        const b = worn.bottom;
+        const long = (o: 1 | -1): string =>
+          `<path d="M${o * 11},9 Q${o * 10.4},${(b * 0.6).toFixed(1)} ${o * 8.6},${(b - 1).toFixed(1)} L${o * 4.4},${(b - 1).toFixed(1)} L${o * 5},9 Z" fill="${robeDark}" ${ink}/>` +
+          `<path d="M${o * 5.1},9.4 L${o * 4.6},${(b - 2).toFixed(1)}" fill="none" stroke="${venom}" stroke-width="0.8" stroke-linecap="round" opacity="0.8"/>`;
+        const more = [9.6, 13, 16.4]
+          .filter((y) => y < b - 3)
+          .map((y) => `<path d="M-3.6,${y} Q-1.8,${y + 2} 0,${y} Q1.8,${y + 2} 3.6,${y}" fill="none" stroke="${venom}" stroke-width="0.6" opacity="0.45"/>`)
+          .join('');
+        detail += long(-1) + long(1) + more;
       }
       break;
     }
@@ -626,7 +725,13 @@ function shirtGlyph(look: ApparelLook, cx: number, cy: number, uid: string): str
   const bodyPath = `M${cx - 13},${cy - 9} L${cx - 6},${cy - 11} L${cx},${cy - 7} L${cx + 6},${cy - 11} L${cx + 13},${cy - 9} L${cx + 10},${cy - 3} L${cx + 9},${cy + 12} L${cx - 9},${cy + 12} L${cx - 10},${cy - 3} Z`;
   const base = `<path d="${bodyPath}" fill="${color}" ${ink}/>`;
   const flair =
-    shape === 'cosmic' || shape === 'blazer' || shape === 'riftplate' || shape === 'solarflare' || shape === 'parrot'
+    shape === 'cosmic' ||
+    shape === 'blazer' ||
+    shape === 'riftplate' ||
+    shape === 'solarflare' ||
+    shape === 'parrot' ||
+    shape === 'wardenMantle' ||
+    shape === 'coilShroud'
       ? sparkles([[cx - 12, cy - 6], [cx + 12, cy + 2]])
       : '';
   return a + base + shirtDetail(look, cx, cy) + flair;
@@ -717,6 +822,48 @@ function pantsGlyph(look: ApparelLook, cx: number, cy: number, uid: string): str
       legFeathers(cx - 3.5, 0) +
       legFeathers(cx + 3.5, 1) +
       `<g fill="#fff"><circle cx="${cx - 3.5}" cy="${cy + 1}" r="0.6"/><circle cx="${cx + 3.5}" cy="${cy + 4}" r="0.6"/><circle cx="${cx - 5.5}" cy="${cy + 6}" r="0.5"/><circle cx="${cx + 5.5}" cy="${cy - 2}" r="0.5"/></g>`;
+  } else if (shape === 'wardenRaiment') {
+    // The Warden's Raiment (GS-story-champion-cosmetics): robed tassets hanging off the waist (a longer,
+    // softer cut than the Valkyrie war-skirt — vestment, not armour) over gilded shin guards, with a gold
+    // seam down each leg. Mirrors the canvas `drawPants 'wardenRaiment'`.
+    const gold = look.accent ?? '#ffe08a';
+    const guard = shade(gold, -0.12);
+    detail = `<g fill="${gold}" stroke="#0c1116" stroke-width="0.6" stroke-linejoin="round" opacity="0.9">
+        <path d="M${cx - 8},${cy - 7} L${cx - 3.2},${cy - 7} Q${cx - 4.4},${cy - 1} ${cx - 5.4},${cy + 2} Z"/>
+        <path d="M${cx - 2.8},${cy - 7} L${cx + 2.8},${cy - 7} L${cx + 1.8},${cy + 2} L${cx - 1.8},${cy + 2} Z"/>
+        <path d="M${cx + 3.2},${cy - 7} L${cx + 8},${cy - 7} Q${cx + 4.4},${cy - 1} ${cx + 5.4},${cy + 2} Z"/>
+      </g>
+      <g fill="none" stroke="${gold}" stroke-width="0.7" opacity="0.55">
+        <path d="M${cx - 4.6},${cy + 2} L${cx - 4},${legBottom - 6}"/><path d="M${cx + 4.6},${cy + 2} L${cx + 4},${legBottom - 6}"/></g>
+      <g fill="${guard}" stroke="#0c1116" stroke-width="0.6" stroke-linejoin="round">
+        <rect x="${cx - 6.4}" y="${legBottom - 6}" width="4" height="6.4" rx="1.4"/>
+        <rect x="${cx + 2.4}" y="${legBottom - 6}" width="4" height="6.4" rx="1.4"/>
+      </g>
+      <g fill="#fff" opacity="0.7"><circle cx="${cx - 4.4}" cy="${legBottom - 4.4}" r="0.5"/><circle cx="${cx + 4.4}" cy="${legBottom - 4.4}" r="0.5"/></g>`;
+  } else if (shape === 'coilScales') {
+    // Coil Scales (GS-story-champion-cosmetics): shed serpent scale grown to fit — stacked scale rows down
+    // each leg in venom green over the deep Coil violet, with a ridged spine line and a fanged cuff at each
+    // ankle. Mirrors the canvas `drawPants 'coilScales'`.
+    const venom = look.accent ?? '#7fe0a0';
+    const dark = shade(color, -0.3);
+    const rows: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const y = cy - 5 + i * ((legBottom - 2 - (cy - 5)) / 5);
+      for (const o of [-1, 1] as const) {
+        const lx = cx + o * (4.6 - i * 0.25);
+        rows.push(
+          `<path d="M${(lx - 2.1).toFixed(1)},${y.toFixed(1)} Q${lx.toFixed(1)},${(y + 2).toFixed(1)} ${(lx + 2.1).toFixed(1)},${y.toFixed(1)}" fill="none" stroke="${venom}" stroke-width="0.7" opacity="${(0.65 - i * 0.06).toFixed(2)}"/>`,
+        );
+      }
+    }
+    detail =
+      `<g stroke="${dark}" stroke-width="1.4" opacity="0.85" fill="none" stroke-linecap="round">` +
+      `<path d="M${cx - 4.8},${cy - 6} L${cx - 4},${legBottom - 1}"/><path d="M${cx + 4.8},${cy - 6} L${cx + 4},${legBottom - 1}"/></g>` +
+      rows.join('') +
+      `<g fill="${venom}" stroke="#0c1116" stroke-width="0.5" stroke-linejoin="round" opacity="0.9">
+        <path d="M${cx - 6.4},${legBottom - 2.4} L${cx - 1.8},${legBottom - 2.4} L${cx - 2.8},${legBottom} L${cx - 4},${legBottom - 1.4} L${cx - 5.4},${legBottom} Z"/>
+        <path d="M${cx + 1.8},${legBottom - 2.4} L${cx + 6.4},${legBottom - 2.4} L${cx + 5.4},${legBottom} L${cx + 4},${legBottom - 1.4} L${cx + 2.8},${legBottom} Z"/>
+      </g>`;
   } else if (shape === 'greaves') {
     // Valkyrie greaves (GS-valkyrie): war-skirt tassets hanging off the waist + gold shin plates.
     const plate = shade(accent, 0.14);
@@ -731,7 +878,12 @@ function pantsGlyph(look: ApparelLook, cx: number, cy: number, uid: string): str
       </g>`;
   }
   const flair =
-    shape === 'nebula' || shape === 'riftgreaves' || shape === 'emberlegs' || shape === 'parrotpants'
+    shape === 'nebula' ||
+    shape === 'riftgreaves' ||
+    shape === 'emberlegs' ||
+    shape === 'parrotpants' ||
+    shape === 'wardenRaiment' ||
+    shape === 'coilScales'
       ? sparkles([[cx - 10, cy - 4], [cx + 10, cy + 6]])
       : '';
   return a + body + band + detail + flair;
