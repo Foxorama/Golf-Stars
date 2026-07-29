@@ -6,9 +6,9 @@
 
 **The Far Carry collects nothing about you and sends nothing anywhere.**
 
-There are no accounts, no analytics, no advertising, no tracking, no crash reporting, and
-no cookies. Your save lives in your own browser or on your own device, and it never leaves
-it unless you deliberately export it yourself.
+There are no accounts, no analytics, no advertising, no tracking, no automatic crash
+reporting, and no cookies. Your save lives in your own browser or on your own device, and
+it never leaves it unless you deliberately export it yourself.
 
 That is the whole policy. The rest of this page just explains it precisely, because "we
 don't collect anything" is a claim worth being able to check.
@@ -52,6 +52,21 @@ and `document.cookie`. They come from two libraries and are never called:
 
 We would rather point at them than have you find them and wonder.
 
+## When something goes wrong
+
+If the game hits an error, it shows you a small bar offering to **copy the details**. That
+report contains the game version, the seed of the run you were playing, your screen size,
+your browser's user-agent string, and the error itself. It never contains your save.
+
+**It is only ever put on your clipboard, and only if you tap the button.** Nothing is sent
+anywhere — there is no server to send it to. If you choose to paste it into a bug report,
+that's you sharing it, and you can read exactly what you're sharing first.
+
+The seed is the useful part: the game is fully deterministic, so a seed lets us replay the
+exact round you were playing and find the fault. That's why there's no crash-reporting
+service here — a seed is a better bug report than anything one of those could collect, and
+it costs you nothing.
+
 ## Things that are not us
 
 **Wherever you're playing it.** Loading any web page means the host can see the request —
@@ -79,8 +94,8 @@ identifiers.
 
 ## Other device features
 
-- **Clipboard** — only when you tap "copy save" yourself, and only to write your own save
-  data. The game never reads your clipboard.
+- **Clipboard** — only when you tap "copy save" or "copy details" on an error yourself, and
+  only to *write* text you asked for. The game never reads your clipboard.
 - **Vibration** — for shot feedback, switchable off in Settings.
 - **Reduced-motion preference** — read once from your system settings to pick a sensible
   default, then it's yours to change. It is read, never transmitted.
