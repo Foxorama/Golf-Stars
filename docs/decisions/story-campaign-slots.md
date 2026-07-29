@@ -131,3 +131,19 @@ lands reviewable and revertable on its own:
 One consequence is already live and worth knowing: because `writeStory` upserts by `characterId`,
 starting a campaign as a *different* golfer no longer destroys the existing one — it adds a slot. There
 is simply no UI yet that lets you get back to the other one on purpose.
+
+### What the picker will need first: the roster in `UiState`
+
+Recorded here because it is the load-bearing decision of the next chunk and was reached while this one
+was fresh. The reducer is pure and currently sees only `state.story` — the ONE active campaign. So it
+**cannot answer "does this golfer already have a campaign?"**, which is exactly the question the
+overwrite confirmation turns on.
+
+Gating that in the app layer would put the guard somewhere the reducer can contradict, and the guard
+protects a *destructive* write. `selectCharacter` under `pendingStoryNew` has to refuse to create over
+an existing slot until confirmed **in the reducer**, or the confirmation is decoration over a write
+that happens anyway. So the next chunk starts by adding `campaigns: CampaignStore` to `UiState`
+(hydrated at boot from `loadCampaignStore()`, kept in step by the reducer on create / continue /
+delete); the picker and the confirm then both read one source. `campaignOverwriteWarning` is already
+pure and already machine-checked to agree with what `upsertCampaign` really does, so it drops in
+unchanged — and the same roster is what PR 3's champion select needs, so this is paid once.

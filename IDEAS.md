@@ -209,6 +209,19 @@ Three sequential PRs, save work first:
   start a new one), and picking a golfer who already has a campaign CONFIRMS the overwrite — naming what it
   costs, and saying outright when it also replaces that golfer's Star Tour character (`campaignOverwriteWarning`
   already returns exactly that, machine-checked to agree with what the write really does).
+  **THE ROSTER HAS TO GO INTO `UiState` FIRST, AND THAT IS THE WHOLE DESIGN OF THIS CHUNK.** The reducer is
+  pure and today sees only `state.story` — the ONE active campaign — so it cannot answer "does this golfer
+  already have a campaign?", which is precisely the question the overwrite confirm turns on. Gating that in
+  the app layer instead would put the guard somewhere the reducer can contradict, and the guard protects a
+  DESTRUCTIVE write: `selectCharacter` under `pendingStoryNew` must refuse to create over an existing slot
+  until confirmed, in the reducer, or the confirmation is decoration. So add `campaigns: CampaignStore` to
+  `UiState` (hydrated at boot from `loadCampaignStore()`, kept in step by the reducer on create/continue/
+  delete), and the picker + confirm both read it. `campaignOverwriteWarning` is already pure and already
+  agrees with `upsertCampaign` by test, so it drops straight in. This also pre-pays PR 3, whose champion
+  select needs the same roster in the reducer. Open question worth one decision before building: whether the
+  picker shows for a SINGLE campaign too (explicit + discoverable, one extra tap on every resume) or only at
+  two or more (zero friction, but a one-campaign player may never discover they can have a second) — the
+  request reads as "when they tap on Story Tour mode it asks for the character they want", i.e. always.
 - **GS-story-startour-champions** — Star Tour offers your champions (one per golfer finished), each with the
   bag/gear/caddy/ship they finished with; a champion ARMS Yggdrasil (Thor's Hammer still gates Asgard itself),
   and **the Serpent at the root** replays the finale battle as Warden or Coil per that champion's `alignment`.
