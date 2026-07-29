@@ -1,0 +1,102 @@
+name: itch
+
+# Ship the built web game to itch.io. The SAME `npm run build` output that pages.yml
+# serves — itch and the Pages build can never be different code, because there is only
+# one build command and one artifact.
+#
+# Triggered by pushing a version tag (`v1.0.1`). The tag is the release: it names the
+# version, it stamps the itch build, and it is asserted to match package.json — which is
+# where APP_VERSION comes from (Vite `define`), so a mismatch would have the game telling
+# the player a version number nobody can trace.
+#
+# ONE-TIME SETUP (admin UI, not in the repo — like the Pages "Source: GitHub Actions" rule):
+#   1. itch.io → Settings → API keys → Generate new key.
+#   2. GitHub → repo Settings → Secrets and variables → Actions → new secret
+#      `BUTLER_API_KEY` with that key.
+#   3. Run this workflow once, then on the itch Edit game page tick
+#      "This file will be played in the browser" on the `html5` upload, and set
+#      Kind of project = HTML. butler keeps the flag on every later push to the same
+#      channel — so this is set once, ever.
+#
+# ⚠️ PUSH TO THE SAME CHANNEL, ALWAYS. An itch HTML5 game is served from a per-upload
+# path, and localStorage is per-origin+path — replacing the upload by hand can hand
+# players a fresh, empty origin and their save is gone (widely reported, never officially
+# confirmed either way; see reports/release-pipeline-2026-07-30.md). butler patches the
+# existing upload rather than creating a new one, which is the whole reason it is used
+# here instead of a zip drag-and-drop.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to stamp (e.g. 1.0.1) — must match package.json'
+        required: true
+
+concurrency:
+  group: itch
+  cancel-in-progress: false
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Resolve version and assert it matches package.json
+        id: ver
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            want="${{ inputs.version }}"
+          else
+            want="${GITHUB_REF_NAME#v}"
+          fi
+          have="$(node -p "require('./package.json').version")"
+          if [ "$want" != "$have" ]; then
+            echo "::error::Tag says $want but package.json says $have. APP_VERSION comes from package.json, so shipping this would show the player the wrong build number. Bump package.json and re-tag."
+            exit 1
+          fi
+          echo "version=$want" >> "$GITHUB_OUTPUT"
+
+      - run: npm ci
+      - run: npm run build
+
+      # The test/demo hub is a dev tool. It rides along on Pages (same origin, useful
+      # there); a store build has no reason to carry it.
+      - run: rm -f dist/test.html
+
+      - name: Install butler
+        run: |
+          curl -sL -o butler.zip https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip -d "$HOME/butler"
+          chmod +x "$HOME/butler/butler"
+          echo "$HOME/butler" >> "$GITHUB_PATH"
+
+      - name: Push to itch.io
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: |
+          if [ -z "$BUTLER_API_KEY" ]; then
+            echo "::error::BUTLER_API_KEY is not set — see the one-time setup notes at the top of this workflow."
+            exit 1
+          fi
+          butler push dist vulpeculagames/the-far-carry:html5 \
+            --userversion "${{ steps.ver.outputs.version }}"
+          butler status vulpeculagames/the-far-carry
+
+      - name: Summary
+        run: |
+          {
+            echo "### Pushed \`${{ steps.ver.outputs.version }}\` to itch"
+            echo ""
+            echo "https://vulpeculagames.itch.io/the-far-carry"
+            echo ""
+            echo "Still to do by hand: **write the devlog**. That is the only thing that"
+            echo "tells anyone the update exists."
+          } >> "$GITHUB_STEP_SUMMARY"
