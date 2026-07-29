@@ -18,7 +18,7 @@ import type { CosmeticRarity } from '../sim/rpg/cosmetics';
 import { CHARACTERS } from '../sim/rpg/characters';
 import type { ReputationByCharacter } from '../sim/rpg/factions';
 
-export const SAVE_VERSION = 31;
+export const SAVE_VERSION = 32;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -476,8 +476,24 @@ export type SaveV31 = Omit<SaveV30, 'version'> & {
   version: 31;
 };
 
+/** v32 adds the LIFETIME ROOT TALLY (GS-startour-serpent-trophy): every Star Tour encounter with the
+ *  serpent at the root of Yggdrasil now counts — `serpentBouts` (every one resolved) and `serpentWins`
+ *  (every one taken), the key to the secret **Beaten into Submission** achievement at 1,000 wins. It
+ *  lives on the MAIN save rather than `gs_story` on purpose: one campaign per golfer means a slot can
+ *  be started over, and a thousand-fight grind that a golfer pick could erase is one nobody would run.
+ *  Seeded at 0 for existing saves — the count is earned in play, never granted retroactively (a player
+ *  who has already replayed the root a hundred times starts from zero, which is the same rule every
+ *  other tally in the game has shipped under). */
+export type SaveV32 = Omit<SaveV31, 'version'> & {
+  version: 32;
+  /** Root encounters resolved, won or lost — the honest denominator. */
+  serpentBouts: number;
+  /** Root encounters WON — the achievement gate. */
+  serpentWins: number;
+};
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV31;
+export type Save = SaveV32;
 
 export function defaultSave(): Save {
   return {
@@ -509,6 +525,8 @@ export function defaultSave(): Save {
     strokePlayBest: {},
     seenLore: {},
     starTourUnlocked: false,
+    serpentBouts: 0,
+    serpentWins: 0,
   };
 }
 
@@ -931,6 +949,13 @@ function v30ToV31(s: SaveV30): SaveV31 {
   return { ...s, version: 31 };
 }
 
+/** v31 → v32: seed the root tally at zero (GS-startour-serpent-trophy). Nothing is granted for replays
+ *  fought before the game counted them — the same rule `lifetimeAces` and the endless-hole ladder ship
+ *  under — and the very next root win begins the count. */
+function v31ToV32(s: SaveV31): SaveV32 {
+  return { ...s, version: 32, serpentBouts: 0, serpentWins: 0 };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -969,6 +994,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 28) s = v28ToV29(s as unknown as SaveV28) as unknown as typeof s;
   if (s.version === 29) s = v29ToV30(s as unknown as SaveV29) as unknown as typeof s;
   if (s.version === 30) s = v30ToV31(s as unknown as SaveV30) as unknown as typeof s;
+  if (s.version === 31) s = v31ToV32(s as unknown as SaveV31) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
@@ -976,7 +1002,7 @@ export function migrate(raw: unknown): Save {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v14 = s as unknown as Partial<SaveV31>;
+  const v14 = s as unknown as Partial<SaveV32>;
   const ownedShips = v14.ownedShips && v14.ownedShips.length ? v14.ownedShips : [DEFAULT_SHIP_ID];
   const ownedApparel = v14.ownedApparel ?? [];
   const bagTier: BagTier = v14.bagTier ?? 'common';
@@ -1019,6 +1045,10 @@ export function migrate(raw: unknown): Save {
       v14.strokePlayBest && typeof v14.strokePlayBest === 'object' ? v14.strokePlayBest : {},
     seenLore: v14.seenLore && typeof v14.seenLore === 'object' ? v14.seenLore : {},
     starTourUnlocked: v14.starTourUnlocked === true,
+    // GS-startour-serpent-trophy: the lifetime root tally. Defensively floored + integerised — a
+    // hand-edited or truncated blob must not hand out (or hide) the thousand-win grail on a NaN.
+    serpentBouts: Math.max(0, Math.floor(Number(v14.serpentBouts) || 0)),
+    serpentWins: Math.max(0, Math.floor(Number(v14.serpentWins) || 0)),
     priceRefund: typeof v14.priceRefund === 'number' && v14.priceRefund > 0 ? v14.priceRefund : undefined,
     activeRun: v14.activeRun,
     savedAt: v14.savedAt,

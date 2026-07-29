@@ -58,6 +58,11 @@ export function cabinStyleOf(kind: string): CabinStyle {
       return 'disc';
     case 'pegasus':
       return 'steed';
+    // GS-startour-serpent-trophy: the world-serpent hull is a LIVING vessel — the same wyrm cabin the
+    // Coil's grown serpent-ship already uses (ribbed gullet, organic panelling), which is exactly what
+    // the inside of a serpent should look like. A new cabin style would be a second description of it.
+    case 'serpent':
+      return 'wyrm';
     case 'moto':
     case 'chopper':
       return 'bike';

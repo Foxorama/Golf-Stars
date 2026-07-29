@@ -253,10 +253,12 @@ where the campaign ended. The boss is the champion's own `alignment`: Warden ⇒
 Warden Ark. `mountStoryBattle` already takes `won`/`loadout`/`shipId`/`herald` as options and had exactly
 one production call site, so this is a **second caller, never a forked fight**.
 
-**It is not a reducer action, and that is the design.** A replay must not touch campaign state — no
-`winFinale`, no `starTourUnlocked`, no persist — and having *no action to dispatch* makes that true by
-construction rather than by remembering. The outcome lands in `starTourView.serpentResult` (app-layer
-view state, never persisted) and the recap returns to the **map**, not the title. It needs its own path
+**It was not a reducer action, and that was the design** — until GS-startour-serpent-trophy gave it one
+(see below), which *moved* the guarantee rather than dropping it. A replay must not touch campaign state
+— no `winFinale`, no `starTourUnlocked`, no persist of `gs_story` — and having *no action to dispatch*
+made that true by construction rather than by remembering. The outcome lands in
+`starTourView.serpentResult` (app-layer view state, never persisted) and the recap returns to the
+**map**, not the title. It needs its own path
 rather than a reuse of `openStoryFinale`/`engageStoryFinale` for a structural reason as well:
 `finaleUnlocked` is `keyToOtherRealm && completed !== true`, so a finished campaign cannot re-enter the
 real finale at all. It also needs its own **reduced-motion branch** — the finale's skips the cinematic by
@@ -283,3 +285,87 @@ the developed Story bag laid over the top, so `tier` stamps `common` on a golfer
 the board was not merely omitting the fact, it was **misstating** it. The ★ is what makes an out-of-reach
 score read as explained rather than as a mystery. Old records simply lack the flag, which is the honest
 "we don't know" for a round banked before the game recorded it; the migration is a pure version stamp.
+
+---
+
+# Beaten into Submission (GS-startour-serpent-trophy)
+
+Code: `src/sim/rpg/serpentTrophy.ts` (pure — the tally, the bar, the grant), `src/sim/rpg/ships.ts` (the
+`serpent` hull kind + the row), `src/render/shipArt.ts` / `shipTopArt.ts` (the beast, side + plan),
+`src/render/battleArms.ts` / `shipWeapons.ts` / `shipInteriorArt.ts` / `hudTheme.ts` (the four tables a
+new hull kind is compile-forced through), `src/ui/game.ts` (`serpentBout`), `src/app.ts` (the dispatch at
+the end of the replay), `src/app/starTourScreens.ts` (the ledger + the reveal), `src/save/schema.ts` v32.
+Guard: `tests/serpent-trophy.test.ts`.
+
+## Every encounter counts
+
+The replay above banked *nothing* — not even a count. That is right for campaign state and wrong for the
+player's own history: a fight you can repeat forever, that leaves no mark at all, is a screensaver. So
+every resolved bout at the root now increments a lifetime pair on the **main save** — `serpentBouts`
+(every one, won or lost) and `serpentWins` — and a thousand victories break the beast to the bridle:
+**The World Serpent** becomes a ship.
+
+**Why the main save and not `gs_story`.** One campaign per golfer means a slot can be started over at any
+time (that is the whole of GS-story-campaign-slots). A thousand-fight grind that a golfer pick could erase
+is a grind nobody would ever run. It sits beside `lifetimeAces`, which is the same kind of fact.
+
+## The guarantee moved; it did not go away
+
+Counting needs an action, and the previous section's guarantee was *"there is no action, so it cannot
+touch the campaign."* The replacement is stated and machine-checked instead of structural:
+
+> `serpentBout` reads and writes the lifetime tally and `ownedShips`, and **nothing else** —
+> `state.story`, `state.campaigns`, `state.run`, `state.strokePlayBest` and `starTourUnlocked` come out
+> of it *referentially identical*.
+
+That is a weaker guarantee honestly stated, and a much stronger one than "remember not to". The test
+asserts object identity, not equality, so a well-meaning `{...state.story}` fails it.
+
+Two smaller decisions inside the action. It does **not** check `state.screen`: the fight resolves through
+a full-screen battle overlay, and refusing to count a bout because the screen underneath moved would
+throw away a fight the player actually finished. And the grant is gated on the **count** (`wins >= 1000`)
+rather than on "this bout was the thousandth", so a player who somehow arrives past the bar without the
+hull — an imported bundle, a future migration — gets what they earned on their very next win.
+
+**Which boss is deliberately not part of the key.** A Warden faces Jörmungandr and a Herald the Warden
+Ark, but it is one fight in one place and the road to the root is the same length either way. Splitting
+the tally would make the achievement cost twice as much for a player who finished both paths.
+
+**Reduced motion still counts.** The replay's reduced-motion branch skips the cinematic and reports the
+gate verdict, so that path reaches 1,000 in far less wall-clock time than fighting them. It counts
+anyway: `settings.reducedMotion()` is an accessibility setting, and gating the game's last cosmetic
+behind the ability to watch a two-minute battle animation is exactly the kind of thing
+`docs/decisions/accessibility.md` forbids. The trade is deliberate and recorded here rather than
+discovered later.
+
+## The ship
+
+A bespoke `ShipLook['kind']`, which costs rows in four `Record<…>` tables (guns, star-map weapon, cabin
+style, HUD livery) — all of them compile-forced, which is the point: the reward for the longest grind in
+the game is not a recoloured wagon. It is `secret` + `cost: 0`, hidden from the Trade Market until owned,
+and placed **last** in `SHIPS` so the catalogue tests' "first mythic is the Mothership" assertions stand.
+
+Three things the art pass learned, all of them visible in the file as comments:
+
+- **The body is one spine path**, stroked at stacked widths for the taper, with every fin, scute and
+  scale row placed at a sampled point and *rotated to the body's local heading* there. Fins drawn
+  axis-upright read as a row of fir trees standing on a green road — which is what the first pass was.
+- **A beast is drawn against open space**, so the skull is edged in its own venom-light rather than in
+  the near-black ink every other hull uses. Outlined in `#07130f` the whole head vanished, and a
+  fully-detailed jaw read as a blunt stump.
+- **The card frame is the real constraint.** `shipCardSVG` shows roughly x ∈ [−25, +25] of the design
+  frame; cropping a wagon trims its exhaust, cropping this trims the *skull* — the one part that says
+  what it is. Hence the single `scale(0.86)` wrap, which leaves it the longest hull in the fleet anyway.
+
+The plan view (portrait fight) obeys the standing rules: symmetric about the keel, no document-global
+ids, no SMIL (the battle rasterizes it into an `<img>`, where animation never runs). Its fangs are a
+genuine flank PAIR, so `planMounts` leaves the row alone and the beast bites with both sides.
+
+## The ledger shows the count, never the target
+
+The Root card prints *"Root ledger — N won of M fought"* and the outcome card prints the running win
+total. Neither ever mentions 1,000: it is a **secret** achievement, so the readout has to be able to grow
+without announcing what it is growing toward — and a grind with no visible progress at all is just as
+bad. Once the hull is owned the card says so, because by then there is nothing left to spoil, and the
+reveal fires only on the bout that actually earned it (the app compares `ownedShips` across the dispatch,
+the `aceShipUnlock` idiom), so re-winning never re-announces the secret.

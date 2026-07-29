@@ -226,6 +226,71 @@ function shipTopBody(look: ShipLook): string {
         </g>
         <g stroke="none">${pair((s) => `<rect x="-18" y="${s * 2.6 - 1.1}" width="3" height="2.2" rx="1" fill="${flame}"/>`)}</g>`;
 
+    case 'serpent': {
+      // THE WORLD SERPENT from above (GS-startour-serpent-trophy) — and the angle that finally shows
+      // what the side elevation can only imply: the jaws spread WIDE to both sides, the paired fangs,
+      // the crown horns swept back over the skull, and the body tapering the whole length of the frame.
+      // Rule 2 does the work here — a snake's flank fangs are a genuine PAIR, so `planMounts` leaves
+      // the row alone and the beast bites with both sides, as it must.
+      // Scale rows down the flanks, tightening toward the tail — the plan-view answer to the side
+      // elevation's belly scutes.
+      const seg = [8, 2, -4, -10, -15.5, -20.5]
+        .map((x, i) => {
+          const t = 5.8 - i * 0.75;
+          return pair(
+            (s) =>
+              `<path d="M${x + 2},${(s * (t - 0.4)).toFixed(1)} L${x - 1.6},${(s * (t - 0.2)).toFixed(1)} L${x - 0.4},${(s * (t - 2.2)).toFixed(1)} Z" fill="${accent}" opacity="0.32"/>`,
+          );
+        })
+        .join('');
+      return `
+        <!-- shed star-scale streaming off the tail -->
+        <g stroke="none">
+          <path d="M-27,-2 L-33,-6.4 L-30,-1.4 L-33,4.4 L-27,2 Z" fill="${flame}" opacity="0.8"/>
+          <path d="M-27,-1.2 L-31,-3.4 L-29.4,-0.8 L-31,2.6 L-27,1.2 Z" fill="${glass}" opacity="0.75"/>
+        </g>
+        <!-- webbed fins, one each side, mid-body — swept BACK and slim, so they read as fins rather than
+             as two crescents parked across the hull -->
+        ${pair((s) => `<path d="M-4,${s * 5} Q-12,${s * 13.4} -19,${s * 12} Q-11,${s * 8.6} -8,${s * 4.2} Z" fill="${glass}" opacity="0.4"/>
+                        <path d="M-6,${s * 5} Q-12,${s * 10.6} -16.6,${s * 10.6}" fill="none" stroke="${glass}" stroke-width="0.6" opacity="0.5"/>`)}
+        <!-- the throat, dark, behind the jaws -->
+        <path d="M14,-4 L26,-9.6 L26,9.6 L14,4 Z" fill="#04120d" stroke="none"/>
+        <!-- body, skull and mandibles, all EDGED IN VENOM-LIGHT: a hull-green shape outlined in near-black
+             disappears against open space, which is the whole problem with drawing a beast on a starfield -->
+        <g stroke="${flame}" stroke-width="0.9" stroke-linejoin="round" stroke-opacity="0.7">
+          <path d="M13,-7.4 C4,-8.2 -10,-6 -21,-2.6 L-28,-1.4 L-28,1.4 L-21,2.6 C-10,6 4,8.2 13,7.4 Z" fill="${body}"/>
+          <!-- crown horns, swept back over the shoulders — blades, not crescents -->
+          ${pair((s) => `<path d="M10,${s * 6.2} Q2,${s * 13.4} -4,${s * 11.6} Q3,${s * 9.4} 7,${s * 5} Z" fill="${accent}" opacity="0.85"/>`)}
+          <!-- the skull plate -->
+          <path d="M7,-7.6 Q13,-8.8 16.4,-6.2 L17.6,-2.6 L17.6,2.6 L16.4,6.2 Q13,8.8 7,7.6 Z" fill="${body}"/>
+          <!-- the mandibles: heavy bars hinged at the skull and thrown wide, NOT thin rails. The mouth is
+               the dark V they leave between them, lit only at the throat — filling that whole wedge with
+               venom-light (the first pass) turns the head into a bright fan with the jaws lost in it. -->
+          ${pair((s) => `<path d="M14.6,${s * 1.4} L26.4,${s * 9.6} L13.4,${s * 4.4} Z" fill="${body}"/>`)}
+        </g>
+        <!-- the maw: dark ahead, venom pooling in the throat at the hinge -->
+        <g stroke="none">
+          <path d="M15.4,-1.6 L26,-8.4 L26,8.4 L15.4,1.6 Z" fill="#04120d"/>
+          <path d="M15.6,-1.4 L21.6,-4.8 L21.6,4.8 Z" fill="${flame}" opacity="0.85"/>
+          <path d="M15.8,-1 L18.8,-2.8 L18.8,2.8 Z" fill="#eafff2" opacity="0.85"/>
+          <!-- fangs standing INTO the maw off each mandible's inner edge -->
+          ${pair((s) => `<path d="M19.6,${s * 4.6} L22.6,${s * 3} L21.4,${s * 6} Z" fill="#f2fff6"/>
+                          <path d="M24.4,${s * 7.6} L26,${s * 5} L25.6,${s * 8.6} Z" fill="#f2fff6"/>`)}
+        </g>
+        <!-- the dorsal ridge running the keel, and the scale rows either side of it -->
+        <g stroke="none" fill="${flame}" opacity="0.85">
+          ${[8, 2, -4, -10, -15.5, -20.5].map((x, i) => `<path d="M${x},${(-4 + i * 0.45).toFixed(1)} L${(x - 2.4).toFixed(1)},0 L${x},${(4 - i * 0.45).toFixed(1)} L${(x + 2.4).toFixed(1)},0 Z"/>`).join('')}
+        </g>
+        <path d="M11,0 L-26,0" stroke="${glass}" stroke-width="0.7" opacity="0.35" fill="none"/>
+        <g stroke="none">${seg}</g>
+        <!-- eyes: gold fire with a serpent's slit, set on the skull plate -->
+        <g stroke="none">
+          ${pair((s) => `<circle cx="11.4" cy="${s * 4.6}" r="2" fill="${accent}"/>
+                          <ellipse cx="11.4" cy="${s * 4.6}" rx="1.7" ry="0.6" fill="#1a0b06"/>
+                          <circle cx="10.6" cy="${s * 4}" r="0.5" fill="#fff8d8"/>`)}
+        </g>`;
+    }
+
     case 'pegasus':
       // The Pegasus overhead: the full spread of both wings, the barrel and neck running down the keel,
       // the head at the nose and the starlight tail streaming aft.

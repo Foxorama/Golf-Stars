@@ -228,6 +228,12 @@ export interface UiState {
    *  campaign — which resets that campaign's own `completed` flag — never relocks the free-roam reward.
    *  The title gate shows the live Star Tour tile when this is set OR the current campaign is complete. */
   starTourUnlocked: boolean;
+  /** The LIFETIME ROOT TALLY (GS-startour-serpent-trophy): every Star Tour encounter with the serpent at
+   *  the root, resolved. Persisted on the MAIN save (never `gs_story` — a slot can be started over, and
+   *  a thousand-fight grind that a golfer pick could erase is one nobody would run). `serpentWins` is the
+   *  key to the secret **Beaten into Submission** ship; `serpentBouts` is the honest denominator. */
+  serpentBouts: number;
+  serpentWins: number;
   /** The lore beat currently being shown on the `'lore'` screen (GS-lore) — its id, resolved to its
    *  presentation via `loreEventById`. Transient (never persisted); set by the arrival lore gate,
    *  cleared on dismiss. */
@@ -516,6 +522,11 @@ export type Action =
   | { type: 'pickStarTourCourse'; courseId: string; effect?: string } // choose a course + weather → character select
   | { type: 'selectStarTourChampion'; characterId: string } // GS-story-startour-champions: free-roam as this finished campaign's protagonist
   | { type: 'exitStarTour' } // GS-star-tour: leave the star map back to the title
+  // GS-startour-serpent-trophy: one resolved encounter at the root of Yggdrasil. Bumps the LIFETIME
+  // tally and, at 1,000 wins, hangs the world-serpent hull in the global garage. It touches the main
+  // save ONLY — never `state.story` — which is what keeps the replay "a memory that rewrites nothing"
+  // now that it is an action at all (machine-checked in `tests/serpent-trophy.test.ts`).
+  | { type: 'serpentBout'; won: boolean }
   | { type: 'openStory' } // GS-story: enter Story Mode — opens the golfer picker (campaigns are per golfer, so "which campaign" and "which golfer" are one question)
   // GS-story-campaign-picker: resume the saved campaign of a named golfer, from the picker.
   | { type: 'storyContinueCampaign'; characterId: string }
@@ -654,6 +665,9 @@ export interface MetaProgress {
   seenLore?: SeenLore;
   /** The permanent Star Tour unlock (GS-story-startour-unlock) — earned on the first Story finale win. */
   starTourUnlocked?: boolean;
+  /** The lifetime root tally (GS-startour-serpent-trophy) — encounters resolved / won at the root. */
+  serpentBouts?: number;
+  serpentWins?: number;
   /** Star Shards refunded by the GS-trade-rebalance 40% Trade Market price cut — set by the save
    *  migration, drives the one-off "prices dropped, here's your refund" notice. */
   priceRefund?: number;

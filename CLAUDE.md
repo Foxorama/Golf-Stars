@@ -108,10 +108,13 @@ This game lives or dies on three axes — put every change through all three bef
   `writeStory` doesn't move `activeId`. `championRun` is ONE builder for both entry paths. Yggdrasil is armed
   by `champion || hammer` — but revealing the tree ≠ opening a branch, so the hard hammer gate in
   `playYggdrasilRealm` stays and Asgard renders as *Bifröst sealed* rather than as a dead button. **THE ROOT
-  REPLAY IS NOT A REDUCER ACTION** — a second caller of `mountStoryBattle` (Warden ⇒ Jörmungandr / Herald ⇒
+  REPLAY TOUCHES NO CAMPAIGN STATE** — a second caller of `mountStoryBattle` (Warden ⇒ Jörmungandr / Herald ⇒
   the Warden Ark, off the champion's `alignment`), landing in `starTourView.serpentResult` and returning to
-  the MAP; having no action to dispatch is what makes "touches no campaign state" true by construction, and
-  it needs its OWN reduced-motion branch because the finale's skips by dispatching `engageStoryFinale`.
+  the MAP; it needs its OWN reduced-motion branch because the finale's skips by dispatching
+  `engageStoryFinale`. That used to be true because there was NO action to dispatch; GS-startour-serpent-
+  trophy gave it one, so the guarantee MOVED rather than lapsed — `serpentBout` writes the lifetime tally +
+  `ownedShips` and nothing else, and `state.story`/`campaigns`/`run`/`strokePlayBest` come out referentially
+  IDENTICAL (asserted on object identity, so a well-meaning `{...state.story}` fails).
   **RECORDS DESCRIBE, THEY DO NOT RANK** (save v31): `StrokePlayRecord.champion` joins `characterId`/`tier`
   as description — one board per course, ranked on to-par alone. Loadout-keyed boards are impossible to do
   honestly (a champion IS the live slot and keeps improving ⇒ no stable loadout identity), and the ★ also
@@ -134,6 +137,24 @@ This game lives or dies on three axes — put every change through all three bef
   ONLY genuinely-new ids so re-winning reveals nothing. NO save bump (ids into pools that already exist;
   `sanitize` drops unknowns). New rows sit LAST in `APPAREL` so the per-slot `.find(mythic)` invariant still
   resolves to the for-sale 300-shard piece. Guarded by `tests/story-champion-cosmetics.test.ts`.
+  **EVERY ROOT ENCOUNTER COUNTS, AND THE TALLY LIVES WHERE A GOLFER PICK CANNOT ERASE IT**
+  (GS-startour-serpent-trophy, save v32, `sim/rpg/serpentTrophy.ts`). The champion's Root replay banked
+  NOTHING — right for campaign state, wrong for the player's own history. `serpentBouts`/`serpentWins` are
+  now a lifetime pair on the MAIN save (beside `lifetimeAces`, never `gs_story`: one campaign per golfer
+  means a slot can be started over, and a thousand-fight grind a golfer pick could erase is one nobody
+  would run). At **1,000 wins** the secret **Beaten into Submission** hangs THE WORLD SERPENT in the global
+  garage — the `aceShipUnlock` idiom (idempotent, additive, same array ref when nothing is new, so the
+  reveal fires only on the bout that earned it). WHICH boss is deliberately not part of the key (one fight,
+  one place; splitting it would double the cost for a player who finished both paths), and the REDUCED-
+  MOTION branch counts too — gating the last cosmetic behind watching a two-minute battle is exactly what
+  `accessibility.md` forbids. The ledger shows the COUNT, never the target (a secret must grow without
+  announcing itself). A bespoke `ShipLook['kind']` costs rows in FOUR compile-forced `Record` tables (guns /
+  star-map weapon / cabin / HUD livery) and is worth it here: the longest grind in the game does not pay out
+  a recoloured wagon. Three art rules it learned — the body is ONE spine path with every fin/scute placed at
+  a sampled point and ROTATED to the local heading (axis-upright fins read as fir trees on a green road); a
+  beast is EDGED IN ITS OWN LIGHT, not the hulls' near-black ink, or it vanishes against space; and the
+  market CARD shows only x ∈ [−25,+25], so an over-long hull loses the SKULL (hence one `scale(0.86)` wrap).
+  Guarded by `tests/serpent-trophy.test.ts`.
   **A backup is a BUNDLE, not a save** (GS-save-transfer, `save/backup.ts` pure · `app/saveTransfer.ts`
   the localStorage/DOM half). Progress lives in THREE blobs (`gs_save` + `gs_story` + `gs_settings`) and
   localStorage is per-ORIGIN, so the website and the Capacitor shell (`https://localhost`) cannot see
