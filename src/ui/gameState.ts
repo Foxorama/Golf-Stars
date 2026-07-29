@@ -417,8 +417,17 @@ export interface UiState {
    *  `storyStartQuest` from the star map), cleared on continue → the round intro (via `withLoreGate`), so the
    *  first story beat always plays regardless of path and never doubles. Transient; quest-only. */
   pendingQuestOffer?: QuestBeat;
-  /** GS-story-yggdrasil: the finale recap payload (win/lose + which gate fell short). Transient. */
-  lastStoryFinale?: { won: boolean; failReason?: 'firepower' | 'defence' | 'repelled'; strike?: 'clean' | 'graze' };
+  /** GS-story-yggdrasil: the finale recap payload (win/lose + which gate fell short). Transient.
+   *  GS-story-champion-cosmetics: a WIN also carries the champion set the ending just hung in the global
+   *  wardrobe — `championUnlocked` is only the genuinely NEW ids, so finishing the same path a second time
+   *  announces nothing (an empty list = no reveal panel), while `championSet` names the outfit either way. */
+  lastStoryFinale?: {
+    won: boolean;
+    failReason?: 'firepower' | 'defence' | 'repelled';
+    strike?: 'clean' | 'graze';
+    championUnlocked?: string[];
+    championSet?: string;
+  };
   /** GS-story-econ: the world whose Pro Shop is open (the `storyShop` screen). Transient. */
   storyShopWorldId?: string;
   /** GS-story-shop-access: the screen the Pro Shop was opened FROM, so exiting returns there — the star map

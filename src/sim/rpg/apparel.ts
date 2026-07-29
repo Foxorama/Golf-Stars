@@ -41,13 +41,18 @@ export type HatShape =
   | 'supernova'
   | 'baggy'
   | 'wingedHelm'
-  | 'tricorn';
+  | 'tricorn'
+  | 'wardenHalo'
+  | 'coilHood';
 /** Shirt silhouettes the drawer renders. `blazer` is a tailored jacket — lapels, buttons, crest.
  *  `valkyrie` is a burnished cuirass — pauldrons, a central ridge and a winged chest boss (GS-valkyrie).
  *  `riftplate` is the Punched Galaxy warplate — a dark cosmic cuirass shot through with glowing galaxy-crack
  *  energy erupting from a chest star-core, styled after a cosmic end-boss warlord (GS-punched-galaxy).
  *  `solarflare` is the SOLAR FLAMES body — a dark purple-black robe with a blazing coronal sun-core on
- *  the chest and solar flames licking up the hem, matched to the flame crown (GS-solar-flames). */
+ *  the chest and solar flames licking up the hem, matched to the flame crown (GS-solar-flames).
+ *  `wardenMantle` and `coilShroud` are the two CHAMPION bodies (GS-story-champion-cosmetics): a white-gold
+ *  Warden vestment under a shoulder mantle with the Fairway crest at the breast, and the Coil's open
+ *  serpent robe over a scaled cuirass with the ouroboros clasp at the throat. */
 export type ShirtShape =
   | 'polo'
   | 'striped'
@@ -58,12 +63,16 @@ export type ShirtShape =
   | 'valkyrie'
   | 'riftplate'
   | 'solarflare'
-  | 'parrot';
+  | 'parrot'
+  | 'wardenMantle'
+  | 'coilShroud';
 /** Pants silhouettes the drawer renders. `greaves` is armoured legwear — war-skirt tassets over the hips
  *  and gold shin greaves (GS-valkyrie). `riftgreaves` is the Punched Galaxy legwear — dark cosmic leggings
  *  cracked with glowing galaxy energy down each leg over angular shin plates (GS-punched-galaxy).
  *  `emberlegs` is the SOLAR FLAMES legwear — dark leggings with solar flames licking up each leg and
- *  red embers flickering, matched to the flame crown + robe (GS-solar-flames). */
+ *  red embers flickering, matched to the flame crown + robe (GS-solar-flames). `wardenRaiment` and
+ *  `coilScales` are the two CHAMPION legwear pieces (GS-story-champion-cosmetics): white-gold robe tassets
+ *  over gilded shin guards, and scaled serpent leggings ridged down each leg in venom green. */
 export type PantsShape =
   | 'trousers'
   | 'shorts'
@@ -74,7 +83,9 @@ export type PantsShape =
   | 'greaves'
   | 'riftgreaves'
   | 'emberlegs'
-  | 'parrotpants';
+  | 'parrotpants'
+  | 'wardenRaiment'
+  | 'coilScales';
 /** Golf-bag silhouettes the drawer renders (the cosmetic BAG slot, GS-unending). */
 export type BagShape = 'staffbag';
 /** Driver-club silhouettes the drawer renders (the cosmetic DRIVER slot, GS-thor): the club head the
@@ -562,6 +573,85 @@ export const APPAREL: readonly Apparel[] = [
     cost: 0, // never bought — earned by winning an Asgard tournament
     secret: true,
     look: { shape: 'thorHammer', color: '#c9a24a', accent: '#59b6ff', glow: '#59b6ff' },
+  },
+
+  // ===== THE CHAMPION SETS (GS-story-champion-cosmetics) ==============================
+  // Two three-piece outfits, one per Story-Tour ending — earned by BEATING the World-Eater on that path,
+  // never bought, hidden from the Trade Market until owned. The alignment you finish on is the whole key:
+  // one campaign can only ever hang ONE of these, so the other set costs a second run down the other road.
+  // Palettes are the paths' established colours, not new invention — Warden white-gold from the Radiant
+  // Warden Cruiser + `wardenArk.ts` (HULL_LIT #f4f8ff / GOLD #ffe08a / GLASS #bfe9ff), Coil violet + venom
+  // from the defector costume (`storyBetrayal.ts` COIL_ROBE #3a1a52 / COIL_HOOD #241038 / COIL_ACCENT
+  // #7fe0a0) — so a champion reads as the order they served everywhere they already appear.
+  //
+  // Kept LAST in the catalogue on purpose: `apparelForSlot` sorts by rarity but is otherwise stable, so
+  // the per-slot `.find(mythic)` invariant in `tests/apparel.test.ts` keeps resolving to the 300-shard
+  // piece that is actually FOR SALE, exactly as the Thor block above preserves it for the driver slot.
+  {
+    id: 'warden-halo',
+    name: "Warden's Halo",
+    slot: 'hat',
+    set: 'Warden Vigil',
+    rarity: 'mythic',
+    blurb: 'A white-gold circlet under a standing ring of held starlight. Worn by the champion who sang the World-Eater back to sleep.',
+    cost: 0, // never bought — earned by finishing the Story Tour on the Warden path
+    secret: true,
+    look: { shape: 'wardenHalo', color: '#f4f8ff', accent: '#ffe08a', glow: '#bfe9ff' },
+  },
+  {
+    id: 'warden-mantle',
+    name: "Warden's Mantle",
+    slot: 'shirt',
+    set: 'Warden Vigil',
+    rarity: 'mythic',
+    blurb: 'The vestment of the Fairway Wardens — pale as an Ark hull, gold at every seam, the Fairway crest at the breast.',
+    cost: 0,
+    secret: true,
+    look: { shape: 'wardenMantle', color: '#f4f8ff', accent: '#ffe08a', glow: '#bfe9ff' },
+  },
+  {
+    id: 'warden-raiment',
+    name: "Warden's Raiment",
+    slot: 'pants',
+    set: 'Warden Vigil',
+    rarity: 'mythic',
+    blurb: 'Robed tassets over gilded shin guards. They have walked a fairway in every world that still has one.',
+    cost: 0,
+    secret: true,
+    look: { shape: 'wardenRaiment', color: '#f4f8ff', accent: '#ffe08a', glow: '#bfe9ff' },
+  },
+  {
+    id: 'coil-hood',
+    name: 'Coil Hood',
+    slot: 'hat',
+    set: 'Coil Shroud',
+    rarity: 'mythic',
+    blurb: 'A raised cobra hood behind a serpent circlet. You are not wearing the Coil. The Coil is wearing you.',
+    cost: 0, // never bought — earned by finishing the Story Tour on the Herald path
+    secret: true,
+    look: { shape: 'coilHood', color: '#241038', accent: '#7fe0a0', glow: '#7fe0a0' },
+  },
+  {
+    id: 'coil-shroud',
+    name: 'Coil Shroud',
+    slot: 'shirt',
+    set: 'Coil Shroud',
+    rarity: 'mythic',
+    blurb: 'An open serpent robe over a scaled cuirass, the ouroboros clasped at the throat. All fairways end.',
+    cost: 0,
+    secret: true,
+    look: { shape: 'coilShroud', color: '#3a1a52', accent: '#7fe0a0', glow: '#7fe0a0' },
+  },
+  {
+    id: 'coil-scales',
+    name: 'Coil Scales',
+    slot: 'pants',
+    set: 'Coil Shroud',
+    rarity: 'mythic',
+    blurb: 'Shed World-Eater scale, grown to fit. It moves before you do.',
+    cost: 0,
+    secret: true,
+    look: { shape: 'coilScales', color: '#3a1a52', accent: '#7fe0a0', glow: '#7fe0a0' },
   },
 ];
 

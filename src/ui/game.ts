@@ -87,6 +87,7 @@ import { isShipUpgradeId, buyShipUpgrade } from '../sim/rpg/storyShipUpgrades';
 import { currentTournament, tournamentForChapter, tournamentRival, sigilMatchThrough, rivalTotalThrough, isTeamTournament, isTeamMatchTournament, teamPartnerOrDefault } from '../sim/rpg/storyTournaments';
 import { finaleMatchup, coilChampionOptions, wardenAllyOptions, type CoilChampionId } from '../sim/rpg/storyBetrayal';
 import { finaleUnlocked, finaleResult, winFinale } from '../sim/rpg/storyFinale';
+import { grantChampionCosmetics } from '../sim/rpg/storyChampionCosmetics';
 import { interludeSeen, applyInterlude } from '../sim/rpg/storyInterlude';
 import { midroundOmen, applyMidroundOmen } from '../sim/rpg/storyMidround';
 import { tournamentAftermath } from '../sim/rpg/storyAftermath';
@@ -1275,17 +1276,28 @@ export function reduce(state: UiState, action: Action): UiState {
       const repelled = res.won && action.outcome === 'lost';
       const won = res.won && !repelled;
       const story = won ? winFinale(state.story) : state.story;
+      // GS-story-champion-cosmetics: the ending hangs the path's set in the GLOBAL wardrobe — the route ship
+      // you flew that road plus its three-piece outfit, keyed on the alignment you finished on. Every other
+      // campaign reward lives inside `gs_story` and dies with the slot; this is the one that outlives it, so
+      // it goes on the main save beside `starTourUnlocked`. Idempotent and purely additive (same array refs
+      // when nothing is new), so re-winning is a no-op and the other path's set is only ever ADDED later.
+      const champ = won
+        ? grantChampionCosmetics(state.ownedShips, state.ownedApparel, story.alignment)
+        : undefined;
       return {
         ...state,
         story,
         // GS-story-startour-unlock: a finale win PERMANENTLY unlocks Star Tour on the main save — so
         // starting a fresh campaign (which resets the campaign's own `completed` flag) never relocks it.
         ...(won ? { starTourUnlocked: true } : {}),
+        ...(champ ? { ownedShips: champ.ownedShips, ownedApparel: champ.ownedApparel } : {}),
         screen: 'storyFinaleResult',
         lastStoryFinale: {
           won,
           failReason: won ? undefined : repelled ? 'repelled' : res.failReason,
           strike: won ? action.strike ?? 'clean' : undefined,
+          championUnlocked: champ?.unlocked,
+          championSet: champ?.cosmetics?.setName,
         },
       };
     }
