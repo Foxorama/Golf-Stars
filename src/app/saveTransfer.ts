@@ -13,8 +13,9 @@
  */
 
 import { loadSave, writeSave } from '../save/storage';
-import { loadStory, writeStory, clearStory } from '../save/storyStore';
+import { loadCampaignStore, writeCampaignStore, clearStory, invalidateCampaignCache } from '../save/storyStore';
 import { buildBackup, type Backup } from '../save/backup';
+import { campaignCount } from '../sim/rpg/storyRoster';
 
 const SETTINGS_KEY = 'gs_settings';
 
@@ -38,7 +39,7 @@ export function currentBackupJSON(): string {
   }
   return buildBackup({
     save: loadSave(),
-    story: loadStory(),
+    campaigns: loadCampaignStore(),
     settings,
     exportedAt: new Date().toISOString(),
   });
@@ -94,14 +95,20 @@ export { parseBackup, describeBackup, BackupError, type Backup } from '../save/b
  * Write a parsed bundle over the local blobs. Destructive and deliberately so — the caller must have
  * confirmed with the player first.
  *
- * The campaign is written OR CLEARED to match the file: a backup that carries no campaign must not
- * leave the device's existing one in place, or a player restoring an old file would end up with a
- * save and a campaign that never coexisted — a state neither device was ever in.
+ * The campaigns are written OR CLEARED to match the file: a backup that carries no campaign must not
+ * leave the device's existing ones in place, or a player restoring an old file would end up with a
+ * save and campaigns that never coexisted — a state neither device was ever in. The roster REPLACES
+ * the local one wholesale rather than merging: a merge would have to invent an answer for "both sides
+ * have a Feather Fade campaign", and silently picking one is precisely the guess an import must not
+ * make. `describeBackup` lists what is in the file so the choice is the player's, made before the write.
  */
 export function applyBackup(b: Backup): void {
   writeSave(b.save);
-  if (b.story) writeStory(b.story);
+  if (campaignCount(b.campaigns) > 0) writeCampaignStore(b.campaigns);
   else clearStory();
+  // The roster cache is module state in `storyStore`; both writes above keep it in step, but drop it
+  // anyway so a future call can never serve a pre-import roster back to the write-after-every-action.
+  invalidateCampaignCache();
   if (b.settings) {
     try {
       store()?.setItem(SETTINGS_KEY, JSON.stringify(b.settings));

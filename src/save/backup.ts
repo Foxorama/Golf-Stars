@@ -16,15 +16,29 @@
  */
 
 import { migrate, type Save } from './schema';
-import { migrateStory, type StoryState } from '../sim/rpg/story';
+import {
+  campaignCount,
+  campaignList,
+  emptyCampaignStore,
+  migrateCampaignStore,
+  type CampaignStore,
+} from '../sim/rpg/storyRoster';
+import { getCharacter } from '../sim/rpg/characters';
 
 /** Marks a file as ours. A JSON file that doesn't carry this (and isn't a recognisable legacy bare
  *  save) is rejected rather than guessed at. */
 export const BACKUP_KIND = 'golf-stars-backup';
 
 /** Bundle format version — INDEPENDENT of `SAVE_VERSION`. This is the envelope; the save inside it
- *  carries its own version and is migrated by the existing `migrate()` chain on import. */
-export const BACKUP_VERSION = 1;
+ *  carries its own version and is migrated by the existing `migrate()` chain on import.
+ *
+ *  v1 → v2 (GS-story-campaign-slots): the single `story` campaign became a `campaigns` ROSTER (one per
+ *  golfer). Bumping is the POINT, not a formality: an older build reading a v2 file trips its own
+ *  `version > BACKUP_VERSION` check and refuses with "made by a newer version of Golf Stars" — a loud,
+ *  correct failure. Had we smuggled the roster through the old `story` field instead, that build would
+ *  have handed a roster to `migrateStory` and silently restored ONE mangled campaign while reporting
+ *  success, which is exactly the class of failure a backup feature exists to prevent. */
+export const BACKUP_VERSION = 2;
 
 export interface Backup {
   kind: typeof BACKUP_KIND;
@@ -33,10 +47,12 @@ export interface Backup {
    *  backup files apart. Never used for ordering or logic. */
   exportedAt: string;
   save: Save;
-  /** The Story Tour campaign, when one exists. `null` is a real value here (no campaign), and is
-   *  applied as "clear the campaign" — importing a pre-Story backup onto a device WITH a campaign
-   *  must not silently leave the old one behind pretending it came with the file. */
-  story: StoryState | null;
+  /** Every Story Tour campaign (GS-story-campaign-slots), keyed by golfer. An EMPTY roster is a real
+   *  value (no campaigns), and is applied as "clear the campaigns" — importing a pre-Story backup onto
+   *  a device WITH campaigns must not silently leave the old ones behind pretending they came with the
+   *  file. A v1 bundle's single `story` is folded in here as a one-slot roster, so there is exactly ONE
+   *  in-memory representation of a player's campaigns and no second description to drift. */
+  campaigns: CampaignStore;
   /** Player preferences. Optional: they're the least important part of the bundle and a file
    *  without them still restores everything that matters. */
   settings: Record<string, unknown> | null;
@@ -48,7 +64,7 @@ export class BackupError extends Error {}
 
 export interface BackupParts {
   save: Save;
-  story: StoryState | null;
+  campaigns: CampaignStore;
   settings: Record<string, unknown> | null;
   /** Passed in rather than read from the clock so this module stays pure (and `Date.now()` is banned
    *  in deterministic paths — see CLAUDE.md). The app layer stamps it. */
@@ -62,7 +78,7 @@ export function buildBackup(parts: BackupParts): string {
     version: BACKUP_VERSION,
     exportedAt: parts.exportedAt,
     save: parts.save,
-    story: parts.story,
+    campaigns: parts.campaigns,
     settings: parts.settings,
   };
   return JSON.stringify(backup, null, 2);
@@ -77,7 +93,8 @@ export function buildBackup(parts: BackupParts): string {
  * report success. An import must refuse rather than guess.
  *
  * Accepts two shapes:
- *  - a bundle (`kind: 'golf-stars-backup'`);
+ *  - a bundle (`kind: 'golf-stars-backup'`), v1 or v2 — a v1 file's single `story` campaign is folded
+ *    into a one-slot roster, so every backup ever written by this game still restores its campaign;
  *  - a BARE save object — what `exportSave()` has always emitted — so a file written by any older
  *    build still restores. It carries no campaign, which is honest: there wasn't one in the file.
  */
@@ -105,7 +122,10 @@ export function parseBackup(json: string): Backup {
       version: BACKUP_VERSION,
       exportedAt: typeof obj.exportedAt === 'string' ? obj.exportedAt : '',
       save: migrateSaveOrThrow(obj.save),
-      story: migrateStoryOrNull(obj.story),
+      // v1 carried ONE campaign under `story`; v2 carries the roster under `campaigns`. Both land in
+      // the same place — `migrateCampaignStore` adopts a bare `StoryState` as a one-slot roster, which
+      // is the identical code path a pre-roster `gs_story` blob takes on load.
+      campaigns: migrateCampaignsOrEmpty(obj.campaigns ?? obj.story),
       settings: plainObjectOrNull(obj.settings),
     };
   }
@@ -117,7 +137,7 @@ export function parseBackup(json: string): Backup {
       version: BACKUP_VERSION,
       exportedAt: typeof obj.savedAt === 'string' ? obj.savedAt : '',
       save: migrateSaveOrThrow(obj),
-      story: null,
+      campaigns: emptyCampaignStore(),
       settings: null,
     };
   }
@@ -136,15 +156,15 @@ function migrateSaveOrThrow(raw: unknown): Save {
   }
 }
 
-/** A campaign that won't migrate is dropped rather than failing the whole import: the main save is
+/** Campaigns that won't migrate are dropped rather than failing the whole import: the main save is
  *  the bulk of a player's progress, and refusing everything because the Story blob is odd would be a
  *  worse trade. The import summary reports what actually came through. */
-function migrateStoryOrNull(raw: unknown): StoryState | null {
-  if (!raw || typeof raw !== 'object') return null;
+function migrateCampaignsOrEmpty(raw: unknown): CampaignStore {
+  if (!raw || typeof raw !== 'object') return emptyCampaignStore();
   try {
-    return migrateStory(raw);
+    return migrateCampaignStore(raw);
   } catch {
-    return null;
+    return emptyCampaignStore();
   }
 }
 
@@ -164,6 +184,24 @@ export function describeBackup(b: Backup): string[] {
   const apparel = s.ownedApparel?.length ?? 0;
   if (ships || apparel) lines.push(`🚀 ${ships} ship${ships === 1 ? '' : 's'} · 👕 ${apparel} cosmetic${apparel === 1 ? '' : 's'}`);
   if (s.activeRun) lines.push('▶ A run in progress');
-  lines.push(b.story ? `📖 Story Tour — chapter ${b.story.chapter ?? 1}` : '📖 No Story Tour campaign');
+  // GS-story-campaign-slots: a bundle can now carry SEVERAL campaigns, and importing replaces the lot.
+  // Name each golfer and say where they got to — a player about to overwrite three campaigns with one
+  // deserves to see that before they tap, not after. Champions are called out (★) because a champion is
+  // also a Star Tour character.
+  const campaigns = campaignList(b.campaigns);
+  if (campaigns.length === 0) {
+    lines.push('📖 No Story Tour campaign');
+  } else {
+    lines.push(`📖 ${campaigns.length} Story Tour campaign${campaigns.length === 1 ? '' : 's'}`);
+    for (const c of campaigns) {
+      const who = getCharacter(c.characterId)?.name ?? c.characterId;
+      lines.push(c.completed ? `   ★ ${who} — complete (Star Tour champion)` : `   · ${who} — chapter ${c.chapter ?? 1}`);
+    }
+  }
   return lines;
+}
+
+/** How many campaigns a bundle carries — for the import confirmation's "this replaces N campaigns". */
+export function backupCampaignCount(b: Backup): number {
+  return campaignCount(b.campaigns);
 }
