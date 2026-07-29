@@ -353,6 +353,39 @@
         margin: .45em 0 0; font-size: 11px; letter-spacing: .22em; text-transform: uppercase;
         color: var(--gs-dim); text-wrap: balance;
       }
+      /* ── Crash toast (GS-crash-diagnostics) — its OWN `.gs-crash*` prefix, never the play
+         screen's `.gs-hud*`, which is the class collision that caused the #353 map-blur bug.
+         Fixed to the bottom above the play controls, `pointer-events:none` on the host so an
+         empty toast can never eat a tap meant for the game beneath it. Uses --gs-dvh's sibling
+         units only; no raw viewport units (GS-a11y-sheet-scroll). */
+      .gs-crash { position: fixed; left: 0; right: 0; bottom: 0; z-index: 9000; pointer-events: none; }
+      .gs-crash__bar {
+        pointer-events: auto; margin: 0 auto 10px; max-width: min(560px, calc(100% - 20px));
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        padding: 9px 12px; border-radius: 10px;
+        background: #2a1416; border: 1px solid #7a3b40; color: #ffd9d9;
+        box-shadow: 0 6px 22px rgba(0, 0, 0, .55); font-size: 13px;
+      }
+      .gs-crash__msg { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+      .gs-crash__btn {
+        flex: 0 0 auto; font: inherit; font-family: var(--gs-font);
+        padding: 6px 10px; border-radius: 8px; cursor: pointer;
+        background: #43201f; border: 1px solid #8d4a4a; color: #ffe6e6;
+      }
+      .gs-crash__btn:hover { filter: brightness(1.15); }
+      .gs-crash__btn:focus-visible { outline: 2px solid var(--gs-info); outline-offset: 2px; }
+      .gs-crash__btn--x { padding: 6px 9px; }
+      /* The manual-copy fallback, shown only when the clipboard API refuses. Monospace would suit a
+         stack trace, but a `font:` shorthand RESETS the family and the Readable-text toggle could
+         never reach it (GS-a11y-readable-text) — and this box exists to be read by someone already
+         having a bad time. The token wins; the text is select-and-copy, so column alignment is not
+         load-bearing. */
+      .gs-crash__text {
+        flex: 1 0 100%; margin-top: 6px; min-height: 88px; resize: vertical;
+        font: 11px/1.45 var(--gs-font);
+        background: #160b0c; color: #ffd9d9; border: 1px solid #7a3b40; border-radius: 8px; padding: 6px;
+      }
+
       /* The build stamp (GS-release-identity) — deliberately the quietest text on the screen.
          It has to be READABLE when someone is copying it into a bug report, so it is dimmed
          and small rather than hidden; `tabular-nums` keeps the digits legible at this size. */
@@ -2994,6 +3027,13 @@
          every render is not reliably announced — the element has to persist for its content change
          to register as a change. `polite` because a shot resolving is news, not an alert. -->
     <div id="gs-live" role="status" aria-live="polite" aria-atomic="true" class="gs-sr-only"></div>
+    <!-- Post-boot crash toast (GS-crash-diagnostics). OUTSIDE #app for the same reason as the live
+         region above — render() replaces app.innerHTML, and a fault that happens mid-render would
+         otherwise have its own report wiped by the next paint. Empty until something throws; the
+         app layer fills it (src/app/diagnostics.ts). The BOOT watchdog below handles the
+         before-booted case and paints full-screen; this is the after-booted case, where a run is
+         in progress and a non-fatal glitch must not take the screen away from it. -->
+    <div id="gs-crash" class="gs-crash"></div>
     <!-- Probe: does ANY ES module execute in this browser? If modules are unsupported or
          the bundle fails to parse, this never sets the flag and the watchdog reports it. -->
     <script type="module">

@@ -133,6 +133,7 @@ import {
 } from './app/saveTransfer';
 import { backIntent } from './ui/back';
 import { isNativeShell } from './native';
+import { installCrashDiagnostics } from './app/diagnostics';
 import { primeHaptics } from './render/haptics';
 import { mapTopInfo, puttAimLabel, puttAimRow, puttBreakLine, windRead } from './app/playHud';
 import { mountWeatherOverlay, playCaddyVoice, playTentBonk, syncMusic } from './app/playFx';
@@ -4317,6 +4318,25 @@ function registerServiceWorker(): void {
 /** Entry, called from main.ts inside try/catch so any boot fault is visible. */
 export function start(): void {
   boot();
+  // Post-boot fault reporting (GS-crash-diagnostics). Installed AFTER boot() on purpose: a fault
+  // during boot is the watchdog's job and it paints full-screen, which is right when there is no
+  // run to protect. From here on a glitch gets a toast instead, and the run carries on.
+  // The run context is read through a callback because `state` is replaced on every action — a
+  // captured reference would report whichever hole the player was on when the game started.
+  // Gated on an ACTIVE run: a placeholder run object exists even on the title screen, and a report
+  // that names a seed and a mode for a fault that happened in a menu sends the reader chasing a
+  // round nobody was playing. No active run ⇒ the builder says "no run in progress", which is true.
+  installCrashDiagnostics(() =>
+    state.run?.status === 'active'
+      ? {
+          seed: state.run.seed,
+          courseSeed: state.course?.seed,
+          mode: state.run.formatId,
+          stop: state.run.stopIndex,
+          hole: state.play ? state.play.holeIndex + 1 : undefined, // 1-based, as the player sees it
+        }
+      : undefined,
+  );
   registerServiceWorker();
   wireBackButton();
   // Load the native haptic engine now, not on the first swing — a lazy load would drop that buzz
