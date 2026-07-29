@@ -24,6 +24,7 @@ import { pinOf } from '../sim/round';
 import { dist } from '../sim/course/contract';
 import { getSettings, clampUiScale, type Settings } from '../settings';
 import { describeBackup, type Backup } from '../save/backup';
+import { storageHealth } from '../save/durability';
 
 /**
  * Save-transfer view state (GS-save-transfer) — an exported mutable view object, the documented
@@ -44,6 +45,26 @@ export const saveView: { stage: 'idle' | 'confirm' | 'note'; pending: Backup | n
   message: '',
   bad: false,
 };
+
+/**
+ * What the browser is actually doing with the save (GS-save-durability) — three honest states, on
+ * the one screen a player looking for save answers already opens.
+ *
+ * The middle state is the interesting one and the reason this is not just an error line: storage
+ * that WORKS is still evictable (iOS Safari clears a browser site after 7 days idle; every browser
+ * evicts under pressure), so "saving normally" is a weaker promise than players assume and it would
+ * be dishonest to print a green tick and stop. Where the browser has granted persistence, it says so
+ * plainly; where it hasn't, it names installing as the thing that usually earns it.
+ */
+function storageStatusHTML(): string {
+  if (!storageHealth.writable) {
+    return `<div class="gs-savenote gs-savenote--bad">⚠ This browser isn't letting the game save — nothing is being written. Export now to keep this session.</div>`;
+  }
+  if (storageHealth.persisted) {
+    return `<div class="gs-setnote">✓ Saving normally, and this browser has agreed to <b>keep</b> your save rather than clear it to reclaim space.</div>`;
+  }
+  return `<div class="gs-setnote">✓ Saving normally — though a browser can still clear site data to reclaim space, or after a long time away. Installing the game usually earns it protected storage; an exported file always survives.</div>`;
+}
 
 /** The Save data section of the settings sheet. `localStorage` is the only copy of a save AND it is
  *  per-origin, so the website and the Android shell cannot see each other's progress — moving
@@ -71,6 +92,7 @@ function saveDataSection(): string {
   return `
         <div class="gs-setsec">💾 Save data</div>
         <div class="gs-setnote">Your progress lives only on this device, and the website and the app store it separately. Export to move a save between them — or to keep a backup.</div>
+        ${storageStatusHTML()}
         <div class="gs-saverow">
           <button class="gs-btn gs-btn--ghost" data-save-transfer="export">⬇ Export save</button>
           <button class="gs-btn gs-btn--ghost" data-save-transfer="import">⬆ Import save</button>

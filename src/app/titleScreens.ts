@@ -5,6 +5,7 @@
  */
 
 import { state } from './ctx';
+import { storageHealth } from '../save/durability';
 import { GAME_TITLE, APP_VERSION } from '../brand';
 import { FORMATS, ASGARD_FORMAT, STROKEPLAY_FORMAT, getFormat } from '../sim/rpg/formats';
 import type { RunSnapshot } from '../sim/rpg/run';
@@ -29,9 +30,38 @@ function installDismissed(): boolean {
     return false;
   }
 }
+/**
+ * The install nudge now says what installing BUYS (GS-save-durability). "⬇ Install app" asked the
+ * player to want a shortcut icon; the actual trade is that an installed app plays offline and gets
+ * a save the browser has agreed to keep — iOS Safari deletes a browser site's storage after 7 days
+ * without a visit and exempts home-screen apps, and Chrome grants `navigator.storage.persist()`
+ * readily to installed apps. That is worth a sentence, and it is the true reason to tap it.
+ */
 function installButtonHTML(): string {
   if (!installView.deferred || installDismissed()) return '';
-  return `<button class="gs-btn gs-btn--ghost" data-install="1">⬇ Install app</button>`;
+  return `<button class="gs-btn gs-btn--ghost" data-install="1" title="Play offline, and keep your save safe from browser clean-ups">⬇ Install app <span class="gs-installwhy">· offline + safer save</span></button>`;
+}
+
+/**
+ * THE ONE MESSAGE IN THIS GAME A PLAYER MUST NOT MISS (GS-save-durability).
+ *
+ * Storage denied means nothing is being written — no shards, no campaign, no records — and every
+ * other surface carries on as if it were. It is not dismissible, because the condition is not
+ * transient and a dismissal could not be remembered anyway (remembering it would need the storage
+ * that is broken). It states the likely cause, because on the itch.io embed it is nearly always
+ * blocked third-party cookies rather than anything the player did wrong.
+ *
+ * Export still works — it is built from state in memory and written out as a file — so the warning
+ * ends on the one action that still saves the session rather than on an apology.
+ */
+function storageWarningHTML(): string {
+  if (storageHealth.writable) return '';
+  return `<div class="gs-storagewarn" role="alert">
+      <b>⚠ This browser isn't letting the game save.</b>
+      Nothing you play here will be kept — not shards, not a campaign, not a record. This is usually
+      private browsing, or third-party cookies blocked while the game runs inside another page.
+      <span class="gs-storagewarn__do">Settings → Save data → <b>Export save</b> still works, and writes the whole thing to a file you keep.</span>
+    </div>`;
 }
 
 export function titleScreen(): string {
@@ -89,6 +119,7 @@ export function titleScreen(): string {
         ${installButtonHTML()}
       </div>
     </header>
+    ${storageWarningHTML()}
     ${resumeHTML}
     <h2 class="gs-seclabel">${resumeHTML ? 'Or start a new run — choose your game' : 'Choose your game'}</h2>
     <div class="gs-navtiles gs-navtiles--games">${modes}${storyTileHTML()}${destinationTileHTML()}${universeUnendingTileHTML()}${starTourRewardTileHTML()}</div>
