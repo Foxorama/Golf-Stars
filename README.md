@@ -5,10 +5,23 @@ golf courses. Play a course, earn rewards, upgrade your bag/ship/perks, travel f
 difficulty and absurdity scale.
 
 > **Named `Golf-Stars` in the repo, shipped as _The Far Carry_** (GS-release-identity). The product
-> name lives in `src/brand.ts` and nowhere else; the repo, the npm package, the `gs_*` save keys,
-> the Capacitor `appId` and `BACKUP_KIND` deliberately keep the old spelling, because those are
-> identifiers baked into data on players' devices rather than labels. `tests/brand.test.ts` pins
-> the distinction.
+> name lives in `src/brand.ts` and nowhere else. The persisted names moved with it, once, before
+> launch — `fc_save`/`fc_story`/`fc_settings`, `far-carry-backup`, the `far-carry-` cache prefix —
+> and every read path still accepts the old spelling (`src/save/legacyKeys.ts`). **That was free
+> only because nobody was holding the contract yet; it must not happen again.** The repo, the npm
+> package and the Capacitor `appId` keep the old spelling deliberately — they are invisible to
+> players. `tests/brand.test.ts` + `tests/save-key-migration.test.ts` pin all of it.
+
+## Licence & privacy
+
+**© 2026 Vulpecula Games. All rights reserved** — see [LICENSE](LICENSE). The repository is public
+so the code can be read and learned from; that is not a licence to reuse it. Ask, and permission is
+usually given.
+
+**The game collects nothing and sends nothing** — see [PRIVACY.md](PRIVACY.md). No accounts, no
+analytics, no tracking, no cookies; your save lives on your own device. That is a property of the
+code, not just a promise, and `tests/privacy.test.ts` fails the build if it stops being true —
+including if a storage key is added without documenting it.
 
 > Deliberately separate from `golf-finder` (a real golf+astronomy tracker). golf-finder's soul is
 > *realism and trust*; this game's soul is *fantasy, feel, and progression*. The two are

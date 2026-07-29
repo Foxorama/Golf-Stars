@@ -1,5 +1,20 @@
 # The Far Carry (repo: `Golf-Stars`) — working notes for Claude
 
+> **"COLLECTS NOTHING" IS A PROPERTY OF THE CODE, NOT A PARAGRAPH IN A FILE** (GS-license-privacy,
+> `PRIVACY.md` · `tests/privacy.test.ts`). The game ships **© Vulpecula Games, all rights reserved**
+> (`LICENSE` — public repo so it can be READ, not a licence to reuse). It stores five `fc_*` blobs on
+> the player's own device and **transmits nothing**: no accounts, analytics, telemetry, ads, cookies
+> or crash reporting. The guard fails the build on a `fetch`/beacon/`document.cookie` in `src/`, on an
+> analytics-shaped dependency, and — the direction that actually rots — on a storage key that exists
+> in the code but is **missing from PRIVACY.md's table** (and vice-versa, so the table can't document
+> a key that was deleted). If one of those fails, the fix is a DECISION — undo it, or update the
+> document — never a relaxed test: a privacy policy that has quietly become false is worse than none.
+> ⚠️ The BUILT bundle does contain `fetch`/`document.cookie` (Vite's modulepreload polyfill +
+> Capacitor's unused HTTP/Cookies shims) — dead code the game never calls, which is why the guard
+> scans `src/` and the document *names them* rather than claiming the bundle is clean. **Crash
+> reporting stays local by design**: the deterministic seeded sim means a seed + build number IS the
+> bug report, and it beats a minified stack trace from an SDK — see `GS-crash-diagnostics`.
+
 > **THE PRODUCT NAME IS A LABEL; A PERSISTED STRING IS A CONTRACT — AND THE RENAME BEAT THE
 > CONTRACT BY ONE RELEASE** (GS-release-identity, `src/brand.ts` · `src/save/legacyKeys.ts`). The
 > game ships as **The Far Carry**, and the persisted names moved WITH it, once, pre-launch:
