@@ -217,13 +217,41 @@ Three sequential PRs, save work first:
   says outright when a champion goes too. `currentRoster` lays the live campaign over the boot snapshot, so
   the tags can't go stale without ~190 `state.story` writes each remembering to mirror themselves.
   Guarded by `tests/story-campaign-picker.test.ts`; eyes-on `scripts/campaign-picker-preview.mjs`.
-- **GS-story-startour-champions** — Star Tour offers your champions (one per golfer finished), each with the
-  bag/gear/caddy/ship they finished with; a champion ARMS Yggdrasil (Thor's Hammer still gates Asgard itself),
-  and **the Serpent at the root** replays the finale battle as Warden or Coil per that champion's `alignment`.
-  The battle already takes everything it needs as options (`mountStoryBattle`: `won`/`loadout`/`shipId`/`herald`)
-  and has ONE production call site, so the replay is a second caller — never a forked fight. It must not touch
-  campaign state: no `winFinale`, no `starTourUnlocked`, recap returns to the map (`finaleUnlocked` is
-  `completed !== true`, which is exactly why the replay needs its own path).
+- **GS-story-startour-champions** — ⬅ **NEXT.** Star Tour offers your champions (one per golfer finished),
+  each with the bag/gear/caddy/ship they finished with; a champion ARMS Yggdrasil (Thor's Hammer still gates
+  Asgard itself — the player's call, so the Asgard reward keeps its meaning); and **the Serpent at the root**
+  replays the finale battle as Warden or Coil per that champion's `alignment`. Start by reading
+  `docs/decisions/story-campaign-slots.md` (the roster + picker that PRs 1–2 built underneath this).
+  - **Champion select.** `openStarTour` (`ui/game.ts`) already builds a developed champion — but off
+    `state.story?.completed`, i.e. whichever campaign happens to be loaded. It must read
+    `championCampaigns(currentRoster(state))` instead: **0 champions ⇒ today's character-first flow
+    byte-for-byte, 1 ⇒ straight to the map as now, 2+ ⇒ a champion picker.** The developed-loadout
+    composition (`applyStoryClubEffects(applyStoryCaddy(applyStoryGear(…)))`) is already there and tested —
+    reuse it, don't re-derive it. The chosen champion goes in `state.story` so the ~193 existing
+    `state.story` readers keep working; `championFreeRoam()` + `tourShipId()`
+    (`app/starTourScreens.ts`) already handle that shape.
+  - **NEVER LOCK ANYONE OUT OF A MODE THEY ALREADY EARNED.** `starTourUnlocked` is a PERMANENT main-save
+    flag and stays the gate. A player who completed the campaign under the old single-slot save and then
+    started over has the unlock but NO champion in the roster — they must still get Star Tour, on the
+    classic default-loadout flow. Champions are an enrichment of the mode, never a new gate on it.
+  - **Yggdrasil.** `yggdrasilArmed()` (`app/starTourScreens.ts`) is `ownedApparel.includes('thors-hammer')`;
+    widen it to `champion || hammer`. The hard hammer gate inside `playYggdrasilRealm` (`ui/game.ts`) STAYS —
+    that is what keeps Asgard behind the Asgard reward. The Root is NOT a realm: leave `YGGDRASIL_REALMS`
+    alone and add a bespoke section under it in `yggdrasilSheet()`.
+  - **The replay must not touch campaign state.** No `winFinale`, no `starTourUnlocked`, no persist; the
+    recap returns to the MAP, not the title. `finaleUnlocked` is `keyToOtherRealm && completed !== true` —
+    a finished campaign can't re-enter the real finale, which is exactly why the replay needs its own path
+    rather than a reuse of `openStoryFinale`/`engageStoryFinale`. The battle itself already takes
+    everything as options (`mountStoryBattle`: `won`/`loadout`/`shipId`/`herald`, `app.ts` ~3233) and has
+    ONE production call site, so this is a SECOND CALLER — never a forked fight. Mind the reduced-motion
+    branch, which skips the cinematic and dispatches the result directly; the replay needs its own.
+    `startAsgardRun` + `asgardFromStarTour` is the existing precedent for "launch from the map, return to
+    the map".
+  - **Open question to settle first:** Star Tour records (`strokePlayBest`) are per-COURSE and don't key on
+    loadout, so a champion with a full solar bag and a default-bag golfer write to the same board. That is
+    already true today for a single champion; multi-champion makes it routine. Decide whether the board
+    notes the champion, or leave scoring alone and log it as its own idea — do NOT quietly change record
+    keying as a side effect of this chunk.
 
 **GS-story-betrayal — the deep betrayal arc (design in `docs/decisions/story-betrayal-arc.md`)**
 Make the back half almost always DIFFERENT: the other three playable golfers become an aboard-ship CAST you
