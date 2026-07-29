@@ -6,7 +6,11 @@ import { questOfferable, questBeatPending } from '../src/sim/rpg/storyQuests';
 import { effectWindMult } from '../src/sim/rpg/effects';
 import { playerHoleOpts } from '../src/sim/rpg/run';
 import { hasStory, loadStory, writeStory, clearStory, exportStory, importStory } from '../src/save/storyStore';
-import { storyWorldServicesHTML } from '../src/app/storyServices';
+import { storyWorldServicesHTML, storyRecapServicesHTML, storyServiceBackLabel } from '../src/app/storyServices';
+import { tournamentForChapter } from '../src/sim/rpg/storyTournaments';
+import { worldHasShop } from '../src/sim/rpg/storyShop';
+import { worldIsShipVendor } from '../src/sim/rpg/storyShips';
+import type { StoryState } from '../src/sim/rpg/story';
 import type { UiState } from '../src/ui/gameState';
 
 /** Dismiss any arrival lore beat(s) so a test can reach the intro — the GS-story-early-beats pass gave the
@@ -434,12 +438,18 @@ describe('Story shop/vendor ACCESS — per-world, never a clubhouse buy-anything
     expect(reduce(hub, { type: 'openStoryShop', worldId: 'verdant-18' }).screen).toBe('story'); // no-op
   });
 
-  it('a ship-vendor world opens its shipyard from the recap (buy mode) and returns to the clubhouse', () => {
+  it('a vendor shipyard routes like the Pro Shop beside it — out to the STAR MAP from the recap too', () => {
+    // GS-story-venue-services: it used to return to the CLUBHOUSE from the recap while the Pro Shop button
+    // right above it flew to the chart, so on the handful of vendor worlds the recap's two services landed
+    // in two different places.
     const recap = afterClear('desert-18'); // desert-18 is the Ch.1 ship vendor
     const yard = reduce(recap, { type: 'openStoryShipyard', worldId: 'desert-18' });
     expect(yard.screen).toBe('storyShipyard');
     expect(yard.storyShipyardWorldId).toBe('desert-18');
-    expect(reduce(yard, { type: 'exitStoryShipyard' }).screen).toBe('story');
+    expect(yard.storyShipyardReturn).toBe('starTour');
+    expect(reduce(yard, { type: 'exitStoryShipyard' }).screen).toBe('starTour');
+    // and the shop at the same world agrees
+    expect(reduce(recap, { type: 'openStoryShop', worldId: 'desert-18' }).storyShopReturn).toBe('starTour');
   });
 
   it('opening a vendor shipyard refuses a non-vendor world and an uncleared world', () => {
@@ -455,6 +465,112 @@ describe('Story shop/vendor ACCESS — per-world, never a clubhouse buy-anything
     expect(hangar.screen).toBe('storyShipyard');
     expect(hangar.storyShipyardWorldId).toBeUndefined();
     expect(reduce(hangar, { type: 'exitStoryShipyard' }).screen).toBe('story');
+  });
+
+  // ── GS-story-venue-services: the SIGIL recap keeps you at the venue ──────────────────────────────
+  describe('the Sigil recap offers the venue’s services (GS-story-venue-services)', () => {
+    /** A campaign sitting on the just-finished major's recap. The venue is cleared win OR lose — the
+     *  resolver banks it through `recordWorldClear` either way. */
+    function sigilRecap(venueId: string, won: boolean, extra: Partial<StoryState> = {}): UiState {
+      const story: StoryState = {
+        ...defaultStoryState('feather-fade'),
+        chapter: 3,
+        credits: 4000,
+        clearedWorldIds: ['standrews-18', venueId],
+        ...extra,
+      };
+      return {
+        ...initState('seed', {}, undefined, story),
+        screen: 'storyTournamentResult' as const,
+        lastStoryTournament: {
+          chapter: 2,
+          name: 'The Ember Open',
+          venueId,
+          sigilName: 'The Ember Sigil',
+          prize: '',
+          rivalName: 'Venoma',
+          playerGross: won ? 70 : 74,
+          rivalGross: 72,
+          won,
+          finalSigil: false,
+        },
+      };
+    }
+
+    it('the Pro Shop opens from the recap and hands you BACK to it (the beat chain still has to run)', () => {
+      // inferno-18 (Orion Forge) is the Chapter-2 Sigil venue: a Pro Shop AND Dr Chipinski wait there.
+      for (const won of [true, false]) {
+        const recap = sigilRecap('inferno-18', won);
+        const shop = reduce(recap, { type: 'openStoryShop', worldId: 'inferno-18' });
+        expect(shop.screen).toBe('storyShop');
+        expect(shop.storyShopWorldId).toBe('inferno-18');
+        // A DETOUR, not a route: exiting returns to the recap so the ceremony / The Choice / the
+        // aftermath / the interlude are never skipped.
+        expect(shop.storyShopReturn).toBe('storyTournamentResult');
+        const back = reduce(shop, { type: 'exitStoryShop' });
+        expect(back.screen).toBe('storyTournamentResult');
+        expect(back.lastStoryTournament?.venueId).toBe('inferno-18');
+        // …and the continuation is intact from there.
+        expect(reduce(back, { type: 'storyTournamentContinue' }).screen).toBe('story');
+      }
+    });
+
+    it('a vendor Sigil venue opens its shipyard from the recap, back to the recap', () => {
+      const recap = sigilRecap('void2-18', true); // Sagittarius Core — a Ch.4 venue AND a ship vendor
+      const yard = reduce(recap, { type: 'openStoryShipyard', worldId: 'void2-18' });
+      expect(yard.screen).toBe('storyShipyard');
+      expect(yard.storyShipyardReturn).toBe('storyTournamentResult');
+      expect(reduce(yard, { type: 'exitStoryShipyard' }).screen).toBe('storyTournamentResult');
+    });
+
+    it('the friend who waits at a Sigil venue can be recruited from the recap', () => {
+      const recap = sigilRecap('inferno-18', true);
+      const hired = reduce(recap, { type: 'hireStoryCaddy', worldId: 'inferno-18', caddyId: 'dr-chipinski' });
+      expect(hired.story!.hiredCaddyIds).toContain('dr-chipinski');
+      expect(hired.screen).toBe('storyTournamentResult'); // recruiting doesn't leave the recap
+    });
+
+    it('the recap footer offers exactly what the world stocks — and refuses what it does not', () => {
+      const recap = sigilRecap('inferno-18', true);
+      const html = storyRecapServicesHTML(recap.story, 'inferno-18');
+      expect(html).toContain('openStoryShop');
+      expect(html).toContain('dr-chipinski');
+      expect(html).not.toContain('openStoryShipyard'); // Orion Forge sells no ships
+      // …and the reducer agrees: a shipyard dispatch at a non-vendor venue is a no-op.
+      expect(reduce(recap, { type: 'openStoryShipyard', worldId: 'inferno-18' }).screen).toBe('storyTournamentResult');
+      // An UNCLEARED world is refused from the recap too (the guard is the same everywhere).
+      expect(reduce(recap, { type: 'openStoryShop', worldId: 'crystal-18' }).screen).toBe('storyTournamentResult');
+    });
+
+    it('the detour is a DETOUR — it can’t tee off past the major’s beat chain', () => {
+      const recap = sigilRecap('inferno-18', true);
+      const shop = reduce(recap, { type: 'openStoryShop', worldId: 'inferno-18' });
+      // "Play this world again" would strand the ceremony / The Choice / the aftermath / the interlude.
+      expect(reduce(shop, { type: 'storyPlayWorld', courseId: 'inferno-18' })).toBe(shop);
+      // …while the same button off the normal star-map shop route still works.
+      const mapShop = { ...shop, storyShopReturn: 'starTour' as const };
+      expect(reduce(mapShop, { type: 'storyPlayWorld', courseId: 'inferno-18' }).screen).not.toBe('storyShop');
+    });
+
+    it('a service screen’s back button NAMES where it lands', () => {
+      // The label reads the stored return screen, so it can never promise the chart and deliver the
+      // clubhouse (which is exactly what the vendor shipyard used to do off the world-clear recap).
+      expect(storyServiceBackLabel('starTour')).toMatch(/star chart/i);
+      expect(storyServiceBackLabel('storyTournamentResult')).toMatch(/result/i);
+      expect(storyServiceBackLabel('story')).toMatch(/clubhouse/i);
+      expect(storyServiceBackLabel(undefined)).toMatch(/star chart/i); // the exit's own fallback
+    });
+
+    it('every Sigil venue in the game actually stocks something to spend on', () => {
+      // The whole point of the fix: a major is always played somewhere that sells you the next upgrade.
+      for (const chapter of [1, 2, 3, 4, 5]) {
+        for (const alignment of [undefined, 'warden', 'herald'] as const) {
+          const t = tournamentForChapter(chapter, alignment);
+          if (!t) continue;
+          expect(worldHasShop(t.venueId) || worldIsShipVendor(t.venueId)).toBe(true);
+        }
+      }
+    });
   });
 
   it('cross-nav (GS-story-shop-crossnav): shop ↔ shipyard ↔ caddy at the same world, loop-free', () => {
@@ -775,7 +891,7 @@ describe('The Choice + alignment fork (GS-story-chapters)', () => {
     const recap = {
       ...initState('seed', {}, undefined, story),
       screen: 'storyTournamentResult' as const,
-      lastStoryTournament: { chapter: 3, name: 'The Storm Championship', sigilName: 'The Storm Sigil', prize: '', rivalName: 'Venoma', playerGross: 70, rivalGross: 72, won: true, finalSigil: false },
+      lastStoryTournament: { chapter: 3, name: 'The Storm Championship', venueId: 'tempest-18', sigilName: 'The Storm Sigil', prize: '', rivalName: 'Venoma', playerGross: 70, rivalGross: 72, won: true, finalSigil: false },
     };
     // Continue from the Ch.3 recap → The Choice (not the clubhouse), because the path is unchosen.
     const choice = reduce(recap, { type: 'storyTournamentContinue' });
@@ -851,7 +967,7 @@ describe('The Choice + alignment fork (GS-story-chapters)', () => {
       ...initState('seed', {}, undefined, story),
       screen: 'storyTournamentResult' as const,
       // GS-story-sigil-rivals: the Drowning Rite rival is the severed FRIEND (here: Woo, the first tour-mate).
-      lastStoryTournament: { chapter: 4, name: 'The Drowning Rite', sigilName: 'The Drowned Sigil', prize: '', rivalName: 'Woo', playerGross: 70, rivalGross: 72, won: true, finalSigil: false },
+      lastStoryTournament: { chapter: 4, name: 'The Drowning Rite', venueId: 'ocean-18', sigilName: 'The Drowned Sigil', prize: '', rivalName: 'Woo', playerGross: 70, rivalGross: 72, won: true, finalSigil: false },
     };
     const interlude = reduce(recap, { type: 'storyTournamentContinue' });
     expect(interlude.screen).toBe('storyInterlude');

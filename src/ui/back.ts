@@ -39,6 +39,10 @@ export type BackIntent =
   /** Close the play screen's club picker (GS-hud-bag) — app-layer module state, like the settings
    *  sheet, so again there is no Action (tier 0). */
   | { kind: 'closeClubPicker' }
+  /** Close the star map's open sheet — a world dossier / the records board / the Yggdrasil realms
+   *  (GS-story-venue-services). Same shape as the two above: `starTourView` is app-layer module
+   *  state, so there is no Action to dispatch (tier 0). */
+  | { kind: 'closeStarMapSheet' }
   /** Go to this screen's parent by dispatching `action` (tier 1). */
   | { kind: 'navigate'; action: Action }
   /** A forward-only beat: absorb the press and do nothing (tier 2). */
@@ -55,6 +59,10 @@ export interface BackContext {
   settingsOpen?: boolean;
   /** The play screen's club picker sheet (GS-hud-bag) — module state in `app.ts` for the same reason. */
   clubPickerOpen?: boolean;
+  /** A star-map sheet is raised over the chart — a world dossier, the records board, the Yggdrasil
+   *  realms (`starTourView`, module state in `app.ts`). Back closes the sheet before it ever leaves
+   *  the map; without this, pressing back at an open dossier flew you home to the clubhouse. */
+  starMapSheetOpen?: boolean;
 }
 
 /**
@@ -170,6 +178,10 @@ export function backIntent(state: UiState, ctx: BackContext = {}): BackIntent {
   if (state.storyItemInspectId) return { kind: 'dismiss', action: { type: 'storyCloseItem' } };
   if (state.storyAllyInspectId) return { kind: 'dismiss', action: { type: 'storyCloseAlly' } };
   if (state.pendingFireCaddy) return { kind: 'dismiss', action: { type: 'cancelFireCaddy' } };
+  // The star map's sheets (world dossier / records board / Yggdrasil realms) are the last tier-0 layer:
+  // they are raised OVER the chart, so back closes the sheet and leaves you on the map. Guarded to the
+  // map screen so a stale flag can never swallow a back press anywhere else.
+  if (ctx.starMapSheetOpen && state.screen === 'starTour') return { kind: 'closeStarMapSheet' };
 
   return screenIntent(state);
 }

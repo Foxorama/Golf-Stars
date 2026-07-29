@@ -18,10 +18,9 @@ import { spaceportSceneHTML } from '../render/storySpaceport';
 import { STORY_CHAPTER_COUNT, PROLOGUE_COURSE_ID, worldCleared, type StoryState } from '../sim/rpg/story';
 import { currentTournament, tournamentForChapter, tournamentRival } from '../sim/rpg/storyTournaments';
 import { finaleUnlocked } from '../sim/rpg/storyFinale';
-import { worldHasShop } from '../sim/rpg/storyShop';
-import { worldIsShipVendor } from '../sim/rpg/storyShips';
-import { worldCaddy, storyCaddyHired, activeStoryCaddy, STORY_CADDY_PRICE } from '../sim/rpg/storyCaddies';
+import { activeStoryCaddy } from '../sim/rpg/storyCaddies';
 import { shopItem } from '../sim/rpg/economy';
+import { storyRecapServicesHTML } from './storyServices';
 import { staticCourseSpec } from '../sim/course/staticCourses';
 import { allyInspectOverlayHTML } from '../render/storyCrew';
 import { activeQuest, questWorld, questById, questGiverShortName, questRewardEffectLabel } from '../sim/rpg/storyQuests';
@@ -337,19 +336,6 @@ function spaceClubhouseHTML(story: StoryState): string {
     ${allyOverlay}`;
 }
 
-/** GS-story-caddies: the recap's recruit-a-friend row for the world just cleared (a caddy waits here) —
- *  recruit them, or note they're already aboard. Empty when no friend waits at this world. */
-function recapCaddyHTML(story: StoryState | undefined, courseId: string): string {
-  if (!story) return '';
-  const caddyId = worldCaddy(courseId);
-  if (!caddyId) return '';
-  const name = shopItem(caddyId)?.name ?? 'a friend';
-  if (storyCaddyHired(story, caddyId)) return `<div style="text-align:center;color:#7fe0a0;font-size:13px;">🎒 ${name} is already in your crew.</div>`;
-  // GS-story-quality (GAP1): the Herald can't recruit the Warden friends they turned on.
-  if (story.alignment === 'herald') return '';
-  return `<button class="gs-btn" style="background:linear-gradient(180deg,#22161f,#170f16);border-color:#6a3a52;color:#f0a8c8;" data-action='${JSON.stringify({ type: 'hireStoryCaddy', worldId: courseId, caddyId })}'>🎒 Recruit ${name} · ✦ ${STORY_CADDY_PRICE}</button>`;
-}
-
 /**
  * The world-round recap (GS-story-prologue). For now: the round score, credits earned, and — for the
  * prologue — the "you won the World Tour" beat. The Mothership landing + the Parrot's recruitment + the
@@ -508,9 +494,7 @@ export function storyResultScreen(): string {
               // always; ship-vendor worlds open their shipyard; a friend who waits here can be recruited) —
               // no need to fly back for the first visit. All guarded to a stocking world, so each only shows
               // where there's actually something to do.
-              `${worldHasShop(r.courseId) ? `<button class="gs-btn" data-action='${JSON.stringify({ type: 'openStoryShop', worldId: r.courseId })}'>🛒 Visit the Pro Shop</button>` : ''}
-             ${worldIsShipVendor(r.courseId) ? `<button class="gs-btn" data-action='${JSON.stringify({ type: 'openStoryShipyard', worldId: r.courseId })}'>🚀 Visit the Shipyard</button>` : ''}
-             ${recapCaddyHTML(state.story, r.courseId)}
+              `${storyRecapServicesHTML(state.story, r.courseId)}
              <button class="gs-btn" data-action='${JSON.stringify({ type: 'openStoryMap' })}'>🗺 Back to the star chart — fly on ›</button>
              <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'storyRoundContinue' })}'>🚀 Return to the clubhouse ›</button>`
       }

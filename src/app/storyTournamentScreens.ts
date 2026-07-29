@@ -8,7 +8,9 @@
 
 import { state, btn } from './ctx';
 import { getCharacter } from '../sim/rpg/characters';
-import { STORY_CHAPTER_COUNT, type StoryState } from '../sim/rpg/story';
+import { STORY_CHAPTER_COUNT, worldCleared, type StoryState } from '../sim/rpg/story';
+import { staticCourseSpec } from '../sim/course/staticCourses';
+import { storyRecapServicesHTML } from './storyServices';
 import { currentTournament, sigilCount, tournamentCompetitors, tournamentRival, tournamentIntroLines, isTeamTournament, isSinglesMatchTournament, isTeamMatchTournament, teamPartnerPool, type StoryTournament } from '../sim/rpg/storyTournaments';
 import {
   finaleMatchup,
@@ -478,7 +480,7 @@ export function storyTournamentResultScreen(): string {
       ${body}
     </section>
     ${scoreboardHTML(r)}
-    <div style="max-width:420px;margin:18px auto 0;">
+    <div style="display:flex;flex-direction:column;gap:10px;max-width:420px;margin:18px auto 0;">
       ${
         r.won
           ? // GS-story-sigil-ceremony: a win plays the spectacular Sigil→Keystone→serpent cinematic
@@ -486,8 +488,26 @@ export function storyTournamentResultScreen(): string {
             `<button class="gs-btn" data-sigil-ceremony="1">${r.finalSigil ? '🗝 Complete the Keystone ›' : '⟐ Set the Sigil into the Keystone ›'}</button>`
           : `<button class="gs-btn" data-action='${JSON.stringify({ type: 'storyTournamentContinue' })}'>Back to the clubhouse ›</button>`
       }
+      ${venueServicesHTML(r.venueId)}
     </div>
     ${TOURN_STYLE}`;
+}
+
+/**
+ * GS-story-venue-services: the major's recap keeps you AT the venue. Every Sigil venue stocks a Pro Shop,
+ * one is a ship vendor, and three host a friend — and the recap used to fly you straight home to the
+ * clubhouse, so restocking after the biggest payday in the campaign meant flying back across the galaxy.
+ * These are a DETOUR: the reducer routes them home to this recap (`storyShopReturn`), so the win's
+ * continuation chain — the Sigil ceremony, The Choice, the aftermath beat, the interlude — still runs.
+ * A loss gets them too: the recap's own copy says "sharpen your bag, arm your ship, take the rematch".
+ */
+function venueServicesHTML(venueId: string | undefined): string {
+  if (!venueId || !state.story || !worldCleared(state.story, venueId)) return '';
+  const links = storyRecapServicesHTML(state.story, venueId);
+  if (!links) return '';
+  return `<div class="gs-tourn-svc"><div class="gs-tourn-svc-hdr">Before you fly on — ${
+    staticCourseSpec(venueId)?.name ?? 'this venue'
+  }</div>${links}</div>`;
 }
 
 /** GS-story-tournament-field: the full "all competitors" scoreboard for the tournament recap — every
@@ -541,6 +561,10 @@ const TOURN_STYLE = `
     .gs-tsb-row--you td{background:linear-gradient(90deg,#1b2a1e,#132018);color:#9dffce;font-weight:800;}
     .gs-tsb-row--you .gs-tsb-pos{color:#7fe0a0;}
     .gs-tsb-row--rival td{color:#e6a6d6;}
+    /* GS-story-venue-services: the "spend before you fly on" footer under the recap's continue button */
+    .gs-tourn-svc{display:flex;flex-direction:column;gap:8px;padding-top:10px;margin-top:2px;border-top:1px solid #232b3b;}
+    .gs-tourn-svc-hdr{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+      color:var(--gs-dim,#9fb0c8);text-align:center;}
     /* the hype rival card */
     .gs-tourn-card{display:flex;gap:14px;align-items:stretch;background:linear-gradient(135deg,#1c1224,#120b16);
       border:1px solid #3a2440;border-left:3px solid #b060c0;border-radius:14px;padding:12px 14px;margin-bottom:12px;

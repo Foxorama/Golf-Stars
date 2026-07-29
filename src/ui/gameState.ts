@@ -328,6 +328,9 @@ export interface UiState {
   lastStoryTournament?: {
     chapter: number;
     name: string;
+    /** GS-story-venue-services: the world the major was played at — the recap offers ITS Pro Shop /
+     *  Shipyard / friend, so a win doesn't fly you home past the shop you just earned the credits for. */
+    venueId: string;
     sigilName: string;
     prize: string;
     rivalName: string;
