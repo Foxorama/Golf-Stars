@@ -196,6 +196,27 @@ focused tested auto-merged PR each:
 - **GS-story-parrot-bar** — ✅ *shipped* (the Parrot BAR interaction): "The Crow's Nest", a cosmetic Mothership hangout off the clubhouse — tap the Prognostic Parrot to cycle campaign-adaptive chatter (a state-appropriate greeting + rotating lore/Coil/path/hint lines gated on chapter/alignment/Sigils/completion). Content-as-data (`parrotBar.ts`) + a bespoke SVG cantina scene (porthole to space, neon sign, bottle shelf, the Parrot behind the bar reusing his lore bust). Transient tap counter, zero sim rng, no save bump.
 - **GS-story-balance** — ✅ *shipped* (the cross-chapter difficulty + economy pass): measured the rival ghost vs fixed to-par reference rounds → the late Sigils were a near-wall (a −6 round won ~13% by Ch5, a mandatory gate) with a Ch2→Ch3 cliff. Recalibrated the rival edges to a smooth ~1-stroke/chapter curve (0.07/0.12/0.18/0.23/0.29) so a grown −6 round wins ~77%→~38% Ch1→Ch5 (winnable-but-earned, growth matters, no cliffs), and added a Sigil-win milestone bonus (`SIGIL_WIN_BONUS` 250, first win only) so the majors fund the escalating spend (5 Sigils ≈ the ~1300cr finale floor). Guarded by `tests/story-balance.test.ts`. **Story Tour is feature-complete** (all chunks shipped).
 
+**GS-story-champions — carry a finished golfer into Star Tour (design in `docs/decisions/story-campaign-slots.md`)**
+Star Tour was unlocked by finishing Story Tour and connected to it in no other way: the champion free-roam
+reads the SINGLE live campaign, so starting a new Story Tour deleted the developed character you had earned.
+Three sequential PRs, save work first:
+- **GS-story-campaign-slots** — ✅ *shipped* (the save layer): `gs_story` holds a `CampaignStore` — one
+  campaign PER GOLFER — instead of one `StoryState`. A pre-roster save is ADOPTED as a one-slot roster (same
+  key, so the bundle's blob list is unchanged and nobody loses a campaign); a Star Tour champion IS that
+  golfer's completed slot, never a snapshot that can drift; `BACKUP_VERSION` → 2 so an older build refuses a
+  roster file loudly rather than restoring one mangled campaign. Guarded by `tests/story-roster.test.ts`.
+- **GS-story-campaign-picker** — Story Tour entry becomes a campaign PICKER (continue any saved golfer, or
+  start a new one), and picking a golfer who already has a campaign CONFIRMS the overwrite — naming what it
+  costs, and saying outright when it also replaces that golfer's Star Tour character (`campaignOverwriteWarning`
+  already returns exactly that, machine-checked to agree with what the write really does).
+- **GS-story-startour-champions** — Star Tour offers your champions (one per golfer finished), each with the
+  bag/gear/caddy/ship they finished with; a champion ARMS Yggdrasil (Thor's Hammer still gates Asgard itself),
+  and **the Serpent at the root** replays the finale battle as Warden or Coil per that champion's `alignment`.
+  The battle already takes everything it needs as options (`mountStoryBattle`: `won`/`loadout`/`shipId`/`herald`)
+  and has ONE production call site, so the replay is a second caller — never a forked fight. It must not touch
+  campaign state: no `winFinale`, no `starTourUnlocked`, recap returns to the map (`finaleUnlocked` is
+  `completed !== true`, which is exactly why the replay needs its own path).
+
 **GS-story-betrayal — the deep betrayal arc (design in `docs/decisions/story-betrayal-arc.md`)**
 Make the back half almost always DIFFERENT: the other three playable golfers become an aboard-ship CAST you
 partner with, and WHO betrays you is decided by your Sigil 1 & 2 partner picks. The five Sigils become

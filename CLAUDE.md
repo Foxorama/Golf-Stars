@@ -71,6 +71,20 @@ This game lives or dies on three axes — put every change through all three bef
   (localStorage is the only copy). Current schema is **v30**; bump + add a migration when you
   persist a new field. Loadouts are rebuilt from perk *ids* (`loadoutFromPerks`), so most
   run-state changes need NO save bump.
+  **`gs_story` holds ONE CAMPAIGN PER GOLFER** (GS-story-campaign-slots, `sim/rpg/storyRoster.ts` pure ·
+  `save/storyStore.ts` the localStorage half): a `CampaignStore` = `{version, campaigns: Record<characterId,
+  StoryState>, activeId?}`. One slot per golfer is the ONE decision the whole feature falls out of — four
+  golfers ⇒ four campaigns that can't touch each other, a **Star Tour champion IS that golfer's completed
+  slot** (never a second copy of a loadout to drift), and "starting over as a golfer you finished with
+  replaces your Star Tour character" stops being a rule and becomes a description of overwriting one slot.
+  SAME KEY as the old single campaign on purpose: `migrateCampaignStore` **adopts a pre-roster bare
+  `StoryState` as a one-slot roster**, so upgrading loses nobody's campaign and the bundle's blob list is
+  unchanged. Two traps: `writeStory` READ-MODIFY-WRITES the roster (a write built from stale memory drops
+  every other golfer — hence the `storyStore` cache, `invalidateCampaignCache()` after any outside write),
+  and it must **NOT move `activeId`** (Star Tour persists the champion it free-roams as after every action;
+  moving the pointer would hijack the Continue of a campaign you left mid-chapter — the pointer moves only
+  at `openStory` / campaign creation). `activeCampaign` never returns null while campaigns exist — a boot
+  path always has an answer; which one to resume is the PICKER's question. Guarded by `tests/story-roster.test.ts`.
   **A backup is a BUNDLE, not a save** (GS-save-transfer, `save/backup.ts` pure · `app/saveTransfer.ts`
   the localStorage/DOM half). Progress lives in THREE blobs (`gs_save` + `gs_story` + `gs_settings`) and
   localStorage is per-ORIGIN, so the website and the Capacitor shell (`https://localhost`) cannot see
@@ -79,7 +93,15 @@ This game lives or dies on three axes — put every change through all three bef
   **THROWS** (`BackupError`) on anything untrustworthy — never `importSave`'s swallow-and-return-
   `defaultSave()`, which is right for boot and catastrophic for an import (it would report success
   while wiping a real save). Import is two steps by construction: the pick PARSES + summarises, a
-  second tap writes. Guarded by `tests/save-backup.test.ts` + `tests/save-transfer-browser.test.ts`.
+  second tap writes. **`BACKUP_VERSION` is 2** — bumping when `story` became the `campaigns` roster is the
+  POINT, not a formality: an older build trips its own `version > BACKUP_VERSION` check and refuses with
+  "made by a newer version", whereas smuggling a roster through the old `story` field would have had it
+  hand the container to `migrateStory` and restore ONE mangled campaign while reporting success. A v1
+  bundle's single `story` folds into a one-slot roster on read, so every backup ever written still
+  restores. The import summary NAMES every campaign and marks champions — import replaces the whole
+  roster (never merges: a merge has to invent an answer for "both sides have a Feather Fade campaign"),
+  so the player must see what is about to go. Guarded by `tests/save-backup.test.ts` +
+  `tests/save-transfer-browser.test.ts`.
 - **Content as data, not code:** clubs, lies, biomes, items, economy, formats, characters, golfers,
   caddies, ships are tables the sim reads. **New world / item / golfer = a new row, not an engine edit.**
   Cutting/re-spreading the club taxonomy (`src/sim/clubs.ts CLUBS`) looks like a one-line edit but

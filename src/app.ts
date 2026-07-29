@@ -53,7 +53,7 @@ import {
   type UiState,
 } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
-import { loadStory } from './save/storyStore';
+import { loadStory, setActiveCampaignId } from './save/storyStore';
 import { defaultSave } from './save/schema';
 import { mountIntro } from './render/introView';
 import { mountStoryIntro } from './render/storyIntro';
@@ -629,6 +629,9 @@ function dispatch(action: Action): void {
     // The sector-scan sweep (GS-fuel-4) fires only on a scan that actually BURNT fuel — a refused
     // tap (dry tank, wrong screen) stays silent, so the sonar can never lie about a redraw.
     const prevScans = state.run.routeScans;
+    // GS-story-campaign-slots: `selectCharacter` creates a CAMPAIGN only when the character screen was
+    // opened for a new one — the flag is cleared by the reduce, so capture it first.
+    const prevPendingStoryNew = state.pendingStoryNew === true;
     setState(reduce(state, action));
     // Entering character select seeds the difficulty pickers (GS-title-2 / GS-golf-score). Ascension
     // defaults to the LAST tier you chose (persisted pref), clamped to what's now unlocked — so it
@@ -739,6 +742,14 @@ function dispatch(action: Action): void {
     }
     persist();
     persistStory(); // GS-story: write the campaign to its own gs_story blob when one is active
+    // GS-story-campaign-slots: `gs_story` holds a campaign PER GOLFER, so it also has to remember which
+    // one "Continue" resumes. The pointer moves only where the player has unambiguously chosen a
+    // campaign — entering Story Tour, or creating one — and never on the write-after-every-action,
+    // because Star Tour persists the champion it free-roams as and must not hijack a campaign you left
+    // half-way through.
+    if (state.story && (action.type === 'openStory' || (action.type === 'selectCharacter' && prevPendingStoryNew))) {
+      setActiveCampaignId(state.story.characterId);
+    }
     render();
     // The sector-scan sweep (GS-fuel-4): a radar beam climbs the fresh journey map and the redrawn
     // lanes pop in behind it. Called synchronously after render() (same task, before paint) so the

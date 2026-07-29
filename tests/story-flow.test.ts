@@ -5,7 +5,8 @@ import { defaultStoryState, REVISIT_CREDIT_MULT } from '../src/sim/rpg/story';
 import { questOfferable, questBeatPending } from '../src/sim/rpg/storyQuests';
 import { effectWindMult } from '../src/sim/rpg/effects';
 import { playerHoleOpts } from '../src/sim/rpg/run';
-import { hasStory, loadStory, writeStory, clearStory, exportStory, importStory } from '../src/save/storyStore';
+import { hasStory, loadStory, writeStory, clearStory, exportCampaigns, importCampaigns } from '../src/save/storyStore';
+import { emptyCampaignStore, upsertCampaign } from '../src/sim/rpg/storyRoster';
 import { storyWorldServicesHTML, storyRecapServicesHTML, storyServiceBackLabel } from '../src/app/storyServices';
 import { tournamentForChapter } from '../src/sim/rpg/storyTournaments';
 import { worldHasShop } from '../src/sim/rpg/storyShop';
@@ -1100,11 +1101,16 @@ describe('storyStore persistence (GS-story-save wiring)', () => {
     expect(() => clearStory()).not.toThrow();
   });
 
-  it('export/import round-trips a campaign through JSON', () => {
+  it('export/import round-trips the campaign roster through JSON', () => {
+    // GS-story-campaign-slots: the round-trip unit is the ROSTER, not a lone campaign — and it must
+    // survive with EVERY golfer's slot intact, which is the whole point of the container. Built
+    // directly rather than through the store, which is a no-op without localStorage (see above).
     const story = { ...defaultStoryState('feather-fade'), credits: 750, chapter: 2, trophyIds: ['a', 'b'] };
-    const json = exportStory(story);
-    const back = importStory(json);
-    expect(back).toEqual(story);
+    const other = { ...defaultStoryState('longshot-larry'), credits: 40, chapter: 1 };
+    const store = upsertCampaign(upsertCampaign(emptyCampaignStore(), story), other);
+    const back = importCampaigns(exportCampaigns(store));
+    expect(back.campaigns['feather-fade']).toEqual(story);
+    expect(back.campaigns['longshot-larry']).toEqual(other);
   });
 });
 

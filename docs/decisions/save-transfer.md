@@ -39,6 +39,12 @@ the failure a backup feature exists to prevent, so the file is an envelope:
   "save": { ... }, "story": { ... } | null, "settings": { ... } | null }
 ```
 
+> **Superseded at `version: 2`** (GS-story-campaign-slots, `story-campaign-slots.md`): `story` — one
+> campaign — became `campaigns`, the per-golfer roster `gs_story` now holds. A v1 file's single
+> campaign folds into a one-slot roster on read, so everything written under the shape above still
+> restores. The bump is deliberate: it makes an older build **refuse** a v2 file loudly instead of
+> handing the roster to `migrateStory` and silently restoring one mangled campaign.
+
 `version` here is the **envelope's**, independent of `SAVE_VERSION`; the save inside carries its own
 and rides the existing `migrate()` chain on import. **A new persisted blob must join the bundle**, or
 it is lost on every transfer — that's the rule this file exists to state.
