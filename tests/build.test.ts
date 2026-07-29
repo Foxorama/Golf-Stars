@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { GAME_TITLE } from '../src/brand';
+import { findChromium as findChromiumShared } from './chromium';
 
 /**
  * Guards the BUILT ARTIFACT, not just the source — this is the class of failure that
@@ -75,27 +76,7 @@ describe('build output (regression guards)', () => {
 // playwright-core's expected revision differs from what got downloaded). Checking the
 // directory alone made `runIf` lie and the launch hard-fail in CI; verifying the binary
 // lets the test SKIP cleanly when Chromium isn't genuinely installed, and run when it is.
-function findChromium(): string | null {
-  const bases = [
-    process.env.PLAYWRIGHT_BROWSERS_PATH,
-    '/opt/pw-browsers',
-    process.env.HOME ? `${process.env.HOME}/.cache/ms-playwright` : undefined,
-  ].filter(Boolean) as string[];
-  for (const base of bases) {
-    let dirs: string[];
-    try {
-      dirs = readdirSync(base).filter((x) => x.startsWith('chromium-') && !x.includes('headless'));
-    } catch {
-      continue; // not this dir
-    }
-    for (const d of dirs) {
-      const bin = `${base}/${d}/chrome-linux/chrome`;
-      if (existsSync(bin)) return bin;
-    }
-  }
-  return null;
-}
-const chromePath = findChromium();
+const chromePath = findChromiumShared();
 
 describe('build output (real browser)', () => {
   it.runIf(chromePath)(
@@ -486,7 +467,16 @@ describe('build output (real browser)', () => {
         await page.waitForSelector('[data-gs-storyfinale]', { state: 'detached', timeout: 6000 });
         await page.waitForSelector('.gs-storyres', { timeout: 4000 });
         const txt = await page.evaluate(() => document.getElementById('app')?.textContent ?? '');
-        const done = await page.evaluate(() => JSON.parse(localStorage.getItem('fc_story') || '{}').completed);
+        // The blob is a ROSTER, not a bare campaign (GS-story-campaign-slots): one StoryState per
+        // golfer under `campaigns`, so `completed` is never a top-level field. This assertion read
+        // it as one and had been quietly comparing `undefined` to `true` — it went unnoticed because
+        // this whole block was skipping everywhere, CI included (GS-browser-test-gate).
+        const done = await page.evaluate(() => {
+          const roster = JSON.parse(localStorage.getItem('fc_story') || '{}') as {
+            campaigns?: Record<string, { completed?: boolean }>;
+          };
+          return Object.values(roster.campaigns ?? {}).some((c) => c.completed === true);
+        });
         expect(errors, `pageerror: ${errors[0] ?? ''}`).toEqual([]);
         expect(txt).toContain('Star Tour is unlocked');
         expect(done).toBe(true);

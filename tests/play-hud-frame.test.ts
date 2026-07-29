@@ -14,23 +14,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { playFrameHTML, type PlayFrameMode } from '../src/app/playFrame';
+import { findChromium as findChromiumShared } from './chromium';
 
 const dist = resolve(__dirname, '../dist/index.html');
-const chromePath = (() => {
-  for (const p of [
-    process.env.CHROME_PATH,
-    '/opt/pw-browsers/chromium',
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/google-chrome',
-  ]) {
-    if (p && existsSync(p)) return p;
-  }
-  return null;
-})();
+const chromePath = findChromiumShared();
 
 /** The frame's five fixed regions. Every play state must mount every one of them. */
 const REGIONS = [
