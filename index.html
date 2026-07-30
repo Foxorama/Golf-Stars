@@ -2151,6 +2151,28 @@
         font-size: 10.5px; opacity: .65; margin-top: 3px; overflow-wrap: anywhere;
         display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
       }
+      /* GS-save-slots: the "you already have a run going" row. `flex-wrap` + `min-width:0` rather than
+         a breakpoint — at 1.45x the badge and the ghost restart can't share a line on a 375px phone,
+         and a media query is blind to the root zoom (GS-a11y-readable-text). */
+      .gs-charcard-slot {
+        flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -2px 0 2px;
+      }
+      .gs-charcard-slotbadge {
+        min-width: 0; font-size: 10.5px; font-weight: 800; letter-spacing: .03em; padding: 2px 9px;
+        border-radius: 999px; color: var(--cc); background: color-mix(in srgb, #0d1018 78%, var(--cc));
+        border: 1px solid color-mix(in srgb, var(--cc) 55%, transparent); overflow-wrap: anywhere;
+      }
+      .gs-charcard-restart {
+        min-width: 0; font-size: 10.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px;
+        color: var(--gs-dim); background: transparent; border: 1px solid var(--gs-line);
+        cursor: pointer; overflow-wrap: anywhere;
+      }
+      .gs-charcard-restart:hover, .gs-charcard-restart:focus-visible {
+        color: var(--gs-ink); border-color: color-mix(in srgb, var(--gs-warn) 60%, transparent);
+      }
+      /* Same reason as the portrait: a control nested inside the card button needs its own ring, or
+         Tab moving from "pick this golfer" to "bin their run" is invisible. */
+      .gs-charcard-restart:focus-visible { outline: 2px solid var(--gs-info); outline-offset: 2px; }
       .gs-charcard-blurb { flex: 0 0 auto; font-size: 12.5px; opacity: .9; margin: 0; line-height: 1.45; }
       /* Phone-sized cards: the one-line ✓ strength · ▲ quirk hint stands in for the blurb + full
          pros/cons list, which come back at desktop width (same markup, media-query visibility). */

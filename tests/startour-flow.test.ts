@@ -7,6 +7,7 @@ import { ASGARD_FORMAT } from '../src/sim/rpg/formats';
 import { starTourMapSVG, worldPos, EARTH_POS, YGGDRASIL_REALMS, hoverBank, HOVER_BANK_MAX, SHIP_DOCK_HEADING, type StarTourWorld } from '../src/render/starTourMap';
 import { SHIPS, shipById } from '../src/sim/rpg/ships';
 import { defaultStoryState } from '../src/sim/rpg/story';
+import { readSlot } from '../src/sim/rpg/runSlots';
 
 /** Drive a Star Tour round to the strokeResult recap (openStarTour → CHARACTER → star map → pick a
  *  course → intro → play 18 → holeComplete×18). Character select comes FIRST (GS-star-tour-2). */
@@ -64,15 +65,17 @@ describe('Star Tour reducer flow (GS-star-tour-2)', () => {
     // Back to the title — the run parks as a resumable snapshot carrying the hole + scorecard.
     s = reduce(s, { type: 'toTitle' });
     expect(s.screen).toBe('title');
-    expect(s.resumable!.stopHoleIndex).toBe(5);
-    expect(s.resumable!.stopPlayed).toHaveLength(5);
+    const parked = readSlot(s.runSlots, 'startour', CHARACTERS[0]!.id)!;
+    expect(parked.stopHoleIndex).toBe(5);
+    expect(parked.stopPlayed).toHaveLength(5);
+    expect(s.lastPlayed).toEqual({ mode: 'startour', characterId: CHARACTERS[0]!.id });
     // Continue — lands straight back on the 6th hole (index 5), still playing, card restored (NOT the
     // 1st tee, which the old restart-the-stop resume would have done).
     s = reduce(s, { type: 'resume' });
     expect(s.screen).toBe('playing');
     expect(s.play!.holeIndex).toBe(5);
     expect(s.stopPlayed).toHaveLength(5);
-    expect(s.resumable).toBeUndefined();
+    expect(s.runSlots).toEqual({});
     // Finishing out still banks a full 18-hole record.
     guard = 0;
     while (s.screen === 'playing' && guard++ < 300) {

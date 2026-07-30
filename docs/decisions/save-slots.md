@@ -1,9 +1,11 @@
 # Save slots — one run per mode, per golfer (GS-save-slots)
 
-> **Status: DESIGNED, NOT BUILT.** This is the brief for the work, written while the analysis was
-> fresh. Read it before touching `persist.ts`, `toTitle`, or anything that decides what "resume"
-> means. One bug from the same root is already fixed (GS-story-switch-clobber, #662); the other is
-> deliberately left for this redesign to subsume rather than patched twice.
+> **Status: BUILT.** All four steps shipped in one pass — the slot table + save v33, the one
+> resumable rule, the title CONTINUE + per-mode picker, and mid-stop resume in every parked mode.
+> The brief below is preserved as written (it is still the best statement of *why*); **what actually
+> shipped, and the three things the build learned that the brief did not know, are recorded at the
+> bottom under "What shipped".** Read both before touching `persist.ts`, `toTitle`, `runSlots.ts` or
+> anything that decides what "resume" means.
 
 ## The problem, in one line
 
@@ -22,7 +24,8 @@ PARAMETER precisely so every mode could use it. The groundwork is done; it was j
 
 Both are the same shape: **two places describing one decision, disagreeing.**
 
-1. **`toTitle` clobbers the parked run with a Story round.** `persist.ts` is careful —
+1. **`toTitle` clobbers the parked run with a Story round.** *(Now FIXED — see "What shipped".)*
+   `persist.ts` is careful —
    `state.run.storyRound` and `ASGARD_FORMAT` both pass `state.resumable` through instead of
    snapshotting. `toTitle` (`ui/game.ts`) has neither check, so it overwrites `state.resumable`
    *itself*, and `persist` then faithfully writes it. Park a Voyage, play a Story world, hit Back to
@@ -127,11 +130,82 @@ Steps 1–2 are safe to land without touching a screen; 3 is where it becomes vi
 
 This file, and:
 
-- `src/app/persist.ts` — `persist()` and `roundProgress()`, the current single-slot writer.
-- `src/ui/game.ts` — `toTitle` (~2355), `currentRoster` (~228), and the `storyOverwriteId` guards
-  around `selectCharacter` / `storyRestartCampaign` (~299–615) that become the universal pattern.
-- `src/sim/rpg/storyRoster.ts` — the shape to copy (`upsertCampaign`, `campaignTag`,
+- `src/sim/rpg/runSlots.ts` — the pure slot table: mode derivation, keys, upsert/read/clear, badges,
+  the overwrite warning, and the defensive re-keying migration.
+- `src/ui/resumable.ts` — **the one function**: `resumableState`, plus `resumeCost`/`liveRoundProgress`.
+- `src/app/persist.ts` — `persist()` + `metaFromSave`, both now thin mappers.
+- `src/ui/game.ts` — `resume`, `toTitle`, `selectCharacter`'s overwrite guard, `buildMatch`,
+  `modeSlotTags`.
+- `src/sim/rpg/storyRoster.ts` — the shape this was copied from (`upsertCampaign`, `campaignTag`,
   `campaignOverwriteWarning`, `migrateCampaignStore`).
-- `src/save/storyStore.ts` — the read-modify-write + cache discipline the new table needs too.
 - `src/sim/rpg/run.ts` — `snapshotRun` / `RoundProgress`.
-- CLAUDE.md's save bullets, and `docs/decisions/story-campaign-slots.md`.
+- `tests/save-slots.test.ts` — the guard. CLAUDE.md's save bullets, and
+  `docs/decisions/story-campaign-slots.md`.
+
+---
+
+## What shipped
+
+**The model, as designed.** `fc_save.runSlots` is `Record<'${mode}:${characterId}', RunSnapshot>` over
+`voyage | endless | startour`; `fc_save.lastPlayed` is `{ mode, characterId }` and its `mode` MAY be
+`'story'`. `fc_story` is untouched. Save **v33** removes `activeRun` outright rather than keeping it
+alongside — two descriptions of "the resumable run" is the bug the version exists to close, and
+deleting the field makes every reader fail to compile until it moves. The migration files the existing
+snapshot under its own format's mode + golfer and points `lastPlayed` at it, so nobody loses a run and
+a returning player's Continue button offers exactly what it offered before. No `BACKUP_VERSION` bump:
+the bundle carries the save's own version, so every backup ever written still restores.
+
+**The one function is `resumableState(state)` in `src/ui/resumable.ts`.** `persist()` and `toTitle`
+both call it and neither re-derives anything — machine-checked by a source scan that also forbids
+`snapshotRun` from reappearing in `persist.ts`, because building its own snapshot is exactly what let
+the two disagree. Five cases, each a rule rather than an exception: Asgard parks `asgardReturn` (never
+the tournament), a story round moves only the pointer, a finished run gives up its slot, a run with
+nothing worth continuing leaves the slots alone, and anything else parks in its own slot.
+
+**Three things the brief did not know:**
+
+1. **`storyRound` has to outrank the format.** A Story world round is played on `STROKEPLAY_FORMAT`
+   (it is a pinned static course), so deriving the mode from the format alone would file it under Star
+   Tour — and a campaign round would overwrite a parked free-roam round. `runModeOf(formatId,
+   storyRound)` checks the flag first.
+2. **"Nothing worth continuing" had to become a predicate, not a special case.** Opening the star map
+   builds a strokeplay run with a golfer and no course, and under the old single-slot code that
+   snapshot silently overwrote the parked offer. `slotTag()` returns `null` for it — the same
+   predicate the title card and the picker badge use — so all three agree about whether a slot is
+   real, and merely opening a mode can no longer eat the run parked in it.
+3. **A confirmed start-over must empty the slot THERE AND THEN.** Waiting for the new run to overwrite
+   it is not the same thing: a fresh Star Tour run has no course pinned, so there is nothing worth
+   parking yet and the old round would sit there — still offered — after the player had explicitly
+   agreed to bin it.
+
+**Step 4 landed in full, and the "prove it or fall back" table came out easier than feared** — because
+almost everything a stop needs is DERIVED rather than remembered. The course comes from the run's own
+seed/stop/theme/event; the cut and competition field are computed inside `finishStop` from `run` +
+`stopPlayed`; the endless per-set allowance from `run.holesSurvived` + the same cards; `run.history`
+was already snapshotted (GS-voyage-field); and the qualifier plan is a pure hash off `campaignSeed`.
+The only genuinely stateful case was the **matchplay boss**, and `buildMatch(run, course, played)` —
+now shared by `playInteractive` AND the resume, so they cannot drift — rebuilds it: the opponent from
+the run, the boss's whole card from its own private `:boss` stream (never the play stream, so it is
+byte-identical whenever rebuilt), and the duels by folding the cards the player actually banked.
+
+⚠️ **`partnerHoles` is the one thing that cannot be rebuilt.** A best-ball partner's ball is drawn
+from the PLAY stream, interleaved with the player's shots, and a resume reseeds that stream. It is
+padded to the right LENGTH with the banked cards instead — bookkeeping only, because the reveal reads
+`partnerHoles[holeIndex]` (always written fresh by `withBestBallPartner`) and the SCORES for finished
+holes are already in `stopPlayed`, where the better ball was banked at the time. Without the padding
+the array silently misaligns and every later reveal shows somebody else's card.
+
+**Resuming on the hole is strictly LESS forgiving than what it replaced**, which is worth knowing
+before anyone worries about save-scumming: the old rule replayed the whole stop, handing back every
+hole. The new one keeps the card and re-tees only the hole in progress. The play stream is reseeded
+(its position is not persisted), so the holes still to come draw a fresh dispersion stream — nothing
+already banked is re-rolled, and the headless auto sim, the thing determinism is guarded for, never
+takes this path.
+
+**Every exit says the rule, in one sentence, from one place.** `resumePromise(state)` reads
+`resumeCost`, and both the back-button confirm (`exitPrompt`) and the settings sheet's
+return-to-title footer print it — the footer used to promise only a vague "continue it any time"
+while the confirm beside it named the rule. Three honest answers: `hole` for every parked mode,
+`world` for a Story round (the campaign is saved, the round is not — it owns no slot), `forfeit` for
+Asgard. A uniform promise is what the player is owed; a uniform *lie* is not an acceptable way to get
+one.

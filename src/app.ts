@@ -51,6 +51,7 @@ import { endlessScoreCard } from './render/endlessCards';
 import {
   asgardFieldEdge,
   initState,
+  modeSlotTags,
   reduce,
   type Action,
   type UiState,
@@ -182,7 +183,10 @@ function boot(): void {
     const campaigns = loadCampaignStore();
     // Always land on the title screen; a saved run is offered as "Continue", never
     // auto-resumed — so the format choice is always reachable.
-    setState(initState(seed, meta, save.activeRun, story, campaigns));
+    // GS-save-slots: the parked runs ride `meta` (`runSlots` + `lastPlayed`) now that there is a table
+    // rather than one snapshot, so the lone-run argument is `undefined` here — boot has nothing single
+    // to hand over.
+    setState(initState(seed, meta, undefined, story, campaigns));
     applyDebugParams(); // GS-asgard: test-hub-only `?rainbow=` / `?asgard=` jumps (dormant in the live game)
     // A rotate / desktop window resize changes the play map's frame (GS-play-fullframe). Re-render so
     // the SVG is rebuilt at the new aspect instead of meet-fitting black bands back in. rAF-throttled,
@@ -3013,6 +3017,12 @@ function render(): void {
           // Per-golfer Ascension-clear ladder (GS-ascension-clubs display) — drives each Voyage card's
           // "does a win here unlock a new club?" badge. Voyage-only (endless grants no club unlocks).
           unlockLadder: getFormat(state.run.formatId).winnable ? state.maxAscensionByCharacter : undefined,
+          // GS-save-slots: the badges for the mode BEING ENTERED — resolved here and passed in, never
+          // fetched by the renderer, because this screen is shared with every mode (the rule
+          // `campaignTags` already ships under). The mode comes from the run's format, the same
+          // derivation the reducer's overwrite guard uses.
+          slotTags: modeSlotTags(state),
+          overwriteId: state.slotOverwriteId,
         }) + charLoreOverlay
       : state.screen === 'intro'
       ? introScreen()

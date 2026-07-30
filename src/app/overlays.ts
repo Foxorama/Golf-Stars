@@ -6,7 +6,7 @@
  */
 
 import { state } from './ctx';
-import { exitPrompt } from '../ui/back';
+import { exitPrompt, resumePromise } from '../ui/back';
 import { teamDuel, teamPartnerChar } from './duelHud';
 import { getCharacter } from '../sim/rpg/characters';
 import { storyPartnerName } from '../sim/rpg/storyPartners';
@@ -179,7 +179,10 @@ export function settingsSheetInner(): string {
       ? ''
       : `<div class="gs-setfoot">
           <button class="gs-setrow gs-setrow--nav" data-settings-home="1">
-            <span class="gs-setlabel"><b>🏠 Return to title</b><span>${midRun ? 'Your run is saved — continue it any time' : 'Back to the main menu'}</span></span>
+            <!-- GS-save-slots: EVERY exit says what leaving costs, in the same words — this footer is a
+                 second way out of a round that used to promise only a vague "continue it any time",
+                 while the back-button confirm beside it named the rule. Both read \`resumePromise\`. -->
+            <span class="gs-setlabel"><b>🏠 Return to title</b><span>${midRun ? resumePromise(state) : 'Back to the main menu'}</span></span>
             <span style="font-size:16px;opacity:.6;" aria-hidden="true">→</span>
           </button>
         </div>`;

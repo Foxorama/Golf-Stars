@@ -21,6 +21,7 @@ import type { ReputationByCharacter } from '../sim/rpg/factions';
 import type { SeenLore } from '../sim/rpg/lore';
 import type { StoryState } from '../sim/rpg/story';
 import type { CampaignStore } from '../sim/rpg/storyRoster';
+import type { LastPlayed, RunMode, RunSlots } from '../sim/rpg/runSlots';
 import type { FriendRivalVoice } from '../sim/rpg/storyBetrayal';
 import type { MidroundOmen } from '../sim/rpg/storyMidround';
 import type { TournamentAftermath } from '../sim/rpg/storyAftermath';
@@ -122,8 +123,20 @@ export interface UiState {
   shopRerolls?: number;
   /** Which hole the play view is showing (0-based). */
   viewHole: number;
-  /** A saved in-progress run that the title screen can resume, if any. */
-  resumable?: RunSnapshot;
+  /** Every parked run, one slot per MODE per GOLFER (GS-save-slots) — `mode:characterId → snapshot`.
+   *  This replaced the single `resumable` snapshot that Voyage, Unending and Star Tour fought over.
+   *  Story Tour has a mode but no slot: its progress is the `fc_story` campaign roster. */
+  runSlots: RunSlots;
+  /** The last mode + golfer played (GS-save-slots) — what the title's CONTINUE offers, and why it can
+   *  NAME the mode before you tap it. `mode` may be `'story'`, in which case the thing to continue is
+   *  that golfer's campaign rather than a slot. */
+  lastPlayed?: LastPlayed;
+  /** The golfer whose parked run the player has asked to START OVER (GS-save-slots) — the picker's
+   *  overwrite confirmation, generalised from `storyOverwriteId` to every mode. While set, and ONLY
+   *  while set, `selectCharacter` may replace that golfer's slot for the mode being entered; without
+   *  it, tapping a golfer who already has a run CONTINUES it. The guard lives in the reducer so no
+   *  surface can route around it — which is exactly how #662 happened. */
+  slotOverwriteId?: string;
   // --- interactive shot-by-shot play (the 'playing' screen) ---
   /** Current hole being played interactively. */
   play?: HolePlay;
@@ -506,7 +519,15 @@ export type Action =
   | { type: 'start'; format: string; ascension?: number }
   | { type: 'selectCharacter'; characterId: string; ascension?: number; bagTier?: BagTier } // pick a golfer (+ their Ascension tier for a voyage / starting club set for the Unending Universe), then begin the run
   | { type: 'backToCharacter' } // GS-intro-split: from the stop intro, step back to re-pick the golfer
-  | { type: 'resume' }
+  // GS-save-slots: continue a parked run. Bare (the title's CONTINUE card) resumes whatever
+  // `lastPlayed` points at; naming a mode + golfer resumes THAT slot — which is what the per-mode
+  // golfer picker dispatches when you tap a card that already has a run going.
+  | { type: 'resume'; mode?: RunMode; characterId?: string }
+  // GS-save-slots: the picker's start-over confirm, the twin of `storyRequestRestart`. Asking raises
+  // the card; cancelling drops it; only while it names a golfer may `selectCharacter` overwrite that
+  // golfer's slot for the mode being entered.
+  | { type: 'slotRequestRestart'; characterId: string }
+  | { type: 'slotCancelRestart' }
   | { type: 'play' } // auto-play the whole stop (watch)
   | { type: 'warpStop' } // GS-warp: fast-forward this stop under the hidden auto-birdie rule
   | { type: 'playInteractive' } // play shot-by-shot
@@ -671,4 +692,9 @@ export interface MetaProgress {
   /** Star Shards refunded by the GS-trade-rebalance 40% Trade Market price cut — set by the save
    *  migration, drives the one-off "prices dropped, here's your refund" notice. */
   priceRefund?: number;
+  /** Every parked run (GS-save-slots) and the CONTINUE pointer, straight off the save. They ride
+   *  `MetaProgress` rather than a positional `initState` argument for the reason the whole file
+   *  exists: a persisted field should be mapped in ONE place (`app/persist.ts`), not two. */
+  runSlots?: RunSlots;
+  lastPlayed?: LastPlayed;
 }

@@ -17,8 +17,17 @@ import { APPAREL } from '../sim/rpg/apparel';
 import type { CosmeticRarity } from '../sim/rpg/cosmetics';
 import { CHARACTERS } from '../sim/rpg/characters';
 import type { ReputationByCharacter } from '../sim/rpg/factions';
+import {
+  migrateLastPlayed,
+  migrateRunSlots,
+  slotKey,
+  slotModeOf,
+  UNKNOWN_GOLFER,
+  type LastPlayed,
+  type RunSlots,
+} from '../sim/rpg/runSlots';
 
-export const SAVE_VERSION = 32;
+export const SAVE_VERSION = 33;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -492,8 +501,33 @@ export type SaveV32 = Omit<SaveV31, 'version'> & {
   serpentWins: number;
 };
 
+/** v33 replaces the single `activeRun` with the RUN SLOT TABLE (GS-save-slots): one parked run per
+ *  MODE, per GOLFER (`runSlots`), plus the `lastPlayed` pointer the title's CONTINUE reads.
+ *
+ *  There was ONE resumable run slot and four modes fought over it — starting anything discarded
+ *  whatever else was parked, and `toTitle` and `persist` disagreed about the one exception carved out
+ *  to protect it (a Story world round), which is how a parked Voyage could be lost by playing a Story
+ *  world and tapping Back. `activeRun` is REMOVED rather than kept alongside: two descriptions of
+ *  "the resumable run" is the bug this whole version exists to close, and dropping the field makes
+ *  every reader fail to compile until it is moved.
+ *
+ *  The migration is unusually clean — the existing snapshot becomes ONE entry keyed by its own
+ *  format's mode + `loadout.characterId`, and `lastPlayed` points at it, so nobody loses anything and
+ *  a returning player's Continue button says exactly what it said before. `fc_save` is already in the
+ *  backup bundle and the bundle carries the save's own version, so no `BACKUP_VERSION` bump is
+ *  needed (GS-save-transfer): every backup ever written still restores. */
+export type SaveV33 = Omit<SaveV32, 'version' | 'activeRun'> & {
+  version: 33;
+  /** `mode:characterId → the run parked there` (voyage | endless | startour). Story Tour's progress
+   *  stays in `fc_story`, which already has this shape. */
+  runSlots: RunSlots;
+  /** The last mode + golfer played — what CONTINUE offers. `mode` may be `'story'`. Absent on a save
+   *  that has never played anything. */
+  lastPlayed?: LastPlayed;
+};
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV32;
+export type Save = SaveV33;
 
 export function defaultSave(): Save {
   return {
@@ -527,6 +561,7 @@ export function defaultSave(): Save {
     starTourUnlocked: false,
     serpentBouts: 0,
     serpentWins: 0,
+    runSlots: {},
   };
 }
 
@@ -956,6 +991,26 @@ function v31ToV32(s: SaveV31): SaveV32 {
   return { ...s, version: 32, serpentBouts: 0, serpentWins: 0 };
 }
 
+/** v32 → v33: the single `activeRun` becomes ONE run slot (GS-save-slots), keyed by its own format's
+ *  mode + golfer, with `lastPlayed` pointing at it. Nobody loses a run: the parked snapshot is the
+ *  same object, filed rather than replaced, so a returning player's Continue button offers exactly
+ *  what it offered before — it just no longer sits in a slot three other modes can overwrite.
+ *
+ *  A snapshot with no `characterId` (a v1-era run, from before golfers existed) is keyed under the
+ *  empty string rather than dropped; an Asgard snapshot — which should never have been parked — has
+ *  no mode and is discarded, which is what the live code already does with it. */
+function v32ToV33(s: SaveV32): SaveV33 {
+  const { activeRun, ...rest } = s as SaveV32 & { activeRun?: RunSnapshot };
+  const mode = activeRun ? slotModeOf(activeRun) : null;
+  if (!activeRun || !mode) return { ...rest, version: 33, runSlots: {} };
+  return {
+    ...rest,
+    version: 33,
+    runSlots: { [slotKey(mode, activeRun.characterId)]: activeRun },
+    lastPlayed: { mode, characterId: activeRun.characterId ?? UNKNOWN_GOLFER },
+  };
+}
+
 /**
  * Migrate an unknown persisted blob up to the current version, one step at a time. Each
  * future version bump adds another `if (s.version === N)` step in sequence.
@@ -995,6 +1050,7 @@ export function migrate(raw: unknown): Save {
   if (s.version === 29) s = v29ToV30(s as unknown as SaveV29) as unknown as typeof s;
   if (s.version === 30) s = v30ToV31(s as unknown as SaveV30) as unknown as typeof s;
   if (s.version === 31) s = v31ToV32(s as unknown as SaveV31) as unknown as typeof s;
+  if (s.version === 32) s = v32ToV33(s as unknown as SaveV32) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // Unknown / unsupported version: start clean rather than guess at a shape.
@@ -1002,7 +1058,7 @@ export function migrate(raw: unknown): Save {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v14 = s as unknown as Partial<SaveV32>;
+  const v14 = s as unknown as Partial<SaveV33>;
   const ownedShips = v14.ownedShips && v14.ownedShips.length ? v14.ownedShips : [DEFAULT_SHIP_ID];
   const ownedApparel = v14.ownedApparel ?? [];
   const bagTier: BagTier = v14.bagTier ?? 'common';
@@ -1050,7 +1106,11 @@ export function migrate(raw: unknown): Save {
     serpentBouts: Math.max(0, Math.floor(Number(v14.serpentBouts) || 0)),
     serpentWins: Math.max(0, Math.floor(Number(v14.serpentWins) || 0)),
     priceRefund: typeof v14.priceRefund === 'number' && v14.priceRefund > 0 ? v14.priceRefund : undefined,
-    activeRun: v14.activeRun,
+    // GS-save-slots: the run-slot table + the CONTINUE pointer. Both re-derived from the blob rather
+    // than trusted — `migrateRunSlots` re-keys each entry off the snapshot's own format + golfer, so a
+    // hand-edited key can't file a Voyage under Star Tour and have the picker offer it there.
+    runSlots: migrateRunSlots(v14.runSlots),
+    lastPlayed: migrateLastPlayed(v14.lastPlayed),
     savedAt: v14.savedAt,
   };
 }
