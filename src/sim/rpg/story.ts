@@ -22,9 +22,10 @@ import { clubSetById, buildRewardClub } from './economy';
 import type { CourseEffectId } from './effects';
 import { DEFAULT_CHARACTER_ID } from './characters';
 import { DEFAULT_SHIP_ID } from './ships';
+import type { RoundProgress } from './runSerialise';
 
 /** Current Story-Mode save version. Bump + add a `migrateStory` step when persisting a new field. */
-export const STORY_VERSION = 7;
+export const STORY_VERSION = 8;
 
 /** The player's PATH (GS-story-chapters) — chosen at The Choice after Chapter 3. `warden` re-consecrates
  *  and protects (redeem Venoma); `herald` desecrates and serves the Coil (crush your former allies). Absent
@@ -317,6 +318,33 @@ export interface StoryState {
    *  you keep drawing — or the one you keep leaving on the ship — is the one who ends up standing apart.
    *  Empty = no paired event played yet. */
   qualifierPartners: Record<string, string>;
+
+  /**
+   * GS-story-round-resume: the world round you are part-way through, so leaving mid-round and coming
+   * back puts you on the hole you were on rather than back on the first tee.
+   *
+   * The campaign is the ONLY thing `fc_story` holds, and a Story world round owns no run slot in
+   * `fc_save` (GS-save-slots deliberately kept the two blobs apart), so the round's progress belongs
+   * HERE — with the rest of the campaign it is part of. Absent = no round in progress, which is every
+   * campaign that is sitting in the clubhouse and every campaign written before v8.
+   *
+   * Deliberately NOT a `RunSnapshot`. A story round is fully determined by the campaign plus the two
+   * things the player chose — which world, and who they took with them — because the qualifier plan is
+   * a pure hash off `campaignSeed` + the world (GS-story-qualifier-formats). So the run is REBUILT by
+   * the same builder that started it, exactly as a parked run's course is rebuilt from its seed rather
+   * than remembered. Nothing here can drift out of step with the campaign, because everything else is
+   * derived from it.
+   */
+  liveRound?: StoryLiveRound;
+}
+
+/** A world round in progress: what was chosen to start it, and how far it got. `stopHoleIndex` is the
+ *  hole to tee off on next; `stopPlayed` is the card already banked for the holes before it. */
+export interface StoryLiveRound extends RoundProgress {
+  /** The world/static course being played — the same id `storyPlayWorld` was given. */
+  courseId: string;
+  /** The playing partner chosen on the dossier, when the drawn format is a paired one. */
+  partnerId?: string;
 }
 
 /** A fresh campaign: the chosen golfer, the green bag, the station wagon, an empty purse, chapter 0. */
@@ -391,6 +419,13 @@ export function migrateStory(raw: unknown): StoryState {
     // exactly the two team-Sigil picks it always did. So a v6 campaign upgrades with its arc unchanged.
     ...(typeof s.campaignSeed === 'string' && s.campaignSeed ? { campaignSeed: s.campaignSeed } : {}),
     qualifierPartners: strMap(s.qualifierPartners),
+    // v7 → v8 (GS-story-round-resume): the world round in progress. Absent on every earlier campaign,
+    // which reads as "no round in progress" — the exact state those campaigns were actually in, since
+    // leaving a round used to discard it. Validated rather than trusted: a blob claiming a round on a
+    // course that no longer exists, or a negative hole, must not strand a campaign on a tee it cannot
+    // build, so anything malformed degrades to no round at all (back to the clubhouse — the old
+    // behaviour, which is the right floor).
+    ...(liveRound(s.liveRound) ? { liveRound: liveRound(s.liveRound)! } : {}),
   };
 }
 
@@ -639,6 +674,31 @@ function strList(v: unknown): string[] {
 function uniq(v: readonly string[]): string[] {
   return [...new Set(v)];
 }
+/**
+ * Read a persisted `liveRound`, or `undefined` for anything it cannot trust (GS-story-round-resume).
+ *
+ * A round is only resumable if it says WHICH world and HOW FAR — a blob missing either would strand a
+ * campaign on a tee that cannot be built. `stopPlayed` is passed through as an opaque card list (the
+ * round layer validates its own shape); what is checked here is that the two things the REBUILD needs
+ * are present and sane. Anything else degrades to no round, which lands the player in the clubhouse:
+ * the pre-v8 behaviour, and the right floor.
+ */
+function liveRound(v: unknown): StoryLiveRound | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const r = v as Partial<StoryLiveRound>;
+  if (typeof r.courseId !== 'string' || !r.courseId) return undefined;
+  if (typeof r.stopHoleIndex !== 'number' || !Number.isFinite(r.stopHoleIndex) || r.stopHoleIndex < 0) {
+    return undefined;
+  }
+  if (!Array.isArray(r.stopPlayed)) return undefined;
+  return {
+    courseId: r.courseId,
+    stopHoleIndex: Math.floor(r.stopHoleIndex),
+    stopPlayed: r.stopPlayed,
+    ...(typeof r.partnerId === 'string' && r.partnerId ? { partnerId: r.partnerId } : {}),
+  };
+}
+
 function strMap(v: unknown): Record<string, string> {
   const out: Record<string, string> = {};
   if (v && typeof v === 'object') {

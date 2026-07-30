@@ -14,6 +14,7 @@
  */
 
 import type { UiState } from './gameState';
+import type { StoryLiveRound, StoryState } from '../sim/rpg/story';
 import { snapshotRun } from '../sim/rpg/run';
 import type { RoundProgress } from '../sim/rpg/run';
 import { ASGARD_FORMAT } from '../sim/rpg/formats';
@@ -36,24 +37,29 @@ export interface Resumable {
 /**
  * WHAT LEAVING COSTS — the one description, in three cases (GS-save-slots).
  *
- *  - `hole`  — the run parks and continues on the hole you were on. Every parked mode: Voyage,
- *    Unending, Star Tour. This is the DECIDED rule, chosen over "replay the stop" because mixed rules
- *    are worse than any single rule — a player who learns one mode's behaviour would lose a run in
- *    another. It is also strictly less forgiving than the restart-the-stop resume it replaces.
- *  - `world` — a Story Tour world round. The campaign is saved (`fc_story`) but the ROUND is not: it
- *    owns no run slot, so the world is replayed from its first tee. A uniform promise is what the
- *    player is owed; a uniform LIE is not an acceptable way to get one, so this case says its own
- *    truth everywhere it is stated.
+ *  - `hole`  — the run parks and continues on the hole you were on. EVERY mode: Voyage, Unending,
+ *    Star Tour, and — since GS-story-round-resume — Story Tour. This is the DECIDED rule, chosen over
+ *    "replay the stop" because mixed rules are worse than any single rule: a player who learns one
+ *    mode's behaviour would lose a round in whichever mode they learned second.
  *  - `forfeit` — the Asgard tournament, which is never persisted by design: leaving forfeits the
  *    attempt and hands back the suspended run it interrupted.
+ *
+ * There used to be a third, `world`: a Story round was replayed from its first tee, because the
+ * campaign owned no run slot. It was an honest promise about a behaviour that was simply too harsh —
+ * eighteen holes in, leaving for any reason cost the lot — so the behaviour changed rather than the
+ * wording. The campaign now carries its own `liveRound`, and "one rule, every mode" is a description
+ * instead of an aspiration.
  *
  * Every exit surface reads this — the back-button confirm AND the settings sheet's return-to-title —
  * so no screen can quietly promise something the resume does not do.
  */
-export type ResumeCost = 'hole' | 'world' | 'forfeit';
+export type ResumeCost = 'hole' | 'forfeit';
 
 export function resumeCost(formatId: string | undefined, storyRound?: boolean): ResumeCost {
-  if (storyRound) return 'world';
+  // GS-story-round-resume: a Story world round used to cost the whole round ('world'). It no longer
+  // does — the campaign carries its own `liveRound`, so story resumes on its hole like everything
+  // else, and the "one rule, every mode" promise below is now literally true rather than aspirational.
+  if (storyRound) return 'hole';
   if (formatId === ASGARD_FORMAT) return 'forfeit';
   return 'hole';
 }
@@ -121,4 +127,44 @@ export function resumableState(state: UiState): Resumable {
   const snap = snapshotRun(run, liveRoundProgress(state));
   if (!slotTag(snap)) return unchanged;
   return { runSlots: upsertSlot(state.runSlots, mode, characterId, snap), lastPlayed: { mode, characterId } };
+}
+
+/**
+ * WHAT THE CAMPAIGN PARKS — the `fc_story` twin of `resumableState` (GS-story-round-resume).
+ *
+ * A Story world round owns no run slot in `fc_save`: GS-save-slots deliberately kept the two blobs
+ * apart, so the round's progress belongs in the campaign it is part of. This is the ONE function that
+ * decides what that campaign should hold right now, and it is called by BOTH writers — `persistStory`
+ * (which runs after every action) and `toTitle` (which folds the answer back into the live state).
+ *
+ * That is not ceremony. `persistStory` writing one thing while the in-memory campaign says another is
+ * exactly the shape of GS-resume-slot-loss: the picker reads `state.campaigns`, so a round recorded to
+ * disk but not to state is a round the Continue button cannot see. One function, both callers, no gap.
+ *
+ * `undefined` in ⇒ `undefined` out: a session with no campaign loaded writes no campaign.
+ */
+export function campaignWithLiveRound(state: UiState): StoryState | undefined {
+  const story = state.story;
+  if (!story) return undefined;
+  const round = liveStoryRound(state);
+  // Nothing in progress ⇒ the field is REMOVED, not left stale. Finishing a round, or walking back to
+  // the clubhouse, must clear the offer — the same rule that empties a slot when a run ends. Returning
+  // the identical object when there is nothing to change keeps a no-op action from churning the blob.
+  if (!round) return story.liveRound ? { ...story, liveRound: undefined } : story;
+  return { ...story, liveRound: round };
+}
+
+/** The live Story world round, or `undefined` when the player is not part-way through one. */
+export function liveStoryRound(state: UiState): StoryLiveRound | undefined {
+  const run = state.run;
+  if (!run.storyRound || !run.staticCourseId || !state.play) return undefined;
+  // A finished round has already banked itself into the campaign at `resolveStoryRound`; re-offering
+  // it would put the player back on a tee they have walked off.
+  if (run.status !== 'active') return undefined;
+  return {
+    courseId: run.staticCourseId,
+    stopHoleIndex: state.play.holeIndex,
+    stopPlayed: state.stopPlayed ?? [],
+    ...(run.storyTournamentPartner ? { partnerId: run.storyTournamentPartner } : {}),
+  };
 }

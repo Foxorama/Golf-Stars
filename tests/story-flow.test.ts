@@ -1284,3 +1284,90 @@ describe('Story star-map navigation (GS-story-map-nav)', () => {
     expect(reduce(map, { type: 'openStoryTournament' })).toBe(map);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+/**
+ * LEAVING A WORLD ROUND MID-WAY, AND COMING BACK TO IT (GS-story-round-resume).
+ *
+ * Reported from play: eighteen holes into a world, stopping for any reason cost the whole round —
+ * "too brutal". It was the documented design (`resumeCost` returned `'world'`) rather than a defect,
+ * because a Story round owns no run slot in `fc_save`. The campaign carries its own `liveRound` now,
+ * so the promise CLAUDE.md already made — resume on the hole you were on, in every mode — is true.
+ *
+ * The round is REBUILT rather than snapshotted: a story round is fully determined by the campaign plus
+ * which world and which partner, since the qualifier plan is a pure hash. So these assert the rebuild
+ * is the same round (course, format, partner), not merely that some round came back.
+ */
+describe('a Story world round resumes on the hole you left (GS-story-round-resume)', () => {
+  const HERO = DEFAULT_CHARACTER_ID;
+
+  /** Start a campaign, tee off the prologue world, play `holes`, and go back to the title. */
+  function partWayThrough(holes: number, seed = 'story-resume') {
+    let s = reduce(initState(seed), { type: 'openStory' });
+    s = reduce(s, { type: 'selectCharacter', characterId: HERO });
+    s = reduce(s, { type: 'storyPlayWorld', courseId: 'standrews-18' });
+    let guard = 0;
+    while (s.screen === 'lore' && guard++ < 8) s = reduce(s, { type: 'dismissLore' });
+    s = reduce(s, { type: 'playInteractive' });
+    for (let h = 0; h < holes; h++) {
+      while (s.play && !s.play.done && guard++ < 600) s = reduce(s, { type: 'autoShotHole' });
+      s = reduce(s, { type: 'holeComplete' });
+    }
+    return s;
+  }
+
+  it('records the round on the campaign when you leave, and picks it up where you left it', () => {
+    const mid = partWayThrough(3);
+    expect(mid.play!.holeIndex).toBe(3);
+    const parScored = mid.stopPlayed!.map((p) => p.record.strokes);
+
+    const title = reduce(mid, { type: 'toTitle' });
+    // The campaign carries the round — in STATE as well as on disk, or the picker could not see it.
+    const live = title.story!.liveRound!;
+    expect(live.courseId).toBe('standrews-18');
+    expect(live.stopHoleIndex).toBe(3);
+    expect(live.stopPlayed).toHaveLength(3);
+    expect(title.campaigns.campaigns[HERO]!.liveRound!.stopHoleIndex).toBe(3);
+
+    // Back in: straight onto the 4th tee, with the card already played still on it.
+    const back = reduce(title, { type: 'storyContinueCampaign', characterId: HERO });
+    expect(back.screen).toBe('playing');
+    expect(back.play!.holeIndex).toBe(3);
+    expect(back.stopPlayed!.map((p) => p.record.strokes)).toEqual(parScored);
+    // The SAME round, rebuilt — not a fresh strokeplay round that happens to be on the same course.
+    expect(back.run.storyRound).toBe(true);
+    expect(back.run.staticCourseId).toBe('standrews-18');
+    expect(back.run.staticEffect).toBe(mid.run.staticEffect);
+    expect(back.run.loadout.bag.map((c) => c.id)).toEqual(mid.run.loadout.bag.map((c) => c.id));
+  });
+
+  it('finishing the round clears the offer, so a finished world is never re-teed', () => {
+    let s = partWayThrough(3);
+    // Play it out; the round banks itself into the campaign at `resolveStoryRound`.
+    let guard = 0;
+    while (s.screen === 'playing' && guard++ < 400) {
+      while (s.play && !s.play.done && guard++ < 900) s = reduce(s, { type: 'autoShotHole' });
+      s = reduce(s, { type: 'holeComplete' });
+    }
+    expect(s.screen).not.toBe('playing');
+    expect(s.story!.liveRound, 'a finished round was left on the campaign as an offer').toBeUndefined();
+  });
+
+  it('a campaign sitting in the clubhouse offers nothing, and continues to the hub', () => {
+    // The control: no round in progress must still land on the hub, exactly as before.
+    let s = reduce(initState('story-no-round'), { type: 'openStory' });
+    s = reduce(s, { type: 'selectCharacter', characterId: HERO });
+    const title = reduce(s, { type: 'toTitle' });
+    expect(title.story!.liveRound).toBeUndefined();
+    expect(reduce(title, { type: 'storyContinueCampaign', characterId: HERO }).screen).toBe('story');
+  });
+
+  it('a round on a world the build can no longer serve falls back to the hub rather than stranding', () => {
+    const title = reduce(partWayThrough(2), { type: 'toTitle' });
+    // A hole index past the rebuilt course — what a GENERATOR_VERSION bump that re-rolls a static
+    // course would leave behind. The campaign must open, not break.
+    const bogus = { ...title.story!, liveRound: { ...title.story!.liveRound!, stopHoleIndex: 999 } };
+    const s = { ...title, story: bogus, campaigns: upsertCampaign(title.campaigns, bogus) };
+    expect(reduce(s, { type: 'storyContinueCampaign', characterId: HERO }).screen).toBe('story');
+  });
+});

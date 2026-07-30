@@ -390,13 +390,16 @@ describe('the picker shows what a tap will do before it is tapped', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────────
 describe('what a resume promises — one rule, three honest answers', () => {
-  it('every PARKED mode continues on the hole; the two that cannot say their own truth', () => {
+  it('EVERY mode continues on the hole; the one that cannot says its own truth', () => {
     expect(resumeCost('voyage')).toBe('hole');
     expect(resumeCost('unending')).toBe('hole');
     expect(resumeCost(STROKEPLAY_FORMAT)).toBe('hole');
-    // A Story world round owns no run slot — the campaign is saved, the round is replayed.
-    expect(resumeCost(STROKEPLAY_FORMAT, true)).toBe('world');
-    // The Asgard tournament is never persisted: leaving forfeits the attempt.
+    // GS-story-round-resume: a Story world round used to be `'world'` — replayed from its first tee,
+    // because the campaign owned no run slot. The campaign carries its own `liveRound` now, so "one
+    // rule, every mode" is a description rather than an aspiration.
+    expect(resumeCost(STROKEPLAY_FORMAT, true)).toBe('hole');
+    expect(keepsHoleOnResume(STROKEPLAY_FORMAT, true)).toBe(true);
+    // The Asgard tournament is never persisted: leaving forfeits the attempt. The ONE exception left.
     expect(resumeCost(ASGARD_FORMAT)).toBe('forfeit');
     expect(keepsHoleOnResume('voyage')).toBe(true);
     expect(keepsHoleOnResume(ASGARD_FORMAT)).toBe(false);
@@ -409,9 +412,14 @@ describe('what a resume promises — one rule, three honest answers', () => {
     });
     s = reduce(s, { type: 'playInteractive' });
     expect(liveRoundProgress(s)).toEqual({ stopHoleIndex: 0, stopPlayed: [] });
-    // …and none at all for a Story world round, which is not parked.
+    // GS-story-round-resume: a Story world round carries its hole too now. It still parks no RUN SLOT
+    // — `resumableState` returns early for mode 'story' — but the progress is real, and it is the
+    // campaign's own `liveRound` that carries it.
     const storyish: UiState = { ...s, run: { ...s.run, storyRound: true } };
-    expect(liveRoundProgress(storyish)).toBeUndefined();
+    expect(liveRoundProgress(storyish)).toEqual({ stopHoleIndex: 0, stopPlayed: [] });
+    // An Asgard tournament still parks nothing to continue: leaving forfeits it.
+    const asgard: UiState = { ...s, run: { ...s.run, formatId: ASGARD_FORMAT } };
+    expect(liveRoundProgress(asgard)).toBeUndefined();
   });
 });
 
@@ -701,10 +709,17 @@ describe('walkthrough: Voyage → title → Story Tour', () => {
     const roster = savedCampaigns(s);
     expect(Object.keys(roster.campaigns).sort()).toEqual([BO, FEATHER].sort());
     expect(roster.campaigns[FEATHER]).toEqual(feathersCampaign);
-    // 5. …and CONTINUE really does resume the campaign rather than a run.
+    // 5. …and CONTINUE really does resume the campaign rather than a run — landing on the HOLE Bo was
+    //    on, not back on the first tee (GS-story-round-resume). Two holes were played, so the third is
+    //    the one waiting, with the card intact.
     const resumed = reduce(s, { type: 'resume' });
-    expect(resumed.screen).toBe('story');
+    expect(resumed.screen).toBe('playing');
     expect(resumed.story!.characterId).toBe(BO);
+    expect(resumed.run.storyRound).toBe(true);
+    expect(resumed.run.staticCourseId).toBe('standrews-18');
+    expect(resumed.play!.holeIndex).toBe(2);
+    expect(resumed.stopPlayed).toHaveLength(2);
+    // …and none of that touched the parked Voyage, which is what this walkthrough is really about.
     expect(readSlot(resumed.runSlots, 'voyage', LARRY)).toEqual(larrySnap);
   });
 

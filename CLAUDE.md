@@ -233,9 +233,27 @@ This game lives or dies on three axes — put every change through all three bef
   `buildMatch`, which `playInteractive` and the resume SHARE so they cannot drift. ⚠️ A best-ball
   `partnerHoles` cannot be rebuilt (drawn from the PLAY stream, which a resume reseeds): it is padded to
   the right LENGTH with the banked cards, or the array misaligns and every later reveal shows somebody
-  else's card. **Every exit says what leaving costs, from `resumePromise`** — `hole` / `world` (a story
-  round: campaign saved, round replayed) / `forfeit` (Asgard) — the back confirm AND the settings
-  footer, which used to promise something vaguer. Guarded by `tests/save-slots.test.ts`.
+  else's card. **Every exit says what leaving costs, from `resumePromise`** — `hole` / `forfeit`
+  (Asgard, the ONE exception left) — the back confirm AND the settings footer, which used to promise
+  something vaguer. Guarded by `tests/save-slots.test.ts`.
+  **AND A STORY WORLD ROUND KEEPS ITS HOLE TOO, SO "EVERY MODE" IS A DESCRIPTION NOT AN ASPIRATION**
+  (GS-story-round-resume, save `STORY_VERSION` 8, `StoryState.liveRound` · `ui/resumable.ts
+  campaignWithLiveRound`). The third `ResumeCost`, `world` (campaign saved, ROUND replayed from its
+  first tee), was an honest promise about a behaviour that was simply too harsh — eighteen holes in,
+  stopping for any reason cost the lot — so the BEHAVIOUR changed rather than the wording, and `world`
+  is retired. Story owns no run slot by design (GS-save-slots kept `fc_save`/`fc_story` apart), so the
+  round rides the CAMPAIGN it belongs to. **It is REBUILT, never snapshotted**: a story round is fully
+  determined by the campaign + which world + which partner (the qualifier plan is a pure hash off
+  `campaignSeed`), so `buildStoryWorldRun` is ONE builder both the tee-off and the resume call — a
+  second one would resume you into a different bag, sky, or *scoring format*. `campaignWithLiveRound`
+  is the `fc_story` twin of `resumableState` and BOTH writers call it (`persistStory` + `toTitle`):
+  writing the round to disk without folding it into `state.campaigns` is exactly GS-resume-slot-loss,
+  because the picker reads state. A finished/abandoned round REMOVES the field (never a stale offer),
+  and a `liveRound` whose hole the rebuilt course can't serve falls back to the hub — a
+  `GENERATOR_VERSION` bump re-rolls a static course, and a tee that can't be built must not strand a
+  campaign. No `BACKUP_VERSION` bump (the roster's SHAPE is unchanged); a v8 campaign meeting a v7
+  build is refused loudly by `campaignStoreTooNew`, which is precisely what GS-save-integrity is for.
+  Guarded by `tests/story-flow.test.ts`.
   **THIS BUILD NEVER OVERWRITES DATA IT COULD NOT FULLY READ** (GS-save-integrity, `save/integrity.ts` ·
   `save/schema.ts readSave` · `docs/decisions/save-integrity.md`). `migrate()` answered every blob it
   didn't understand with `defaultSave()` — its return type is `Save`, so "I can't read this" had nowhere

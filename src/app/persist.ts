@@ -11,7 +11,7 @@ import { state } from './ctx';
 import { writeSave } from '../save/storage';
 import { writeStory } from '../save/storyStore';
 import { SAVE_VERSION, type Save } from '../save/schema';
-import { resumableState } from '../ui/resumable';
+import { campaignWithLiveRound, resumableState } from '../ui/resumable';
 
 /** The cross-run meta carried into `initState` from a loaded save. */
 export function metaFromSave(save: Save) {
@@ -56,7 +56,8 @@ export function metaFromSave(save: Save) {
 /** GS-story: write the active Story Mode campaign to its OWN `fc_story` blob (separate from the main save),
  *  when one is present. A no-op with no campaign, so Voyage/Unending sessions never touch `fc_story`. */
 export function persistStory(): void {
-  if (state.story) writeStory(state.story);
+  const story = campaignWithLiveRound(state);
+  if (story) writeStory(story);
 }
 
 /** Write the live state to localStorage (the only copy). Called after every reducer action. */
