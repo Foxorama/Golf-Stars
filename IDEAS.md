@@ -11,6 +11,24 @@ under the new format). Avenue (1), a full top-down RPG shell, stays deferred unt
 
 ## Now / next
 
+**GS-embed-letterbox — half the itch embed's width is undressed background on the play screen**
+*(surfaced by the 2026-07-31 itch-embed layout sweep; deliberately NOT done there, because it is a
+camera decision wearing a CSS bug's clothes — see `reports/itch-embed-layout-2026-07-31.md`)*
+On the itch.io embed's default desktop viewport (820×760) the play frame is capped to a **395px**
+portrait strip with ~210px of flat page background either side — 51% of the width. The cap itself is
+correct and must stay: `mapFrame()` grows the 360×640 design frame to the CONTAINER's aspect
+(GS-play-fullframe), so an uncapped wide container yields a wide camera and every shot reads as
+over-zoomed — which is exactly why GS-play-desktop-frame introduced the cap, keyed on aspect rather
+than width. What is wrong is only that the leftover is *nothing*: bare `--gs-bg` with the body
+vignette on it, so it reads as a broken embed rather than as a frame.
+Shapes: (a) dress the letterbox — the world's own sky/nebula palette bled out of the hole, so the
+strip sits in space rather than on a page; (b) put something there on a wide container (the shot
+card, the scoreboard, the caddy); (c) allow a modestly wider camera at wide aspects, which is a
+**physics-adjacent readability change** and would need eyes-on play plus a re-look at
+`clearOfPanelBias`/`playFocusBias` (GS-play-hud-space). (a) is cheap and safe; (c) is not.
+**Do NOT "fix" this by removing the aspect cap** — that re-creates the over-zoomed desktop camera the
+cap exists to prevent.
+
 **GS-a11y-bridge-idpod — the travel bridge loses the golfer's name at a large scale** *(surfaced by
 the 2026-07-26 mobile-layout sweep; the one thing it left visibly wrong)*
 `.gs-bhud__idpod` is a fixed-height pill holding `🚩 <name>` + a `white-space: nowrap` "Hole n" chip. At
