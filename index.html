@@ -141,6 +141,30 @@
            (pre-2024) it is simply ignored: the old top-anchored layout, never a broken one. */
         align-content: safe center;
       }
+      /* ── IN AN EMBED, THE PAGE SCROLLS ITSELF (GS-embed-scroll) ───────────────────────────
+         itch.io serves HTML5 games in an iframe with `scrolling="no"`, so the game's DOCUMENT
+         cannot scroll: a wheel over the game scrolls the STORE PAGE behind it. Measured in that
+         setup, the Pro Shop is 1388px of content in an 860px frame and 528px of it was simply
+         unreachable — the rack ended. The shipyard, clubhouse, locker and Story bar all had it.
+
+         Same rule the overlays already follow (GS-a11y-sheet-scroll): a box bigger than the
+         viewport is unreachable content, so it caps itself to one screen and scrolls INSIDE.
+         `overscroll-behavior-y: contain` stops the scroll chaining out to the store page when the
+         rack ends, which is what made it feel like nothing was happening.
+
+         Scoped to `[data-gs-embed]` — a self-scrolling page stops a mobile browser's address bar
+         collapsing, which costs real screen in a context that was never broken.
+
+         `--fit` and `--bleed` are excluded BY NAME: both are already exactly one screen tall and
+         own their overflow (the viewport-locked roster deliberately hides it, the play frame has
+         nothing to scroll), and this selector would otherwise out-specify them. */
+      html[data-gs-embed] .gs-main:not(.gs-main--fit):not(.gs-main--bleed) {
+        min-height: 0;
+        height: var(--gs-vh);
+        height: var(--gs-dvh);
+        overflow-y: auto;
+        overscroll-behavior-y: contain;
+      }
       /* Headings keep their extra tracking ON TOP of the reader's, never instead of it. */
       .gs-main h1, .gs-main h2, .gs-main h3 { letter-spacing: calc(var(--gs-track) + .2px); }
       ::selection { background: #5fd45a44; }
