@@ -1209,6 +1209,19 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     one positive result resolved to SPACING, not shapes; so the toggle buys tracking/word-spacing/leading,
     kills italics and justification, and asks for legible faces already on the device. Guarded by
     `tests/accessibility.test.ts`.
+  - **A SCREEN SITS IN THE MIDDLE OF THE ROOM** (GS-page-centre, `index.html .gs-main`). `.gs-main` is
+    `min-height:var(--gs-vh)`, and every screen stacked from the TOP of that frame and left the rest black
+    — fine-ish on a phone, broken on a landscape viewport. Measured at the **820×760 itch embed** (the
+    default desktop embed size): the Star Tour recap left **43%** of the frame empty below the content, the
+    Trade Market 47%, the champion picker 59%, a Story beat **64%**. ONE line — `align-content: safe center`
+    — fixes all ~20 flow screens at once, and it must stay `align-content` on a **BLOCK** container: flex or
+    grid would centre too and would ALSO stop adjacent sibling margins collapsing (the title screen's five
+    sections gain ~48px) and turn every child into a flex/grid item. `safe`, never bare `center`, for the
+    same reason the overlays use it — content taller than the frame starts at the top and scrolls. Screens
+    that already fill the frame (full-bleed play, the viewport-locked roster, anything scrolling) have no
+    free space, so it is a no-op for them BY CONSTRUCTION, not by exception; and an engine without
+    block-container alignment just ignores it and keeps today's layout. Guarded by `tests/page-centre.test.ts`
+    (which pins the block-container property, not only the centring).
   - **A `position:fixed` BOX BIGGER THAN THE VIEWPORT IS UNREACHABLE CONTENT** (GS-a11y-sheet-scroll) —
     the page cannot scroll it, that is what fixed MEANS. Every overlay caps itself to `var(--gs-dvh)` and
     scrolls INSIDE (`overscroll-behavior:contain`), and centres with **`align-items:safe center`**, never

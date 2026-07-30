@@ -101,6 +101,30 @@
           calc(18px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
           calc(28px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
         color: var(--gs-ink); min-height: var(--gs-vh);
+        /* ── A SCREEN SITS IN THE MIDDLE OF THE ROOM (GS-page-centre) ──────────────────────
+           `min-height` makes the page frame at least one viewport tall; every screen then
+           stacked its content from the TOP of that frame and left the remainder black. On a
+           phone that reads as "the screen is short". On a landscape viewport — the 820x760
+           itch embed, a desktop browser, a tablet — it reads as broken: measured across the
+           deep-linkable screens at 820x760, the round recap left 43% of the frame empty, the
+           Trade Market 47%, the champion picker 59% and a Story beat 64%, with the content
+           glued to the top edge of the void.
+
+           `align-content` on a BLOCK container is the whole fix, and it is the reason this is
+           one line rather than a pass over twenty screens. Flex or grid would centre too, but
+           both would ALSO change what the children are: adjacent sibling margins stop
+           collapsing (the title screen's five sections would gain ~48px between them) and
+           every child becomes a flex/grid item with different sizing rules. Block alignment
+           moves the stack and changes nothing else — measured content height is identical
+           before and after.
+
+           `safe`, never bare `center`: content taller than the frame must start at the top
+           edge and scroll, never be centred with its head cut off (GS-a11y-sheet-scroll).
+           Screens that already fill the frame — the full-bleed play screen, the viewport-locked
+           roster, anything that scrolls — have no free space to distribute, so this is a no-op
+           for them by construction. And on an engine without block-container alignment
+           (pre-2024) it is simply ignored: the old top-anchored layout, never a broken one. */
+        align-content: safe center;
       }
       /* Headings keep their extra tracking ON TOP of the reader's, never instead of it. */
       .gs-main h1, .gs-main h2, .gs-main h3 { letter-spacing: calc(var(--gs-track) + .2px); }
