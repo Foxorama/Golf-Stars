@@ -420,7 +420,12 @@ describe('ui reducer', () => {
     expect(resumed.run.formatId).toBe('ladder');
     expect(resumed.run.stopIndex).toBe(2);
     expect(resumed.run.loadout.perks).toEqual(['gyro']);
-    expect(resumed.runSlots).toEqual({}); // the offer is consumed — the run is live now
+    // The slot STAYS while the run is live (GS-resume-slot-loss). This used to assert `{}` — "the
+    // offer is consumed" — which pinned the implementation rather than any player-facing property,
+    // and the property it pinned was the bug: `resumableState` builds the save from `state.runSlots`
+    // plus the LIVE run, so an emptied table lost the run the moment the live run became another
+    // golfer's ("‹ Change golfer"). `state.runSlots` must be a superset of the save, never a subset.
+    expect(readSlot(resumed.runSlots, 'endless', undefined)).toEqual(snap);
   });
 
   it('resume is a no-op when there is nothing to resume', () => {
