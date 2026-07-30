@@ -15,7 +15,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { initState, reduce, type UiState } from '../src/ui/game';
+import { currentRoster, initState, modeSlotTags, reduce, type UiState } from '../src/ui/game';
 import { resumableState, keepsHoleOnResume, liveRoundProgress, resumeCost } from '../src/ui/resumable';
 import { migrate, defaultSave, SAVE_VERSION } from '../src/save/schema';
 import {
@@ -34,7 +34,7 @@ import {
 } from '../src/sim/rpg/runSlots';
 import { currentCourse, type RunSnapshot } from '../src/sim/rpg/run';
 import { ASGARD_FORMAT, STROKEPLAY_FORMAT } from '../src/sim/rpg/formats';
-import { defaultStoryState } from '../src/sim/rpg/story';
+import { defaultStoryState, type StoryState } from '../src/sim/rpg/story';
 import { emptyCampaignStore, upsertCampaign } from '../src/sim/rpg/storyRoster';
 import { characterScreen } from '../src/render/golferCards';
 
@@ -51,6 +51,39 @@ const snap = (over: Partial<RunSnapshot> = {}): RunSnapshot => ({
   perks: [],
   ...over,
 });
+
+/** Play `holes` complete holes of the current stop, attacking every shot. */
+function playHoles(s: UiState, holes: number): UiState {
+  s = reduce(s, { type: 'playInteractive' });
+  let guard = 0;
+  for (let h = 0; h < holes; h++) {
+    while (s.play && !s.play.done && guard++ < 600) s = reduce(s, { type: 'autoShotHole' });
+    s = reduce(s, { type: 'holeComplete' });
+  }
+  return s;
+}
+
+/**
+ * WHAT WOULD ACTUALLY BE ON DISK right now.
+ *
+ * The reducer is not the save: `state.runSlots` is only rewritten at the moments a slot changes hands
+ * (park, resume, confirmed start-over), while `persist()` calls `resumableState` after EVERY action
+ * and writes whatever it returns. So a test that asserts on `state.runSlots` alone is asserting on a
+ * cache, not on the save — and the bug this whole feature is about lived in exactly that gap. These
+ * two helpers are the pure equivalents of the two writers, and the walkthroughs below assert through
+ * them.
+ */
+const saved = (s: UiState) => resumableState(s);
+/** …and the campaign half, the pure equivalent of `persistStory` → `writeStory` (an upsert of the
+ *  LIVE campaign into the roster, leaving every other golfer's slot alone). */
+const savedCampaigns = (s: UiState) => currentRoster(s);
+
+/** Dismiss any story/lore beat the flow lands on, so a walkthrough can reach the golf. */
+function pastBeats(s: UiState): UiState {
+  let guard = 0;
+  while (s.screen === 'lore' && guard++ < 8) s = reduce(s, { type: 'dismissLore' });
+  return s;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────────
 describe('a run belongs to exactly one mode, and the format says which', () => {
@@ -265,16 +298,24 @@ describe('the overwrite guard is universal now, not story-only', () => {
       type: 'selectCharacter',
       characterId: LARRY,
     });
-    return reduce(s, { type: 'toTitle' });
+    // Play two holes before parking. A run parked at stop 0 with an empty card is INDISTINGUISHABLE
+    // from a fresh one, so asserting `stopIndex` alone would pass with the continue-guard deleted —
+    // the card is what makes "continued" a claim worth checking.
+    return reduce(playHoles(s, 2), { type: 'toTitle' });
   }
 
   it('tapping a golfer who already has a run CONTINUES it — it never silently starts over', () => {
     const parked = parkedVoyage();
-    const stopIndex = readSlot(parked.runSlots, 'voyage', LARRY)!.stopIndex;
+    const before = readSlot(parked.runSlots, 'voyage', LARRY)!;
+    expect(before.stopPlayed).toHaveLength(2);
     const picker = reduce(parked, { type: 'start', format: 'voyage' });
     const cont = reduce(picker, { type: 'selectCharacter', characterId: LARRY });
-    expect(cont.run.stopIndex).toBe(stopIndex);
+    expect(cont.run.stopIndex).toBe(before.stopIndex);
     expect(cont.run.loadout.characterId).toBe(LARRY);
+    // The card came back, and it teed up the hole it was left on rather than the first.
+    expect(cont.screen).toBe('playing');
+    expect(cont.play!.holeIndex).toBe(2);
+    expect(cont.stopPlayed!.map((p) => p.record.strokes)).toEqual(before.stopPlayed!.map((p) => p.record.strokes));
   });
 
   it('a golfer with NO run in this mode simply starts theirs, and the other slot is untouched', () => {
@@ -376,17 +417,6 @@ describe('what a resume promises — one rule, three honest answers', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────────
 describe('a parked run resumes on the hole it was left on, in every mode', () => {
-  /** Play `holes` complete holes of the current stop, attacking every shot. */
-  function playHoles(s: UiState, holes: number): UiState {
-    s = reduce(s, { type: 'playInteractive' });
-    let guard = 0;
-    for (let h = 0; h < holes; h++) {
-      while (s.play && !s.play.done && guard++ < 600) s = reduce(s, { type: 'autoShotHole' });
-      s = reduce(s, { type: 'holeComplete' });
-    }
-    return s;
-  }
-
   function parkAndResume(format: string, characterId: string, holes: number, seed: string) {
     const started = reduce(reduce(initState(seed), { type: 'start', format }), {
       type: 'selectCharacter',
@@ -453,5 +483,199 @@ describe('a parked run resumes on the hole it was left on, in every mode', () =>
     // A best-ball partner array must stay index-aligned with the holes played, or every later reveal
     // reads somebody else's card.
     if (before.partnerHoles) expect(resumed.match!.partnerHoles).toHaveLength(3);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+/**
+ * SWITCHING GOLFERS INSIDE ONE MODE — the walkthrough, not the unit.
+ *
+ * The cases above each check one reducer decision. What a player actually does is a SEQUENCE, and
+ * this is the sequence that used to cost them a run: open a mode, see a golfer you have a run going
+ * with, pick somebody else instead, and play. Every assertion is made through `saved()` — what
+ * `persist` would write — because `state.runSlots` is a cache and the bug lived in the gap.
+ */
+describe('walkthrough: changing golfer on the Voyage picker', () => {
+  /** Start the Voyage as `who`, play `holes`, and park back on the title. */
+  function parkVoyage(s: UiState, who: string, holes: number): UiState {
+    const picker = reduce(s, { type: 'start', format: 'voyage' });
+    const run = reduce(picker, { type: 'selectCharacter', characterId: who });
+    return reduce(playHoles(run, holes), { type: 'toTitle' });
+  }
+
+  it('picking a DIFFERENT golfer starts theirs and leaves the first run byte-for-byte intact', () => {
+    // Larry has a Voyage going, three holes into his first stop.
+    const afterLarry = parkVoyage(initState('switch-voyage'), LARRY, 3);
+    const larrySnap = readSlot(saved(afterLarry).runSlots, 'voyage', LARRY)!;
+    expect(larrySnap.stopPlayed).toHaveLength(3);
+    expect(saved(afterLarry).lastPlayed).toEqual({ mode: 'voyage', characterId: LARRY });
+
+    // Re-enter the Voyage. The picker badges Larry — and ONLY Larry.
+    const picker = reduce(afterLarry, { type: 'start', format: 'voyage' });
+    expect(Object.keys(modeSlotTags(picker))).toEqual([LARRY]);
+    expect(modeSlotTags(picker)[LARRY]!.short).toBe('Stop 1');
+
+    // Tap FEATHER instead. She has no run, so she starts one — Larry's is not consulted, not
+    // continued, and not touched.
+    const feather = reduce(picker, { type: 'selectCharacter', characterId: FEATHER });
+    expect(feather.run.loadout.characterId).toBe(FEATHER);
+    expect(feather.run.stopIndex).toBe(0);
+    expect(feather.screen).toBe('intro'); // a fresh run's intro, not Larry's mid-stop 'playing'
+    expect(feather.stopPlayed).toBeUndefined();
+
+    // Play her, park her, and check BOTH saves.
+    const parked = reduce(playHoles(feather, 2), { type: 'toTitle' });
+    const disk = saved(parked);
+    expect(readSlot(disk.runSlots, 'voyage', LARRY)).toEqual(larrySnap); // untouched, field for field
+    expect(readSlot(disk.runSlots, 'voyage', FEATHER)!.stopPlayed).toHaveLength(2);
+    expect(readSlot(disk.runSlots, 'voyage', FEATHER)!.characterId).toBe(FEATHER);
+    // Two runs, one mode, two golfers — and CONTINUE offers the one just played.
+    expect(Object.keys(disk.runSlots).sort()).toEqual([slotKey('voyage', FEATHER), slotKey('voyage', LARRY)].sort());
+    expect(disk.lastPlayed).toEqual({ mode: 'voyage', characterId: FEATHER });
+    expect(reduce(parked, { type: 'resume' }).run.loadout.characterId).toBe(FEATHER);
+  });
+
+  it('continuing the FIRST golfer afterwards still lands on their own run, at their own hole', () => {
+    let s = parkVoyage(initState('switch-back'), LARRY, 3);
+    const larrySnap = readSlot(saved(s).runSlots, 'voyage', LARRY)!;
+    s = reduce(reduce(s, { type: 'start', format: 'voyage' }), { type: 'selectCharacter', characterId: FEATHER });
+    s = reduce(playHoles(s, 2), { type: 'toTitle' });
+
+    // Back into the Voyage: both golfers are badged now, each with their own run.
+    const picker = reduce(s, { type: 'start', format: 'voyage' });
+    expect(Object.keys(modeSlotTags(picker)).sort()).toEqual([FEATHER, LARRY].sort());
+
+    // Tap Larry — his card, his hole, not Feather's.
+    const back = reduce(picker, { type: 'selectCharacter', characterId: LARRY });
+    expect(back.screen).toBe('playing');
+    expect(back.run.loadout.characterId).toBe(LARRY);
+    expect(back.play!.holeIndex).toBe(3);
+    expect(back.stopPlayed!.map((p) => p.record.strokes)).toEqual(larrySnap.stopPlayed!.map((p) => p.record.strokes));
+    // Feather's run is still parked while Larry's is live.
+    expect(readSlot(saved(back).runSlots, 'voyage', FEATHER)).toBeDefined();
+  });
+
+  it('a golfer with a run in ANOTHER mode is not badged here, and picking them starts a fresh one', () => {
+    // Bo is deep in the Unending Universe; that must say nothing about Bo on the Voyage picker.
+    const bo = reduce(reduce(initState('cross-mode-pick'), { type: 'start', format: 'unending' }), {
+      type: 'selectCharacter',
+      characterId: BO,
+    });
+    const parked = reduce(playHoles(bo, 2), { type: 'toTitle' });
+    const boEndless = readSlot(saved(parked).runSlots, 'endless', BO)!;
+
+    const picker = reduce(parked, { type: 'start', format: 'voyage' });
+    expect(modeSlotTags(picker)).toEqual({}); // nothing parked in THIS mode
+    const voyageBo = reduce(picker, { type: 'selectCharacter', characterId: BO });
+    expect(voyageBo.screen).toBe('intro');
+    expect(voyageBo.run.formatId).toBe('voyage');
+    expect(voyageBo.run.stopIndex).toBe(0);
+
+    const after = saved(reduce(playHoles(voyageBo, 2), { type: 'toTitle' }));
+    // One golfer, two modes, two independent runs.
+    expect(readSlot(after.runSlots, 'endless', BO)).toEqual(boEndless);
+    expect(readSlot(after.runSlots, 'voyage', BO)!.formatId).toBe('voyage');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+/**
+ * CROSSING FROM A RUN INTO A CAMPAIGN — the other walkthrough, and where the original bug lived.
+ *
+ * Story Tour is the mode that owns no run slot: its save is the `fc_story` roster. So this walks the
+ * full path a player takes (Voyage → title → Story Tour → pick → play a world → title) and checks
+ * BOTH writers afterwards — the run slots `persist` writes and the roster `persistStory` upserts —
+ * including the case where it is the SAME golfer on both sides, whose two saves live in two different
+ * keyspaces and must not know about each other.
+ */
+describe('walkthrough: Voyage → title → Story Tour', () => {
+  /** A boot state holding campaigns, so the Story picker has a roster to be right about. */
+  function booted(seed: string, ...stories: StoryState[]): UiState {
+    const roster = stories.reduce((r, st) => upsertCampaign(r, st), emptyCampaignStore());
+    return initState(seed, {}, undefined, stories[0], roster);
+  }
+
+  /** Park a Voyage run for `who`, ending on the title. */
+  function parkVoyage(s: UiState, who: string, holes: number): UiState {
+    const run = reduce(reduce(s, { type: 'start', format: 'voyage' }), { type: 'selectCharacter', characterId: who });
+    return reduce(playHoles(run, holes), { type: 'toTitle' });
+  }
+
+  it('starting a DIFFERENT golfer’s campaign leaves the parked Voyage and every other campaign alone', () => {
+    // Feather already has a campaign three chapters in; Larry has a Voyage going.
+    const feathersCampaign = { ...defaultStoryState(FEATHER), chapter: 3, credits: 900 };
+    let s = parkVoyage(booted('run-into-story', feathersCampaign), LARRY, 3);
+    const larrySnap = readSlot(saved(s).runSlots, 'voyage', LARRY)!;
+
+    // Into Story Tour, and pick BO — a golfer with no campaign at all.
+    s = reduce(s, { type: 'openStory' });
+    expect(s.screen).toBe('character');
+    s = reduce(s, { type: 'selectCharacter', characterId: BO });
+    expect(s.screen).toBe('story');
+    expect(s.story!.characterId).toBe(BO);
+
+    // Play one of Bo's world rounds and go back to the title.
+    s = pastBeats(reduce(s, { type: 'storyPlayWorld', courseId: 'standrews-18' }));
+    expect(s.run.storyRound).toBe(true);
+    s = reduce(playHoles(s, 2), { type: 'toTitle' });
+
+    const disk = saved(s);
+    // 1. The Voyage is exactly where it was left. This is the bug that started the redesign.
+    expect(readSlot(disk.runSlots, 'voyage', LARRY)).toEqual(larrySnap);
+    // 2. A story round invents no run slot of its own — not under Bo, not under Star Tour.
+    expect(Object.keys(disk.runSlots)).toEqual([slotKey('voyage', LARRY)]);
+    expect(readSlot(disk.runSlots, 'startour', BO)).toBeNull();
+    // 3. …but CONTINUE now points at the campaign, because that is genuinely what was last played.
+    expect(disk.lastPlayed).toEqual({ mode: 'story', characterId: BO });
+    // 4. Both campaigns are on disk, and Feather's is untouched.
+    const roster = savedCampaigns(s);
+    expect(Object.keys(roster.campaigns).sort()).toEqual([BO, FEATHER].sort());
+    expect(roster.campaigns[FEATHER]).toEqual(feathersCampaign);
+    // 5. …and CONTINUE really does resume the campaign rather than a run.
+    const resumed = reduce(s, { type: 'resume' });
+    expect(resumed.screen).toBe('story');
+    expect(resumed.story!.characterId).toBe(BO);
+    expect(readSlot(resumed.runSlots, 'voyage', LARRY)).toEqual(larrySnap);
+  });
+
+  it('the SAME golfer can hold a Voyage run AND a campaign — two keyspaces, neither aware of the other', () => {
+    let s = parkVoyage(initState('same-golfer'), LARRY, 3);
+    const larrySnap = readSlot(saved(s).runSlots, 'voyage', LARRY)!;
+
+    // Larry again, this time in Story Tour.
+    s = reduce(reduce(s, { type: 'openStory' }), { type: 'selectCharacter', characterId: LARRY });
+    expect(s.screen).toBe('story');
+    expect(s.story!.characterId).toBe(LARRY);
+    s = pastBeats(reduce(s, { type: 'storyPlayWorld', courseId: 'standrews-18' }));
+    s = reduce(playHoles(s, 2), { type: 'toTitle' });
+
+    // Both saves survive, under keys that cannot collide.
+    expect(readSlot(saved(s).runSlots, 'voyage', LARRY)).toEqual(larrySnap);
+    expect(savedCampaigns(s).campaigns[LARRY]?.characterId).toBe(LARRY);
+    expect(saved(s).lastPlayed).toEqual({ mode: 'story', characterId: LARRY });
+
+    // Going back into the VOYAGE and tapping Larry gets the RUN, not the campaign.
+    const picker = reduce(s, { type: 'start', format: 'voyage' });
+    expect(modeSlotTags(picker)[LARRY]!.short).toBe('Stop 1');
+    const back = reduce(picker, { type: 'selectCharacter', characterId: LARRY });
+    expect(back.screen).toBe('playing');
+    expect(back.run.formatId).toBe('voyage');
+    expect(back.run.storyRound).toBeFalsy();
+    expect(back.play!.holeIndex).toBe(3);
+    // …and his campaign is still on disk while the run is live.
+    expect(savedCampaigns(back).campaigns[LARRY]).toBeDefined();
+  });
+
+  it('re-entering Story Tour as a golfer who already has a campaign CONTINUES it, never overwrites', () => {
+    const larrysCampaign = { ...defaultStoryState(LARRY), chapter: 2, credits: 640 };
+    let s = parkVoyage(booted('story-continue', larrysCampaign), FEATHER, 2);
+    const featherSnap = readSlot(saved(s).runSlots, 'voyage', FEATHER)!;
+
+    s = reduce(reduce(s, { type: 'openStory' }), { type: 'selectCharacter', characterId: LARRY });
+    expect(s.screen).toBe('story');
+    expect(s.story!.chapter).toBe(2); // resumed, not restarted
+    expect(s.story!.credits).toBe(640);
+    // The Voyage run belonging to a different golfer is untouched throughout.
+    expect(readSlot(saved(s).runSlots, 'voyage', FEATHER)).toEqual(featherSnap);
   });
 });
