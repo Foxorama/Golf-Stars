@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { GAME_TITLE, GAME_TITLE_UPPER, APP_VERSION } from '../src/brand';
 import { BACKUP_KIND, LEGACY_BACKUP_KIND, buildBackup, parseBackup } from '../src/save/backup';
@@ -84,6 +84,27 @@ describe('the service-worker cache prefix agrees across all three files', () => 
     expect(sw).toContain(`var CACHE = '${PREFIX}'`);
     expect(sw).toContain(`k.indexOf('${PREFIX}') === 0`);
     expect(sw, 'the pre-rename prefix must be gone').not.toContain("'golf-stars-'");
+  });
+
+  it('the worker version is STAMPED from package.json, never hand-bumped (GS-sw-version)', () => {
+    // The last hand-bumped constant in the repo, and the same failure mode `%GS_VERSION%` was
+    // introduced to kill for the boot watchdog: forgetting it leaves returning offline players on the
+    // PREVIOUS build's snapshot for one more boot — silent, and only visible offline.
+    const sw = src('public/sw.js');
+    expect(sw, 'the source must carry the placeholder, not a version').toContain("'fc-pwa-%GS_VERSION%'");
+    expect(sw, 'a literal version means somebody has to remember to bump it').not.toMatch(
+      /fc-pwa-\d+\.\d+\.\d+/,
+    );
+
+    // And the BUILT worker must actually carry the number — a placeholder that ships unsubstituted is
+    // a cache name that never changes, which is the same bug with extra steps.
+    const built = resolve(__dirname, '../dist/sw.js');
+    if (!existsSync(built)) return; // dist is built by globalSetup; skip if a run has none
+    const out = readFileSync(built, 'utf8');
+    const version = (JSON.parse(src('package.json')) as { version: string }).version;
+    expect(out).toContain(`'fc-pwa-${version}'`);
+    expect(out, 'the placeholder shipped unsubstituted').not.toContain('%GS_VERSION%');
+    expect(out, 'the built worker must still name the same cache prefix').toContain(`var CACHE = '${PREFIX}'`);
   });
 
   it("index.html's foreign-cache sweep spares exactly that prefix", () => {
