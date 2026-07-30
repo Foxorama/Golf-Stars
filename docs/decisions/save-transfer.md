@@ -78,6 +78,15 @@ A campaign that won't migrate is the one thing dropped rather than fatal: the ma
 of a player's progress, and refusing the whole import over an odd `fc_story` is the worse trade. The
 confirm summary says what actually came through.
 
+**Update (GS-save-integrity):** that guard leaked one layer down for two years. `parseBackup` checks
+the *bundle's* version, but `migrateSaveOrThrow` called `migrate()` for the save inside it — and
+`migrate` returns `defaultSave()` for an unknown version **without throwing**, so the try/catch never
+fired for the one case that mattered. Since `BACKUP_VERSION` tracks the container and `SAVE_VERSION`
+moves independently (27→32 all shipped inside bundle v1), a future save arrives in a valid current
+bundle and imported as empty *while reporting success*. It now uses `readSave`, which can tell.
+A newer **campaign** in a bundle throws as well: the drop-rather-than-fail trade above covers an *odd*
+blob, not a readable-but-lossy one. See `save-integrity.md`.
+
 ## Two steps, always
 
 Import replaces everything, so picking a file only **parses and summarises** it — shards, best score,

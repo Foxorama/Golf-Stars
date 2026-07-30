@@ -216,13 +216,19 @@ the screen where it matters.
    Settings → Save data as one of three honest states.
 3. ~~**Let the install nudge say what it buys**~~ ✅ **Shipped** — same PR. It reads
    "offline + safer save" rather than asking the player to want a shortcut icon.
-4. **Namespace the keys against the communal itch bucket.** Not a rename — GS-release-identity
-   forbids a second legacy namespace, and rightly. A collision *detector* (does the blob parse as
-   ours?) costs nothing and turns a corrupted save into a caught error rather than a mangled run.
+4. ~~**Namespace the keys against the communal itch bucket.**~~ ✅ **Shipped** — GS-save-integrity.
+   It needed no detector of its own in the end: a blob with no numeric schema version is not ours,
+   and that falls out of a classification two *other* data-loss paths needed anyway. `migrate()`
+   answered every unreadable blob with `defaultSave()`, and the next ordinary persist wrote that
+   over the real save — so the collision case, a save from a newer build (the Capacitor shell, on
+   the documented export→import workflow), and corrupt bytes were all the same bug. The build now
+   goes READ-ONLY rather than overwrite anything it could not fully read, and offers the stored
+   bytes as a download. It also closed a hole in item 3's neighbour: a bundle whose *inner* save was
+   newer imported as empty **while reporting success**. See `docs/decisions/save-integrity.md`.
 5. **Make export a habit, not a memory test.** A "last backed up N runs ago" nudge on the settings
    screen, driven off a counter that already exists in the save.
 
-Items 4–5 remain open and are follow-ups, not blockers on a release.
+Item 5 remains open and is a follow-up, not a blocker on a release.
 
 ### What is still true after that PR
 

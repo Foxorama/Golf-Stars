@@ -29,5 +29,6 @@ domain. The root `CLAUDE.md` carries the load-bearing invariants and points here
 | `ui-intro.md` | The pure UI reducer, play-loop UX, and the loading-intro cinematic |
 | `process-and-deploy.md` | Testing, the test/demo hub, art pipeline, GitHub Pages deploy gotcha, PWA service worker, change/versioning flow |
 | `save-transfer.md` | Save export/import (GS-save-transfer): the bundle format across all three blobs, why import THROWS instead of defaulting, the two-step confirm, and the per-origin split between the website and the Android shell |
+| `save-integrity.md` | Never overwrite what you couldn't read (GS-save-integrity): the one `migrate()` line that lost saves three ways, read-only mode, the itch shared-bucket collision, the newer-inner-save import hole, and why the rescue download is raw bytes |
 | `story-campaign-slots.md` | One campaign PER GOLFER (GS-story-campaign-slots): the `fc_story` roster, why a champion IS the completed slot rather than a snapshot, adopting a pre-roster save, the two store traps, and why `BACKUP_VERSION` went to 2 |
 | `android-packaging.md` | The Capacitor shell (GS-android): app id, the disabled service worker, back-button policy, signing + the "app failed to update" trap |

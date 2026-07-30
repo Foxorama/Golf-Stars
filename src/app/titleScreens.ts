@@ -6,6 +6,7 @@
 
 import { state } from './ctx';
 import { storageHealth } from '../save/durability';
+import { faultExplanation, faultHeadline, faultRescue, saveIntegrity } from '../save/integrity';
 import { GAME_TITLE, APP_VERSION } from '../brand';
 import { FORMATS, ASGARD_FORMAT, STROKEPLAY_FORMAT, getFormat } from '../sim/rpg/formats';
 import type { RunSnapshot } from '../sim/rpg/run';
@@ -90,6 +91,25 @@ function storageWarningHTML(): string {
     </div>`;
 }
 
+/**
+ * THE OTHER MESSAGE A PLAYER MUST NOT MISS (GS-save-integrity) — the storage works, and there is
+ * something in it this build cannot read, so the game has stopped writing rather than overwrite it.
+ *
+ * Same non-dismissible `role="alert"` treatment and the same chrome as the storage warning: it is the
+ * same severity (progress is not being kept) and reusing `.gs-storagewarn` means no new global CSS for
+ * a second alert on one screen. Every word comes from `save/integrity.ts`'s pure builders, which the
+ * settings sheet also reads — the two surfaces state the same finding or they state a contradiction.
+ */
+function integrityWarningHTML(): string {
+  const fault = saveIntegrity.fault;
+  if (!fault) return '';
+  return `<div class="gs-storagewarn" role="alert">
+      <b>⚠ ${faultHeadline(fault)}</b>
+      ${faultExplanation(fault)}
+      <span class="gs-storagewarn__do">${faultRescue(fault)} Settings → <b>Save data</b>.</span>
+    </div>`;
+}
+
 export function titleScreen(): string {
   // Headline the winnable campaign (GS-voyage) first, then the endless survival format. Each GAME
   // tile (GS-title-2) is the SAME doorway component as the Market/Clubhouse tiles below — painted
@@ -147,6 +167,7 @@ export function titleScreen(): string {
       </div>
     </header>
     ${storageWarningHTML()}
+    ${integrityWarningHTML()}
     ${resumeHTML}
     <h2 class="gs-seclabel">${resumeHTML ? 'Or start a new run — choose your game' : 'Choose your game'}</h2>
     <div class="gs-navtiles gs-navtiles--games">${modes}${storyTileHTML()}${destinationTileHTML()}${universeUnendingTileHTML()}${starTourRewardTileHTML()}</div>

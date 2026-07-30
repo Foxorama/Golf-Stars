@@ -227,6 +227,31 @@ This game lives or dies on three axes — put every change through all three bef
   else's card. **Every exit says what leaving costs, from `resumePromise`** — `hole` / `world` (a story
   round: campaign saved, round replayed) / `forfeit` (Asgard) — the back confirm AND the settings
   footer, which used to promise something vaguer. Guarded by `tests/save-slots.test.ts`.
+  **THIS BUILD NEVER OVERWRITES DATA IT COULD NOT FULLY READ** (GS-save-integrity, `save/integrity.ts` ·
+  `save/schema.ts readSave` · `docs/decisions/save-integrity.md`). `migrate()` answered every blob it
+  didn't understand with `defaultSave()` — its return type is `Save`, so "I can't read this" had nowhere
+  to go — and since `writeSave` couldn't tell, the next ordinary persist wrote that default OVER the real
+  save. **One line, three losses**: a save from a LATER build (the Capacitor shell never auto-updates and
+  is its own origin, so export→import between two builds is the DOCUMENTED workflow and was a data-loss
+  path the moment their schema versions differed); a FOREIGN blob (itch serves every HTML5 game from one
+  shared CDN origin, so `fc_save` sits in a bucket shared with the whole platform — the old code read a
+  neighbour's data as garbage and overwrote it too); and CORRUPT bytes. `readSave` is the ONE classifier
+  and `migrate()` is now a thin wrapper over it, so every caller that can't act on the difference is
+  BYTE-FOR-BEHAVIOUR unchanged (pinned against every shape of input — a refactor of that function that
+  quietly moves one outcome is a save-losing bug wearing a tidy-up's clothes). A fault puts the save layer
+  READ-ONLY: fully playable, persists nothing, a non-dismissible title alert, and `false` from every
+  writer — which costs nothing, because callers have handled `false` from the storage-unavailable case
+  since v1. **The import is the ONE write allowed through** (deliberate, confirmed, replaces every blob),
+  and `applyBackup` must `clearFault()` FIRST or it reports success having written nothing — the same lie
+  in the opposite direction. Campaigns fail the OTHER way — `migrateStory` never reads `version`, so a
+  newer campaign is silently TRUNCATED and written back (a slow puncture vs the main save's total loss) —
+  so `campaignStoreTooNew` refuses those, envelope AND per-slot, since `STORY_VERSION` and
+  `CAMPAIGN_STORE_VERSION` move independently. ⚠️ **The rescue download is RAW STORED BYTES, never an
+  export**: a normal export is built from `loadSave()`, which under a fault returns the empty default, so
+  the button would hand the player a file containing nothing and they'd believe it was a backup — worse
+  than offering nothing. NO new key (a quarantine copy would double the blob in a shared quota and owe
+  PRIVACY.md a row), no save bump, no new hook. Guarded by `tests/save-integrity.test.ts` +
+  `tests/save-integrity-browser.test.ts`.
   **A backup is a BUNDLE, not a save** (GS-save-transfer, `save/backup.ts` pure · `app/saveTransfer.ts`
   the localStorage/DOM half). Progress lives in THREE blobs (`fc_save` + `fc_story` + `fc_settings`) and
   localStorage is per-ORIGIN, so the website and the Capacitor shell (`https://localhost`) cannot see
