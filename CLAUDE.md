@@ -210,7 +210,16 @@ This game lives or dies on three axes — put every change through all three bef
   (source-scanned, incl. a ban on `snapshotRun` returning to `persist.ts`): two descriptions of that
   decision is the bug the whole feature exists because of, and the one that cost a parked Voyage every
   time a Story world was played. `runModeOf` checks **`storyRound` BEFORE the format** (a story round is
-  played on `STROKEPLAY_FORMAT`, so the format alone files it under Star Tour); `slotTag() === null` is
+  played on `STROKEPLAY_FORMAT`, so the format alone files it under Star Tour); **`state.runSlots` is a
+  faithful SUPERSET of the save — it may lead it, never trail it** (GS-resume-slot-loss): `resume` used
+  to `clearSlot` the run it picked up ("the offer is consumed"), but `resumableState` builds the save
+  from the table PLUS THE LIVE RUN, so the clear survived only while the live run was still that
+  golfer's — and `‹ Change golfer` exists to make it somebody else's, so the next persist wrote a save
+  with no trace of the run. Clearing was never load-bearing (the upsert rewrites that slot every
+  persist); only a confirmed start-over or a run ENDING may remove an entry. ⚠️ A reducer test asserting
+  on `state.runSlots` alone is asserting on a CACHE — assert through `resumableState` (the `saved()`
+  helper), and note that every walkthrough routed via `toTitle` HEALS the table, which is exactly why
+  three tests pinned the broken behaviour and none caught it; `slotTag() === null` is
   the ONE predicate for "nothing worth continuing" that the title card, the picker badge and the parker
   all read, so merely opening the star map can no longer eat the round parked there; and a confirmed
   start-over **empties the slot immediately**, never "when the new run overwrites it" (a fresh Star Tour

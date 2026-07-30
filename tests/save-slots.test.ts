@@ -555,6 +555,76 @@ describe('walkthrough: changing golfer on the Voyage picker', () => {
     expect(readSlot(saved(back).runSlots, 'voyage', FEATHER)).toBeDefined();
   });
 
+  /**
+   * THE ONE THAT GOT AWAY (GS-resume-slot-loss).
+   *
+   * `resume` used to `clearSlot` the run it was picking up, on the reasoning that the offer had been
+   * consumed and `persist` would re-park it from the live run on that very action. The re-park is
+   * real; the conclusion was not. `resumableState` builds the save from `state.runSlots` PLUS the
+   * live run, so the clear survived exactly as long as the live run stayed that golfer's — and
+   * "‹ Change golfer" is the button whose whole job is to make it somebody else's.
+   *
+   * These walk it in the reducer, and they assert through `saved()` (what would be ON DISK) rather
+   * than `state.runSlots`, because the gap between those two is where the bug lived. Every existing
+   * walkthrough in this file went through `toTitle`, which folds `resumableState` back into the state
+   * and healed the table — which is exactly why none of them caught it.
+   */
+  it('resuming a golfer and then CHANGING GOLFER keeps the resumed run (GS-resume-slot-loss)', () => {
+    // Larry has a Voyage parked. Leaving from the intro (rather than mid-hole) is what makes the
+    // resume land back on the intro, which is the only screen that offers "‹ Change golfer".
+    let s = reduce(reduce(initState('resume-swap'), { type: 'start', format: 'voyage' }), {
+      type: 'selectCharacter',
+      characterId: LARRY,
+    });
+    s = reduce(s, { type: 'toTitle' });
+    const larrySnap = readSlot(saved(s).runSlots, 'voyage', LARRY)!;
+    expect(larrySnap).toBeDefined();
+
+    // Re-enter, tap Larry — this is the resume that used to empty his slot.
+    s = reduce(reduce(s, { type: 'start', format: 'voyage' }), { type: 'selectCharacter', characterId: LARRY });
+    expect(s.screen).toBe('intro');
+    expect(s.run.loadout.characterId).toBe(LARRY);
+    // The table still holds him WHILE he is live. That is the invariant: `state.runSlots` is a
+    // faithful superset of the save, never a subset of it.
+    expect(readSlot(s.runSlots, 'voyage', LARRY), 'resume emptied the slot it just picked up').toBeDefined();
+    expect(readSlot(saved(s).runSlots, 'voyage', LARRY)).toBeDefined();
+
+    // Change your mind.
+    s = reduce(s, { type: 'backToCharacter' });
+    expect(s.screen).toBe('character');
+    expect(readSlot(saved(s).runSlots, 'voyage', LARRY)).toBeDefined();
+
+    // Pick somebody else. THIS is the action that used to write a save with no trace of Larry.
+    s = reduce(s, { type: 'selectCharacter', characterId: FEATHER });
+    expect(s.run.loadout.characterId).toBe(FEATHER);
+    const disk = saved(s);
+    expect(readSlot(disk.runSlots, 'voyage', LARRY), "Larry's parked run was lost").toEqual(larrySnap);
+    expect(readSlot(disk.runSlots, 'voyage', FEATHER)).toBeDefined();
+
+    // And it survives being played on and parked, which is where the player actually noticed.
+    const parked = saved(reduce(playHoles(s, 1), { type: 'toTitle' }));
+    expect(readSlot(parked.runSlots, 'voyage', LARRY)).toEqual(larrySnap);
+    expect(readSlot(parked.runSlots, 'voyage', FEATHER)!.stopPlayed).toHaveLength(1);
+  });
+
+  it('a resume never DROPS a slot — the table may lead the save, never trail it', () => {
+    // Stated as the general rule rather than the one path, because the specific path was reachable
+    // only through the intro's Change golfer and the next such route would not be.
+    for (const [format, mode] of [['voyage', 'voyage'], ['unending', 'endless']] as const) {
+      let s = reduce(reduce(initState(`no-drop-${format}`), { type: 'start', format }), {
+        type: 'selectCharacter',
+        characterId: BO,
+      });
+      s = reduce(s, { type: 'toTitle' });
+      const before = Object.keys(saved(s).runSlots);
+      expect(before).toContain(slotKey(mode, BO));
+
+      const resumed = reduce(s, { type: 'resume', mode, characterId: BO });
+      expect(Object.keys(resumed.runSlots), `${format}: resume dropped a slot from the table`).toEqual(before);
+      expect(Object.keys(saved(resumed).runSlots).sort()).toEqual(before.sort());
+    }
+  });
+
   it('a golfer with a run in ANOTHER mode is not badged here, and picking them starts a fresh one', () => {
     // Bo is deep in the Unending Universe; that must say nothing about Bo on the Voyage picker.
     const bo = reduce(reduce(initState('cross-mode-pick'), { type: 'start', format: 'unending' }), {

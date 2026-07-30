@@ -75,7 +75,10 @@ describe('Star Tour reducer flow (GS-star-tour-2)', () => {
     expect(s.screen).toBe('playing');
     expect(s.play!.holeIndex).toBe(5);
     expect(s.stopPlayed).toHaveLength(5);
-    expect(s.runSlots).toEqual({});
+    // The slot is NOT emptied by resuming (GS-resume-slot-loss) — it stays, holding the round, and
+    // every persist overwrites it with fresher progress. Asserting `{}` here pinned the old
+    // "the offer is consumed" behaviour, which lost the run as soon as the live run changed golfer.
+    expect(readSlot(s.runSlots, 'startour', CHARACTERS[0]!.id)).toEqual(parked);
     // Finishing out still banks a full 18-hole record.
     guard = 0;
     while (s.screen === 'playing' && guard++ < 300) {

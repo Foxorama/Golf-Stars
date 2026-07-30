@@ -498,9 +498,21 @@ export function reduce(state: UiState, action: Action): UiState {
       }
       const snap = readSlot(state.runSlots, target.mode, target.characterId);
       if (!snap) return state;
-      // The offer is consumed: the run is LIVE now, not parked. `persist` re-parks it from the live
-      // run on this very action, so the slot is refilled before anything can observe it empty.
-      const runSlots = clearSlot(state.runSlots, target.mode, target.characterId);
+      // THE SLOT IS LEFT EXACTLY WHERE IT IS (GS-resume-slot-loss).
+      //
+      // This used to `clearSlot` on the reasoning that "the offer is consumed: the run is LIVE now,
+      // not parked", and that `persist` re-parks it from the live run on this very action so the slot
+      // is refilled before anything can observe it empty. The second half is true and the conclusion
+      // does not follow: `resumableState` rebuilds the slot from `state.runSlots` PLUS THE LIVE RUN,
+      // so the clear survives only as long as the live run is still this golfer's. "‹ Change golfer"
+      // makes it somebody else's — and with the entry already gone from the in-memory table, the very
+      // next persist wrote a save with no trace of it. Park a Voyage, re-enter, tap that golfer,
+      // change your mind, pick anybody else: the first run was gone.
+      //
+      // Clearing was never load-bearing. `resumableState` upserts the live run into this same slot on
+      // every persist, so the entry is immediately rewritten with fresher data; the clear only ever
+      // opened a window in which the table said less than the disk. Leaving it makes `state.runSlots`
+      // a faithful superset of the save, which is the invariant every other reader assumes.
       const lastPlayed = target;
       const run = resumeRun(snap);
       const course = currentCourse(run);
@@ -537,7 +549,6 @@ export function reduce(state: UiState, action: Action): UiState {
           starmartOffer: undefined,
           starmartRerolls: undefined,
           scrambleChoice: undefined,
-          runSlots,
           lastPlayed,
           viewHole: 0,
         };
@@ -550,7 +561,6 @@ export function reduce(state: UiState, action: Action): UiState {
         played: undefined,
         lastResult: undefined,
         routes: undefined,
-        runSlots,
         lastPlayed,
         viewHole: 0,
       });

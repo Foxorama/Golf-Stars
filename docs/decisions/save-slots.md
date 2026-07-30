@@ -209,3 +209,48 @@ while the confirm beside it named the rule. Three honest answers: `hole` for eve
 `world` for a Story round (the campaign is saved, the round is not — it owns no slot), `forfeit` for
 Asgard. A uniform promise is what the player is owed; a uniform *lie* is not an acceptable way to get
 one.
+
+## Postscript: the third bug, found in play (GS-resume-slot-loss)
+
+Reported as *"the issue seems to be related to the 'change golfer' option"* — which was exactly right.
+
+`resume` emptied the slot it was picking up:
+
+```ts
+// The offer is consumed: the run is LIVE now, not parked. `persist` re-parks it from the live
+// run on this very action, so the slot is refilled before anything can observe it empty.
+const runSlots = clearSlot(state.runSlots, target.mode, target.characterId);
+```
+
+The second sentence is true. The conclusion does not follow. `resumableState` builds the save from
+`state.runSlots` **plus the live run**, so that clear held only as long as the live run was still that
+golfer's — and `‹ Change golfer` is the button whose entire job is to make it somebody else's. With
+the entry already gone from the in-memory table, the next persist wrote a save with no trace of it:
+
+```
+park Larry ▸ re-enter the Voyage ▸ tap Larry (resume) ▸ ‹ Change golfer ▸ tap anyone else
+                                          ↑                                      ↑
+                              table loses Larry                    disk loses Larry
+```
+
+The clear was never load-bearing — `resumableState` upserts the live run into that same slot on every
+persist, so the entry is immediately rewritten with fresher data. All the clear ever did was open a
+window where the table said **less** than the disk.
+
+**The invariant, stated properly:** `state.runSlots` is a faithful **superset** of the save — it may
+lead it, never trail it. The table not yet holding a *fresh* run is fine (`resumableState` adds it, and
+abandoning a golfer you just picked should cost their untouched stop-1 run). The table having *dropped*
+something is never fine. Only two things may remove an entry: a confirmed start-over, and a run ending.
+
+### Why the existing tests missed it
+
+Every walkthrough in `save-slots.test.ts` reached the picker through `toTitle` — which folds
+`resumableState` back into `state.runSlots` and **heals the table**. So the one route that reaches
+character select with a live run (`backToCharacter`, gated to the intro at stop 0) was the one route
+never walked. Two tests did assert the old behaviour directly, in `ui.test.ts` and
+`startour-flow.test.ts`, both as `expect(runSlots).toEqual({})` with the comment *"the offer is
+consumed"* — pinning the implementation choice rather than any property a player has. They now assert
+the superset invariant instead.
+
+A reducer test that asserts on `state.runSlots` alone is asserting on a cache. The helpers at the top
+of that file exist for this reason: assert through `saved()`, which is what would be **on disk**.
