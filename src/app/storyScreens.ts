@@ -248,6 +248,12 @@ function earthClubhouseHTML(story: StoryState): string {
         inspectId,
         inspectId === story.characterId
           ? { label: '★ Your golfer', action: {}, disabled: true }
+          : // A golfer who already holds a campaign is NOT switchable-to: the switch restamps your loaded
+          // campaign with their id and `upsertCampaign` would write it over their slot. The reducer
+          // refuses (GS-story-switch-clobber), so the button must say why rather than sit there dead —
+          // a guarded action that returns the same state is the dead-button trap GS-story-back-dead names.
+          campaignOverwriteWarning(currentRoster(state), inspectId)
+          ? { label: `${getCharacter(inspectId)?.shortName ?? 'They'} has their own campaign`, action: {}, disabled: true }
           : { label: `Switch to ${getCharacter(inspectId)?.name ?? 'this golfer'}`, action: { type: 'storySwitchGolfer', characterId: inspectId } },
       )
     : '';

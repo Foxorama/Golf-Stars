@@ -16,7 +16,7 @@ import { initState, reduce, storyCampaignTags, currentRoster, type UiState } fro
 import { backIntent } from '../src/ui/back';
 import { defaultStoryState, type StoryState } from '../src/sim/rpg/story';
 import { campaignFor, emptyCampaignStore, isChampion, upsertCampaign } from '../src/sim/rpg/storyRoster';
-import { storyGolferPickerHTML } from '../src/app/storyScreens';
+import { storyGolferPickerHTML, storyHubScreen } from '../src/app/storyScreens';
 import { setState } from '../src/app/ctx';
 
 const FEATHER = 'feather-fade';
@@ -294,6 +294,51 @@ describe('state hygiene', () => {
     const open = picker(s);
     expect(open.storyInspectId).toBeUndefined();
     expect(open.storyOverwriteId).toBeUndefined();
+  });
+});
+
+/**
+ * GS-story-switch-clobber. `storySwitchGolfer` restamps the LOADED campaign with another golfer's id,
+ * and `writeStory` → `upsertCampaign` keys on exactly that id — so the switch wrote a fresh prologue
+ * straight over whatever the target golfer already had. The existing `chapter > 0` guard protects the
+ * campaign being LEFT; nothing protected the one being LANDED ON.
+ *
+ * This is the same rule `selectCharacter` and `storyRestartCampaign` already enforce, which is the point:
+ * the guard lives in the REDUCER so no surface can route around it — and this action routed around it.
+ */
+describe('switching protagonist can never overwrite the golfer you switch TO', () => {
+  const hub = (...stories: StoryState[]): UiState => ({ ...booted(...stories), screen: 'story' });
+
+  it('refuses a switch onto a golfer who already holds a campaign', () => {
+    const s = hub(defaultStoryState(FEATHER), { ...defaultStoryState(LARRY), chapter: 1 });
+    const after = reduce(s, { type: 'storySwitchGolfer', characterId: LARRY });
+    expect(after).toBe(s); // refused outright — same state, nothing written
+    expect(campaignFor(currentRoster(after), LARRY)?.chapter).toBe(1);
+    expect(after.story?.characterId).toBe(FEATHER);
+  });
+
+  it('refuses even when the target campaign is only at the prologue', () => {
+    // The bug also SEEDED prologue slots for every golfer switched through, so "nothing of value
+    // there" is not a judgement this action gets to make — a slot is a slot.
+    const s = hub(defaultStoryState(FEATHER), defaultStoryState(LARRY));
+    expect(reduce(s, { type: 'storySwitchGolfer', characterId: LARRY })).toBe(s);
+  });
+
+  it('still switches freely to a golfer with no campaign at all', () => {
+    const s = hub(defaultStoryState(FEATHER));
+    const after = reduce(s, { type: 'storySwitchGolfer', characterId: LARRY });
+    expect(after.story?.characterId).toBe(LARRY);
+    expect(after.storyInspectId).toBeUndefined();
+  });
+
+  it('the clobbering button is DISABLED, not dead', () => {
+    // GS-story-back-dead: a guarded action that returns the same state renders as a button that does
+    // nothing at all. If the reducer refuses, the surface must not still offer it.
+    const s = hub(defaultStoryState(FEATHER), { ...defaultStoryState(LARRY), chapter: 1 });
+    setState({ ...s, storyInspectId: LARRY });
+    const html = storyHubScreen();
+    expect(html).not.toContain('storySwitchGolfer');
+    expect(html).toContain('has their own campaign');
   });
 });
 

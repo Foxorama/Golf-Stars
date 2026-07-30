@@ -97,6 +97,7 @@ import { questBeatFor, questBeatTurnIndex, questOfferBeatFor } from '../sim/rpg/
 import type { GearSlot } from '../sim/rpg/story';
 import {
   campaignFor,
+  campaignOverwriteWarning,
   campaignTags,
   championCampaigns,
   emptyCampaignStore,
@@ -702,6 +703,13 @@ export function reduce(state: UiState, action: Action): UiState {
       // GS-story-clubhouse: change your protagonist from the prologue hub — only BEFORE the campaign has
       // begun (chapter 0, Earth not yet cleared), so it never rewrites a golfer mid-campaign.
       if (state.screen !== 'story' || !state.story || state.story.chapter > 0) return state;
+      // …and never CLOBBER THE GOLFER YOU ARE SWITCHING TO (GS-story-switch-clobber). This restamps the
+      // LOADED campaign with another golfer's id, and `writeStory` → `upsertCampaign` keys on exactly
+      // that id — so switching to Larry wrote your prologue straight over Larry's chapter-1 slot. The
+      // chapter check above guards the campaign you are LEAVING; this guards the one you are LANDING ON.
+      // Same predicate the restart confirm consults, so the reducer and the sheet cannot disagree about
+      // what "there is something here to destroy" means.
+      if (campaignOverwriteWarning(currentRoster(state), action.characterId)) return state;
       return { ...state, story: { ...state.story, characterId: action.characterId }, storyInspectId: undefined };
     }
 
