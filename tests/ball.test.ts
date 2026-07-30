@@ -34,9 +34,11 @@ function recordingCtx(): {
   fillAlphas: number[];
   fills: number;
   strokes: number;
+  strokeWidths: number[];
 } {
   const arcs: { x: number; y: number; r: number }[] = [];
   const fillAlphas: number[] = [];
+  const strokeWidths: number[] = [];
   let fills = 0;
   let strokes = 0;
   const noop = (): void => undefined;
@@ -48,7 +50,7 @@ function recordingCtx(): {
     lineTo: noop,
     closePath: noop,
     fill: () => { fills++; fillAlphas.push((ctx as { globalAlpha: number }).globalAlpha); },
-    stroke: () => { strokes++; },
+    stroke: () => { strokes++; strokeWidths.push((ctx as { lineWidth: number }).lineWidth); },
     arc: (x: number, y: number, r: number) => { arcs.push({ x, y, r }); },
     ellipse: (x: number, y: number, r: number) => { arcs.push({ x, y, r }); },
     createRadialGradient: () => ({ addColorStop: noop }),
@@ -58,7 +60,7 @@ function recordingCtx(): {
     lineWidth: 1,
     lineCap: 'butt',
   } as unknown as CanvasRenderingContext2D;
-  return { ctx, arcs, fillAlphas, fills, strokes };
+  return { ctx, arcs, fillAlphas, fills, strokes, strokeWidths };
 }
 
 /**
@@ -70,12 +72,14 @@ const SHOT_CAMS = [2.56, 3.41, 5.7];
 const PUTT_CAMS = [7.56, 10.95, 17.1, 35];
 
 describe('ball size (the camera decides, within limits)', () => {
-  it('sits on the OLD fixed radius at the whole-hole cameras, so that view is unchanged', () => {
-    // Before this feature every ball everywhere was exactly 3px — so the whole-hole view has to land
-    // back on it to within a fraction of a pixel, or the map people already know changes under them.
+  it('sits on its floor at the whole-hole cameras — one size, all the way out', () => {
+    // The floor used to be the pre-feature fixed 3px so that view was untouched. It is now 2.25:
+    // "the golf ball in all zoom levels, normal, chipping, putting looks too large still… about 75%
+    // of the size it is now" is a request about EVERY camera, and the map cameras are the ones
+    // pinned to the floor, so honouring it there means moving the floor.
     for (const px of MAP_CAMS) {
-      expect(ballRadiusPx(px), `${px} px/yd`).toBeGreaterThanOrEqual(3);
-      expect(ballRadiusPx(px), `${px} px/yd`).toBeLessThan(3.15);
+      expect(ballRadiusPx(px), `${px} px/yd`).toBeGreaterThanOrEqual(2.25);
+      expect(ballRadiusPx(px), `${px} px/yd`).toBeLessThan(2.35);
     }
   });
 
@@ -99,12 +103,42 @@ describe('ball size (the camera decides, within limits)', () => {
   });
 
   it('never gets big enough to swamp the scene it sits in', () => {
-    // The fixed-size markers around it: the tee dot is r5 and the flagstick is 14 units tall. The
-    // reported "really big balls" was an 18px-wide ball on a green — taller than the whole flagstick.
+    // The fixed-size markers it is drawn among (style.ts, section 11): the tee dot is r5, the
+    // flagstick 14 units tall and the PIN's base shadow r2.2 — which is the one the player judges it
+    // against on a green, and the one the report is about ("compared to the hole/flag it's a
+    // beachball"). At the old r4.4 cap the ball was twice the width of the cup it was rolling at.
+    const PIN_BASE_R = 2.2;
+    const FLAGSTICK_H = 14;
     for (const px of [...SHOT_CAMS, ...PUTT_CAMS, 60, 1000]) {
-      expect(ballRadiusPx(px), `${px} px/yd`).toBeLessThanOrEqual(5.5);
+      const r = ballRadiusPx(px);
+      expect(r, `${px} px/yd`).toBeLessThanOrEqual(3.35);
+      expect(r / PIN_BASE_R, `${px} px/yd vs the cup marker`).toBeLessThan(1.6);
+      expect(r * 2, `${px} px/yd vs the flagstick`).toBeLessThan(FLAGSTICK_H / 2);
     }
     expect(ballRadiusPx(1000)).toBe(DEFAULT_BALL_FEEL.ballMaxPx);
+  });
+
+  it('every length on the ball is ONE scale — the ink shrinks with the radius', () => {
+    // The rim is stroked ON the silhouette, so it adds HALF its width to the apparent radius. Leave
+    // it at the 1px it was drawn at when the cap was r4.4 and a 25%-smaller ball reads as a muddier
+    // ball rather than a smaller one (1px on a 4.5px silhouette is a third of it) — and the apparent
+    // radius lands at 78% of the old one, short of the reduction that was asked for.
+    const rim = (r: number): number => {
+      const rec = recordingCtx();
+      drawBall(rec.ctx, 50, 50, r, { skin: BALL_SKINS.classic });
+      return rec.strokeWidths[rec.strokeWidths.length - 1]!; // the hairline is stroked last
+    };
+    const capped = DEFAULT_BALL_FEEL.ballMaxPx;
+    const apparent = capped + rim(capped) / 2;
+    expect(apparent / (4.4 + 1 / 2), 'apparent radius vs the ball that was reported too big').toBeLessThan(0.78);
+    // The SVG twin carries the same rim, or the resting ball is inked differently from the flying one.
+    const sw = [...ballSVG(50, 50, capped, BALL_SKINS.classic).matchAll(/stroke-width="([\d.]+)"/g)].map((m) => +m[1]!);
+    expect(sw.at(-1)).toBeCloseTo(rim(capped), 3);
+    // …and the feature-onset thresholds are on the same scale, which is what keeps it the SAME ball:
+    // the CAMERA each feature arrives at is unchanged by the resize.
+    const onset = (minR: number): number =>
+      ((minR - DEFAULT_BALL_FEEL.ballMinPx) / DEFAULT_BALL_FEEL.ballGrowth) ** 2 + DEFAULT_BALL_FEEL.ballGrowFrom;
+    expect(onset(DEFAULT_BALL_FEEL.dimpleMinPx), 'dimples still arrive at ~8.9 px/yd').toBeCloseTo(8.91, 1);
   });
 
   it('the EXAGGERATION shrinks as you zoom in — you zoom to see closer to the truth', () => {
@@ -168,11 +202,13 @@ describe('roll (measured in screen distance, deliberately)', () => {
 
 describe('the painter', () => {
   it('draws dimples once the ball is big enough to hold them, and not before', () => {
+    // Keyed off the threshold rather than hard-coded radii: the whole ball has been rescaled twice
+    // now, and a literal 3 was a ball WITHOUT dimples in the first size and one WITH them in this one.
     const small = recordingCtx();
-    drawBall(small.ctx, 50, 50, 3, { skin: BALL_SKINS.classic });
+    drawBall(small.ctx, 50, 50, DEFAULT_BALL_FEEL.dimpleMinPx - 0.3, { skin: BALL_SKINS.classic });
     const big = recordingCtx();
-    drawBall(big.ctx, 50, 50, 8, { skin: BALL_SKINS.classic });
-    // A 3px ball is the body + the rim; an 8px one carries a dimple field on top.
+    drawBall(big.ctx, 50, 50, DEFAULT_BALL_FEEL.dimpleMinPx + 4, { skin: BALL_SKINS.classic });
+    // The small ball is the body + band + mark + rim; the big one carries a dimple field on top.
     expect(big.arcs.length).toBeGreaterThan(small.arcs.length + 10);
   });
 

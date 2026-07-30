@@ -866,10 +866,19 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     FIXED 3px whatever the camera did — so it could never look like it was ROLLING (a featureless disc
     can't) and the run-out's hops were INVISIBLE (a 3px disc rising 1.5px off a static shadow is not a
     bounce; the model had been hopping the whole time). Three rules: the drawn ball SCALES with
-    `proj.scale` **sub-linearly** (`sqrt`) — floored at the old 3px so the whole-hole map is unchanged,
-    capped at 5.5 against the scene's own fixed markers (the tee dot is r5, the flagstick 14 units), and
-    sub-linear because LINEAR growth pinned every putt to the cap: an 18px ball, and flat, so a tap-in
-    looked like a 20-footer. The measured cameras are 0.5–5.7 px/yd for shots and **7.6–35 for putts** —
+    `proj.scale` **sub-linearly** (`sqrt`) — floored (2.25px, the whole-hole map) and capped (3.3px)
+    against the scene's own fixed markers (tee dot r5, flagstick 14 units, the pin's base shadow r2.2),
+    and sub-linear because LINEAR growth pinned every putt to the cap: an 18px ball, and flat, so a
+    tap-in looked like a 20-footer. **EVERY LENGTH ON THE DRAWN BALL IS ONE SCALE AND THE WHOLE OF IT
+    MOVES TOGETHER** — the size has been reported too big twice, and the second time (*"a tennis ball…
+    compared to the hole/flag it's a beachball"*, 75% asked for) the radius curve, the feature-onset
+    radii (band/mark/`dimpleMinPx`) AND every absolute ink width that rides on it (the rim hairline, band
+    width, dimple/mark floors, the aura's outset) went down together. Scale the curve alone and a
+    25%-smaller ball keeps a 1px rim on a 4.5px silhouette — a third of it — so it reads MUDDIER rather
+    than smaller, and since the rim is stroked ON the silhouette the apparent radius (`r` + half the rim)
+    lands at 78%, not 75%. Scaling the onset radii by the same factor is what keeps it the SAME ball: the
+    cameras at which dimples/band/mark arrive come out unchanged. The measured cameras are 0.5–5.7 px/yd
+    for shots and **7.6–35 for putts** —
     guess them and you tune the wrong end (a real ball is 0.047yd = a THIRD OF A PIXEL at the putt
     camera, so a scale model was never on the table); **roll is the ONE thing measured in
     SCREEN px, not yards** (`dθ = ds/r` with BOTH taken as drawn — real yards and a real radius give 68
