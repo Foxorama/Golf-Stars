@@ -80,58 +80,23 @@ function mulberry32(a) {
   };
 }
 
-// A scatter of stars, thinned out of the centre band so they never fight the wordmark for the eye.
-const rng = mulberry32(20260729);
-const stars = [];
-for (let i = 0; i < 95; i++) {
-  const x = rng() * W;
-  const y = rng() * H;
-  const centreBand = Math.abs(y - H * 0.5) < 58 && x > W * 0.12 && x < W * 0.88;
-  if (centreBand && rng() < 0.86) continue;
-  const r = 0.5 + rng() * 1.5;
-  stars.push({ x, y, r, a: 0.2 + rng() * 0.6 });
-}
-// Faint constellation links — the intro cinematic's motif. AT MOST ONE LINK PER STAR, to its
-// nearest unclaimed neighbour: linking every near pair (the obvious implementation) produces a
-// dense triangulated mesh that reads as scribble, not as star figures. Sparse pairs and short
-// chains are what look like a constellation.
-const links = [];
-const claimed = new Set();
-for (let i = 0; i < stars.length; i++) {
-  if (claimed.has(i) || rng() > 0.42) continue;
-  let best = -1;
-  let bestD = 26000; // (~160px)² — long enough to span a figure, short enough to stay legible
-  for (let j = 0; j < stars.length; j++) {
-    if (j === i || claimed.has(j)) continue;
-    const dx = stars[i].x - stars[j].x;
-    const dy = stars[i].y - stars[j].y;
-    const d = dx * dx + dy * dy;
-    if (d < bestD) {
-      bestD = d;
-      best = j;
-    }
-  }
-  if (best < 0) continue;
-  claimed.add(i);
-  claimed.add(best);
-  links.push([stars[i], stars[best]]);
-}
-
-const starSVG = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg"
-     style="position:absolute;inset:0;">
-  ${links
-    .map(
-      ([a, b]) =>
-        `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="#9fd8e6" stroke-width="0.6" opacity="0.16"/>`,
-    )
-    .join('')}
-  ${stars
-    .map(
-      (s) =>
-        `<circle cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="${s.r.toFixed(2)}" fill="#fff" opacity="${s.a.toFixed(2)}"/>`,
-    )
-    .join('')}
-</svg>`;
+// THE BANNER CARRIES NO STARS OF ITS OWN, AND THAT IS THE POINT (GS-itch-page-sky).
+//
+// It used to: the page background was a flat colour swatch, so the banner had to bring its own
+// sky or the wordmark floated on nothing. Once `page-sky.png` exists that reason is gone, and
+// keeping them was actively wrong in two ways that only show up on the assembled page:
+//
+//   * DOUBLE DENSITY. The banner is transparent and composites ON the page sky, so its rectangle
+//     had two starfields stacked — a visibly busier patch of sky exactly where the eye lands
+//     first, with a straight edge along the bottom of the image.
+//   * IT SLID. The page sky is `background-attachment: fixed` and the banner is an ordinary
+//     scrolling `<img>`, so the two layers moved against each other the moment you scrolled.
+//     Same star size and brightness in both, so it read as a mismatched patch rather than as
+//     parallax depth — reported as "when you first scroll it looks a bit odd".
+//
+// Deliberately not solved by matching the densities or by un-fixing the background: `Fixed` is
+// what makes the nebulae possible at all (see the sky block), and two skies that merely agree
+// today would drift the next time either is retuned. One sky, drawn once.
 
 const bannerHTML = `<!doctype html><html><head><meta charset="utf-8"><style>
   html,body { margin:0; padding:0; background:transparent; }
@@ -155,7 +120,6 @@ const bannerHTML = `<!doctype html><html><head><meta charset="utf-8"><style>
           filter: drop-shadow(0 0 20px ${GLOW_GREEN}); }
 </style></head><body>
   <div class="wrap">
-    ${starSVG}
     <h1 class="title"><svg class="flag" viewBox="0 0 44 64" xmlns="http://www.w3.org/2000/svg"><rect x="12" y="4" width="3.4" height="55" rx="1.7" fill="${INK}" opacity="0.85" /><path d="M15.4 7 L41 16 L15.4 26 Z" fill="#5fd45a" /><circle cx="28" cy="55" r="4" fill="#fff" opacity="0.92" /></svg>The Far Carry</h1>
   </div>
 </body></html>`;
@@ -378,10 +342,6 @@ async function shoot(html, width, height, file, transparent, dpr = 2, quality) {
 await shoot(bannerHTML, W, H, 'banner.png', true);
 const tileBuf = await shoot(embedHTML, TILE, TILE, 'embed-bg.png', false, 1);
 const skyBuf = await shoot(skyPano, SKY_W, SKY_H, 'page-sky.png', false, 1);
-// Eyes-on only, never uploaded: the same banner composited over the page background it will sit
-// on. A transparent PNG of pale text is unreadable in an image viewer, so judging the real thing
-// means judging it on #0b0d12.
-await shoot(bannerHTML.replace('background:transparent', `background:${PAGE_BG}`), W, H, 'banner-preview.png', false);
 
 // Eyes-on only. Two checks that cannot be made by reading the tile on its own:
 //   seam-preview  — the tile repeated 2x2 with the joins ruled in red. A wrap that does not line
@@ -398,6 +358,16 @@ await shoot(seamHTML.replace('__TILE__', tileURI), TILE, TILE, 'seam-preview.png
 await shoot(
   seamHTML.replace('__TILE__', skyURI).replaceAll(`${TILE}px`, `${SKY_W / 2}px`).replace(`${SKY_W / 2}px ${SKY_W / 2}px`, `${SKY_W / 2}px ${SKY_H / 2}px`),
   SKY_W / 2, SKY_H / 2, 'sky-seam-preview.png', false, 1,
+);
+// The banner on the sky it actually composites onto — NOT on a flat colour. Now that the banner
+// carries no stars of its own, a flat-colour preview would show a bare wordmark and tell you
+// nothing about the only question left: whether the page sky reads through the glow.
+await shoot(
+  bannerHTML.replace(
+    'background:transparent',
+    `background:${PAGE_BG} url("${skyURI}") center/auto no-repeat`,
+  ),
+  W, H, 'banner-preview.png', false,
 );
 
 const EMBED_W = 600;
