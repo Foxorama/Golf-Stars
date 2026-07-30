@@ -85,10 +85,25 @@
         font-family: var(--gs-font);
         letter-spacing: var(--gs-track);
         word-spacing: var(--gs-wordspace);
-        /* A faint cosmic vignette so flat panels sit on a living sky, not a slab. */
+        /* A faint cosmic vignette so flat panels sit on a living sky, not a slab — and, over it,
+           an actual STARFIELD (GS-space-sky, `src/render/spaceSky.ts`).
+
+           `--gs-sky` is a seamless star tile handed over as a `url(…)` at boot. It is a background
+           LAYER rather than a fixed element on purpose: `body`'s background propagates to the
+           canvas, so it covers the whole viewport at any `--gs-uiscale` with no size to state (a
+           fixed box inside a zoomed root does not measure the display — GS-a11y-scale-wrap), it
+           needs no `z-index: -1` and nothing above it can bury it with a stacking context, and it
+           does not have to be mounted outside `#app` to survive `render()`.
+
+           The fallback is the POINT of writing it this way: `var(--gs-sky, none)` means a build
+           where that boot call never runs falls back to exactly the old vignette, not to a hole.
+           Star layer FIRST so it sits on top of the colour wash rather than under it, and
+           `repeat` only for that layer — the two vignette blobs are single, placed washes. */
         background-image:
+          var(--gs-sky, none),
           radial-gradient(1100px 620px at 78% -8%, #18203044 0%, transparent 60%),
           radial-gradient(900px 520px at 12% 4%, #1a162a3a 0%, transparent 58%);
+        background-repeat: repeat, no-repeat, no-repeat;
         background-attachment: fixed;
       }
       .gs-main {

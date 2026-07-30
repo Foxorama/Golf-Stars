@@ -1668,7 +1668,7 @@ function fuelTruckGroup(): string {
 
 /** Star tints — most stars are white, but a galaxy reads richer with a scatter of blue-white giants,
  *  warm gold suns and the odd red one. Weighted so white dominates. */
-const STAR_TINTS = ['#ffffff', '#ffffff', '#ffffff', '#dbe6ff', '#bcd4ff', '#fff0cf', '#ffd8a8', '#ffc0b0'];
+export const STAR_TINTS = ['#ffffff', '#ffffff', '#ffffff', '#dbe6ff', '#bcd4ff', '#fff0cf', '#ffd8a8', '#ffc0b0'];
 
 /** Deep-space nebula clouds — soft, luminous colour washes that give the chart a galaxy/system feel
  *  instead of a flat black field. Fixed positions/hues (only ONE star map mounts at a time, so the

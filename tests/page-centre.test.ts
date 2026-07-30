@@ -50,12 +50,25 @@ describe.runIf(chromePath)('the page frame centres its content (GS-page-centre)'
   }, 60_000);
   afterAll(async () => { await browser?.close(); });
 
-  /** Boot the built app at a given viewport + deep-linked screen. */
+  /**
+   * Boot the built app at a given viewport + deep-linked screen, with `reducedMotion` stored so
+   * entrance animations are collapsed before anything is measured. Several screens slide or fade
+   * their content in; a fixed wait races them, and a geometry assertion that measures a moving
+   * layout fails under load and passes in isolation.
+   */
   async function open(w: number, h: number, screen: string) {
     const page = await browser.newPage({ viewport: { width: w, height: h } });
-    await page.goto(`file://${dist}?intro=0&seed=42${screen ? `&screen=${screen}` : ''}`, { waitUntil: 'load' });
-    await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', { timeout: 15_000 });
-    await page.waitForTimeout(300);
+    const url = `file://${dist}?intro=0&seed=42${screen ? `&screen=${screen}` : ''}`;
+    const booted = () => document.getElementById('app')?.getAttribute('data-booted') === '1';
+    await page.goto(url, { waitUntil: 'load' });
+    await page.waitForFunction(booted, { timeout: 15_000 });
+    await page.evaluate(() => localStorage.setItem('fc_settings', JSON.stringify({
+      sound: false, music: false, haptics: false, reducedMotion: true, leftHanded: false,
+      fastShots: true, lastAscension: 0, aimMode: 'auto', readableFont: false, uiScale: 1,
+    })));
+    await page.goto(url, { waitUntil: 'load' });
+    await page.waitForFunction(booted, { timeout: 15_000 });
+    await page.waitForTimeout(250);
     return page;
   }
 

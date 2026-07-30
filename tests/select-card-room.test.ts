@@ -55,24 +55,31 @@ describe.runIf(chromePath)('the roster card is dressed for the room it has (GS-s
   }, 60_000);
   afterAll(async () => { await browser?.close(); });
 
-  /** Open the roster at a viewport, optionally with a UI scale already stored (it applies at boot). */
+  /**
+   * Open the roster at a viewport, with a UI scale already stored (it applies at boot).
+   *
+   * The settings blob is written and the page RELOADED every time, not only when the scale
+   * differs, and `reducedMotion` is always on. The roster cards animate in over 420ms
+   * (`gs-char-in`), and a fixed wait shorter than that measures a grid that has not settled: this
+   * suite passed in isolation and failed under full-suite load, which is a flaky test, not a
+   * layout bug. `.gs-reduced` collapses every animation duration to ~0, so the measurement is of
+   * the resting layout by construction rather than by waiting long enough.
+   */
   async function roster(w: number, h: number, scale = 1): Promise<{ card: Card; close: () => Promise<void> }> {
     const page = await browser.newPage({ viewport: { width: w, height: h } });
     const url = `file://${dist}?intro=0&seed=42&screen=character`;
     const booted = () => document.getElementById('app')?.getAttribute('data-booted') === '1';
     await page.goto(url, { waitUntil: 'load' });
     await page.waitForFunction(booted, { timeout: 15_000 });
-    if (scale !== 1) {
-      await page.evaluate(
-        (s) => localStorage.setItem('fc_settings', JSON.stringify({
-          sound: false, music: false, haptics: false, reducedMotion: true, leftHanded: false,
-          fastShots: true, lastAscension: 0, aimMode: 'auto', readableFont: false, uiScale: s,
-        })), scale,
-      );
-      await page.goto(url, { waitUntil: 'load' });
-      await page.waitForFunction(booted, { timeout: 15_000 });
-    }
-    await page.waitForTimeout(350);
+    await page.evaluate(
+      (s) => localStorage.setItem('fc_settings', JSON.stringify({
+        sound: false, music: false, haptics: false, reducedMotion: true, leftHanded: false,
+        fastShots: true, lastAscension: 0, aimMode: 'auto', readableFont: false, uiScale: s,
+      })), scale,
+    );
+    await page.goto(url, { waitUntil: 'load' });
+    await page.waitForFunction(booted, { timeout: 15_000 });
+    await page.waitForTimeout(250);
     return { card: (await page.evaluate(CARD)) as Card, close: () => page.close() };
   }
 
