@@ -1326,6 +1326,21 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     re-wires (`refreshSettings`, GS-settings-flicker); the settings sheet inner is split from its backdrop;
     the pull-to-power drag redraws only the overlay. A full `render()` re-mounts frames and replays slide-up
     animations as a flicker.
+  - **WHICH ROSTER CARD YOU GET IS A QUESTION ABOUT THE CARD, NOT ABOUT THE PAGE** (GS-select-card-room).
+    The golfer card has two dressings — COMPACT (portrait · stats · one clamped ✓/▲ hint) and FULL (blurb ·
+    pros/cons · the "Tap · …" footer) — and the switch was `max-width: 999px` alone, which is a question
+    about the PAGE standing in for one about the CARD: a page can be far too narrow for FOUR cards while
+    being roomy for TWO. On the itch embed's default desktop viewport (820×760) the roster is 2-across, so
+    each card is **390×323 — wider than the four-across desktop card at 1280×800 (277×348)** — and all four
+    wore the phone dressing, reading as big cards 60% empty; a 768×1024 tablet was worse (**364×455**,
+    stripped). The condition now asks about BOTH axes and asks TWICE, because the layouts differ: 4-across
+    is ONE row so height never limits it (a short desktop window stays full — `TIGHT_H` is 660, so gating
+    there would strip a card that fits), 2-across is TWO rows and needs a measured **760×760** floor, which
+    is where the roster stops scrolling and GS-select-onescreen's promise survives. The 2-across branch also
+    consults `data-gs-fit` — a media query CANNOT see `--gs-uiscale`, and the same embed at the top reader
+    rung lays out in 566×524 units, which the full card overflows. Two conditions set ONE `--gs-card-*`
+    switch that the four consumers read, so a fifth element can't be wired into one branch and forgotten in
+    the other. Guarded by `tests/select-card-room.test.ts`.
   - Screen specifics: the settings cog rides EVERY screen (return-to-title parks the run as `resumable`,
     never snapshots the title's placeholder run). Character select fits ONE mobile screen with no scroll
     (GS-select-onescreen, viewport-locked flex column, the card IS the button on phones); Ascension + club
