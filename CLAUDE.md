@@ -1517,3 +1517,25 @@ GPS/geolocation, OSM/Overpass, weather APIs, real astronomy/star catalogs, the d
 offline-utility service-worker framing. We deliberately left all of it behind. (One scoped exception:
 the NETWORK-first, subpath-scoped PWA SW above — the inverse of golf-finder's cache-first offline SW,
 not a re-coupling of the two apps.)
+
+## One decision, one home — the register (GS-one-description)
+The most expensive recurring bug here is ONE FACT DESCRIBED TWICE (the derelict deck ×7,
+`resumableState`, the SW cache prefix, `findChromium`'s 50 silently-skipped tests, and
+`isBareCampaignBlob` on the day GS-save-integrity shipped). Guards, strongest first: **compile-forced**
+(a `Record<Key,…>` / a `never` fallthrough — makes drift not BUILD, always prefer it, but only covers
+"one answer per member of a known set") ▸ **one seam + a source scan** banning the alternative
+(`tests/one-description.test.ts` — a behavioural test proves the code works TODAY, a scan proves the
+second description can't be INTRODUCED tomorrow: it catches the class, not the instance) ▸ **a test
+reading both copies** (weakest; sometimes the only option, e.g. the three-file SW prefix).
+**ADMISSION RULE: a row earns its place only once a fact has TWO OR MORE callers** — extracting a seam
+for one caller is over-abstraction, and banning re-derivation of a fact nobody re-derives is that same
+error wearing a guard's clothes. The trigger for a row is the trigger for the seam: a SECOND asker
+appeared. Every row states its `cost` (a rule nobody can weigh later is a style guide) and every
+exception NAMES a reason (an unexplained exception is a hole). ⚠️ **When a row cries wolf the fix is a
+precise pattern or a named exception — NEVER a relaxed one**: a guard everyone has learned to edit is
+worse than none (the `PRIVACY.md` rule, restated). Two self-checks keep it honest — each pattern is
+proved against a SAMPLE of the re-derivation it bans (a scan matching nothing passes forever), and the
+register EXCLUDES ITSELF (it names every banned shape in its own literals). The ~8 pre-existing scans
+listed in its header stay where they are for now: moving a working guard can only be verified by
+breaking it on purpose, and doing that to eight at once is how a register ends up weaker than the mess
+it replaced.
