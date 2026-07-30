@@ -1,0 +1,225 @@
+import { describe, it, expect } from 'vitest';
+import { readFileSync, readdirSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+/**
+ * ONE DECISION, ONE HOME — the register (GS-one-description).
+ *
+ * The most expensive recurring bug in this codebase is a single fact described in two places. The
+ * derelict ship paid it seven times (where does the deck end); GS-release-identity paid it on the
+ * rename; GS-save-slots paid it because `persist` and `toTitle` each had their own idea of what a run
+ * parks, which cost players a parked Voyage every time they played a Story world; GS-browser-test-gate
+ * paid it with 50 tests that silently skipped in CI for months because nine files each carried their
+ * own copy of "where is Chromium"; and GS-save-integrity paid it on the day it shipped, when a new
+ * version check re-derived a blob-shape discrimination `migrateCampaignStore` already owned and
+ * declared every legacy campaign in existence to be from the future.
+ *
+ * THE GUARDS THAT ACTUALLY WORK, in order of strength:
+ *
+ *   1. COMPILE-FORCED. A `Record<FlightClass, …>` or `screenIntent`'s `never` fallthrough does not
+ *      detect drift, it makes drift not build. Always prefer this. It only covers decisions shaped
+ *      like "one answer per member of a known set".
+ *   2. ONE SEAM + A SOURCE SCAN banning the alternative. This file. A behavioural test proves the code
+ *      works today; a source scan proves the second description cannot be INTRODUCED tomorrow. It
+ *      catches the class, not the instance, for about fifteen lines.
+ *   3. A test that reads both copies. Weakest, and sometimes the only option — the service-worker
+ *      cache prefix genuinely cannot share a constant across three files, so `brand.test.ts` reads all
+ *      three.
+ *
+ * ── THE ADMISSION RULE ───────────────────────────────────────────────────────────────────────────
+ *
+ * A row earns its place here only once a fact has TWO OR MORE callers. Extracting a seam for a fact
+ * with one caller is over-abstraction, and a row banning re-derivation of a fact nobody re-derives is
+ * the same error wearing a guard's clothes — `isBareCampaignBlob` was correctly inline while it had one
+ * asker. The trigger for a row is the same as the trigger for the seam: a SECOND asker appeared.
+ *
+ * And when a row starts producing false positives, the fix is to make the pattern precise or to add a
+ * named, justified exception — NEVER to relax it into uselessness. A guard everyone has learned to
+ * edit is worse than no guard, which `PRIVACY.md`'s own rule already says in its own words.
+ *
+ * ── ALREADY GUARDED ELSEWHERE (do not duplicate; add new rows here) ──────────────────────────────
+ *
+ *   `Math.random` in deterministic paths      → ball.test.ts, runout.test.ts, and the sim suite
+ *   `matchMedia` for reduced motion           → a11y-motion.test.ts
+ *   `devicePixelRatio` computed locally       → accessibility.test.ts
+ *   a `font-family` that is not the token     → accessibility.test.ts
+ *   raw viewport units (`vh`/`dvh`/…)         → accessibility.test.ts
+ *   `snapshotRun` returning to persist.ts     → save-slots.test.ts
+ *   the SW cache prefix, in three files       → brand.test.ts
+ *   storage keys vs PRIVACY.md's table        → privacy.test.ts
+ *
+ * Folding those into this register is a worthwhile follow-up — they are scattered across seven files
+ * and their existence is tribal knowledge, which is exactly why the GS-save-integrity bug did not
+ * reach for one. It is deliberately NOT done in the same pass that introduces the register: moving a
+ * working guard is a change that can only be verified by breaking it on purpose, and doing that to
+ * eight of them at once is how a register ends up weaker than the mess it replaced.
+ */
+
+const root = resolve(__dirname, '..');
+const read = (p: string): string => readFileSync(resolve(root, p), 'utf8');
+
+/** Every `.ts` under a tree, as `[path, source]`. */
+function sourceFiles(dir: string): [string, string][] {
+  const out: [string, string][] = [];
+  const walk = (d: string): void => {
+    for (const entry of readdirSync(resolve(root, d), { withFileTypes: true })) {
+      const p = `${d}/${entry.name}`;
+      if (entry.isDirectory()) walk(p);
+      else if (entry.name.endsWith('.ts')) out.push([p, read(p)]);
+    }
+  };
+  walk(dir);
+  return out;
+}
+
+const TREES: Record<'src' | 'tests', [string, string][]> = {
+  src: sourceFiles('src'),
+  tests: sourceFiles('tests'),
+};
+
+/** This file, excluded from its own scans — see the note at the filter below. */
+const REGISTER_PATH = 'tests/one-description.test.ts';
+
+/**
+ * A fact with exactly one home.
+ *
+ *  - `fact`    — what is being decided, in the player's or the domain's terms.
+ *  - `home`    — the file that owns it, and the exported name that answers it.
+ *  - `pattern` — the shape of a SECOND description. Anything matching this outside the home is a
+ *                re-derivation.
+ *  - `allowed` — files that may match anyway, each with a reason. An entry without a reason is not an
+ *                exception, it is a hole.
+ *  - `cost`    — what the codebase paid, or would pay. Rows are not free; this is the justification.
+ */
+interface OneDescription {
+  fact: string;
+  home: string;
+  answers: string;
+  /** Which tree a second description would appear in. A row scanning the wrong one passes vacuously. */
+  scan: 'src' | 'tests';
+  pattern: RegExp;
+  allowed?: Record<string, string>;
+  cost: string;
+}
+
+const REGISTER: OneDescription[] = [
+  {
+    fact: 'Which shape a persisted `fc_story` blob is — a roster, or a pre-roster single campaign',
+    home: 'src/sim/rpg/storyRoster.ts',
+    answers: 'isBareCampaignBlob',
+    // The discrimination is `campaigns` absent AND `characterId` a string. Anyone spelling that out
+    // again is deciding the blob's shape for themselves.
+    scan: 'src',
+    pattern: /!\w+\.campaigns\s*&&\s*typeof\s+\w+\.characterId\s*===\s*'string'/,
+    cost:
+      'Both shapes carry a top-level `version` meaning different things (envelope 1 vs STORY_VERSION 7), ' +
+      'so a re-derivation read 7 against a maximum of 1 and declared every legacy campaign to be from ' +
+      'the future — a save-protection feature that locked out the oldest saves (GS-save-integrity).',
+  },
+  // NOTE: "what does a live state park" (`resumableState`) is deliberately NOT a row. The second
+  // description that actually cost a run was `persist.ts` taking its own snapshot, and
+  // save-slots.test.ts already bans `snapshotRun` from that file precisely. A broader ban on
+  // `snapshotRun` here would flag the Asgard SUSPENSION (`asgardReturn: snapshotRun(run)`), which
+  // answers a different question, and a row that needs three reasoned exceptions to cover a five-site
+  // pattern is weaker than the targeted ban that already exists. Duplicating it would break this
+  // file's own header rule.
+  {
+    fact: 'Where Chromium is, for a test that drives the built artifact',
+    home: 'tests/chromium.ts',
+    answers: 'findChromium',
+    scan: 'tests',
+    pattern: /CHROME_PATH|chromium-\d|playwright[/\\]+chromium/i,
+    cost:
+      'Nine files each carried their own copy and they drifted into two different answers, so 50 tests ' +
+      'in build.test.ts reported SKIPPED everywhere — CI included — for months (GS-browser-test-gate).',
+  },
+  {
+    fact: 'Whether the animator has already drawn this hole',
+    home: 'src/app/playAnim.ts',
+    answers: 'holeIsNewToAnimator',
+    scan: 'src',
+    // The original inline condition. Comparing a hole index to the animator's own index is the
+    // re-derivation, and it is precisely the comparison that was wrong.
+    pattern: /holeIndex\s*!==\s*animHoleIndex/,
+    cost:
+      'A hole index is not a hole identity: returning to the same index carried the previous visit\'s ' +
+      'tallies into a fresh hole and silently skipped that many shots (GS-anim-counter-stale).',
+  },
+  {
+    fact: 'Whether a stored save blob can be read, and why not',
+    home: 'src/save/schema.ts',
+    answers: 'readSave',
+    scan: 'src',
+    // Comparing a blob's version to SAVE_VERSION by hand is how the caller loses the distinction
+    // between "nothing here" and "something here I can't read".
+    pattern: /\.version\s*!==\s*SAVE_VERSION/,
+    cost:
+      'That one comparison, answered with `defaultSave()`, destroyed a newer save, a neighbouring itch ' +
+      "game's blob, and corrupt bytes — three data-loss paths from one line (GS-save-integrity).",
+  },
+];
+
+describe('one decision, one home (GS-one-description)', () => {
+  for (const row of REGISTER) {
+    describe(row.fact, () => {
+      it(`is answered by ${row.answers} in ${row.home}`, () => {
+        const src = read(row.home);
+        expect(src, `${row.home} no longer defines ${row.answers} — did it move? Update the register.`).toContain(
+          row.answers,
+        );
+      });
+
+      it(`is not described a second time anywhere in ${row.scan}/`, () => {
+        const offenders = TREES[row.scan].filter(([path, src]) => {
+          if (path === row.home) return false;
+          // THIS FILE names every banned shape in its own `pattern` literals, so it matches them all.
+          // Naming a re-derivation is not performing one — the register documents the rule it enforces.
+          if (path === REGISTER_PATH) return false;
+          if (Object.keys(row.allowed ?? {}).some((a) => path.startsWith(a))) return false;
+          return row.pattern.test(src);
+        }).map(([path]) => path);
+
+        expect(
+          offenders,
+          `these re-derive a decision that lives in ${row.home} (${row.answers}) — call it instead.\n` +
+            `WHY THIS ROW EXISTS: ${row.cost}\n` +
+            `If the match is legitimate, add it to that row's \`allowed\` WITH A REASON — never widen the pattern.`,
+        ).toEqual([]);
+      });
+    });
+  }
+
+  it('every row carries a home, an answer, and the cost that justifies it', () => {
+    // A row with no stated cost is a rule nobody can weigh later. The register is not a style guide.
+    for (const row of REGISTER) {
+      expect(row.fact.length, `a row needs a fact: ${row.answers}`).toBeGreaterThan(10);
+      expect(row.cost.length, `${row.answers} has no stated cost`).toBeGreaterThan(40);
+      expect(row.home.startsWith('src/') || row.home.startsWith('tests/')).toBe(true);
+    }
+  });
+
+  it('every exception names a reason, because an unexplained exception is a hole', () => {
+    for (const row of REGISTER) {
+      for (const [path, reason] of Object.entries(row.allowed ?? {})) {
+        expect(reason.length, `${row.answers} exempts ${path} without saying why`).toBeGreaterThan(10);
+      }
+    }
+  });
+
+  it('the patterns actually match the thing they claim to ban', () => {
+    // A source scan that matches nothing is a guard that passes forever. Each pattern is proved
+    // against a sample of the second description it exists to catch, so a typo'd regex fails HERE
+    // rather than in six months when somebody re-derives the fact and nothing complains.
+    const samples: Record<string, string> = {
+      isBareCampaignBlob: "if (!obj.campaigns && typeof obj.characterId === 'string') return adopt(obj);",
+      findChromium: 'const p = process.env.CHROME_PATH ?? findLocalChromium();',
+      holeIsNewToAnimator: 'if (state.play.holeIndex !== animHoleIndex) { animatedShots = 0; }',
+      readSave: 'if (s.version !== SAVE_VERSION) return defaultSave();',
+    };
+    for (const row of REGISTER) {
+      const sample = samples[row.answers];
+      expect(sample, `no sample for ${row.answers} — add one or the pattern is unproven`).toBeDefined();
+      expect(row.pattern.test(sample!), `${row.answers}'s pattern does not match its own sample`).toBe(true);
+    }
+  });
+});
