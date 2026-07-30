@@ -31,6 +31,25 @@
   publishing from a custom GitHub Actions workflow, no CNAME file is created, and
   any existing CNAME file is ignored and is not required." The domain lives in
   repo settings only.
+
+  INSTALL, AS IT ACTUALLY BEHAVES (verified on Android Chrome, 2026-07-30):
+
+  • Chrome will not offer a real install until the service worker is registered
+    AND controlling the page. On a first visit to a new origin that race is lost,
+    and Chrome silently degrades to "Add to Home screen" — a bookmark shortcut
+    that opens in the browser, not an app. A single reload fixes it. Worth
+    knowing because the failure is silent and looks like a manifest bug: the
+    manifest, icons and SW all serve correctly (checked).
+
+  • A successful install is a WebAPK, i.e. a REAL app, so Android files it in the
+    app DRAWER — not the home screen. Whether new apps also land on the home
+    screen is a launcher setting, and a manifest cannot ask for it. The degraded
+    shortcut went straight to the home screen, so the broken path looked better
+    in the one place a player is watching. The copy below says so rather than
+    promising a home-screen icon that will not appear.
+
+  • `chrome://webapks` on Android lists what was actually minted — the only
+    definitive check.
 -->
 
 
@@ -106,7 +125,15 @@
 
 <p>Saves do not travel between where you play. A save made here lives with this page; the export file is the bridge.</p>
 
-<p><strong>To play offline — and to get the sturdiest save</strong> — open the game at <a href="https://farcarry.vulpecula.games/">farcarry.vulpecula.games</a> and use your browser's <em>Install app</em> / <em>Add to Home Screen</em>. Installed, it runs with no connection and the browser stops treating your progress as disposable. (An app cannot be installed from inside an embedded page, which is why that link is outside this one.)</p>
+<p><strong>To play offline — and to get the sturdiest save</strong> — open the game at <a href="https://farcarry.vulpecula.games/">farcarry.vulpecula.games</a> and install it:</p>
+
+<ul>
+<li><strong>Android (Chrome)</strong> — let the page finish loading, then menu ⋮ → <em>Install app</em>. It installs as a real app, so it lands in your app drawer rather than on your home screen; drag it across from there if you want it on the front page.</li>
+<li><strong>iPhone / iPad</strong> — open it in <em>Safari</em>, then Share → <em>Add to Home Screen</em>. It has to be Safari; installing from another browser on iOS gives you a bookmark, not an app.</li>
+<li><strong>Desktop</strong> — Chrome or Edge show an install icon in the address bar.</li>
+</ul>
+
+<p>Installed, it runs with no connection at all and the browser stops treating your progress as disposable. (An app cannot be installed from inside an embedded page, which is why that link is outside this one.)</p>
 
 
 <!--
@@ -121,7 +148,7 @@
 
 <p>Progress saves to your own device and never leaves it. <strong>Export a backup from Settings → Save data</strong> — one file with every campaign, your run and your settings, importable anywhere. Clearing your browser's site data will erase the save, and some private-browsing modes block saving outright (the title screen tells you if that is happening, rather than letting you lose a campaign to it).</p>
 
-<p>For offline play and the most durable save, install it from <a href="https://farcarry.vulpecula.games/">farcarry.vulpecula.games</a> — same game, same build, added to your home screen.</p>
+<p>For offline play and the most durable save, install it from <a href="https://farcarry.vulpecula.games/">farcarry.vulpecula.games</a> — same game, same build, running as its own app with no connection needed. On Android use Chrome's ⋮ → <em>Install app</em>; on iPhone use Safari's Share → <em>Add to Home Screen</em>.</p>
 
 
 <!--
