@@ -1832,6 +1832,68 @@ while aiming, the SVG's feature positions coincide with the canvas's, and no ids
 size ladder is now asserted at the **measured** cameras, including that the ball keeps growing across
 the putt range and never exceeds the cap.
 
+## GS-ball-art round 3 — 75%, and every length on the ball goes with it (2026-07-30)
+
+> "The golf ball in all zoom levels, normal, chipping, putting looks too large still. It looks like a
+> tennis ball and not a golf ball and needs to be reduced in size so it's about 75% of the size it is
+> now… especially on greens, compared to the hole/flag it's a beachball."
+
+Third size report, and the first one to name a factor. Round 2 took the growth coefficient 0.5 → 0.3
+and the cap 5.5 → 4.4 but left the **floor at 3px**, on the standing promise that the whole-hole map
+was byte-for-byte with the pre-feature fixed dot. That promise is what this report retires: the shot
+cameras run **0.53–5.7 px/yd**, and across that whole range the old curve returned 3.0–3.6 — i.e.
+essentially pinned to the floor. "All zoom levels, normal" is a request about the floor, so honouring
+it means moving the floor.
+
+### The comparison the report is actually making
+
+The markers the ball is drawn among are **fixed-size** (`style.ts` §11): the tee dot is `r5`, the
+flagstick is 14 units tall, and the pin's base shadow — the cup, as far as the eye is concerned — is
+`r2.2`. At the r4.4 cap the ball was **twice the width of the cup it was rolling at**. "Beachball" was
+a measurement, not a mood.
+
+### Scaling the curve alone would have been the wrong fix
+
+Every drawn length on the ball is *not* a fraction of `r`. Five of them were absolute px, sized when
+the cap was 4.4:
+
+| ink | was | now |
+|---|---|---|
+| rim hairline | 1.0 | 0.75 |
+| band width floor | 0.7 | 0.52 |
+| dimple radius floor | 0.55 | 0.41 |
+| mark radius floor | 0.6 | 0.45 |
+| aura outset | r + 1.1 | r + 0.83 |
+
+Leave those and a 25%-smaller ball is a **muddier** ball, not a smaller one — a 1px rim on a 4.5px
+silhouette is a third of it. Worse, the rim is stroked **on** the silhouette, so it contributes half
+its width to what the eye reads as the ball: apparent radius is `r + lw/2`, which with an unscaled rim
+comes out at **78%** of the old ball, not the 75% asked for. Scaling the ink brings it to exactly 0.75
+and that ratio is what the test pins, off the recorded `lineWidth` rather than a source scan.
+
+The **feature-onset radii** scale by the same factor for the opposite reason — to hold something
+still. `dimpleMinPx` 3.8 → 2.85, band 2.6 → 1.95, mark 3.4 → 2.55 (the latter two hoisted out of the
+two painters into shared constants, since a resting ball wearing a feature the flying ball doesn't is
+the drift `surfaceProjector` exists to prevent). Because the threshold and the curve move together,
+the **camera** each feature arrives at is unchanged: dimples still at 8.9 px/yd, the mark still at
+3.6, the band still everywhere. Same ball, drawn smaller.
+
+| camera | round 2 | now |
+|---|---|---|
+| 0.53–1.83 (map) | 3.00–3.05 | **2.25–2.29** |
+| 2.56–5.7 (shots) | 3.26–3.59 | 2.45–2.69 |
+| 7.56–17.1 (putts) | 3.72–4.17 | 2.79–3.13 |
+| 35 (tap-in) | 4.40 (cap) | **3.30** (cap) |
+
+Ball vs cup marker: **2.0× → 1.5×**. Ball diameter vs flagstick height: 0.63 → 0.47.
+
+**Eyes-on:** `scripts/ball-preview.mjs` gained a row that draws the ball beside the real pin and tee
+markers at both sizes — the sheet now answers the report's own question instead of showing balls on
+bare turf. It also stopped carrying its own Linux-only Chromium lookup and loads `tests/chromium.ts`
+through vite like `scripts/banner.mjs` does, so it runs on Windows at all (GS-browser-test-gate again,
+in a script this time). Judged in situ by rendering the aim map focused on a green at both putt
+cameras, before and after.
+
 ## GS-green-apron-blend — the apron was never a ring, it was a crescent (2026-07-28)
 
 **The report** (with four in-game screenshots, across four worlds): *"for the holes, the green aprons look

@@ -17,8 +17,19 @@
  * which is why it was drawn at a fixed size in the first place. But a fixed size means the ball is
  * the SAME dot on the whole-hole map and in a two-foot putt, so zooming in never shows you more.
  * `ballRadiusPx` scales with the projector's px-per-yard around a deliberately exaggerated ball
- * diameter, floored at the old 3px (so the whole-hole map is unchanged) and capped so a deep zoom
- * doesn't put a beachball on the green.
+ * diameter, floored (so the whole-hole map barely moves) and capped so a deep zoom doesn't put a
+ * beachball on the green.
+ *
+ * **EVERY LENGTH ON THE DRAWN BALL IS ONE SCALE, AND THE WHOLE OF IT MOVES TOGETHER.** The size has
+ * been reported too big twice; the second time — *"it looks like a tennis ball and not a golf ball…
+ * especially on greens, compared to the hole/flag it's a beachball"* — asked for 75%, and the only
+ * honest way to give it is to take 75% off the radius curve AND off every absolute ink width that
+ * rides on it: the rim hairline, the band, the dimple and mark floors, the aura's outset. Scale the
+ * curve alone and the ball gets 25% smaller while its outline, band and glow stay put, so it reads
+ * as a MUDDIER ball rather than a smaller one (a 1px rim on a 4.5px ball is a third of it), and the
+ * apparent radius — `r + half the rim` — lands short of the 75% asked for. Scaling the feature-onset
+ * thresholds by the same factor is what keeps it the SAME ball: the cameras at which dimples, band
+ * and mark arrive come out unchanged (8.9 / always / 3.6 px per yard), just drawn smaller.
  *
  * ### Rotation: measured in SCREEN distance, deliberately
  *
@@ -85,12 +96,13 @@ export interface BallFeel {
    * shrinks as you zoom, which is the right direction: you zoom in to see closer to the truth.
    */
   ballGrowth: number;
-  /** px-per-yard below which the ball stays on its floor — the whole-hole map, unchanged. */
+  /** px-per-yard below which the ball stays on its floor — the whole-hole map. */
   ballGrowFrom: number;
-  /** Screen-radius floor (the pre-GS-ball-art constant, so the whole-hole map is unchanged) and cap.
-   *  The cap is measured against the fixed-size scene markers the ball sits among: the tee dot is r5
-   *  and the flagstick is 14 units tall, so a ball bigger than ~r5.5 stops reading as a ball on a
-   *  green and starts reading as a prop. */
+  /** Screen-radius floor and cap. Both are measured against the fixed-size scene markers the ball
+   *  sits among: the tee dot is r5, the flagstick 14 units tall and the pin's base shadow r2.2. At
+   *  the old r4.4 cap the ball was TWICE the width of the cup marker it was rolling at — "compared
+   *  to the hole/flag it's a beachball" — so the cap sits at r3.3, a ball a little wider than the
+   *  cup and under half the height of the stick behind it. */
   ballMinPx: number;
   ballMaxPx: number;
   /** Extra radius at the flight apex, as a fraction — the ball reads as nearer the camera up there. */
@@ -107,15 +119,24 @@ export interface BallFeel {
 }
 
 export const DEFAULT_BALL_FEEL: BallFeel = {
-  ballGrowth: 0.3,
+  ballGrowth: 0.225,
   ballGrowFrom: 1.8,
-  ballMinPx: 3,
-  ballMaxPx: 4.4,
+  ballMinPx: 2.25,
+  ballMaxPx: 3.3,
   ballLoftGrow: 0.5,
   spinMaxStep: 0.55,
   flightSpinRate: 9,
-  dimpleMinPx: 3.8,
+  dimpleMinPx: 2.85,
 };
+
+/**
+ * The radii the band and the mark arrive at, shared by the canvas painter and the SVG one — one
+ * description each, or the resting ball can wear a feature the flying ball doesn't. Both are on the
+ * same scale as the size curve above: they are stated as radii, so a change to how big the ball is
+ * drawn moves them with it and the CAMERA each feature arrives at stays put.
+ */
+const BAND_MIN_PX = 1.95;
+const MARK_MIN_PX = 2.55;
 
 const clamp = (x: number, lo: number, hi: number): number => (x < lo ? lo : x > hi ? hi : x);
 
@@ -242,12 +263,14 @@ export function drawBall(
 
   ctx.save();
   // A legendary aura, kept TIGHT. At `r + 2.4` and half opacity it added better than a pixel of
-  // apparent radius all round, so a skinned ball read as a bigger ball rather than a fancier one.
+  // apparent radius all round, so a skinned ball read as a bigger ball rather than a fancier one —
+  // and an outset in absolute px grows as a share of the ball every time the ball shrinks, so it
+  // scales with the size curve like every other length here.
   if (skin.glow) {
     ctx.globalAlpha = 0.34;
     ctx.fillStyle = skin.glow;
     ctx.beginPath();
-    ctx.arc(x, y, r + 1.1, 0, Math.PI * 2);
+    ctx.arc(x, y, r + 0.83, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
   }
@@ -268,9 +291,9 @@ export function drawBall(
   // equator: the equator of the rotation is invariant under that rotation and would sit dead still
   // while the ball spun underneath it. This one sweeps across the face once per turn, which is what
   // makes a 4px ball read as rolling before it is big enough to hold dimples.
-  if (skin.band && r >= 2.6) {
+  if (skin.band && r >= BAND_MIN_PX) {
     ctx.strokeStyle = skin.band;
-    ctx.lineWidth = Math.max(0.7, r * 0.13);
+    ctx.lineWidth = Math.max(0.52, r * 0.13);
     ctx.lineCap = 'butt';
     ctx.beginPath();
     let started = false;
@@ -290,7 +313,7 @@ export function drawBall(
 
   if (r >= feel.dimpleMinPx) {
     ctx.fillStyle = skin.dimple;
-    const dr = Math.max(0.55, r * 0.16);
+    const dr = Math.max(0.41, r * 0.16);
     for (const p of DIMPLES) {
       const q = project(p);
       if (q.z <= 0.12) continue; // back hemisphere + the grazing rim, where a dimple is a smudge
@@ -304,21 +327,23 @@ export function drawBall(
 
   // The maker's mark — one dot, so there is always exactly one unambiguous feature to track. It is
   // what tells you the ball is turning when it is too small for dimples.
-  if (skin.mark && r >= 3.4) {
+  if (skin.mark && r >= MARK_MIN_PX) {
     const q = project(MARK_POINT);
     if (q.z > 0.05) {
       ctx.globalAlpha = Math.min(1, 0.35 + q.z);
       ctx.fillStyle = skin.mark;
       ctx.beginPath();
-      ctx.arc(q.sx, q.sy, Math.max(0.6, r * 0.17), 0, Math.PI * 2);
+      ctx.arc(q.sx, q.sy, Math.max(0.45, r * 0.17), 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
     }
   }
 
-  // A hairline so the ball keeps its edge against a bright fairway or a white bunker.
+  // A hairline so the ball keeps its edge against a bright fairway or a white bunker. It is stroked
+  // ON the silhouette, so it adds half its width to the APPARENT radius — which is why it scales with
+  // the ball: at 1px on the small-camera ball it was a third of the drawn width and swallowed it.
   ctx.strokeStyle = 'rgba(0,0,0,0.45)';
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 0.75;
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.stroke();
@@ -405,7 +430,7 @@ export function ballSVG(
   const n = (v: number): string => v.toFixed(2);
   const out: string[] = [];
   if (skin.glow) {
-    out.push(`<circle cx="${n(x)}" cy="${n(y)}" r="${n(r + 2.2)}" fill="${skin.glow}" opacity="0.45" />`);
+    out.push(`<circle cx="${n(x)}" cy="${n(y)}" r="${n(r + 1.65)}" fill="${skin.glow}" opacity="0.45" />`);
   }
   // The lit sphere. An SVG radial gradient needs an id, and ids are DOCUMENT-global — several hole
   // SVGs share one document in the gallery and the test hub (see `holeIdPrefix`). Two overlaid
@@ -416,11 +441,11 @@ export function ballSVG(
     for (const p of DIMPLES) {
       const q = project(p);
       if (q.z <= 0.12) continue;
-      const dr = Math.max(0.4, r * 0.15) * (0.55 + 0.45 * q.z);
+      const dr = Math.max(0.3, r * 0.15) * (0.55 + 0.45 * q.z);
       out.push(`<circle cx="${n(q.sx)}" cy="${n(q.sy)}" r="${n(dr)}" fill="${skin.dimple}" opacity="${(0.3 + 0.45 * q.z).toFixed(2)}" />`);
     }
   }
-  if (skin.band && r >= 2.6) {
+  if (skin.band && r >= BAND_MIN_PX) {
     const pts: string[] = [];
     for (let i = 0; i <= BAND_STEPS; i++) {
       const p = project(bandPoint(i));
@@ -428,15 +453,15 @@ export function ballSVG(
       pts.push(`${n(p.sx)},${n(p.sy)}`);
     }
     if (pts.length > 1) {
-      out.push(`<polyline points="${pts.join(' ')}" fill="none" stroke="${skin.band}" stroke-width="${n(Math.max(0.6, r * 0.13))}" />`);
+      out.push(`<polyline points="${pts.join(' ')}" fill="none" stroke="${skin.band}" stroke-width="${n(Math.max(0.45, r * 0.13))}" />`);
     }
   }
-  if (skin.mark && r >= 3.4) {
+  if (skin.mark && r >= MARK_MIN_PX) {
     const q = project(MARK_POINT);
     if (q.z > 0.05) {
-      out.push(`<circle cx="${n(q.sx)}" cy="${n(q.sy)}" r="${n(Math.max(0.5, r * 0.17))}" fill="${skin.mark}" />`);
+      out.push(`<circle cx="${n(q.sx)}" cy="${n(q.sy)}" r="${n(Math.max(0.38, r * 0.17))}" fill="${skin.mark}" />`);
     }
   }
-  out.push(`<circle cx="${n(x)}" cy="${n(y)}" r="${n(r)}" fill="none" stroke="rgba(0,0,0,0.45)" stroke-width="1" />`);
+  out.push(`<circle cx="${n(x)}" cy="${n(y)}" r="${n(r)}" fill="none" stroke="rgba(0,0,0,0.45)" stroke-width="0.75" />`);
   return out.join('');
 }
