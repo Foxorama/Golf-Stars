@@ -3654,6 +3654,22 @@ function render(): void {
   wireShotGesture(app);
   // (GS-hud-bag: the old 🏌 "use suggested" button is gone — Sam's pick is the ★ on its row in the
   // club picker, so the suggestion is taken by tapping the club itself, like any other.)
+  // Replay the boot cinematic on demand (GS-intro-replay). The intro is a <body>-level takeover that
+  // seals #app and removes itself via its single `finish()`, so replaying it needs nothing but the
+  // call — no render(), no state, no flag to unwind. `fc_introSeen` is deliberately NOT cleared: it
+  // gates the AUTOMATIC play, and a deliberate replay is not a request to have it ambush you on the
+  // next reload.
+  app.querySelectorAll<HTMLElement>('[data-replay-intro]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sfx.click();
+      try {
+        mountIntro({});
+      } catch {
+        /* the title is already painted underneath — losing the intro is harmless */
+      }
+    });
+  });
   // PWA install nudge: fire the captured prompt, then forget it (one offer).
   app.querySelectorAll<HTMLElement>('[data-install]').forEach((el) => {
     el.addEventListener('click', () => {
