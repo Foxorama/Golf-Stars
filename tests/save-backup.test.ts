@@ -11,8 +11,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { BACKUP_KIND, BACKUP_VERSION, BackupError, buildBackup, describeBackup, parseBackup } from '../src/save/backup';
-import { defaultSave, exportSave, SAVE_VERSION } from '../src/save/schema';
+import { BACKUP_KIND, BACKUP_NUDGE_URGENT_RUNS, BACKUP_VERSION, BackupError, backupNudge, buildBackup, describeBackup, parseBackup } from '../src/save/backup';
+import { defaultSave, exportSave, migrate, SAVE_VERSION } from '../src/save/schema';
 import { defaultStoryState } from '../src/sim/rpg/story';
 import { campaignCount, emptyCampaignStore, upsertCampaign, type CampaignStore } from '../src/sim/rpg/storyRoster';
 
@@ -185,5 +185,90 @@ describe('backup format (GS-save-transfer)', () => {
     expect(json).toContain('\n');
     const parsed = JSON.parse(json) as Record<string, unknown>;
     expect(Object.keys(parsed).slice(0, 3)).toEqual(['kind', 'version', 'exportedAt']);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+/**
+ * THE BACKUP NUDGE (GS-backup-nudge) — report item 5.
+ *
+ * An exported file is the only durable copy of a save that exists: `localStorage` is the only copy
+ * the game keeps, iOS Safari clears script-writeable storage after seven idle days, and on itch the
+ * quota is shared with every other game on the platform. And it is completely invisible — nothing
+ * has ever asked for one, so the players who most need it are the ones who have never opened Settings.
+ *
+ * Measured in RUNS (`clubhouseVisit`, bumped once per finished run) rather than days: the unit the
+ * player feels is progress made, and a counter needs no clock, no timezone, and no trust in the
+ * device's date.
+ *
+ * What these mostly guard is the SILENCE. A warning that fires every time is wallpaper, and this one
+ * sits in the same section as the storage alert that must never be ignored.
+ */
+describe('the backup nudge says something only when it is worth saying', () => {
+  it('is silent for a save with nothing behind it', () => {
+    // A first boot has no finished run to lose, and a warning nobody can act on is one they learn to skip.
+    expect(backupNudge({ clubhouseVisit: 0 })).toBeNull();
+    expect(backupNudge({ clubhouseVisit: 0, lastExportRun: 0 })).toBeNull();
+  });
+
+  it('is silent for a player who exported this run', () => {
+    // Nagging someone who just did the thing is exactly how a nudge becomes noise.
+    expect(backupNudge({ clubhouseVisit: 7, lastExportRun: 7 })).toBeNull();
+    // …and a counter that somehow ran backwards is treated as "up to date", never as a huge overdue.
+    expect(backupNudge({ clubhouseVisit: 3, lastExportRun: 9 })).toBeNull();
+  });
+
+  it('speaks up once a run has been played since the last backup', () => {
+    const one = backupNudge({ clubhouseVisit: 8, lastExportRun: 7 })!;
+    expect(one.runsSince).toBe(1);
+    expect(one.urgent).toBe(false);
+    expect(one.text).toContain('1 run '); // singular, not "1 runs"
+
+    const few = backupNudge({ clubhouseVisit: 12, lastExportRun: 7 })!;
+    expect(few.runsSince).toBe(5);
+    expect(few.text).toContain('5 runs');
+  });
+
+  it('turns urgent only after a genuinely long gap', () => {
+    expect(backupNudge({ clubhouseVisit: 7 + BACKUP_NUDGE_URGENT_RUNS - 1, lastExportRun: 7 })!.urgent).toBe(false);
+    expect(backupNudge({ clubhouseVisit: 7 + BACKUP_NUDGE_URGENT_RUNS, lastExportRun: 7 })!.urgent).toBe(true);
+  });
+
+  it('tells a player who has NEVER exported that this device is the only copy', () => {
+    const never = backupNudge({ clubhouseVisit: 3 })!;
+    expect(never.runsSince).toBeNull();
+    expect(never.text).toMatch(/never/i);
+    expect(never.text).toMatch(/only copy/i);
+    expect(never.urgent).toBe(false);
+    // Deep into a campaign with no backup at all is the case this exists for.
+    expect(backupNudge({ clubhouseVisit: BACKUP_NUDGE_URGENT_RUNS })!.urgent).toBe(true);
+  });
+
+  it('never claims a number it cannot support', () => {
+    for (const n of [backupNudge({ clubhouseVisit: 4 }), backupNudge({ clubhouseVisit: 9, lastExportRun: 2 })]) {
+      expect(n!.text).not.toMatch(/undefined|NaN|null/);
+      expect(n!.text.length).toBeGreaterThan(15);
+    }
+  });
+});
+
+describe('the save carries when it was last exported (save v34)', () => {
+  it('round-trips through a migrate, and an absent field reads as never exported', () => {
+    const exported = migrate({ ...defaultSave(), clubhouseVisit: 12, lastExportRun: 5 });
+    expect(exported.lastExportRun).toBe(5);
+    expect(backupNudge(exported)!.runsSince).toBe(7);
+
+    // A v33 save upgrading has never exported — the honest reading, and the safe direction (the
+    // nudge appears rather than being suppressed by a field nobody set).
+    const upgraded = migrate({ ...defaultSave(), version: 33, clubhouseVisit: 4 });
+    expect(upgraded.version).toBe(SAVE_VERSION);
+    expect(upgraded.lastExportRun).toBeUndefined();
+    expect(backupNudge(upgraded)!.runsSince).toBeNull();
+  });
+
+  it('refuses to trust a nonsense counter rather than printing it', () => {
+    for (const bad of [-1, Number.NaN, 'soon', {}]) {
+      expect(migrate({ ...defaultSave(), lastExportRun: bad }).lastExportRun).toBeUndefined();
+    }
   });
 });

@@ -253,3 +253,63 @@ export function describeBackup(b: Backup): string[] {
 export function backupCampaignCount(b: Backup): number {
   return campaignCount(b.campaigns);
 }
+
+/**
+ * HOW OVERDUE IS A BACKUP? (GS-backup-nudge)
+ *
+ * `localStorage` is the only copy of a save and every browser can evict it — iOS Safari clears
+ * script-writeable storage after seven idle days, and on itch the quota is shared with every other
+ * game on the platform. An exported file is the only durable copy that exists, and it is completely
+ * invisible: nothing has ever asked for one, so the players who most need it are precisely the ones
+ * who have never opened Settings.
+ *
+ * Measured in RUNS, not days: `clubhouseVisit` is bumped once per finished run, so the unit is
+ * progress the player actually feels rather than time passed — and a counter needs no clock, no
+ * timezone, and no trust in the device's date.
+ *
+ * PURE, and returns `null` when there is nothing worth saying. Two silences are deliberate: a brand
+ * new save has nothing to lose, and a player who exported this run does not need telling. Nagging a
+ * player who just did the thing is how a warning becomes wallpaper — the same reasoning that keeps
+ * the storage alert non-dismissible but rare.
+ */
+export interface BackupNudge {
+  /** The sentence to show. */
+  text: string;
+  /** True once it is overdue enough to warrant the warning styling rather than a quiet note. */
+  urgent: boolean;
+  /** Runs since the last export; `null` when there has never been one. */
+  runsSince: number | null;
+}
+
+/** Runs after which the nudge starts shouting. Deliberately generous — a run is a long sitting. */
+export const BACKUP_NUDGE_URGENT_RUNS = 10;
+
+export function backupNudge(save: Pick<Save, 'clubhouseVisit' | 'lastExportRun'>): BackupNudge | null {
+  const runs = Math.max(0, Math.floor(save.clubhouseVisit ?? 0));
+  const last = save.lastExportRun;
+
+  if (last === undefined) {
+    // Never exported. Silent until there is genuinely something to lose — a save with no finished run
+    // behind it is a save nobody would miss, and a first-boot warning is one nobody reads.
+    if (runs < 1) return null;
+    return {
+      runsSince: null,
+      urgent: runs >= BACKUP_NUDGE_URGENT_RUNS,
+      text:
+        runs >= BACKUP_NUDGE_URGENT_RUNS
+          ? `You've never exported a backup, and you're ${runs} runs in. This device is the only copy.`
+          : `You've never exported a backup — this device is the only copy of your progress.`,
+    };
+  }
+
+  const since = Math.max(0, runs - last);
+  if (since < 1) return null; // exported this run; saying anything would be noise
+  return {
+    runsSince: since,
+    urgent: since >= BACKUP_NUDGE_URGENT_RUNS,
+    text:
+      since === 1
+        ? `1 run since your last backup.`
+        : `${since} runs since your last backup.`,
+  };
+}

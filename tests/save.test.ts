@@ -14,7 +14,7 @@ import { readSlot } from '../src/sim/rpg/runSlots';
 
 describe('save schema', () => {
   it('default save carries the current version (12) with the starter fleet + empty wardrobe + per-character maps', () => {
-    expect(SAVE_VERSION).toBe(33);
+    expect(SAVE_VERSION).toBe(34);
     const d = defaultSave();
     expect(d.version).toBe(SAVE_VERSION);
     expect(d.golfBagByCharacter).toEqual({});

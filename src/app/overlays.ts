@@ -23,7 +23,7 @@ import { shotCardHTML } from '../render/cards';
 import { pinOf } from '../sim/round';
 import { dist } from '../sim/course/contract';
 import { getSettings, clampUiScale, type Settings } from '../settings';
-import { describeBackup, type Backup } from '../save/backup';
+import { backupNudge, describeBackup, type Backup } from '../save/backup';
 import { storageHealth } from '../save/durability';
 import { faultExplanation, faultHeadline, faultRescue, saveIntegrity } from '../save/integrity';
 
@@ -109,10 +109,14 @@ function saveDataSection(): string {
         ${note}
         <input type="file" id="gs-save-file" accept="application/json,.json" hidden>`;
   }
+  // GS-backup-nudge: how overdue a backup is, in RUNS. `null` = nothing worth saying (a save with no
+  // finished run behind it, or one exported this run) — a warning that fires every time is wallpaper.
+  const nudge = backupNudge({ clubhouseVisit: state.clubhouseVisit, lastExportRun: state.lastExportRun });
   return `
         <div class="gs-setsec">💾 Save data</div>
         <div class="gs-setnote">Your progress lives only on this device, and the website and the app store it separately. Export to move a save between them — or to keep a backup.</div>
         ${storageStatusHTML()}
+        ${nudge ? `<div class="gs-savenote${nudge.urgent ? ' gs-savenote--bad' : ''}">${nudge.urgent ? '⚠ ' : ''}${nudge.text}</div>` : ''}
         <div class="gs-saverow">
           <button class="gs-btn gs-btn--ghost" data-save-transfer="export">⬇ Export save</button>
           <button class="gs-btn gs-btn--ghost" data-save-transfer="import">⬆ Import save</button>

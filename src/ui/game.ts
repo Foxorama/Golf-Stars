@@ -226,6 +226,7 @@ export function initState(
     driverByCharacter: meta.driverByCharacter ?? {},
     unlockedClubsByCharacter: meta.unlockedClubsByCharacter ?? {},
     clubhouseVisit: meta.clubhouseVisit ?? 0,
+    lastExportRun: meta.lastExportRun,
     endlessBestHoles: meta.endlessBestHoles ?? 0,
     marmotBartender: meta.marmotBartender ?? false,
     marmotTips: meta.marmotTips ?? 0,
@@ -2563,6 +2564,14 @@ export function reduce(state: UiState, action: Action): UiState {
         // golfer in the wardrobe afterwards.
         bagTierByCharacter: {},
       };
+    }
+
+    case 'backupExported': {
+      // GS-backup-nudge: a backup file actually reached the player — stamp the run counter so the
+      // nudge goes quiet until they have played on. Dispatched from the app layer on a CONFIRMED
+      // success (a download that reported true, a clipboard write that resolved), never on the tap:
+      // a nudge silenced by a failed export is worse than one that never fired.
+      return { ...state, lastExportRun: state.clubhouseVisit };
     }
 
     case 'toTitle': {
