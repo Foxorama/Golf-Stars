@@ -1098,9 +1098,12 @@ run that raced past the frame can't pass silently. Verified red on the unfixed b
     zoomed OUT than intrinsic — `ST_OPEN_ZOOM`). The SPACEPORT is the map's way OUT (GS-star-tour-port): it's
     a TAPPABLE station (`data-startour-port`, drawn as a proper docking port with gantries/pads + a "DOCK ·
     CLUBHOUSE" hint) — flying home to it DOCKS the ship (`flyStarTourToPort` → `dockingAtPort`, arrival
-    dispatches `openClubhouseHall`) and opens the Clubhouse; the Clubhouse hall's "🚀 Depart to Star Tour"
-    button (`openStarTour`, now reachable from `clubhouseHall`) flies you back out — the spaceport ↔ clubhouse
-    loop. The cockpit HUD REUSES the journey bridge HUD
+    dispatches `openClubhouseHall`) and opens the Clubhouse. The return leg of that loop — the Clubhouse
+    hall's "🚀 Depart to Star Tour" button (`openStarTour` from `clubhouseHall`) — is **RETIRED**: it dated
+    from the pre-champions Star Tour, and once entry became character-first (GS-star-tour-2) and then
+    champion-aware (GS-story-startour-champions) the Clubhouse was simply the outfitting room, with the
+    mode entered from the title tile. `clubhouseHall` came out of the `openStarTour` origin guard with it —
+    a guard that still listed it would promise a route nothing takes. The cockpit HUD REUSES the journey bridge HUD
     (GS-star-tour-hud, `stHud`): the star map renders a `.gs-bhud gs-bhud--st gs-bhud--<variant>` frame
     piped `hudThemeForShip`/`hudThemeVars` + `hudChromeFor`, so it recolours to the flown ship AND inherits
     the identical fleet ornaments (title plate = ship name, rails, nodes, wings, deck) — a themed bridge is

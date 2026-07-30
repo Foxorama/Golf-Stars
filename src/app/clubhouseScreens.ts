@@ -55,7 +55,6 @@ export function clubhouseHallScreen(): string {
     </header>
     <div style="margin:12px 0;">${clubhouseLoungeHTML(golfers, state.clubhouseVisit, state.marmotBartender, state.marmotTips, state.ownedApparel.includes('thors-hammer'))}</div>
     <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-      ${btn('🚀 Depart to Star Tour', { type: 'openStarTour' }, { variant: 'primary' })}
       ${btn('← Back to title', { type: 'closeClubhouseHall' }, { variant: 'ghost' })}
     </div>`;
 }
