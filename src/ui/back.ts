@@ -208,13 +208,15 @@ export function backIntent(state: UiState, ctx: BackContext = {}): BackIntent {
  */
 export function resumePromise(state: UiState): string {
   switch (resumeCost(state.run.formatId, state.run.storyRound)) {
-    case 'world':
-      // A Story world round owns no run slot — the campaign is saved, the round is not.
-      return 'Your campaign is saved — you’ll replay this world from its first tee.';
     case 'forfeit':
       return 'Leaving forfeits the Asgard tournament — the run it interrupted is saved and waiting.';
     default:
-      return 'Your run is saved — you’ll pick up on this hole.';
+      // GS-story-round-resume: a Story world round used to say "you'll replay this world from its
+      // first tee" — an honest promise about a behaviour that was simply too harsh. The campaign now
+      // carries its round, so every mode says the same true sentence.
+      return state.run.storyRound
+        ? 'Your campaign and this round are saved — you’ll pick up on this hole.'
+        : 'Your run is saved — you’ll pick up on this hole.';
   }
 }
 

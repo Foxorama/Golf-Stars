@@ -254,3 +254,52 @@ the superset invariant instead.
 
 A reducer test that asserts on `state.runSlots` alone is asserting on a cache. The helpers at the top
 of that file exist for this reason: assert through `saved()`, which is what would be **on disk**.
+
+## Postscript 2: the story exception, retired (GS-story-round-resume)
+
+The rule at the top of this document — *resume at the hole you were on, in every mode* — shipped with
+an asterisk. Story Tour was `'world'`: the campaign was saved, the **round** was not, so a world was
+replayed from its first tee. That was an honest promise, stated in `resumePromise` and repeated
+wherever it mattered, about a behaviour that was simply too harsh. Reported from play as *"too brutal
+to stop playing halfway through 18 holes and then have to redo all of it"* — and the right response to
+an honest promise nobody wants is to change the behaviour, not the wording.
+
+`ResumeCost` is now `'hole' | 'forfeit'`. Asgard is the one exception left, and it is a real one: the
+tournament run is ephemeral by design.
+
+### Where the round lives, and why it is rebuilt
+
+`fc_save` and `fc_story` were deliberately kept apart, and that hasn't changed — story still owns no
+run slot. The round rides `StoryState.liveRound` (`STORY_VERSION` 8), with the rest of the campaign it
+is part of.
+
+It stores **what was chosen, not what was built**: the world, the partner, the hole reached, the card
+banked. The run is then rebuilt by `buildStoryWorldRun` — the same function that tees one off — because
+a story round is fully determined by the campaign plus those two choices. The qualifier plan is a pure
+hash off `campaignSeed` + the world, the sky is a pure function of the world, and the loadout is folded
+from the campaign's own gear and caddy. Same reason a parked run's course is rebuilt from its seed
+rather than stored: nothing that is derived can drift.
+
+One builder, two callers, and that is not tidiness — a second description here would resume you into a
+different bag, a different sky, or a different **scoring format**, since the drawn qualifier format
+decides how the card is even counted.
+
+### The write, and the lesson taken from three hours earlier
+
+`campaignWithLiveRound` is the `fc_story` twin of `resumableState`, and both writers call it:
+`persistStory` (every action) and `toTitle` (folding the answer back into live state).
+
+That second caller is the whole point. Writing the round to disk while `state.campaigns` said otherwise
+is *precisely* GS-resume-slot-loss, fixed the same day — the golfer picker reads state, so a round on
+disk that state doesn't know about is a round the Continue button cannot see.
+
+### Three floors
+
+- A finished or abandoned round **removes** the field. A stale offer would re-tee a world you walked off.
+- A `liveRound` whose hole the rebuilt course cannot serve falls back to the hub. A `GENERATOR_VERSION`
+  bump re-rolls a static course, and a tee that cannot be built must never strand a campaign.
+- A malformed persisted `liveRound` degrades to no round — the pre-v8 behaviour, which is the right floor.
+
+No `BACKUP_VERSION` bump: the roster's shape is unchanged. A v8 campaign meeting a v7 build is refused
+loudly by `campaignStoreTooNew` rather than silently truncated, which is exactly the case
+GS-save-integrity shipped for that morning.

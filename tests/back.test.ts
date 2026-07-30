@@ -222,11 +222,13 @@ describe('the confirm copy stays truthful', () => {
 
   it('and says the OTHER truth where the hole is not kept, rather than a uniform lie', () => {
     const s = on('playing');
-    // A Story world round owns no run slot — the campaign is saved, the round is replayed.
+    // GS-story-round-resume: a Story world round KEEPS its hole now — the campaign carries its own
+    // `liveRound` — so this used to promise "you'll replay this world from its first tee" and no
+    // longer may. It still names the campaign, because two things are being saved, not one.
     const story = exitPrompt({ ...s, run: { ...s.run, formatId: STROKEPLAY_FORMAT, storyRound: true } });
-    expect(story.body).toMatch(/campaign is saved/);
-    expect(story.body).toMatch(/replay this world/);
-    expect(story.body).not.toMatch(/this hole/);
+    expect(story.body).toMatch(/campaign/i);
+    expect(story.body).toMatch(/this hole/);
+    expect(story.body, 'the round is no longer replayed from the first tee').not.toMatch(/replay|first tee/i);
     // The Asgard tournament is never persisted: leaving forfeits the attempt.
     const asgard = exitPrompt({ ...s, run: { ...s.run, formatId: ASGARD_FORMAT } });
     expect(asgard.body).toMatch(/forfeits/);

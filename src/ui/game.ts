@@ -115,7 +115,7 @@ import {
   UNKNOWN_GOLFER,
   type SlotTag,
 } from '../sim/rpg/runSlots';
-import { resumableState } from './resumable';
+import { campaignWithLiveRound, resumableState } from './resumable';
 import {
   autoDecision,
   awaitingPutt,
@@ -324,6 +324,45 @@ export function rerollCost(rerolls: number): number {
  * better ball was banked at the time. Without the padding the array would silently misalign, which is
  * the quiet kind of wrong this codebase keeps learning to avoid.
  */
+/**
+ * THE ONE PLACE A STORY WORLD ROUND IS BUILT (GS-story-round-resume).
+ *
+ * Two callers now: teeing off (`storyPlayWorld`) and picking a round back up
+ * (`storyContinueCampaign`). They MUST produce the identical run or a resume would drop you into a
+ * different round than the one you left — a different bag, a different sky, or worst of all a
+ * different qualifier format, since the drawn format decides how the card is even scored.
+ *
+ * Nothing here is remembered: the loadout is folded from the campaign's own gear/caddy/clubs, the sky
+ * is a pure function of the world, and the qualifier plan is a pure hash off `campaignSeed` + the
+ * world. So the rebuild is exact by construction rather than by copying — the same reason a parked
+ * run's course is rebuilt from its seed instead of stored.
+ */
+function buildStoryWorldRun(state: UiState, courseId: string, partnerId?: string): Run {
+  const story = state.story!;
+  const run0 = startRun(state.run.seed, STROKEPLAY_FORMAT, {}, story.characterId, 0, DEFAULT_BAG_TIER, []);
+  const bag = storyBagClubs(story);
+  // GS-story-gear: fold the campaign's equipped gear (glove/hat/shoes/ball) effects onto the loadout.
+  // GS-story-caddies: then the active caddy (a friend on the bag folds a real effect + shows on course).
+  const loadout = applyStoryClubEffects(applyStoryCaddy(applyStoryGear({ ...run0.loadout, bag }, story), story), story);
+  // GS-story-qualifier-formats: the chapter's qualifying events are nine-hole cards drawn into one of five
+  // formats, three of which put a tour-mate beside you. The plan arms `currentCourse` (nine holes), the
+  // shared co-op machinery, and the format's own scoring. A venue/prologue/quest world draws no plan ⇒ the
+  // pinned 18, byte-for-byte. The partner is the player's dossier CHOICE, validated inside the plan.
+  const qplan = activeQualifierPlan(story, courseId, partnerId);
+  return {
+    ...run0,
+    loadout,
+    staticCourseId: courseId,
+    // GS-story-worlddiff: deep worlds play under a stiffer WIND (pure physics, records-safe) so they're
+    // harder, not just longer — scaled by the world's tier, calm at Ch.1 → the wildest sky by Ch.5.
+    staticEffect: storyWorldEffect(courseId),
+    storyRound: true,
+    ...(qplan ? { storyQualifier: qplan } : {}),
+    ...(qplan?.partnerId ? { storyTournamentPartner: qplan.partnerId } : {}),
+    ...(qplan?.pairing ? { storyTeamFormat: qplan.pairing } : {}),
+  };
+}
+
 function buildMatch(run: Run, course: Course, played: readonly PlayedHole[]): MatchUi | undefined {
   if (!isMatchplayBoss(currentBoss(run))) return undefined;
   const setup = teamDuelSetupForRun(run);
@@ -722,7 +761,31 @@ export function reduce(state: UiState, action: Action): UiState {
       // GS-story-quality: normalise a Herald campaign's caddy roster on resume (a save from before the Coil
       // volunteers shipped still carries Warden caddies) — the Warden friends leave, the Coil takes the bag.
       const story = applyHeraldCaddies(saved);
-      return { ...base, story, campaigns: upsertCampaign(state.campaigns, story), screen: 'story' };
+      const hub: UiState = { ...base, story, campaigns: upsertCampaign(state.campaigns, story), screen: 'story' };
+      // GS-story-round-resume: a world round left part-way through puts you back on the hole you were
+      // on, not on its first tee. The run is REBUILT by the same builder that started it (nothing about
+      // the round is remembered beyond which world and which partner), then the hole is re-teed with the
+      // banked card intact — the same shape as the run-slot mid-stop resume, for the same reason.
+      const live = story.liveRound;
+      if (!live) return hub;
+      const run = buildStoryWorldRun(hub, live.courseId, live.partnerId);
+      const course = currentCourse(run);
+      // A hole index the rebuilt course cannot serve means the world changed under the campaign (a
+      // GENERATOR_VERSION bump re-rolls a static course). Falling back to the hub is the old behaviour,
+      // which is the right floor: a tee that cannot be built must never strand the campaign.
+      if (live.stopHoleIndex >= course.holes.length) return hub;
+      return {
+        ...hub,
+        run,
+        course,
+        screen: 'playing',
+        holeRng: new Rng(`${course.seed}:play`),
+        stopPlayed: [...live.stopPlayed],
+        play: beginHole(course.holes[live.stopHoleIndex]!, live.stopHoleIndex),
+        played: undefined,
+        lastResult: undefined,
+        viewHole: 0,
+      };
     }
 
     case 'slotRequestRestart': {
@@ -811,11 +874,6 @@ export function reduce(state: UiState, action: Action): UiState {
       // ceremony, The Choice, the aftermath beat, the interlude), which is precisely the beat `back`
       // swallows on that screen; a shop button must not become the side door back never was.
       if (state.screen === 'storyShop' && state.storyShopReturn === 'storyTournamentResult') return state;
-      const run0 = startRun(state.run.seed, STROKEPLAY_FORMAT, {}, state.story.characterId, 0, DEFAULT_BAG_TIER, []);
-      const bag = storyBagClubs(state.story);
-      // GS-story-gear: fold the campaign's equipped gear (glove/hat/shoes/ball) effects onto the loadout.
-      // GS-story-caddies: then the active caddy (a friend on the bag folds a real effect + shows on course).
-      const loadout = applyStoryClubEffects(applyStoryCaddy(applyStoryGear({ ...run0.loadout, bag }, state.story), state.story), state.story);
       // GS-story-qualifier-formats: a chapter's QUALIFYING EVENTS are nine-hole cards drawn into one of five
       // formats — and three of those five put a tour-mate beside you. Arming the plan here does three things
       // at once: `currentCourse` serves nine holes, the paired formats arm the SAME co-op machinery the team
@@ -826,19 +884,7 @@ export function reduce(state: UiState, action: Action): UiState {
       // GS-story-qualifier-partner-pick: the partner is the player's CHOICE (the dossier's picker), not the
       // draw's — the format and the pairing are the draw's to set, the company is yours. Validated inside
       // the plan, so a skipped picker tees off with the drawn suggestion exactly as before.
-      const qplan = activeQualifierPlan(state.story, action.courseId, action.partnerId);
-      const run = {
-        ...run0,
-        loadout,
-        staticCourseId: action.courseId,
-        // GS-story-worlddiff: deep worlds play under a stiffer WIND (pure physics, records-safe) so they're
-        // harder, not just longer — scaled by the world's tier, calm at Ch.1 → the wildest sky by Ch.5.
-        staticEffect: storyWorldEffect(action.courseId),
-        storyRound: true,
-        ...(qplan ? { storyQualifier: qplan } : {}),
-        ...(qplan?.partnerId ? { storyTournamentPartner: qplan.partnerId } : {}),
-        ...(qplan?.pairing ? { storyTeamFormat: qplan.pairing } : {}),
-      };
+      const run = buildStoryWorldRun(state, action.courseId, action.partnerId);
       return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', viewHole: 0, played: undefined, storyItemInspectId: undefined });
     }
 
@@ -2531,10 +2577,18 @@ export function reduce(state: UiState, action: Action): UiState {
       // function both call, and the two can no longer disagree.
       if (state.screen === 'title') return state;
       const { runSlots, lastPlayed } = resumableState(state);
+      // GS-story-round-resume: and the campaign's half of the same question, from the same function
+      // `persistStory` calls. It has to land in STATE as well as on disk — the golfer picker reads
+      // `state.campaigns`, so a round written to `fc_story` but not folded back here is a round the
+      // Continue button cannot see. That gap, in the run-slot table, is exactly GS-resume-slot-loss.
+      const story = campaignWithLiveRound(state);
+      const campaigns = story ? upsertCampaign(state.campaigns, story) : state.campaigns;
       // Rebuild the placeholder run backing the title (same seed) so format previews start clean.
       const run = startRun(state.run.seed, undefined, state.metaUpgrades, undefined, 0, state.bagTier);
       return {
         ...state,
+        story,
+        campaigns,
         run,
         course: currentCourse(run),
         screen: 'title',
