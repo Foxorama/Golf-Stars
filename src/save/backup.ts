@@ -15,11 +15,12 @@
  * app layer owns the reading/writing — see `app/saveTransfer.ts`.
  */
 
-import { migrate, type Save } from './schema';
+import { readSave, type Save } from './schema';
 import { GAME_TITLE } from '../brand';
 import {
   campaignCount,
   campaignList,
+  campaignStoreTooNew,
   emptyCampaignStore,
   migrateCampaignStore,
   type CampaignStore,
@@ -160,22 +161,52 @@ export function parseBackup(json: string): Backup {
   throw new BackupError(`That file doesn't look like a ${GAME_TITLE} save.`);
 }
 
+/**
+ * The bundle's own `version` guard above catches a newer BUNDLE SHAPE — it says nothing about the
+ * save inside it, and the two move independently: `BACKUP_VERSION` tracks the container (it went to 2
+ * when `story` became a roster), while `SAVE_VERSION` ran 27→32 inside an unchanged v1 bundle. So a
+ * future v34 save arrives in a perfectly valid v2 container.
+ *
+ * `migrate()` returns `defaultSave()` for a version it has no path for WITHOUT throwing, so this
+ * function's try/catch never fired for exactly that case: the import replaced a real save with an
+ * empty one and the UI reported success — the precise failure this module's doc comment says it
+ * exists to prevent, one layer down (GS-save-integrity). `readSave` is the version that can tell.
+ */
 function migrateSaveOrThrow(raw: unknown): Save {
   if (!raw || typeof raw !== 'object') {
     throw new BackupError('That backup is missing its save data.');
   }
+  let read;
   try {
-    return migrate(raw);
+    read = readSave(raw);
   } catch {
     throw new BackupError("That save couldn't be read — it may be from an incompatible version.");
   }
+  if (read.ok) return read.save;
+  if (read.why === 'newer') {
+    throw new BackupError(
+      `That save was made by a newer version of ${GAME_TITLE} (save format ${String(read.found)}). Update the game, then import it.`,
+    );
+  }
+  throw new BackupError("That save couldn't be read — it may be damaged, or not a save file.");
 }
 
 /** Campaigns that won't migrate are dropped rather than failing the whole import: the main save is
  *  the bulk of a player's progress, and refusing everything because the Story blob is odd would be a
- *  worse trade. The import summary reports what actually came through. */
+ *  worse trade. The import summary reports what actually came through.
+ *
+ *  A campaign from a NEWER build is not "odd" — it is readable-but-lossy, which is the one case that
+ *  trade doesn't cover (GS-save-integrity). `STORY_VERSION` moves independently of `SAVE_VERSION`, so
+ *  this is reachable with a save that migrates perfectly. Truncating it silently is exactly what the
+ *  device-side load now refuses to do, so the import refuses too rather than holding two opinions. */
 function migrateCampaignsOrEmpty(raw: unknown): CampaignStore {
   if (!raw || typeof raw !== 'object') return emptyCampaignStore();
+  const tooNew = campaignStoreTooNew(raw);
+  if (tooNew !== null) {
+    throw new BackupError(
+      `That backup's Story Tour campaigns were made by a newer version of ${GAME_TITLE} (campaign format ${String(tooNew)}). Update the game, then import it.`,
+    );
+  }
   try {
     return migrateCampaignStore(raw);
   } catch {

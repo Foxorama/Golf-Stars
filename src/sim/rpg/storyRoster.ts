@@ -24,7 +24,7 @@
  * honest reading of it, because the alternative on a boot path is a bricked game.
  */
 
-import { migrateStory, storyComplete, type StoryState } from './story';
+import { migrateStory, storyComplete, STORY_VERSION, type StoryState } from './story';
 
 /** Roster envelope version — INDEPENDENT of `STORY_VERSION` (which versions each campaign INSIDE it).
  *  Bump only when the CONTAINER's shape changes, and add a step to `migrateCampaignStore`. */
@@ -49,6 +49,60 @@ export function emptyCampaignStore(): CampaignStore {
 }
 
 /**
+ * Is this a PRE-ROSTER single campaign rather than a roster? A `StoryState` carries `characterId` and
+ * no `campaigns` map.
+ *
+ * The ONE place that question is answered (GS-save-integrity). It used to be inline in
+ * `migrateCampaignStore` alone, which was fine while it had one asker; the version check is a second
+ * asker, and it got the answer wrong the first time by re-deriving it — the two shapes' top-level
+ * `version` fields mean different things, so shape must be decided before the number is read.
+ */
+function isBareCampaignBlob(obj: Record<string, unknown>): boolean {
+  return !obj.campaigns && typeof obj.characterId === 'string';
+}
+
+/**
+ * Was this blob written by a LATER build? (GS-save-integrity) Returns the offending version, or
+ * `null` when everything here is something we understand.
+ *
+ * `migrateStory` is field-by-field and never looks at `version`, which makes it beautifully robust
+ * for a boot path and quietly LOSSY in one direction: a campaign from a newer build keeps every
+ * field this build knows and silently drops the rest, then writes the truncated version back. The
+ * main save's failure was loud and total; this one is a slow puncture, and it needed the same answer
+ * — don't overwrite what you can't fully read.
+ *
+ * Checks the ENVELOPE and every campaign inside it, because the two version independently (a schema
+ * bump inside a campaign does not move `CAMPAIGN_STORE_VERSION`). Pure, so the storage layer's
+ * refusal and this decision are testable apart.
+ */
+export function campaignStoreTooNew(raw: unknown): number | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const obj = raw as Record<string, unknown>;
+
+  // WHICH SHAPE this is has to be decided by `isBareCampaignBlob` and nowhere else. The two shapes
+  // both carry a top-level `version` meaning DIFFERENT things — a roster's is the envelope's
+  // (currently 1), a bare campaign's is its `STORY_VERSION` (currently 7) — so reading the number
+  // before knowing the shape flags every legacy campaign in existence as "from the future".
+  if (isBareCampaignBlob(obj)) {
+    const v = obj.version;
+    return typeof v === 'number' && Number.isFinite(v) && v > STORY_VERSION ? v : null;
+  }
+
+  const envelope = obj.version;
+  if (typeof envelope === 'number' && Number.isFinite(envelope) && envelope > CAMPAIGN_STORE_VERSION) {
+    return envelope;
+  }
+  const rawMap = obj.campaigns;
+  if (!rawMap || typeof rawMap !== 'object' || Array.isArray(rawMap)) return null;
+  for (const entry of Object.values(rawMap as object)) {
+    if (!entry || typeof entry !== 'object') continue;
+    const v = (entry as { version?: unknown }).version;
+    if (typeof v === 'number' && Number.isFinite(v) && v > STORY_VERSION) return v;
+  }
+  return null;
+}
+
+/**
  * Read ANY persisted `fc_story` blob as a roster. Never throws — the worst case is an empty roster.
  *
  * Accepts three shapes, and the middle one is the whole reason this function is careful:
@@ -67,7 +121,7 @@ export function migrateCampaignStore(raw: unknown): CampaignStore {
   const obj = raw as Record<string, unknown>;
 
   // (2) A legacy bare campaign: a `StoryState` carries `characterId` and no `campaigns` map.
-  if (!obj.campaigns && typeof obj.characterId === 'string') {
+  if (isBareCampaignBlob(obj)) {
     return adoptLegacyCampaign(obj);
   }
 

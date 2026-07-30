@@ -1012,11 +1012,39 @@ function v32ToV33(s: SaveV32): SaveV33 {
 }
 
 /**
- * Migrate an unknown persisted blob up to the current version, one step at a time. Each
- * future version bump adds another `if (s.version === N)` step in sequence.
+ * What reading a blob actually produced (GS-save-integrity).
+ *
+ * `migrate()` used to answer this question by returning `defaultSave()` for every input it did not
+ * understand — conflating "there was nothing here" with "there is something here and I can't read
+ * it". Those need opposite responses: the first should start a new game, the second must not write.
+ * Since the caller could not tell them apart, an unreadable save was destroyed by the next ordinary
+ * persist. Three call sites now ask for the distinction (boot, import, the itch collision check) and
+ * `migrate` is a thin wrapper for everyone else.
  */
-export function migrate(raw: unknown): Save {
-  if (!raw || typeof raw !== 'object') return defaultSave();
+export type SaveRead =
+  | { ok: true; save: Save }
+  /** A version this build has no path for — from a LATER build. */
+  | { ok: false; why: 'newer'; found: number }
+  /** Parsed, but carries no schema version we recognise: not this game's blob. */
+  | { ok: false; why: 'foreign' };
+
+/**
+ * Read an unknown persisted blob, saying which of the three outcomes it is.
+ *
+ * The migration chain is unchanged and runs in the same order; the only additions are the two
+ * classifying early returns and the final "no path for this number" arm. `migrate()` maps every
+ * non-ok arm back to `defaultSave()`, so its behaviour is identical for every possible input —
+ * asserted directly in `tests/save-integrity.test.ts`, because a refactor of this function that
+ * quietly changed one input's outcome is a save-losing bug wearing a tidy-up's clothes.
+ */
+export function readSave(raw: unknown): SaveRead {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ok: false, why: 'foreign' };
+  const stamped = (raw as { version?: unknown }).version;
+  // No numeric version ⇒ not ours. This is the itch shared-bucket case: another game's `fc_save`
+  // parses perfectly well and has nothing to say about our schema.
+  if (typeof stamped !== 'number' || !Number.isFinite(stamped)) return { ok: false, why: 'foreign' };
+  if (stamped > SAVE_VERSION) return { ok: false, why: 'newer', found: stamped };
+
   let s = raw as { version?: number } & Record<string, unknown>;
 
   if (s.version === 1) s = v1ToV2(s as unknown as SaveV1) as unknown as typeof s;
@@ -1053,8 +1081,9 @@ export function migrate(raw: unknown): Save {
   if (s.version === 32) s = v32ToV33(s as unknown as SaveV32) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
-    // Unknown / unsupported version: start clean rather than guess at a shape.
-    return defaultSave();
+    // A finite version at or below ours that the chain has no step for (0, a negative, a fraction, a
+    // gap). Not something we can shape — and not something to overwrite either.
+    return { ok: false, why: 'foreign' };
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
@@ -1069,7 +1098,7 @@ export function migrate(raw: unknown): Save {
     for (const [id, item] of Object.entries(m ?? {})) if (owned.includes(item)) out[id] = item;
     return out;
   };
-  return {
+  const save: Save = {
     version: SAVE_VERSION,
     bestStableford: v14.bestStableford ?? 0,
     bestDistance: v14.bestDistance ?? 0,
@@ -1113,6 +1142,21 @@ export function migrate(raw: unknown): Save {
     lastPlayed: migrateLastPlayed(v14.lastPlayed),
     savedAt: v14.savedAt,
   };
+  return { ok: true, save };
+}
+
+/**
+ * Migrate an unknown persisted blob up to the current version, one step at a time. Each future
+ * version bump adds another `if (s.version === N)` step to the chain in `readSave`.
+ *
+ * Returns a playable save for ANY input — which is right for the callers that have no way to act on
+ * the difference, and wrong for the two that do. A caller that is about to WRITE (boot) or that is
+ * reporting to the player (import) must use `readSave` instead: this function cannot tell them that
+ * the blob it just replaced with a default was real (GS-save-integrity).
+ */
+export function migrate(raw: unknown): Save {
+  const read = readSave(raw);
+  return read.ok ? read.save : defaultSave();
 }
 
 /** Serialise a save to a JSON string (the export path). */

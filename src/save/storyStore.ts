@@ -21,6 +21,7 @@
 
 import {
   activeCampaign,
+  campaignStoreTooNew,
   emptyCampaignStore,
   migrateCampaignStore,
   setActiveCampaign,
@@ -29,6 +30,7 @@ import {
 } from '../sim/rpg/storyRoster';
 import { type StoryState } from '../sim/rpg/story';
 import { legacyKeyFor } from './legacyKeys';
+import { readOnly, recordFault } from './integrity';
 
 export const STORY_KEY = 'fc_story';
 
@@ -64,9 +66,26 @@ export function loadCampaignStore(): CampaignStore {
     return emptyCampaignStore();
   }
   if (!raw) return (cache = emptyCampaignStore());
+  let parsed: unknown;
   try {
-    return (cache = migrateCampaignStore(JSON.parse(raw)));
+    parsed = JSON.parse(raw);
   } catch {
+    recordFault({ why: 'corrupt', blob: 'story' }, raw);
+    return (cache = emptyCampaignStore());
+  }
+  // A campaign (or envelope) from a later build (GS-save-integrity). `migrateCampaignStore` would
+  // happily read it — dropping every field this build doesn't know — and the write-after-every-action
+  // would then persist the truncated copy over the real one. Refuse instead, and DON'T cache: the
+  // cache is only ever a mirror of something we could read.
+  const tooNew = campaignStoreTooNew(parsed);
+  if (tooNew !== null) {
+    recordFault({ why: 'newer', blob: 'story', found: tooNew }, raw);
+    return emptyCampaignStore();
+  }
+  try {
+    return (cache = migrateCampaignStore(parsed));
+  } catch {
+    recordFault({ why: 'corrupt', blob: 'story' }, raw);
     return (cache = emptyCampaignStore());
   }
 }
@@ -76,6 +95,9 @@ export function loadCampaignStore(): CampaignStore {
  *  has always been rather than quietly becoming an in-memory store whose contents leak between callers.
  *  The cache is only ever a mirror of what is actually on disk. */
 export function writeCampaignStore(next: CampaignStore): boolean {
+  // Read-only because boot found data it couldn't read (GS-save-integrity). Same no-op contract as
+  // "no localStorage" — including leaving the cache alone.
+  if (readOnly()) return false;
   const s = store();
   if (!s) return false;
   try {
@@ -113,6 +135,10 @@ export function setActiveCampaignId(characterId: string): boolean {
 /** Wipe EVERY campaign. Only a backup import (which replaces the roster wholesale) should do this —
  *  a "start over" replaces one golfer's slot, it does not clear the roster. */
 export function clearStory(): void {
+  // Deleting is the most destructive write there is, so it obeys read-only like every other
+  // (GS-save-integrity). Its one caller — `applyBackup` — clears the fault before it writes, because
+  // an import is the player deliberately replacing everything.
+  if (readOnly()) return;
   cache = null;
   const s = store();
   try {

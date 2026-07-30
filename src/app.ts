@@ -131,6 +131,7 @@ import {
   copyBackupToClipboard,
   currentBackupJSON,
   downloadBackup,
+  downloadUnreadableSave,
   parseBackup,
 } from './app/saveTransfer';
 import { backIntent } from './ui/back';
@@ -2815,6 +2816,18 @@ function wireSaveTransfer(root: ParentNode): void {
               : '⚠ The clipboard was blocked. Try “Export save” instead.',
             !ok,
           ),
+        );
+        return;
+      }
+      if (what === 'rescue') {
+        // The stored bytes, exactly as they are (GS-save-integrity) — never `freshJSON()`, which
+        // would build a bundle from the empty default that boot fell back to.
+        const ok = downloadUnreadableSave();
+        note(
+          ok
+            ? '✅ Saved to your downloads. Keep that file — it holds whatever is on this device.'
+            : "⚠ Couldn't save a file here. Copy it out of the browser's storage inspector if you can.",
+          !ok,
         );
         return;
       }

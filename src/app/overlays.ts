@@ -25,6 +25,7 @@ import { dist } from '../sim/course/contract';
 import { getSettings, clampUiScale, type Settings } from '../settings';
 import { describeBackup, type Backup } from '../save/backup';
 import { storageHealth } from '../save/durability';
+import { faultExplanation, faultHeadline, faultRescue, saveIntegrity } from '../save/integrity';
 
 /**
  * Save-transfer view state (GS-save-transfer) — an exported mutable view object, the documented
@@ -89,6 +90,25 @@ function saveDataSection(): string {
   const note = saveView.stage === 'note' && saveView.message
     ? `<div class="gs-savenote${saveView.bad ? ' gs-savenote--bad' : ''}">${saveView.message}</div>`
     : '';
+  // READ-ONLY because boot found data it couldn't read (GS-save-integrity). Export is REPLACED, not
+  // merely disabled: it is built from `loadSave()`, which handed back an empty default, so the normal
+  // button would write a file containing nothing and call it a backup. Import stays — it is the way
+  // out, and `applyBackup` clears the fault before it writes.
+  const fault = saveIntegrity.fault;
+  if (fault) {
+    return `
+        <div class="gs-setsec">💾 Save data</div>
+        <div class="gs-savenote gs-savenote--bad">⚠ ${faultHeadline(fault)} ${faultExplanation(fault)}</div>
+        <div class="gs-setnote">${faultRescue(fault)}</div>
+        <div class="gs-saverow">
+          <button class="gs-btn gs-btn--ghost" data-save-transfer="rescue" style="flex:1;">⬇ Download the stored data as-is</button>
+        </div>
+        <div class="gs-saverow">
+          <button class="gs-btn gs-btn--ghost" data-save-transfer="import" style="flex:1;">⬆ Import a backup and start saving again</button>
+        </div>
+        ${note}
+        <input type="file" id="gs-save-file" accept="application/json,.json" hidden>`;
+  }
   return `
         <div class="gs-setsec">💾 Save data</div>
         <div class="gs-setnote">Your progress lives only on this device, and the website and the app store it separately. Export to move a save between them — or to keep a backup.</div>

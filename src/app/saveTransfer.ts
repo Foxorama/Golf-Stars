@@ -12,7 +12,8 @@
  * survives a long save being truncated by a paste buffer.
  */
 
-import { loadSave, writeSave } from '../save/storage';
+import { loadSave, unreadableSaveText, writeSave } from '../save/storage';
+import { clearFault, saveIntegrity } from '../save/integrity';
 import { loadCampaignStore, writeCampaignStore, clearStory, invalidateCampaignCache } from '../save/storyStore';
 import { buildBackup, type Backup } from '../save/backup';
 import { campaignCount } from '../sim/rpg/storyRoster';
@@ -60,14 +61,14 @@ export function backupFilename(): string {
 
 /** Offer the backup as a file download. Returns false when the environment gives us no way to do it
  *  (no DOM) — the caller then falls back to the clipboard rather than reporting a success. */
-export function downloadBackup(json: string): boolean {
+export function downloadBackup(json: string, filename = backupFilename()): boolean {
   if (typeof document === 'undefined' || typeof URL === 'undefined') return false;
   try {
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = backupFilename();
+    a.download = filename;
     a.rel = 'noopener';
     document.body.appendChild(a);
     a.click();
@@ -79,6 +80,26 @@ export function downloadBackup(json: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * THE RESCUE (GS-save-integrity). When boot could not read the stored save, a normal export would be
+ * built from `loadSave()` — which handed back an empty DEFAULT — so the player would receive a file
+ * containing nothing and reasonably believe they had backed up. That is worse than offering nothing.
+ *
+ * This writes out the stored bytes EXACTLY as they are: no parse, no migration, no re-stamping. For
+ * the `newer` case it is a complete rescue (update the game, import the file). For `corrupt` it is the
+ * only copy that will ever exist of whatever survived, and it costs one tap to keep.
+ *
+ * The filename says what it is, because it will sit in a Downloads folder next to real backups.
+ */
+export function downloadUnreadableSave(): boolean {
+  const raw = unreadableSaveText();
+  if (!raw) return false;
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  const blob = saveIntegrity.fault?.blob === 'story' ? 'campaigns' : 'save';
+  return downloadBackup(raw, `far-carry-unreadable-${blob}-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.json`);
 }
 
 /** Copy the backup to the clipboard — the route that works inside the Android shell. Async because
@@ -109,6 +130,12 @@ export { parseBackup, describeBackup, BackupError, type Backup } from '../save/b
  * make. `describeBackup` lists what is in the file so the choice is the player's, made before the write.
  */
 export function applyBackup(b: Backup): void {
+  // An import is the ONE write allowed to proceed over unreadable data (GS-save-integrity): it is
+  // deliberate, confirmed, and replaces every blob, so there is nothing left to protect. Clearing the
+  // fault FIRST is load-bearing — `writeSave`/`writeCampaignStore`/`clearStory` all refuse while it is
+  // set, so an import into a read-only device would otherwise report success and write nothing, which
+  // is the same lie in the opposite direction.
+  clearFault();
   writeSave(b.save);
   if (campaignCount(b.campaigns) > 0) writeCampaignStore(b.campaigns);
   else clearStory();
