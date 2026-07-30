@@ -51,12 +51,56 @@ export function applyViewportFit(): void {
 }
 
 /**
+ * Are we inside somebody else's page? (GS-embed-scroll)
+ *
+ * Pure, so the predicate is testable without a frame. `window.top` is cross-origin from an embed,
+ * and merely COMPARING the references is allowed — but a hardened browser can still throw, and a
+ * throw here would take out boot, so the caller treats any error as "embedded". That is the safe
+ * default: self-scrolling works in a normal tab too, it is only worse for the mobile address bar.
+ */
+export function isEmbedded(self: unknown, top: unknown): boolean {
+  return self !== top;
+}
+
+/**
+ * Stamp `data-gs-embed` on `<html>` when the game is running inside an iframe.
+ *
+ * WHY IT MATTERS: itch.io serves HTML5 games in an iframe with `scrolling="no"`, so the game's
+ * DOCUMENT CANNOT SCROLL AT ALL — a wheel over the game scrolls the store page behind it instead.
+ * Measured in that exact setup, the Pro Shop is 1388px of content in an 860px frame and **528px of
+ * it was unreachable**: the rack simply ended. Every taller screen (shipyard, clubhouse, locker,
+ * the Story bar) had the same hole.
+ *
+ * This is the rule the overlays already follow (GS-a11y-sheet-scroll — a box bigger than the
+ * viewport is unreachable content, so it caps itself and scrolls INSIDE), never applied to the page
+ * frame because in an ordinary tab the document scrolls and the bug cannot happen.
+ *
+ * Keyed on "in an iframe" rather than on "the iframe forbade scrolling", which is not observable
+ * from inside: an iframe that DOES allow scrolling works fine either way, so the broader predicate
+ * is safe. And it is deliberately NOT applied everywhere — a self-scrolling page on mobile web
+ * stops the browser's address bar collapsing, which costs a real slice of screen for no gain in a
+ * context that was never broken.
+ */
+export function applyEmbedFlag(): void {
+  if (typeof document === 'undefined' || typeof window === 'undefined') return;
+  let embedded = false;
+  try {
+    embedded = isEmbedded(window.self, window.top);
+  } catch {
+    embedded = true; // cross-origin lockdown ⇒ certainly not the top document
+  }
+  if (embedded) document.documentElement.setAttribute('data-gs-embed', '1');
+  else document.documentElement.removeAttribute('data-gs-embed');
+}
+
+/**
  * Keep it current. A rotation or a desktop resize changes the answer, and so does the UI-scale
  * setting — `applyReaderSettings` calls straight through, so the two always move together.
  */
 export function watchViewportFit(): void {
   if (typeof window === 'undefined') return;
   applyViewportFit();
+  applyEmbedFlag(); // cannot change after load, so it is stamped once alongside the first fit
   window.addEventListener('resize', applyViewportFit);
   window.addEventListener('orientationchange', applyViewportFit);
 }

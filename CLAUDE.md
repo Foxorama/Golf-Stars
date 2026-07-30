@@ -1209,6 +1209,21 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     one positive result resolved to SPACING, not shapes; so the toggle buys tracking/word-spacing/leading,
     kills italics and justification, and asks for legible faces already on the device. Guarded by
     `tests/accessibility.test.ts`.
+  - **IN AN EMBED THE PAGE SCROLLS ITSELF** (GS-embed-scroll, `app/viewportFit.ts applyEmbedFlag`).
+    itch.io serves HTML5 games in an iframe with **`scrolling="no"`**, so the game's DOCUMENT cannot
+    scroll — a wheel over the game scrolls the STORE PAGE behind it. Reproduced: the Pro Shop is
+    **1388px of content in an 860px frame and 528px was unreachable**; shipyard/clubhouse/locker the
+    same. This is GS-a11y-sheet-scroll's rule (a box bigger than the viewport is unreachable content
+    ⇒ cap to one screen, scroll INSIDE) never applied to the page frame, because in an ordinary tab
+    the document scrolls and the bug cannot happen. `data-gs-embed` on `<html>` gates it; the
+    predicate is "in an iframe", NOT "the iframe forbade scrolling" (not observable from inside, and
+    a scrollable iframe works either way), and a `try/catch` treats a cross-origin throw as embedded.
+    Deliberately NOT applied everywhere — a self-scrolling page stops a mobile browser's address bar
+    collapsing, real screen lost in a context that was never broken. `--fit`/`--bleed` are excluded
+    BY NAME (both are already one screen tall and own their overflow; the selector would otherwise
+    out-specify them), and `overscroll-behavior-y: contain` stops the chain-out that made it feel
+    like nothing happened. Guarded by `tests/embed-scroll.test.ts`, which drives a real
+    `scrolling="no"` iframe — the only place the bug exists.
   - **THE PAGE SITS IN SPACE, AND IT IS A `body` BACKGROUND LAYER — NOT AN ELEMENT** (GS-space-sky,
     `render/spaceSky.ts`). `body` was `--gs-bg` + a faint vignette and `.gs-main` sets no background,
     so everything that is not a panel or a canvas was flat near-black. Invisible on a phone; glaring in
