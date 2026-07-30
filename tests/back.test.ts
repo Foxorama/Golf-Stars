@@ -10,10 +10,10 @@
  * time; this catches the other half, that the answer is a real intent rather than an accident.
  */
 import { describe, it, expect } from 'vitest';
-import { backIntent, exitPrompt } from '../src/ui/back';
+import { backIntent, exitPrompt, resumePromise } from '../src/ui/back';
 import { initState, reduce } from '../src/ui/game';
 import type { Screen, UiState } from '../src/ui/gameState';
-import { STROKEPLAY_FORMAT } from '../src/sim/rpg/formats';
+import { ASGARD_FORMAT, STROKEPLAY_FORMAT } from '../src/sim/rpg/formats';
 
 /** Every member of the `Screen` union. Kept literal (not derived) so ADDING a screen without
  *  deciding its back behaviour fails here as well as at the compiler. */
@@ -205,19 +205,36 @@ describe('the exit confirm round-trips through the reducer', () => {
 });
 
 describe('the confirm copy stays truthful', () => {
-  // The prompt must never claim the run is lost — `toTitle` parks it as resumable. What differs by
-  // format is how much of the CURRENT stop is replayed.
+  // The prompt must never claim the run is lost — `toTitle` parks it in its own slot. What differs is
+  // WHAT is parked, and there are exactly three answers (GS-save-slots).
   it('never threatens data loss', () => {
     const body = exitPrompt(on('playing')).body.toLowerCase();
     expect(body).not.toMatch(/lose|lost|discard|delete/);
     expect(body).toMatch(/saved/);
   });
 
-  it('promises a hole-level resume only for strokeplay, which is the format that delivers it', () => {
+  it('promises a hole-level resume in EVERY parked mode — one rule, not a per-format lottery', () => {
     const s = on('playing');
-    const stroke = exitPrompt({ ...s, run: { ...s.run, formatId: STROKEPLAY_FORMAT } });
-    expect(stroke.body).toMatch(/this hole/);
-    // Voyage/Unending replay the stop, and the copy says so rather than over-promising.
-    expect(exitPrompt(s).body).toMatch(/stop/);
+    expect(exitPrompt(s).body).toMatch(/this hole/); // Voyage
+    expect(exitPrompt({ ...s, run: { ...s.run, formatId: STROKEPLAY_FORMAT } }).body).toMatch(/this hole/);
+    expect(exitPrompt({ ...s, run: { ...s.run, formatId: 'unending' } }).body).toMatch(/this hole/);
+  });
+
+  it('and says the OTHER truth where the hole is not kept, rather than a uniform lie', () => {
+    const s = on('playing');
+    // A Story world round owns no run slot — the campaign is saved, the round is replayed.
+    const story = exitPrompt({ ...s, run: { ...s.run, formatId: STROKEPLAY_FORMAT, storyRound: true } });
+    expect(story.body).toMatch(/campaign is saved/);
+    expect(story.body).toMatch(/replay this world/);
+    expect(story.body).not.toMatch(/this hole/);
+    // The Asgard tournament is never persisted: leaving forfeits the attempt.
+    const asgard = exitPrompt({ ...s, run: { ...s.run, formatId: ASGARD_FORMAT } });
+    expect(asgard.body).toMatch(/forfeits/);
+    expect(asgard.body).toMatch(/saved/);
+  });
+
+  it('every exit surface reads the SAME sentence — the settings footer cannot promise something milder', () => {
+    const s = on('playing');
+    expect(exitPrompt(s).body).toBe(resumePromise(s));
   });
 });

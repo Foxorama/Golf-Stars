@@ -3,6 +3,7 @@ import { initState, reduce, type UiState } from '../src/ui/game';
 import { shotView, awaitingPutt } from '../src/sim/rpg/play';
 import { shipForCharacter, hatForCharacter, shirtForCharacter, pantsForCharacter, driverForCharacter } from '../src/ui/game';
 import { DEFAULT_SHIP_ID } from '../src/sim/rpg/ships';
+import { readSlot } from '../src/sim/rpg/runSlots';
 
 /** Drive a whole stop via the interactive reducer flow (attacking every shot). */
 function playStopInteractive(s: UiState): UiState {
@@ -221,12 +222,17 @@ describe('ui reducer', () => {
     expect(s.screen).toBe('title');
     expect(s.play).toBeUndefined(); // transient play state cleaned up
     expect(s.holeRng).toBeUndefined();
-    expect(s.resumable).toBeDefined();
-    expect(s.resumable!.stopIndex).toBe(stopIndex);
-    expect(s.resumable!.characterId).toBe('feather-fade');
-    // …and resuming re-enters the run at the current stop, exactly like a page reload.
+    const parked = readSlot(s.runSlots, 'endless', 'feather-fade');
+    expect(parked).toBeDefined();
+    expect(parked!.stopIndex).toBe(stopIndex);
+    expect(parked!.characterId).toBe('feather-fade');
+    expect(s.lastPlayed).toEqual({ mode: 'endless', characterId: 'feather-fade' });
+    // …and resuming re-enters the run on the hole it was left on (GS-save-slots), exactly like a page
+    // reload — the shot taken above left the run mid-hole, so it tees that hole up again with the card
+    // so far intact rather than replaying the whole stop.
     const back = reduce(s, { type: 'resume' });
-    expect(back.screen).toBe('intro');
+    expect(back.screen).toBe('playing');
+    expect(back.play!.holeIndex).toBe(0);
     expect(back.run.stopIndex).toBe(stopIndex);
     expect(back.run.loadout.characterId).toBe('feather-fade');
   });
@@ -237,7 +243,7 @@ describe('ui reducer', () => {
     expect(picked.screen).toBe('character');
     const s = reduce(picked, { type: 'toTitle' });
     expect(s.screen).toBe('title');
-    expect(s.resumable).toBeUndefined();
+    expect(s.runSlots).toEqual({});
     // A no-op on the title itself.
     expect(reduce(s, { type: 'toTitle' })).toBe(s);
   });
@@ -248,7 +254,7 @@ describe('ui reducer', () => {
     s = reduce(s, { type: 'openClubhouseHall' });
     s = reduce(s, { type: 'toTitle' });
     expect(s.screen).toBe('title');
-    expect(s.resumable).toEqual(snap); // the saved run survives the round-trip
+    expect(readSlot(s.runSlots, 'endless', undefined)).toEqual(snap); // the saved run survives the round-trip
   });
 
   it('a missed cut awards Star Shards (GS-12)', () => {
@@ -405,14 +411,16 @@ describe('ui reducer', () => {
     };
     const title = initState(1, {}, snap);
     expect(title.screen).toBe('title');
-    expect(title.resumable).toEqual(snap);
+    // A retired format id ('ladder') folds into the endless default, so that is the slot it lands in.
+    expect(readSlot(title.runSlots, 'endless', undefined)).toEqual(snap);
+    expect(title.lastPlayed).toEqual({ mode: 'endless', characterId: '' });
 
     const resumed = reduce(title, { type: 'resume' });
     expect(resumed.screen).toBe('intro');
     expect(resumed.run.formatId).toBe('ladder');
     expect(resumed.run.stopIndex).toBe(2);
     expect(resumed.run.loadout.perks).toEqual(['gyro']);
-    expect(resumed.resumable).toBeUndefined();
+    expect(resumed.runSlots).toEqual({}); // the offer is consumed — the run is live now
   });
 
   it('resume is a no-op when there is nothing to resume', () => {

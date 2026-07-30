@@ -8,6 +8,7 @@
  */
 
 import { playHole, type PlayedHole } from '../sim/round';
+import type { Course } from '../sim/course/contract';
 import {
   bank,
   bossEdgeForRun,
@@ -30,7 +31,6 @@ import {
   scrambleOptsFor,
   teamDuelSetupForRun,
   shopOffer,
-  snapshotRun,
   startRun,
   startAsgardRun,
   strand,
@@ -106,6 +106,17 @@ import {
   type CampaignTag,
 } from '../sim/rpg/storyRoster';
 import {
+  clearSlot,
+  readSlot,
+  runModeOf,
+  slotModeOf,
+  slotTags,
+  upsertSlot,
+  UNKNOWN_GOLFER,
+  type SlotTag,
+} from '../sim/rpg/runSlots';
+import { resumableState } from './resumable';
+import {
   autoDecision,
   awaitingPutt,
   beginHole,
@@ -159,6 +170,10 @@ export { asgardFieldEdge, asgardPortalOpens, endlessProgressUpdates, runEndUpdat
 export function initState(
   seed: number | string,
   meta: MetaProgress = {},
+  /** GS-save-slots: a single parked run, filed into its own `mode:golfer` slot. The save carries the
+   *  whole table on `meta` now, so boot never passes this — it survives as the "old input, new
+   *  output" adapter for a lone snapshot (the shape `migrateCampaignStore` uses for a bare campaign),
+   *  which is what a caller with exactly one run in hand actually has. */
   resumable?: RunSnapshot,
   story?: StoryState,
   /** GS-story-campaign-slots: every campaign the player owns (`loadCampaignStore()`). Optional so every
@@ -168,12 +183,24 @@ export function initState(
   const metaUpgrades = meta.metaUpgrades ?? {};
   const bagTier = meta.bagTier ?? DEFAULT_BAG_TIER;
   const run = startRun(seed, undefined, metaUpgrades, undefined, 0, bagTier);
+  // GS-save-slots: the parked-run table, plus the lone-snapshot adapter above folded into its own
+  // slot (and pointed at, since a caller handing over one run means that run).
+  const loneMode = resumable ? slotModeOf(resumable) : null;
+  const runSlots =
+    resumable && loneMode
+      ? upsertSlot(meta.runSlots ?? {}, loneMode, resumable.characterId, resumable)
+      : meta.runSlots ?? {};
+  const lastPlayed =
+    resumable && loneMode
+      ? { mode: loneMode, characterId: resumable.characterId ?? UNKNOWN_GOLFER }
+      : meta.lastPlayed;
   return {
     run,
     screen: 'title',
     course: currentCourse(run),
     viewHole: 0,
-    resumable,
+    runSlots,
+    ...(lastPlayed ? { lastPlayed } : {}),
     ...(story ? { story } : {}),
     // GS-story-campaign-slots: the whole roster, so the reducer can answer "does this golfer already
     // have a campaign?" — the question the overwrite confirmation guards a destructive write with.
@@ -253,6 +280,20 @@ export function storyCampaignTags(state: UiState): Record<string, CampaignTag> {
   return campaignTags(currentRoster(state));
 }
 
+/**
+ * GS-save-slots: the run badge per golfer FOR THE MODE BEING ENTERED — the `campaignTags` twin, and
+ * passed into the shared `character` screen for the same reason.
+ *
+ * The mode comes from the run backing the picker (`start` rebuilt it with the chosen format), which is
+ * the SAME derivation the reducer's overwrite guard uses — so what the card offers and what tapping it
+ * does cannot disagree. Empty for the Story clubhouse (that picker reads campaigns) and for Asgard.
+ */
+export function modeSlotTags(state: UiState): Record<string, SlotTag> {
+  if (state.pendingStoryNew) return {};
+  const mode = runModeOf(state.run.formatId);
+  return mode && mode !== 'story' ? slotTags(state.runSlots, mode) : {};
+}
+
 /** The credit cost of the NEXT shop reroll (GS-shop-reroll) — base 30, ×1.6 per reroll this stop. */
 export const REROLL_BASE_COST = 30;
 export function rerollCost(rerolls: number): number {
@@ -265,6 +306,52 @@ export function rerollCost(rerolls: number): number {
  * by `storyTournamentContinue` (trunk / no-aftermath path) and `storyAftermathContinue` (after the beat),
  * so both read the identical branch. Clears the transient tournament payloads.
  */
+/**
+ * The matchplay boss's UI state (GS-100 / GS-team-duel) — for the first tee, AND for a stop RESUMED
+ * mid-way (GS-save-slots).
+ *
+ * ONE builder because there are now two ways in, and a boss stop is exactly the case the design brief
+ * flagged as needing proof: the duel standing must survive a park. It does, because every part of it
+ * is DERIVABLE rather than remembered — the opponent from the run, the boss's whole card from its own
+ * private `:boss` stream (never the play stream, so it is byte-identical whenever it is rebuilt), and
+ * the duels by folding the cards the player has actually banked. Nothing here reads `holeRng`.
+ *
+ * `partnerHoles` is the one thing that cannot be rebuilt: a best-ball partner's ball is drawn from the
+ * PLAY stream, interleaved with the player's shots, and a resume reseeds that stream. It is padded to
+ * the right LENGTH with the banked cards instead — which is only ever bookkeeping, because the reveal
+ * reads `partnerHoles[holeIndex]` (the hole being played, always written fresh by
+ * `withBestBallPartner`) and the SCORES for finished holes are already in `stopPlayed`, where the
+ * better ball was banked at the time. Without the padding the array would silently misalign, which is
+ * the quiet kind of wrong this codebase keeps learning to avoid.
+ */
+function buildMatch(run: Run, course: Course, played: readonly PlayedHole[]): MatchUi | undefined {
+  if (!isMatchplayBoss(currentBoss(run))) return undefined;
+  const setup = teamDuelSetupForRun(run);
+  const bossId = setup?.opponentId ?? resolveBossId(run);
+  const bossTents = course.meta?.effect === 'tradeMarket';
+  const bossScorch = course.meta?.effect === 'meteorShower';
+  const bossPatch = effectPatchKind(course.meta?.effect);
+  // The solo boss keeps its home-turf edge here too (it was dropped only on this interactive
+  // path — headless playStop always applied it), and both shapes carry the run's Ascension
+  // sharpening (GS-boss-scale) so the pre-played boss is the exact headless boss.
+  const soloHomeEdge = bossHasHomeEdge(bossId, course.meta?.themeId);
+  const bossHoles = setup
+    ? playBossSideStop(course.holes, bossId, setup, new Rng(`${course.seed}:boss`), setup.homeEdge, run.loadout.rainbowRoad, bossTents, bossScorch, bossPatch, bossEdgeForRun(run))
+    : playBossStop(course.holes, bossId, new Rng(`${course.seed}:boss`), soloHomeEdge, run.loadout.rainbowRoad, bossTents, bossScorch, bossPatch, bossEdgeForRun(run));
+  const duels = played.map((p, i) => holeDuel(i, course.holes[i]!.par, p, bossHoles[i]!));
+  const ms = matchState(duels, course.holes.length);
+  return {
+    bossId,
+    bossHoles,
+    duels,
+    holesUp: ms.holesUp,
+    decided: ms.decided,
+    finished: ms.finished,
+    setup,
+    partnerHoles: setup ? played.map((p) => p) : undefined,
+  };
+}
+
 function continuePastTournament(state: UiState): UiState {
   const r = state.lastStoryTournament;
   if (r?.won && r.chapter === 4 && state.story?.alignment && !interludeSeen(state.story, state.story.alignment)) {
@@ -292,7 +379,11 @@ export function reduce(state: UiState, action: Action): UiState {
         played: undefined,
         lastResult: undefined,
         routes: undefined,
-        resumable: undefined,
+        // GS-save-slots: choosing a MODE parks nothing and destroys nothing. It used to clear the one
+        // resumable offer outright, which is how "I'll just look at the Voyage" cost you an Unending
+        // run. The golfer picker below badges each golfer with their slot FOR THIS MODE; continuing
+        // one is a tap, and starting over a live slot goes through `requestSlotRestart`.
+        slotOverwriteId: undefined,
         viewHole: 0,
       };
     }
@@ -313,6 +404,25 @@ export function reduce(state: UiState, action: Action): UiState {
           return reduce({ ...state, characterLoreId: undefined }, { type: 'storyContinueCampaign', characterId: action.characterId });
         }
         return reduce({ ...state, characterLoreId: undefined }, { type: 'storyRestartCampaign', characterId: action.characterId });
+      }
+      // GS-save-slots: the SAME rule for every other mode. Runs are per mode per golfer now, so
+      // picking a golfer who already has one going CONTINUES it — the picker is the run list. Starting
+      // fresh over the top is a destructive write and must come through the confirmed
+      // `slotRequestRestart` path; guarding it HERE rather than in the screen means the confirmation
+      // cannot be bypassed by any surface that dispatches `selectCharacter` (a deep link, the inspect
+      // card, a future picker). This is `storyOverwriteId`'s guard promoted, which is the whole point:
+      // it was right, it simply was not applied widely enough.
+      const pickMode = runModeOf(state.run.formatId);
+      if (
+        pickMode &&
+        pickMode !== 'story' &&
+        state.slotOverwriteId !== action.characterId &&
+        readSlot(state.runSlots, pickMode, action.characterId)
+      ) {
+        return reduce(
+          { ...state, characterLoreId: undefined },
+          { type: 'resume', mode: pickMode, characterId: action.characterId },
+        );
       }
       // Rebuild the run with the golfer's loadout/shape baked in, keeping the format + bag tier
       // chosen at 'start'. Ascension (GS-ascension) is a per-run difficulty picked HERE, alongside
@@ -344,16 +454,24 @@ export function reduce(state: UiState, action: Action): UiState {
         bagTier,
         state.unlockedClubsByCharacter[action.characterId] ?? [],
       );
+      // A CONFIRMED start-over empties the slot right here rather than waiting for the new run to
+      // overwrite it. Waiting is not the same thing: a fresh Star Tour run has no course pinned, so
+      // there is nothing worth parking yet and the old round would sit there — still offered — after
+      // the player had explicitly agreed to bin it.
+      const runSlots =
+        pickMode && pickMode !== 'story' && state.slotOverwriteId === action.characterId
+          ? clearSlot(state.runSlots, pickMode, action.characterId)
+          : state.runSlots;
       // STAR TOUR (GS-star-tour-2): the golfer is chosen BEFORE the star map, so a strokeplay selection
       // flows to the map (to pick a world + fly the golfer's own ship) rather than straight to a stop
       // intro. The course pins on at `pickStarTourCourse`. Every other mode goes to the intro as before.
       if (state.run.formatId === STROKEPLAY_FORMAT) {
-        return { ...state, run, course: currentCourse(run), screen: 'starTour', bagTierByCharacter, characterLoreId: undefined };
+        return { ...state, run, course: currentCourse(run), screen: 'starTour', bagTierByCharacter, runSlots, slotOverwriteId: undefined, characterLoreId: undefined };
       }
       // The Marmot's tip jar ACCUMULATES across runs (GS-tent-tips) — a new run does NOT empty it, so it
       // fills toward a half-dozen over successive marmot bonks. The clubhouse renders the fill-then-cash-out
       // cycle off this running total (`marmotTips % (CAP + 1)`), so the reducer just keeps counting.
-      return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', bagTierByCharacter, characterLoreId: undefined });
+      return withLoreGate({ ...state, run, course: currentCourse(run), screen: 'intro', bagTierByCharacter, runSlots, slotOverwriteId: undefined, characterLoreId: undefined });
     }
 
     case 'backToCharacter': {
@@ -365,23 +483,42 @@ export function reduce(state: UiState, action: Action): UiState {
     }
 
     case 'resume': {
-      if (state.screen !== 'title' || !state.resumable) return state;
-      const snap = state.resumable;
+      // GS-save-slots: continue a parked run. Bare (the title's CONTINUE card) resumes whatever
+      // `lastPlayed` points at; the per-mode golfer picker names the slot instead, so tapping a
+      // golfer who already has a run going continues THAT one and never somebody else's.
+      if (state.screen !== 'title' && state.screen !== 'character') return state;
+      const target = action.mode
+        ? { mode: action.mode, characterId: action.characterId ?? UNKNOWN_GOLFER }
+        : state.lastPlayed;
+      if (!target) return state;
+      // Story Tour's progress is the campaign in `fc_story`, not a run slot — so "continue" there
+      // means the campaign, and it is the campaign path that answers it. One entry point, one rule.
+      if (target.mode === 'story') {
+        return reduce(state, { type: 'storyContinueCampaign', characterId: target.characterId });
+      }
+      const snap = readSlot(state.runSlots, target.mode, target.characterId);
+      if (!snap) return state;
+      // The offer is consumed: the run is LIVE now, not parked. `persist` re-parks it from the live
+      // run on this very action, so the slot is refilled before anything can observe it empty.
+      const runSlots = clearSlot(state.runSlots, target.mode, target.characterId);
+      const lastPlayed = target;
       const run = resumeRun(snap);
       const course = currentCourse(run);
-      // STAR TOUR mid-round resume (GS-star-tour-resume): a parked stroke-play round carries its
+      // MID-STOP RESUME (GS-star-tour-resume, generalised by GS-save-slots): a parked run carries its
       // completed scorecard (`stopPlayed`) + the hole reached (`stopHoleIndex`), so continue drops you
-      // back on that hole's tee with your card intact — the 18 holes are ONE stop, so the ordinary
-      // restart-the-stop resume would otherwise bin the whole round. `holeRng` is reseeded fresh: the
-      // round is a user-driven records chase (no determinism-guarded auto sim), so the resumed holes just
-      // draw a new dispersion stream — no already-played score is re-rolled. No lore gate here (you're
-      // already teed off, mid-round). Every other format keeps the intro/restart-the-stop resume below.
-      if (
-        run.formatId === STROKEPLAY_FORMAT &&
-        snap.stopPlayed &&
-        snap.stopHoleIndex !== undefined &&
-        snap.stopHoleIndex < course.holes.length
-      ) {
+      // back on that hole's tee with your card intact. ONE rule for every mode, deliberately — a player
+      // who learns one mode's behaviour would otherwise lose a run in another (and it is strictly LESS
+      // forgiving than the restart-the-stop resume it replaces, which handed back every hole).
+      //
+      // `holeRng` is reseeded fresh: the play stream's position isn't persisted, so the holes still to
+      // come simply draw a new dispersion stream. Nothing already banked is re-rolled, and the headless
+      // auto sim — the thing determinism is guarded for — never takes this path.
+      //
+      // Everything else the stop needs is DERIVED rather than remembered: the course from the run's own
+      // seed/stop/theme/event, the cut and the competition field inside `finishStop` from `run` +
+      // `stopPlayed`, the endless set allowance from `run.holesSurvived` + the same cards, and the duel
+      // standing from `buildMatch`. No lore gate here (you're already teed off, mid-round).
+      if (snap.stopPlayed && snap.stopHoleIndex !== undefined && snap.stopHoleIndex < course.holes.length) {
         return {
           ...state,
           run,
@@ -390,11 +527,18 @@ export function reduce(state: UiState, action: Action): UiState {
           holeRng: new Rng(`${course.seed}:play`),
           stopPlayed: [...snap.stopPlayed],
           play: beginHole(course.holes[snap.stopHoleIndex]!, snap.stopHoleIndex),
-          match: undefined,
+          match: buildMatch(run, course, snap.stopPlayed),
           played: undefined,
           lastResult: undefined,
           routes: undefined,
-          resumable: undefined,
+          // A tent mulligan / StarMart offer never survives leaving the stop, exactly as they never
+          // carry across a stop boundary (GS-tent-interactions).
+          mulliganPending: undefined,
+          starmartOffer: undefined,
+          starmartRerolls: undefined,
+          scrambleChoice: undefined,
+          runSlots,
+          lastPlayed,
           viewHole: 0,
         };
       }
@@ -406,7 +550,8 @@ export function reduce(state: UiState, action: Action): UiState {
         played: undefined,
         lastResult: undefined,
         routes: undefined,
-        resumable: undefined,
+        runSlots,
+        lastPlayed,
         viewHole: 0,
       });
     }
@@ -542,7 +687,7 @@ export function reduce(state: UiState, action: Action): UiState {
         pendingStoryNew: true,
         storyInspectId: undefined,
         storyOverwriteId: undefined,
-        resumable: state.resumable,
+        slotOverwriteId: undefined,
       };
     }
 
@@ -566,6 +711,23 @@ export function reduce(state: UiState, action: Action): UiState {
       // volunteers shipped still carries Warden caddies) — the Warden friends leave, the Coil takes the bag.
       const story = applyHeraldCaddies(saved);
       return { ...base, story, campaigns: upsertCampaign(state.campaigns, story), screen: 'story' };
+    }
+
+    case 'slotRequestRestart': {
+      // GS-save-slots: the player wants to START OVER as a golfer who already has a run parked in the
+      // mode they are entering. Raise the confirmation rather than writing — and refuse outright when
+      // there is nothing to overwrite, so this can never become a second, unguarded way to bin a run.
+      // The exact twin of `storyRequestRestart`, deliberately: one shape, four modes.
+      if (state.screen !== 'character' || state.pendingStoryNew) return state;
+      const mode = runModeOf(state.run.formatId);
+      if (!mode || mode === 'story') return state;
+      if (!readSlot(state.runSlots, mode, action.characterId)) return state;
+      return { ...state, slotOverwriteId: action.characterId };
+    }
+
+    case 'slotCancelRestart': {
+      if (!state.slotOverwriteId) return state;
+      return { ...state, slotOverwriteId: undefined };
     }
 
     case 'storyRequestRestart': {
@@ -1521,30 +1683,15 @@ export function reduce(state: UiState, action: Action): UiState {
       if (state.screen !== 'intro' || state.run.status !== 'active') return state;
       // Matchplay boss stop (GS-100): pre-play the boss's ball for the whole stop (its own real shots,
       // deterministic), then play your ball hole-by-hole and compare. The boss uses its OWN rng stream,
-      // so your interactive play is byte-for-byte the same as a non-boss stop.
-      let match: MatchUi | undefined;
-      if (isMatchplayBoss(currentBoss(state.run))) {
-        const setup = teamDuelSetupForRun(state.run);
-        const bossId = setup?.opponentId ?? resolveBossId(state.run);
-        const bossTents = state.course.meta?.effect === 'tradeMarket';
-        const bossScorch = state.course.meta?.effect === 'meteorShower';
-        const bossPatch = effectPatchKind(state.course.meta?.effect);
-        // The solo boss keeps its home-turf edge here too (it was dropped only on this interactive
-        // path — headless playStop always applied it), and both shapes carry the run's Ascension
-        // sharpening (GS-boss-scale) so the pre-played boss is the exact headless boss.
-        const soloHomeEdge = bossHasHomeEdge(bossId, state.course.meta?.themeId);
-        const bossHoles = setup
-          ? playBossSideStop(state.course.holes, bossId, setup, new Rng(`${state.course.seed}:boss`), setup.homeEdge, state.run.loadout.rainbowRoad, bossTents, bossScorch, bossPatch, bossEdgeForRun(state.run))
-          : playBossStop(state.course.holes, bossId, new Rng(`${state.course.seed}:boss`), soloHomeEdge, state.run.loadout.rainbowRoad, bossTents, bossScorch, bossPatch, bossEdgeForRun(state.run));
-        match = { bossId, bossHoles, duels: [], holesUp: 0, decided: false, finished: false, setup, partnerHoles: setup ? [] : undefined };
-      }
+      // so your interactive play is byte-for-byte the same as a non-boss stop. `buildMatch` is shared
+      // with the mid-stop resume so the two can never describe the duel differently.
       return {
         ...state,
         screen: 'playing',
         holeRng: new Rng(`${state.course.seed}:play`),
         stopPlayed: [],
         play: beginHole(state.course.holes[0]!, 0),
-        match,
+        match: buildMatch(state.run, state.course, []),
         // A tent mulligan/StarMart never carries across a stop boundary (GS-tent-interactions).
         mulliganPending: undefined,
         starmartOffer: undefined,
@@ -2363,21 +2510,15 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'toTitle': {
       // Return to the title from any screen (GS-settings-nav) — the escape hatch the settings sheet
       // offers on screens with no nav of their own (character select, clubhouse, mid-run…). Never
-      // destructive: a run that's actually underway (a golfer picked, still active) is kept as a
-      // resumable snapshot — exactly what a page reload offers — so "back to title" can't lose a run.
-      // The title's placeholder run (no golfer yet) is NOT worth resuming; any older offer survives.
+      // destructive: a run that's actually underway (a golfer picked, still active) is parked in its
+      // OWN mode/golfer slot — exactly what a page reload offers — so "back to title" can't lose a run.
+      //
+      // GS-save-slots: this used to re-derive the answer itself, and it got it wrong in a way
+      // `persist` did not — it had no Story/Asgard check, so it overwrote the single resumable slot
+      // with whatever was live and `persist` faithfully wrote that. `resumableState` is now the ONE
+      // function both call, and the two can no longer disagree.
       if (state.screen === 'title') return state;
-      const resumable =
-        state.run.status === 'active' && state.run.loadout.characterId
-          ? snapshotRun(
-              state.run,
-              // Carry a live stroke-play round's progress (GS-star-tour-resume) so a Star Tour round
-              // parked via "back to title" resumes from the hole it left off, not the 1st tee.
-              state.run.formatId === STROKEPLAY_FORMAT && state.play
-                ? { stopHoleIndex: state.play.holeIndex, stopPlayed: state.stopPlayed ?? [] }
-                : undefined,
-            )
-          : state.resumable;
+      const { runSlots, lastPlayed } = resumableState(state);
       // Rebuild the placeholder run backing the title (same seed) so format previews start clean.
       const run = startRun(state.run.seed, undefined, state.metaUpgrades, undefined, 0, state.bagTier);
       return {
@@ -2385,7 +2526,8 @@ export function reduce(state: UiState, action: Action): UiState {
         run,
         course: currentCourse(run),
         screen: 'title',
-        resumable,
+        runSlots,
+        lastPlayed,
         played: undefined,
         lastResult: undefined,
         routes: undefined,
@@ -2409,6 +2551,9 @@ export function reduce(state: UiState, action: Action): UiState {
         pendingStoryNew: false,
         storyInspectId: undefined,
         storyOverwriteId: undefined,
+        // …and the per-mode picker's own confirm, for the same reason: carried onto the title it
+        // would let the NEXT mode's first `selectCharacter` overwrite a slot without asking.
+        slotOverwriteId: undefined,
         viewHole: 0,
       };
     }
@@ -2459,8 +2604,11 @@ export function reduce(state: UiState, action: Action): UiState {
           seenLore: state.seenLore,
           // GS-story-startour-unlock: the permanent Star Tour unlock is meta-progression — carry it over.
           starTourUnlocked: state.starTourUnlocked,
+          // GS-save-slots: every parked run survives a restart — re-seeding to a new seed (the Daily)
+          // must not bin the runs going in the other three modes.
+          runSlots: state.runSlots,
+          lastPlayed: state.lastPlayed,
         },
-        state.resumable,
       );
     }
   }

@@ -109,7 +109,7 @@ This game lives or dies on three axes — put every change through all three bef
   renderer consumes it, the sim scores it. Rewrite either side freely behind the contract.
 - **Versioned saves from v1** (`src/save/schema.ts`): every persisted blob has a `version` +
   `migrate()` (one step at a time). Namespace keys `gs_*`. Export/import-to-JSON from day one
-  (localStorage is the only copy). Current schema is **v30**; bump + add a migration when you
+  (localStorage is the only copy). Current schema is **v33**; bump + add a migration when you
   persist a new field. Loadouts are rebuilt from perk *ids* (`loadoutFromPerks`), so most
   run-state changes need NO save bump.
   **`fc_story` holds ONE CAMPAIGN PER GOLFER** (GS-story-campaign-slots, `sim/rpg/storyRoster.ts` pure ·
@@ -196,6 +196,37 @@ This game lives or dies on three axes — put every change through all three bef
   beast is EDGED IN ITS OWN LIGHT, not the hulls' near-black ink, or it vanishes against space; and the
   market CARD shows only x ∈ [−25,+25], so an over-long hull loses the SKULL (hence one `scale(0.86)` wrap).
   Guarded by `tests/serpent-trophy.test.ts`.
+  **ONE PARKED RUN PER MODE, PER GOLFER — AND ONE FUNCTION THAT SAYS WHAT A STATE PARKS**
+  (GS-save-slots, save v33, `sim/rpg/runSlots.ts` pure · `ui/resumable.ts` the decision ·
+  `docs/decisions/save-slots.md`). `fc_save.activeRun` was ONE snapshot and four modes wrote through it,
+  so starting anything discarded whatever else was parked — *"a Voyage with Larry and an Unending with
+  Bo"* had never been true and nothing on screen said so. It is now `runSlots`
+  (`` `${mode}:${characterId}` `` → snapshot, over voyage | endless | startour) + a `lastPlayed` pointer
+  whose mode MAY be `'story'`. **`fc_story` is deliberately NOT folded in** — it already has this shape,
+  its own migration, cache and backup handling, and unifying buys tidiness for a risky migration of the
+  one blob you least want to touch; so story has a MODE but no SLOT, which is what retires the old *"a
+  Story round is NEVER the main-save resumable"* exception rather than patching it. **`resumableState`
+  is the non-negotiable single answer** — `persist` and `toTitle` both call it and neither re-derives
+  (source-scanned, incl. a ban on `snapshotRun` returning to `persist.ts`): two descriptions of that
+  decision is the bug the whole feature exists because of, and the one that cost a parked Voyage every
+  time a Story world was played. `runModeOf` checks **`storyRound` BEFORE the format** (a story round is
+  played on `STROKEPLAY_FORMAT`, so the format alone files it under Star Tour); `slotTag() === null` is
+  the ONE predicate for "nothing worth continuing" that the title card, the picker badge and the parker
+  all read, so merely opening the star map can no longer eat the round parked there; and a confirmed
+  start-over **empties the slot immediately**, never "when the new run overwrites it" (a fresh Star Tour
+  run parks nothing until a course is pinned). The story overwrite guard is PROMOTED to universal —
+  `selectCharacter` CONTINUES a golfer who already has a run and refuses to replace one unless
+  `slotOverwriteId` names them. **Resume is at the HOLE you were on, in every mode**: one rule, because
+  mixed rules lose a player a run in whichever mode they learned second — and it is strictly less
+  forgiving than the restart-the-stop resume it replaced. Everything a stop needs is DERIVED, not
+  remembered (course from the run; cut + field inside `finishStop`; endless allowance from
+  `holesSurvived`; `run.history` already snapshotted) — except the matchplay boss, rebuilt by
+  `buildMatch`, which `playInteractive` and the resume SHARE so they cannot drift. ⚠️ A best-ball
+  `partnerHoles` cannot be rebuilt (drawn from the PLAY stream, which a resume reseeds): it is padded to
+  the right LENGTH with the banked cards, or the array misaligns and every later reveal shows somebody
+  else's card. **Every exit says what leaving costs, from `resumePromise`** — `hole` / `world` (a story
+  round: campaign saved, round replayed) / `forfeit` (Asgard) — the back confirm AND the settings
+  footer, which used to promise something vaguer. Guarded by `tests/save-slots.test.ts`.
   **A backup is a BUNDLE, not a save** (GS-save-transfer, `save/backup.ts` pure · `app/saveTransfer.ts`
   the localStorage/DOM half). Progress lives in THREE blobs (`fc_save` + `fc_story` + `fc_settings`) and
   localStorage is per-ORIGIN, so the website and the Capacitor shell (`https://localhost`) cannot see

@@ -15,6 +15,9 @@ import { getCharacter } from '../sim/rpg/characters';
 import { arcIndexOf } from '../sim/rpg/competition';
 import { staticCourseSpec } from '../sim/course/staticCourses';
 import { storyComplete } from '../sim/rpg/story';
+import { readSlot, RUN_MODE_ICON, RUN_MODE_LABEL } from '../sim/rpg/runSlots';
+import { campaignTag } from '../sim/rpg/storyRoster';
+import { currentRoster } from '../ui/game';
 import { ARCHETYPE_SPACE, ARCHETYPE_TURF } from '../render/palette';
 import type { BiomeArchetype } from '../sim/course/themes';
 
@@ -153,8 +156,8 @@ export function titleScreen(): string {
 
 /** The mode-aware message shown on the Continue Run button (GS-continue-button). Returns `null` when the
  *  run isn't worth (or possible) to continue — today only a Star Tour session with no course teed off. */
-function resumeInfo(r: RunSnapshot): { kicker: string; head: string; sub: string } | null {
-  const ch = getCharacter(r.characterId);
+function resumeInfo(r: RunSnapshot, characterId?: string): { kicker: string; head: string; sub: string } | null {
+  const ch = getCharacter(characterId ?? r.characterId);
   const who = ch ? ch.name : 'Your golfer';
   // Star Tour (GS-star-tour): a records chase on a chosen course — only offer a continue once a course has
   // actually been started, and lead with the COURSE (its icon + name) and the hole reached.
@@ -163,7 +166,7 @@ function resumeInfo(r: RunSnapshot): { kicker: string; head: string; sub: string
     const spec = staticCourseSpec(r.staticCourseId);
     const hole = (r.stopHoleIndex ?? 0) + 1;
     return {
-      kicker: `🗺 Star Tour · ${who}`,
+      kicker: `${RUN_MODE_ICON.startour} ${RUN_MODE_LABEL.startour} · ${who}`,
       head: `${courseIconHTML(spec?.archetype)} ${spec?.name ?? 'Course'}`,
       sub: `Round in progress · <b style="color:var(--gs-ink);">Hole ${hole}</b> of 18`,
     };
@@ -172,7 +175,7 @@ function resumeInfo(r: RunSnapshot): { kicker: string; head: string; sub: string
   if (getFormat(r.formatId).winnable) {
     const arc = arcIndexOf(r.stopIndex) + 1;
     return {
-      kicker: `🚀 The Voyage · ${who}`,
+      kicker: `${RUN_MODE_ICON.voyage} ${RUN_MODE_LABEL.voyage} · ${who}`,
       head: `Arc ${arc}<span style="color:var(--gs-dim);font-weight:600;"> of 3</span>`,
       sub: `Stop ${r.stopIndex + 1} · ${r.credits} credits`,
     };
@@ -180,7 +183,7 @@ function resumeInfo(r: RunSnapshot): { kicker: string; head: string; sub: string
   // The Unending Universe (GS-unending): endless survival — say the hole you're up to.
   const hole = (r.holesSurvived ?? 0) + 1;
   return {
-    kicker: `🌌 Unending Universe · ${who}`,
+    kicker: `${RUN_MODE_ICON.endless} ${RUN_MODE_LABEL.endless} · ${who}`,
     head: `Hole ${hole}`,
     sub: `${r.credits} credits${r.bonusShards ? ` · ✦ ${r.bonusShards}` : ''}`,
   };
@@ -201,21 +204,54 @@ function courseIconHTML(archetype: BiomeArchetype | undefined): string {
   </svg>`;
 }
 
-/** The thematic Continue Run button (GS-continue-button): the character's cosmetic ship + a mode-aware
- *  message. The WHOLE card is the resume button. Empty when there's nothing to continue. */
+/**
+ * The thematic Continue Run button (GS-continue-button): the character's cosmetic ship + a mode-aware
+ * message. The WHOLE card is the resume button. Empty when there's nothing to continue.
+ *
+ * GS-save-slots: it reads `lastPlayed` — a MODE and a GOLFER — and names both, so it can never drop a
+ * player into a mode they did not ask for. That matters now that four modes can be underway at once:
+ * with one shared slot the button only ever had one possible meaning, and with four it has to say
+ * which. Story Tour points at a CAMPAIGN rather than a run slot (its save is `fc_story`), so it is
+ * described from the roster and continued through the campaign path.
+ */
 function continueRunHTML(): string {
-  const r = state.resumable;
+  const last = state.lastPlayed;
+  if (!last) return '';
+  if (last.mode === 'story') return continueCampaignHTML(last.characterId);
+  const r = readSlot(state.runSlots, last.mode, last.characterId);
   if (!r) return '';
-  const info = resumeInfo(r);
+  const info = resumeInfo(r, last.characterId);
   if (!info) return '';
-  const shipId = shipForCharacter(state, r.characterId);
+  const shipId = shipForCharacter(state, last.characterId || r.characterId);
+  const action = { type: 'resume', mode: last.mode, characterId: last.characterId };
   return `
-    <button class="gs-resume" data-action='${JSON.stringify({ type: 'resume' })}'>
+    <button class="gs-resume" data-action='${JSON.stringify(action)}'>
       <span class="gs-resume__ship" aria-hidden="true">${shipCardSVG(shipId, 96, 60)}</span>
       <span class="gs-resume__body">
         <span class="gs-resume__kicker">${info.kicker}</span>
         <span class="gs-resume__head">${info.head}</span>
         <span class="gs-resume__sub">${info.sub}</span>
+      </span>
+      <span class="gs-resume__go" aria-hidden="true">▶</span>
+    </button>`;
+}
+
+/** The same card for a STORY TOUR campaign — the one mode whose progress is not a run snapshot. It is
+ *  described from the live roster (`campaignTag`), so the card and the clubhouse picker's badge can
+ *  never disagree about which chapter you are on. */
+function continueCampaignHTML(characterId: string): string {
+  const tag = campaignTag(currentRoster(state), characterId);
+  if (!tag) return '';
+  const ch = getCharacter(characterId);
+  const who = ch ? ch.name : 'Your golfer';
+  const action = { type: 'resume', mode: 'story', characterId };
+  return `
+    <button class="gs-resume" data-action='${JSON.stringify(action)}'>
+      <span class="gs-resume__ship" aria-hidden="true">${shipCardSVG(shipForCharacter(state, characterId), 96, 60)}</span>
+      <span class="gs-resume__body">
+        <span class="gs-resume__kicker">${RUN_MODE_ICON.story} ${RUN_MODE_LABEL.story} · ${who}</span>
+        <span class="gs-resume__head">${tag.short}</span>
+        <span class="gs-resume__sub">${tag.label}</span>
       </span>
       <span class="gs-resume__go" aria-hidden="true">▶</span>
     </button>`;

@@ -10,10 +10,11 @@ import {
 } from '../src/save/schema';
 import { DEFAULT_SHIP_ID } from '../src/sim/rpg/ships';
 import { CHARACTERS } from '../src/sim/rpg/characters';
+import { readSlot } from '../src/sim/rpg/runSlots';
 
 describe('save schema', () => {
   it('default save carries the current version (12) with the starter fleet + empty wardrobe + per-character maps', () => {
-    expect(SAVE_VERSION).toBe(32);
+    expect(SAVE_VERSION).toBe(33);
     const d = defaultSave();
     expect(d.version).toBe(SAVE_VERSION);
     expect(d.golfBagByCharacter).toEqual({});
@@ -40,6 +41,8 @@ describe('save schema', () => {
     expect(d.reputationByCharacter).toEqual({});
     expect(d.seenLore).toEqual({}); // GS-lore: no story beats seen on a fresh save
     expect(d.starTourUnlocked).toBe(false); // GS-story-startour-unlock: earned by winning the Story finale
+    expect(d.runSlots).toEqual({}); // GS-save-slots: nothing parked in any mode
+    expect(d.lastPlayed).toBeUndefined();
   });
 
   it('migrates a v27 blob forward to v28 (seeds an empty lore-progress set, preserves everything else)', () => {
@@ -84,16 +87,18 @@ describe('save schema', () => {
     expect(s.shards).toBe(22);
   });
 
-  it('carries a stroke-play round\'s mid-round progress through the activeRun snapshot round-trip', () => {
-    // A parked Star Tour round's hole + scorecard ride on the opaque activeRun snapshot, untouched by
+  it('carries a stroke-play round\'s mid-round progress through the run-slot snapshot round-trip', () => {
+    // A parked Star Tour round's hole + scorecard ride on the opaque slot snapshot, untouched by
     // migrate (GS-star-tour-resume), so a resume can continue from where it left off.
     const withProgress = {
       ...defaultSave(),
-      activeRun: { seed: 7, formatId: 'strokeplay', stopIndex: 0, distanceFromStart: 0, credits: 20, perks: [], stopHoleIndex: 6, stopPlayed: [] },
+      runSlots: {
+        'startour:feather-fade': { seed: 7, formatId: 'strokeplay', characterId: 'feather-fade', stopIndex: 0, distanceFromStart: 0, credits: 20, perks: [], stopHoleIndex: 6, stopPlayed: [] },
+      },
     } as unknown as Parameters<typeof migrate>[0];
     const s = migrate(withProgress);
     expect(s.version).toBe(SAVE_VERSION);
-    expect((s.activeRun as { stopHoleIndex?: number }).stopHoleIndex).toBe(6);
+    expect(readSlot(s.runSlots, 'startour', 'feather-fade')?.stopHoleIndex).toBe(6);
   });
 
   it('migrates a v20 blob forward to v21 (seeds empty caddy-faction reputation, preserves everything else)', () => {
@@ -174,7 +179,7 @@ describe('save schema', () => {
     expect(s.version).toBe(SAVE_VERSION);
     expect(s.shards).toBe(33);
     // The history field is optional and absent here → resume treats it as an empty history (unchanged).
-    expect((s.activeRun as { history?: unknown }).history).toBeUndefined();
+    expect(readSlot(s.runSlots, 'voyage', undefined)?.history).toBeUndefined();
   });
 
   it('migrates a v24 blob forward to v25 (refunds 40% of owned Trade Market items, stamps the notice)', () => {
@@ -223,18 +228,21 @@ describe('save schema', () => {
     ];
     const save = {
       ...defaultSave(),
-      activeRun: {
-        seed: 7,
-        formatId: 'voyage',
-        stopIndex: 2,
-        distanceFromStart: 10,
-        credits: 200,
-        perks: ['gyro'],
-        history,
+      runSlots: {
+        'voyage:longshot-larry': {
+          seed: 7,
+          formatId: 'voyage',
+          characterId: 'longshot-larry',
+          stopIndex: 2,
+          distanceFromStart: 10,
+          credits: 200,
+          perks: ['gyro'],
+          history,
+        },
       },
     } as unknown as Parameters<typeof exportSave>[0];
     const restored = importSave(exportSave(save));
-    expect((restored.activeRun as { history?: unknown }).history).toEqual(history);
+    expect(readSlot(restored.runSlots, 'voyage', 'longshot-larry')?.history).toEqual(history);
   });
 
   it('drops a per-character driver the player does not own (defensive backfill)', () => {
@@ -324,14 +332,17 @@ describe('save schema', () => {
       pantsByCharacter: { 'longshot-larry': 'pants-astro' },
       bagTier: 'epic' as const,
       unlockedClubsByCharacter: { 'feather-fade': ['7i', '3W'] },
-      activeRun: {
-        seed: 7,
-        stopIndex: 3,
-        distanceFromStart: 9,
-        credits: 250,
-        perks: ['gyro', 'precision-chip', 'precision-chip'],
-        meta: { 'vet-hands': 2 },
-        bagTier: 'epic' as const,
+      runSlots: {
+        'endless:feather-fade': {
+          seed: 7,
+          characterId: 'feather-fade',
+          stopIndex: 3,
+          distanceFromStart: 9,
+          credits: 250,
+          perks: ['gyro', 'precision-chip', 'precision-chip'],
+          meta: { 'vet-hands': 2 },
+          bagTier: 'epic' as const,
+        },
       },
     };
     const restored = importSave(exportSave(save));
@@ -351,7 +362,9 @@ describe('save schema', () => {
       bagTier: 'epic',
       unlockedClubsByCharacter: { 'feather-fade': ['7i', '3W'] },
       metaUpgrades: { 'vet-hands': 2, 'deep-pockets': 1 },
-      activeRun: { seed: 7, perks: ['gyro', 'precision-chip', 'precision-chip'], meta: { 'vet-hands': 2 }, bagTier: 'epic' },
+      runSlots: {
+        'endless:feather-fade': { seed: 7, perks: ['gyro', 'precision-chip', 'precision-chip'], meta: { 'vet-hands': 2 }, bagTier: 'epic' },
+      },
     });
   });
 
@@ -644,8 +657,12 @@ describe('save schema', () => {
     expect(s.ownedShips).toEqual([DEFAULT_SHIP_ID]);
     expect(s.shipByCharacter).toEqual({});
     expect(s.bestDistance).toBe(8);
-    expect(s.activeRun).toMatchObject({ seed: 5, perks: ['gyro'] });
+    // GS-save-slots: the single `activeRun` became one slot, keyed by its format's mode (no formatId
+    // on a v2 snapshot ⇒ the endless default) and its golfer (none yet, this far back).
+    expect(readSlot(s.runSlots, 'endless', undefined)).toMatchObject({ seed: 5, perks: ['gyro'] });
+    expect(s.lastPlayed).toEqual({ mode: 'endless', characterId: '' });
     expect('credits' in s).toBe(false);
+    expect('activeRun' in s).toBe(false);
   });
 
   it('migrates a v1 blob all the way forward to v13', () => {
@@ -662,12 +679,13 @@ describe('save schema', () => {
     expect(s.ownedShips).toEqual([DEFAULT_SHIP_ID]);
     expect(s.bestStableford).toBe(30);
     expect(s.bestDistance).toBe(5); // distanceFromStart folded into bestDistance
-    expect(s.activeRun).toMatchObject({ seed: 99, distanceFromStart: 5, perks: [] });
+    expect(readSlot(s.runSlots, 'endless', undefined)).toMatchObject({ seed: 99, distanceFromStart: 5, perks: [] });
   });
 
-  it('a v1 blob with no run migrates with no active run', () => {
+  it('a v1 blob with no run migrates with no parked run in any slot', () => {
     const s = migrate({ version: 1, distanceFromStart: 0, credits: 0, bestStableford: 0 });
-    expect(s.activeRun).toBeUndefined();
+    expect(s.runSlots).toEqual({});
+    expect(s.lastPlayed).toBeUndefined();
   });
 
   it('migrates garbage / unknown versions to a clean default', () => {

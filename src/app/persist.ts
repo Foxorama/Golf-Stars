@@ -11,20 +11,9 @@ import { state } from './ctx';
 import { writeSave } from '../save/storage';
 import { writeStory } from '../save/storyStore';
 import { SAVE_VERSION, type Save } from '../save/schema';
-import { snapshotRun, type RoundProgress } from '../sim/rpg/run';
-import { ASGARD_FORMAT, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
+import { resumableState } from '../ui/resumable';
 
-/** The live in-progress round state to carry on the snapshot (GS-star-tour-resume) — only for an
- *  underway stroke-play round (a Star Tour course teed off), so its resume continues from the hole it
- *  left off. Every other format restarts the current stop on resume, exactly as before. */
-function roundProgress(): RoundProgress | undefined {
-  return state.run.formatId === STROKEPLAY_FORMAT && state.play
-    ? { stopHoleIndex: state.play.holeIndex, stopPlayed: state.stopPlayed ?? [] }
-    : undefined;
-}
-
-/** The cross-run meta carried into `initState` from a loaded save (everything but the active run,
- *  which boot passes separately). */
+/** The cross-run meta carried into `initState` from a loaded save. */
 export function metaFromSave(save: Save) {
   return {
     bestStableford: save.bestStableford,
@@ -57,6 +46,10 @@ export function metaFromSave(save: Save) {
     serpentBouts: save.serpentBouts,
     serpentWins: save.serpentWins,
     priceRefund: save.priceRefund,
+    // GS-save-slots: every parked run + the CONTINUE pointer. They ride the meta bag rather than a
+    // positional argument so a persisted field is still mapped in exactly one file.
+    runSlots: save.runSlots,
+    lastPlayed: save.lastPlayed,
   };
 }
 
@@ -68,6 +61,11 @@ export function persistStory(): void {
 
 /** Write the live state to localStorage (the only copy). Called after every reducer action. */
 export function persist(): void {
+  // GS-save-slots: what this state parks is answered ONCE, by `resumableState` — the same function
+  // `toTitle` calls. It used to be answered here AND there, in different words, and the two
+  // disagreed: `persist` knew a Story round and an Asgard tournament must pass the existing offer
+  // through, `toTitle` did not, so parking a Voyage and then playing a Story world lost the Voyage.
+  const { runSlots, lastPlayed } = resumableState(state);
   writeSave({
     version: SAVE_VERSION,
     bestStableford: state.bestStableford,
@@ -106,23 +104,7 @@ export function persist(): void {
     // The one-off Trade Market price-cut notice (GS-trade-rebalance): persisted while pending so a
     // reload before dismissal still shows it; cleared to undefined once the player closes it.
     priceRefund: state.priceRefund,
-    // Persist the LIVE run only when it's actually underway (a golfer picked). The title's
-    // placeholder run is active-but-empty — snapshotting it used to overwrite a saved run the
-    // moment anything dispatched from the title. While no real run is live, any resumable offer
-    // the state carries (a reload's, or one parked by 'toTitle') is kept instead of wiped.
-    // The Asgard tournament run (GS-asgard) is NEVER persisted — a mid-tournament quit resumes the
-    // SUSPENDED real run (the Asgard attempt is forfeited, the Rainbow Ball intact), so persist the
-    // parked snapshot instead of the ephemeral tournament run.
-    // A Story Mode world round (GS-story-prologue) is NEVER the main-save resumable — the campaign has its
-    // own `fc_story` save, and a mid-round quit replays the world — so pass the parked snapshot through,
-    // exactly like the Asgard tournament run.
-    activeRun:
-      state.run.status === 'active' && state.run.formatId === ASGARD_FORMAT
-        ? state.asgardReturn
-        : state.run.status === 'active' && state.run.storyRound
-        ? state.resumable
-        : state.run.status === 'active' && state.run.loadout.characterId
-        ? snapshotRun(state.run, roundProgress())
-        : state.resumable,
+    runSlots,
+    lastPlayed,
   });
 }

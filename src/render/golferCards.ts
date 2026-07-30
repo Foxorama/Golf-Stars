@@ -7,6 +7,7 @@ import { type Leaderboard } from '../sim/rpg/league';
 import { CLUB_SET_DIFFICULTIES } from '../sim/rpg/endless';
 import { bagTierRank, type BagTier } from '../sim/rpg/bag';
 import { unlockableClubTypes } from '../sim/rpg/club-unlock';
+import type { SlotTag } from '../sim/rpg/runSlots';
 
 // Golfer presentation: the player/competitor avatar SVG art, the character-select cards, and the
 // arc competition views (field strip + leaderboard table). All pure string/SVG builders — they take
@@ -200,9 +201,30 @@ export function characterScreen(
     unlockLadder?: Record<string, number>;
     /** GS-story: override the card verb ("Play as" for Story Mode); defaults to Survive/Voyage by mode. */
     verb?: string;
+    /**
+     * GS-save-slots: `characterId → the run this golfer already has going IN THE MODE BEING ENTERED`.
+     * PASSED IN, never looked up — this screen is shared with Voyage / Unending / Star Tour / the
+     * Story clubhouse, so a renderer that fetched the table itself would badge golfers on every
+     * mode's picker with the wrong mode's run (the same rule `campaignTags` ships under). Absent ⇒
+     * every card renders byte-for-byte as it did before slots existed.
+     */
+    slotTags?: Record<string, SlotTag>;
+    /** The golfer whose parked run the player has asked to replace (`state.slotOverwriteId`) — raises
+     *  the confirmation over the roster. The card itself can never write; it can only ask. */
+    overwriteId?: string;
   } = {},
 ): string {
   const verb = opts.verb ?? (opts.winnable === false ? 'Survive as' : 'Voyage as');
+  // ONE builder for the pick action, because the confirmation's "Start a new run" is the same tap as
+  // the card's — built separately it would quietly drop the Ascension / club-set choice the pills
+  // above it are showing.
+  const selectAction = (characterId: string): string =>
+    JSON.stringify({
+      type: 'selectCharacter',
+      characterId,
+      ...(opts.ascension ? { ascension: opts.ascension.sel } : {}),
+      ...(opts.clubSet && opts.clubSet.touched ? { bagTier: opts.clubSet.sel } : {}),
+    });
   const statRows = (st: GolferStats, col: string): string =>
     statBar('PWR', st.power, col) + statBar('ACC', st.accuracy, col) + statBar('TCH', st.touch, col) + statBar('CON', st.consistency, col);
 
@@ -218,15 +240,27 @@ export function characterScreen(
     );
     // The phone-sized card swaps the blurb + full pros/cons for this one-line strength · quirk hint.
     const hint = `<p class="gs-charcard-hint"><span style="color:var(--gs-accent);">✓</span> ${ch.pros[0] ?? ''} <span style="color:var(--gs-warn);">▲</span> ${ch.cons[0] ?? ''}</p>`;
-    const action = {
-      type: 'selectCharacter',
-      characterId: ch.id,
-      ...(opts.ascension ? { ascension: opts.ascension.sel } : {}),
-      ...(opts.clubSet && opts.clubSet.touched ? { bagTier: opts.clubSet.sel } : {}),
-    };
+    // GS-save-slots: a golfer who already has a run going in THIS mode is continued, not restarted —
+    // so the card says so before it is tapped, and the destructive alternative is a separate, quieter
+    // control that only ever RAISES a confirm. The badge is `slotTag`'s own words, which is what the
+    // title's Continue card reads too, so the two surfaces cannot describe the same run differently.
+    const slot = opts.slotTags?.[ch.id];
+    const cta = slot
+      ? `<span class="gs-charcard-cta" style="--cc:${cap};"><span style="opacity:.7;font-weight:700;">Tap ·</span> Continue as ${ch.shortName} <span aria-hidden="true">→</span></span>`
+      : `<span class="gs-charcard-cta" style="--cc:${cap};"><span style="opacity:.7;font-weight:700;">Tap ·</span> ${verb} ${ch.shortName} <span aria-hidden="true">→</span></span>`;
+    const slotRow = slot
+      ? `<div class="gs-charcard-slot">
+          <span class="gs-charcard-slotbadge" style="--cc:${cap};">▶ ${slot.short}</span>
+          <span class="gs-charcard-restart" role="button"
+            data-action='${JSON.stringify({ type: 'slotRequestRestart', characterId: ch.id })}'
+            aria-label="Start a new run as ${ch.name}, replacing the one in progress"
+            title="Start over — replaces the run in progress"
+            onclick="event.stopPropagation()">↺ Start over</span>
+        </div>`
+      : '';
     return `
-      <button class="gs-charcard" data-action='${JSON.stringify(action)}'
-        aria-label="${verb} ${ch.name}"
+      <button class="gs-charcard" data-action='${selectAction(ch.id)}'
+        aria-label="${slot ? `Continue as ${ch.name} — ${slot.short}` : `${verb} ${ch.name}`}"
         style="--cc:${cap};animation-delay:${i * 70}ms;">
         <span class="gs-charcard-sheen" aria-hidden="true"></span>
         <div class="gs-charcard-top">
@@ -242,12 +276,13 @@ export function characterScreen(
             <div class="gs-charcard-org">${ch.origin} · ${ch.identity}</div>
           </div>
         </div>
+        ${slotRow}
         <p class="gs-charcard-blurb">${ch.blurb}</p>
         <div class="gs-charcard-stats">${statRows(ch.stats, cap)}</div>
         ${hint}
         <ul class="gs-charcard-pc">${pros}${cons}</ul>
         ${unlocks}
-        <span class="gs-charcard-cta" style="--cc:${cap};"><span style="opacity:.7;font-weight:700;">Tap ·</span> ${verb} ${ch.shortName} <span aria-hidden="true">→</span></span>
+        ${cta}
       </button>`;
   }).join('');
   // The two DIFFICULTY pills (GS-diffpills) — compact native-select dropdowns that fit one mobile row and
@@ -288,15 +323,64 @@ export function characterScreen(
   // and difficulty pills sit at their natural height and the roster grid fills the rest, so the whole
   // roster lands on ONE mobile screen with no scroll (and reflows to more rows, not off-screen, as
   // future golfers are added).
+  // GS-save-slots: when runs are parked in this mode, the roster IS the run list — say so, so a player
+  // reads "tap to continue" rather than assuming a pick starts over.
+  const anySlot = Object.keys(opts.slotTags ?? {}).length > 0;
+  const lede = anySlot
+    ? 'Tap a golfer to continue their run — or pick one who hasn’t teed off. Every golfer keeps their own.'
+    : 'Four wildly different swings — each trades a clear strength for a clear quirk.';
   return `
     <section class="gs-select">
       <header class="gs-charhead">
         <h1>Choose your golfer</h1>
-        <p>${opts.modeName ? `<b style="color:var(--gs-gold);">${opts.modeName}</b> · ` : ''}Four wildly different swings — each trades a clear strength for a clear quirk.</p>
+        <p>${opts.modeName ? `<b style="color:var(--gs-gold);">${opts.modeName}</b> · ` : ''}${lede}</p>
       </header>
       ${diffRow}
       <div class="gs-charwrap">${cards}</div>
-    </section>`;
+    </section>
+    ${opts.overwriteId ? slotRestartConfirmHTML(opts.overwriteId, opts.slotTags?.[opts.overwriteId], selectAction(opts.overwriteId), opts.modeName) : ''}`;
+}
+
+/**
+ * The START-OVER confirmation (GS-save-slots) — the one destructive act in the picker, and the exact
+ * twin of the Story clubhouse's `storyRestartConfirmHTML`.
+ *
+ * It reuses the shared `.gs-sheet` chrome rather than minting new global classes, and its copy is
+ * built from the SAME `SlotTag` the reducer's guard resolves and the badge prints, so the sheet can
+ * never promise something milder than the write. "Keep it" is the primary: the safe choice is the fat
+ * button. Back CANCELS it (tier 0 in `backIntent`), like every other confirm in the game.
+ */
+function slotRestartConfirmHTML(
+  characterId: string,
+  tag: SlotTag | undefined,
+  confirmAction: string,
+  modeName?: string,
+): string {
+  if (!tag) return '';
+  const ch = CHARACTERS.find((c) => c.id === characterId);
+  const who = ch?.name ?? 'this golfer';
+  const short = ch?.shortName ?? who;
+  // "a ${modeName} run" reads as "a The Voyage run" — the mode names carry their own articles, so
+  // name the mode as a place instead of gluing it in front of the noun.
+  const where = modeName ? ` in <b>${modeName}</b>` : '';
+  return `
+    <div class="gs-sheet-backdrop" style="align-items:center;z-index:70;">
+      <div class="gs-sheet" style="max-width:380px;text-align:center;">
+        <div style="font-size:30px;margin:2px 0 6px;">↺</div>
+        <b style="font-size:18px;">Start over as ${short}?</b>
+        <p style="margin:10px 0 6px;line-height:1.5;color:var(--gs-dim);">
+          ${who} has a run in progress${where} — <b>${tag.label.replace('In progress — ', '').replace('Round in progress — ', '')}</b>.
+          Starting a new one replaces it.</p>
+        <p style="margin:0 0 16px;line-height:1.5;color:var(--gs-dim);font-size:12.5px;">
+          No other golfer’s run, and no other mode, is touched.</p>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button class="gs-btn gs-btn--primary" data-action='${JSON.stringify({ type: 'slotCancelRestart' })}'
+            style="padding:11px 24px;">Keep ${short}’s run</button>
+          <button class="gs-btn gs-btn--ghost" data-action='${confirmAction}'
+            style="padding:10px 24px;">Start a new run</button>
+        </div>
+      </div>
+    </div>`;
 }
 
 /** 1 → "1st", 2 → "2nd", … */

@@ -28,7 +28,7 @@
  * `title` is the ONE screen where back exits the app. Nowhere else may close the game.
  */
 import type { Action, Screen, UiState } from './gameState';
-import { STROKEPLAY_FORMAT } from '../sim/rpg/formats';
+import { resumeCost } from './resumable';
 
 /** What the caller should do about a back press. */
 export type BackIntent =
@@ -181,6 +181,9 @@ export function backIntent(state: UiState, ctx: BackContext = {}): BackIntent {
   // so it is listed first — and like every other confirm, back CANCELS it. A back press must never be
   // able to destroy a campaign.
   if (state.storyOverwriteId) return { kind: 'dismiss', action: { type: 'storyCancelRestart' } };
+  // GS-save-slots: the same rule for the per-mode picker's start-over confirm — back must never be
+  // able to destroy a parked run either.
+  if (state.slotOverwriteId) return { kind: 'dismiss', action: { type: 'slotCancelRestart' } };
   if (state.characterLoreId) return { kind: 'dismiss', action: { type: 'closeCharacterLore' } };
   if (state.storyInspectId) return { kind: 'dismiss', action: { type: 'storyCloseInspect' } };
   if (state.storyItemInspectId) return { kind: 'dismiss', action: { type: 'storyCloseItem' } };
@@ -195,21 +198,27 @@ export function backIntent(state: UiState, ctx: BackContext = {}): BackIntent {
 }
 
 /**
- * The copy for the leave-the-round confirm. Lives here (not in the renderer) so the wording is
- * derived from the SAME state the intent is, and so a test can assert it stays truthful.
+ * WHAT LEAVING COSTS, in one sentence — the shared line, read by the back-button confirm AND the
+ * settings sheet's return-to-title footer (GS-save-slots).
  *
- * It deliberately does not say "you will lose your run", because that is false — `toTitle` parks an
- * active run as `resumable`. What it says instead is the thing that IS true, which differs by
- * format: a strokeplay round carries its hole index (GS-star-tour-resume), while a Voyage/Unending
- * stop restarts from its first hole.
+ * It lives here rather than in a renderer so the wording is derived from the SAME state the intent
+ * is, and it comes off `resumeCost`, the one function that decides what a resume actually does — so a
+ * screen can never promise something milder than the behaviour. It deliberately does not say "you
+ * will lose your run", because that is false: `toTitle` parks an active run in its own slot.
  */
+export function resumePromise(state: UiState): string {
+  switch (resumeCost(state.run.formatId, state.run.storyRound)) {
+    case 'world':
+      // A Story world round owns no run slot — the campaign is saved, the round is not.
+      return 'Your campaign is saved — you’ll replay this world from its first tee.';
+    case 'forfeit':
+      return 'Leaving forfeits the Asgard tournament — the run it interrupted is saved and waiting.';
+    default:
+      return 'Your run is saved — you’ll pick up on this hole.';
+  }
+}
+
+/** The copy for the leave-the-round confirm. */
 export function exitPrompt(state: UiState): { title: string; body: string; confirmLabel: string } {
-  const keepsHole = state.run.formatId === STROKEPLAY_FORMAT;
-  return {
-    title: 'Leave this round?',
-    body: keepsHole
-      ? 'Your round is saved — you’ll pick up on this hole.'
-      : 'Your run is saved — you’ll restart this stop from its first hole.',
-    confirmLabel: 'Leave round',
-  };
+  return { title: 'Leave this round?', body: resumePromise(state), confirmLabel: 'Leave round' };
 }

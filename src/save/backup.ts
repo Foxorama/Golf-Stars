@@ -25,6 +25,7 @@ import {
   type CampaignStore,
 } from '../sim/rpg/storyRoster';
 import { getCharacter } from '../sim/rpg/characters';
+import { slotCount } from '../sim/rpg/runSlots';
 
 /** Marks a file as ours. A JSON file that doesn't carry this (and isn't a recognisable legacy bare
  *  save, or a pre-rename bundle) is rejected rather than guessed at.
@@ -197,7 +198,9 @@ export function describeBackup(b: Backup): string[] {
   const ships = s.ownedShips?.length ?? 0;
   const apparel = s.ownedApparel?.length ?? 0;
   if (ships || apparel) lines.push(`🚀 ${ships} ship${ships === 1 ? '' : 's'} · 👕 ${apparel} cosmetic${apparel === 1 ? '' : 's'}`);
-  if (s.activeRun) lines.push('▶ A run in progress');
+  // GS-save-slots: a bundle can carry a run per MODE per GOLFER, so say how many rather than whether.
+  const runs = slotCount(s.runSlots ?? {});
+  if (runs) lines.push(`▶ ${runs} run${runs === 1 ? '' : 's'} in progress`);
   // GS-story-campaign-slots: a bundle can now carry SEVERAL campaigns, and importing replaces the lot.
   // Name each golfer and say where they got to — a player about to overwrite three campaigns with one
   // deserves to see that before they tap, not after. Champions are called out (★) because a champion is
