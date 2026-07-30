@@ -11,6 +11,7 @@ import { mountPlayView, type PlayViewHandle } from './render/playView';
 import { ballSkinFor } from './render/ball';
 import { installDecorProbe } from './render/decorProbe';
 import { applyViewportFit, watchViewportFit } from './app/viewportFit';
+import { applySpaceSky } from './render/spaceSky';
 import { renderHoleSVG, renderPuttOverlaySVG, PUTT_OVERLAY_ID, renderShotOverlaySVG, SHOT_OVERLAY_ID } from './render/holeView';
 import { bandCentreBias, clearOfPanelBias, fitFrame, type ProjectOptions } from './render/project';
 import { shotView, previewShot, previewBackspin, resolveAimTarget, awaitingPutt, canPuttFringe, type AimMode } from './sim/rpg/play';
@@ -172,6 +173,10 @@ function boot(): void {
     // …and the scale-aware fit class alongside it (GS-a11y-tight-fit): a media query can't see the
     // root zoom, so the play HUD's either/or reflow reads this attribute instead.
     watchViewportFit();
+    // The starfield behind everything (GS-space-sky). Purely a `body` background layer, so it can
+    // go in beside the other pre-paint theme work and never needs re-applying: it survives
+    // `render()` because it was never in `#app`, and it resizes with the viewport for free.
+    applySpaceSky();
     installDecorProbe(); // GS-decor-view-states: test-only `window.__gsDecorProbe` for the CI view-invariance check
     const save = loadSave();
     stage('loaded');

@@ -1209,6 +1209,22 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     one positive result resolved to SPACING, not shapes; so the toggle buys tracking/word-spacing/leading,
     kills italics and justification, and asks for legible faces already on the device. Guarded by
     `tests/accessibility.test.ts`.
+  - **THE PAGE SITS IN SPACE, AND IT IS A `body` BACKGROUND LAYER — NOT AN ELEMENT** (GS-space-sky,
+    `render/spaceSky.ts`). `body` was `--gs-bg` + a faint vignette and `.gs-main` sets no background,
+    so everything that is not a panel or a canvas was flat near-black. Invisible on a phone; glaring in
+    FULLSCREEN, which is where a desktop player actually plays — the play frame is capped to a portrait
+    strip (GS-play-desktop-frame), so it uses **29%** of the width on any 16:9 display (22% on 21:9),
+    and the menus are worse at **68%** empty behind an 820px column at 2560×1440. One background, both
+    fixed. A seeded seamless star tile (the SAME sky as the itch store page) is handed to CSS as
+    `--gs-sky` and read as **`var(--gs-sky, none)`** — so a build where the boot call never runs lands
+    on the old vignette, never on a hole. A background layer, deliberately, because a fixed ELEMENT
+    would need a size (and a fixed box inside a `zoom`ed root does not measure the display —
+    GS-a11y-scale-wrap), a `z-index:-1` nothing above may bury, and a mount outside `#app` to survive
+    `render()`; `body`'s background propagates to the canvas and has none of those. Only the star layer
+    `repeat`s — the vignette blobs are single placed washes. Wrapping is the fragile part: the link
+    search is TOROIDAL and draws along the WRAPPED delta, or neighbours across an edge become a line
+    ruled through the middle of the tile. Guarded by `tests/space-sky.test.ts` (determinism, the
+    nine-fold wrap, max link length, a CSS-safe data URI, and that it still adds NO element).
   - **A SCREEN SITS IN THE MIDDLE OF THE ROOM** (GS-page-centre, `index.html .gs-main`). `.gs-main` is
     `min-height:var(--gs-vh)`, and every screen stacked from the TOP of that frame and left the rest black
     — fine-ish on a phone, broken on a landscape viewport. Measured at the **820×760 itch embed** (the
