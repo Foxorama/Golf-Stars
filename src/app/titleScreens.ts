@@ -43,6 +43,29 @@ function installButtonHTML(): string {
 }
 
 /**
+ * Replay the boot cinematic (GS-intro-replay).
+ *
+ * The intro only ever played once, unprompted, on a fresh session — so the people most likely to
+ * miss it are the ones arriving through an embedded store page, where the game may autostart while
+ * the visitor is still reading the description. That is the specific case this exists for: it makes
+ * "autoplay on load" a safe setting to turn on, because the cinematic stops being a one-shot the
+ * player can permanently miss by looking away.
+ *
+ * It sits in the hero chips row rather than a bespoke corner: that row is already the home for the
+ * title's small ghost controls (the install nudge), it is directly under the wordmark where the eye
+ * lands when the cinematic ends, and it costs no new layout on a screen that is viewport-locked.
+ *
+ * NOT gated on reduced motion, deliberately. That setting exists to stop motion happening TO the
+ * player unasked — which is exactly what `shouldPlayIntro()` already enforces for the automatic
+ * play. A cinematic the player deliberately taps is the opposite case, and hiding the control would
+ * mean a reduced-motion player could never see the intro at all. The overlay ships its own
+ * always-present `Skip ▸`, so the exit is one tap away.
+ */
+function replayIntroHTML(): string {
+  return `<button class="gs-btn gs-btn--ghost" data-replay-intro="1" title="Play the opening cinematic again" aria-label="Replay the opening cinematic">▶ Intro</button>`;
+}
+
+/**
  * THE ONE MESSAGE IN THIS GAME A PLAYER MUST NOT MISS (GS-save-durability).
  *
  * Storage denied means nothing is being written — no shards, no campaign, no records — and every
@@ -116,6 +139,7 @@ export function titleScreen(): string {
         ${state.lifetimeAces > 0 ? `<span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:12px;" title="lifetime holes-in-one">⛳ <b>${state.lifetimeAces}</b> Ace${state.lifetimeAces === 1 ? '' : 's'}</span>` : ''}
         ${best}
         ${endlessBest}
+        ${replayIntroHTML()}
         ${installButtonHTML()}
       </div>
     </header>
