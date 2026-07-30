@@ -1,17 +1,26 @@
-// Rasterise the store-page banner + embed backdrop for the itch.io project page.
+// Rasterise the store-page banner + page sky for the itch.io project page.
 //
 // The banner REPLACES the page title on itch, so it has to carry the wordmark itself — and it is
 // scaled to the page's content column, so it is drawn oversized and shrunk rather than sized to a
-// spec itch does not publish. Transparent background: with the page theme set to the game's own
-// `--gs-bg` (#0b0d12) there is no edge to line up and no colour to match.
+// spec itch does not publish. Transparent background, so it composites onto whatever the page
+// theme is painted with (the star tile below) rather than carrying an edge of its own.
 //
 // The type is the title screen's own `.gs-hero-title` treatment (index.html) scaled up — same face,
 // same letter-spacing, same green/gold glow — so the store page and the first screen of the game
 // are visibly one thing. Stars are seeded (mulberry32), never Math.random, so re-shooting the
 // banner produces the identical image.
 //
-//   node scripts/banner.mjs        → assets/itch/banner.png + assets/itch/embed-bg.png
+// THE STORE PAGE IS THREE SKIES AND THEY HAVE TO BE ONE (GS-itch-page-sky): the banner's, the
+// page's, and the game's. The page's used to be a flat colour swatch, so the banner floated on
+// nothing and the embed — a black game on a black page — had no edge to be seen against. See the
+// tile block below for what fixes each half.
+//
+//   node scripts/banner.mjs        → assets/itch/*.png   (UPLOAD banner.png + embed-bg.png)
 //   BANNER_OUT=/path/dir node ...  → writes there instead
+//
+// Also writes three eyes-on previews that are never uploaded — banner-preview (the banner on its
+// real background), seam-preview (the tile repeated 2x2 with the joins ruled), and page-preview
+// (the whole store page as itch assembles it, embed included).
 //
 // Pure dev tool — ships nothing, imports no game logic. Re-run after a wordmark or palette change.
 
@@ -143,31 +152,182 @@ const bannerHTML = `<!doctype html><html><head><meta charset="utf-8"><style>
   </div>
 </body></html>`;
 
+// ── The page background: a SEAMLESS starfield tile (GS-itch-page-sky) ────────────────────────
+// This used to be a flat 256px swatch of `--gs-bg` — a colour, not a picture. The banner above it
+// has a starfield and the game inside it has a starfield, so the page between them was the only
+// flat-black band on the whole store page: the banner had no sky to sit in and the embed had no
+// edge, because a black game on a black page has nothing to be an edge against.
+//
+// Same visual language as the banner (same star radii, same alpha range, the same `#9fd8e6`
+// constellation links at a lower opacity) so the two read as ONE sky rather than two starfields
+// that happen to be adjacent. Star TINTS come from the star map's own `STAR_TINTS` weighting —
+// mostly white, with the odd blue-white giant, warm sun and red one — so the page sky is the same
+// sky the player flies through.
+//
+// TWO properties make it usable as a repeating background, and both are easy to get wrong:
+//
+//   * SEAMLESS. Every star and every link is emitted at all NINE (dx,dy) offsets of ±TILE, so a
+//     star near an edge appears on the opposite edge too and the joins are invisible. The link
+//     search uses TOROIDAL distance and draws along the WRAPPED delta — without that, two stars
+//     that are neighbours ACROSS an edge are found as far-apart pairs and the tile gets a long
+//     line ruled across its middle instead of a figure that continues into the next tile.
+//   * NOT OBVIOUSLY REPEATED. A big tile and no large features. Density is deliberately below the
+//     banner's (~1 star per 4200px² vs ~1 per 3000px²): the banner is a strip you look AT, this is
+//     a field the page's body text sits ON, and alpha is capped for the same reason.
+//
+// THE PAGE SKY IS ONE STEP LIGHTER THAN THE GAME, AND THAT IS WHAT GIVES THE EMBED AN EDGE. The
+// embed is an iframe: nothing on the store page can draw a border around it, and the game's own
+// root is `--gs-bg`. So a page painted the same `--gs-bg` produces a black rectangle on black —
+// the embed reads as a hole in the page rather than as a screen set into it. `PAGE_BG` is the
+// app's own `--gs-bg-2` (#11141b, the card fill), so the relationship is one the game already
+// uses rather than a colour picked by eye, and the embed becomes the darkest thing on the page:
+// recessed, defined on all four sides, with no border to align or to look drawn on.
+const PAGE_BG = '#11141b'; // --gs-bg-2
+const TILE = 1024;
+const brng = mulberry32(20260731);
+// The star map's weighting (src/render/starTourMap.ts STAR_TINTS) — white dominates by repetition.
+const STAR_TINTS = ['#ffffff', '#ffffff', '#ffffff', '#dbe6ff', '#bcd4ff', '#fff0cf', '#ffd8a8', '#ffc0b0'];
+const bgStars = [];
+for (let i = 0; i < 250; i++) {
+  bgStars.push({
+    x: brng() * TILE,
+    y: brng() * TILE,
+    r: 0.5 + brng() * 1.4,
+    a: 0.16 + brng() * 0.42, // capped below the banner's .8 — body text reads over this
+    t: STAR_TINTS[(brng() * STAR_TINTS.length) | 0],
+  });
+}
+// Nearest-neighbour links, at most one per star — the banner's rule, on a torus.
+const bgLinks = [];
+const bgClaimed = new Set();
+const wrapDelta = (d) => (d > TILE / 2 ? d - TILE : d < -TILE / 2 ? d + TILE : d);
+for (let i = 0; i < bgStars.length; i++) {
+  if (bgClaimed.has(i) || brng() > 0.34) continue;
+  let best = -1;
+  let bestD = 20000; // (~140px)²
+  for (let j = 0; j < bgStars.length; j++) {
+    if (j === i || bgClaimed.has(j)) continue;
+    const dx = wrapDelta(bgStars[i].x - bgStars[j].x);
+    const dy = wrapDelta(bgStars[i].y - bgStars[j].y);
+    const d = dx * dx + dy * dy;
+    if (d < bestD) {
+      bestD = d;
+      best = j;
+    }
+  }
+  if (best < 0) continue;
+  bgClaimed.add(i);
+  bgClaimed.add(best);
+  const a = bgStars[i];
+  // The far end is placed by the WRAPPED delta, so it may sit outside the tile — the nine-fold
+  // replication below is what brings the continuation back in on the opposite edge.
+  bgLinks.push([a, { x: a.x - wrapDelta(a.x - bgStars[best].x), y: a.y - wrapDelta(a.y - bgStars[best].y) }]);
+}
+const OFFSETS = [-TILE, 0, TILE];
+const tiled = (fn) => OFFSETS.flatMap((dx) => OFFSETS.map((dy) => fn(dx, dy))).join('');
+
 const embedHTML = `<!doctype html><html><head><meta charset="utf-8"><style>
   html,body { margin:0; padding:0; }
-  body { width:256px; height:256px; background:${BG}; }
-</style></head><body></body></html>`;
+  body { width:${TILE}px; height:${TILE}px; background:${PAGE_BG}; overflow:hidden; }
+  svg { position:absolute; inset:0; }
+</style></head><body><svg width="${TILE}" height="${TILE}" xmlns="http://www.w3.org/2000/svg">
+  ${tiled((dx, dy) =>
+    bgLinks
+      .map(
+        ([a, b]) =>
+          `<line x1="${(a.x + dx).toFixed(1)}" y1="${(a.y + dy).toFixed(1)}" x2="${(b.x + dx).toFixed(1)}" y2="${(b.y + dy).toFixed(1)}" stroke="#9fd8e6" stroke-width="0.6" opacity="0.10"/>`,
+      )
+      .join(''),
+  )}
+  ${tiled((dx, dy) =>
+    bgStars
+      .map(
+        (s) =>
+          `<circle cx="${(s.x + dx).toFixed(1)}" cy="${(s.y + dy).toFixed(1)}" r="${s.r.toFixed(2)}" fill="${s.t}" opacity="${s.a.toFixed(2)}"/>`,
+      )
+      .join(''),
+  )}
+</svg></body></html>`;
+
+// Eyes-on only, never uploaded: the tile repeated 2x2 with the seams marked, so a join that does
+// not line up is obvious rather than something to squint at.
+const seamHTML = `<!doctype html><html><head><meta charset="utf-8"><style>
+  html,body { margin:0; padding:0; background:${PAGE_BG}; }
+  .g { position:relative; width:${TILE}px; height:${TILE}px;
+       background-image:url("__TILE__"); background-repeat:repeat; background-size:${TILE / 2}px ${TILE / 2}px; }
+  .g::after { content:''; position:absolute; inset:0;
+       background:linear-gradient(90deg, transparent calc(50% - 1px), #ff004455 50%, transparent calc(50% + 1px)),
+                  linear-gradient(0deg, transparent calc(50% - 1px), #ff004455 50%, transparent calc(50% + 1px)); }
+</style></head><body><div class="g"></div></body></html>`;
 
 const { chromium } = await import('playwright-core');
 const browser = await chromium.launch({ executablePath: chromePath, args: ['--no-sandbox'] });
 
-async function shoot(html, width, height, file, transparent) {
-  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 2 });
+// `dpr` is 2 for the banner (it is scaled DOWN by the page, so it wants the extra pixels) and 1
+// for the tile: a repeating background is laid out at its INTRINSIC pixel size, so a 2x export
+// would tile at 2048 CSS px and halve the star density itch actually shows.
+async function shoot(html, width, height, file, transparent, dpr = 2) {
+  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: dpr });
   await page.setContent(html, { waitUntil: 'load' });
   await page.evaluate(() => document.fonts.ready);
   const buf = await page.screenshot({ omitBackground: transparent });
   const path = join(outDir, file);
   writeFileSync(path, buf);
   await page.close();
-  console.log(`${file}  ${width * 2}×${height * 2}  ${(buf.length / 1024).toFixed(0)} KB  →  ${path}`);
+  console.log(`${file}  ${width * dpr}×${height * dpr}  ${(buf.length / 1024).toFixed(0)} KB  →  ${path}`);
+  return buf;
 }
 
 await shoot(bannerHTML, W, H, 'banner.png', true);
-await shoot(embedHTML, 256, 256, 'embed-bg.png', false);
+const tileBuf = await shoot(embedHTML, TILE, TILE, 'embed-bg.png', false, 1);
 // Eyes-on only, never uploaded: the same banner composited over the page background it will sit
 // on. A transparent PNG of pale text is unreadable in an image viewer, so judging the real thing
 // means judging it on #0b0d12.
-await shoot(bannerHTML.replace('background:transparent', `background:${BG}`), W, H, 'banner-preview.png', false);
+await shoot(bannerHTML.replace('background:transparent', `background:${PAGE_BG}`), W, H, 'banner-preview.png', false);
+
+// Eyes-on only. Two checks that cannot be made by reading the tile on its own:
+//   seam-preview  — the tile repeated 2x2 with the joins ruled in red. A wrap that does not line
+//                   up shows as a star cut in half ON the red line.
+//   page-preview  — the whole store page as itch will assemble it: banner, the tiled sky, and the
+//                   600x860 embed sitting in it. The embed has no border of its own, so this is
+//                   where you see whether the sky gives it an edge or swallows it.
+const tileURI = `data:image/png;base64,${tileBuf.toString('base64')}`;
+await shoot(seamHTML.replace('__TILE__', tileURI), TILE, TILE, 'seam-preview.png', false, 1);
+
+const EMBED_W = 600;
+const EMBED_H = 860;
+const pageHTML = `<!doctype html><html><head><meta charset="utf-8"><style>
+  html,body { margin:0; padding:0; background:${PAGE_BG}; }
+  body { background-image:url("${tileURI}"); background-repeat:repeat;
+         font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color:#c8ccd4; }
+  .col { width:1000px; margin:0 auto; padding:0 0 40px; }
+  .banner { display:block; width:100%; }
+  .embed { width:${EMBED_W}px; height:${EMBED_H}px; margin:14px auto; background:${BG};
+           display:flex; align-items:center; justify-content:center; color:#3a4150; font-size:13px;
+           letter-spacing:.12em; }
+  p { font-size:14px; line-height:1.6; margin:14px 0; }
+  h2 { color:#5fd45a; font-size:19px; margin:26px 0 6px; }
+</style></head><body>
+  <div class="col">
+    <img class="banner" src="__BANNER__"/>
+    <div class="embed">[ 600 × 860 GAME EMBED ]</div>
+    <h2>A whole galaxy of golf courses and competition</h2>
+    <p>Fifteen worlds, each with its own physics and its own personality: links in the ice rings
+       where the crosswind never rests, molten doglegs on the ember world, a derelict generation
+       ship whose bulkheads your ball can carom off.</p>
+    <p>Fly a galaxy of procedurally-generated golf courses, earn your bag, upgrade your ship, and
+       find out what has been sleeping at the root of the World-Tree.</p>
+  </div>
+</body></html>`;
+const bannerURI = `data:image/png;base64,${(await (async () => {
+  const p = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 2 });
+  await p.setContent(bannerHTML, { waitUntil: 'load' });
+  await p.evaluate(() => document.fonts.ready);
+  const b = await p.screenshot({ omitBackground: true });
+  await p.close();
+  return b;
+})()).toString('base64')}`;
+await shoot(pageHTML.replace('__BANNER__', bannerURI), 1200, 1400, 'page-preview.png', false, 1);
 
 await browser.close();
 await server.close();
