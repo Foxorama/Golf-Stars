@@ -567,9 +567,11 @@ export function reduce(state: UiState, action: Action): UiState {
       // choice flows to the star map (so the map can fly the golfer's own cosmetic ship). The corner
       // "change golfer" button on the map re-enters here too. EXCEPTION: coming back from a round's
       // recap ("Star map") keeps the SAME golfer and lands straight on the map — you just picked them.
-      // GS-star-tour-port: also reachable from the Clubhouse hall's "Depart to Star Tour" button (the
-      // spaceport ↔ clubhouse loop), which re-enters character select before the map.
-      if (!['title', 'gameover', 'strokeResult', 'starTour', 'character', 'clubhouseHall'].includes(state.screen)) return state;
+      // GS-star-tour-port: the Clubhouse hall used to carry a "Depart to Star Tour" button (the spaceport
+      // ↔ clubhouse loop) — RETIRED, a leftover from the pre-champions Star Tour. The Clubhouse is the
+      // outfitting room reached from the title, and the mode is entered from the title tile, so
+      // `clubhouseHall` is no longer an origin: leave it out or the guard promises a route nothing takes.
+      if (!['title', 'gameover', 'strokeResult', 'starTour', 'character'].includes(state.screen)) return state;
       // GS-story-startour-champion: Star Tour is the REWARD for completing the campaign, so a finished
       // campaign plays free-roam AS the developed champion — the golfer who saved the galaxy, carrying the
       // bag / gear / active caddy you built up.
