@@ -1,0 +1,154 @@
+<!--
+  ============================================================================
+  itch.io store copy — tags/metadata, download & install instructions, and the
+  "Playing & saving" section for the Details box.
+
+  Companions: itch-description-2026-07-29.html (the full Details body) and
+  itch-description-short-2026-07-29.html (the 200-char tagline). This file is
+  everything else on the edit page.
+  ============================================================================
+
+  ⚠️ ONE THING IS NOT LIVE YET.
+
+  Both blocks below link to https://farcarry.vulpecula.games/ — the GitHub Pages
+  custom domain. The Cloudflare CNAME exists (farcarry → foxorama.github.io,
+  DNS-only) but the Pages setting has NOT been switched, so THE LINK IS DEAD
+  UNTIL IT IS:
+
+      gh api -X PUT repos/Foxorama/Golf-Stars/pages -f cname=farcarry.vulpecula.games
+      gh api -X PUT repos/Foxorama/Golf-Stars/pages -F https_enforced=true   # once the cert issues
+
+  Until then, either hold this copy back or swap the URL for
+  https://foxorama.github.io/Golf-Stars/ — which works today but names the old
+  repo, not the game.
+
+  The switch changes ORIGIN, so saves on the old Pages URL do not follow. Export
+  first (Settings → Save data), import after. Nothing else moves: `base` is './',
+  the SW registers relative, and the cache prefix is a constant — the build does
+  not care what it is served from.
+
+  Note: a `public/CNAME` file would do nothing here. GitHub's docs: "If you are
+  publishing from a custom GitHub Actions workflow, no CNAME file is created, and
+  any existing CNAME file is ignored and is not required." The domain lives in
+  repo settings only.
+-->
+
+
+<!--
+  ============================================================================
+  0. TAGS & METADATA — not paste-able HTML; these are edit-page fields.
+  ============================================================================
+
+  GENRE (single select):  Sports
+    Keeps `rpg` useful as a tag. If Genre is set to Role Playing instead, swap
+    the `rpg` tag out for `sports`.
+
+  TAGS (max 10):
+    golf  space  roguelike  rpg  procedural-generation
+    singleplayer  story-rich  top-down  2d  physics
+
+    Dropped from the earlier set, and why:
+      short                    — false. Five story chapters, three voyage arcs,
+                                 an endless mode. Draws players who bounce.
+      casual                   — undersells the game and is a hopelessly
+                                 crowded tag; ranks nowhere.
+      supports-lefthandedplay  — the feature is real (Settings → left-handed
+                                 mirrors the controls and the cast) but the tag
+                                 has near-zero traffic. Say it in the copy and
+                                 the Accessibility boxes instead.
+
+    Added:
+      procedural-generation    — the core of the game and the biggest miss;
+                                 how the roguelike audience finds things.
+      story-rich               — the one tag separating this from every other
+                                 golf game on itch.
+      physics                  — carry/roll, spray cone, bounce and run-out.
+
+  INPUTS:  mouse, keyboard, touchscreen
+  ACCESSIBILITY: tick every box that applies — configurable controls, textless/
+    subtitles, high contrast if it qualifies. Screen-reader narration, full
+    keyboard play, readable-text scaling and reduced motion are all shipped, and
+    it is a rare filter to appear in.
+
+  AI DISCLOSURE: worth re-checking Graphics and Sounds. All audio is synthesized
+    WebAudio with zero asset files, and effectively all art is drawn by code at
+    runtime — the only rasters that ship are public/icon-*.png. Each ticked box
+    adds a filtering tag.
+
+  UPLOADS: the index.html zip should be dropped, or renamed "Offline copy
+    (desktop)". It cannot install as an app on any phone — service workers do not
+    register on file:// (src/app.ts:4373 guards for exactly this), install needs a
+    manifest on an https origin, and iOS Safari cannot open file:// at all. It
+    also creates a fourth, separate save universe.
+  ============================================================================
+-->
+
+
+<!--
+  ============================================================================
+  BLOCK A — "Download & install instructions" field.
+
+  itch only surfaces this field on a DOWNLOADABLE upload. While the only upload
+  is the play-in-browser html5 channel, almost nobody will see it — paste it
+  anyway (it costs nothing and is correct the day a download exists), but Block B
+  is the one that actually gets read.
+  ============================================================================
+-->
+
+<p><strong>Nothing to install.</strong> The Far Carry runs in your browser, on desktop or phone — press <em>Run game</em> and play. Fullscreen is where it looks best; it is designed portrait-first, so it works properly on a phone.</p>
+
+<p><strong>Your progress is saved on your own device</strong>, in this browser, with no account and nothing sent anywhere. That means two things worth knowing:</p>
+
+<ul>
+<li><strong>Back it up.</strong> Settings → Save data → Export writes one file holding every campaign, your current run and your settings. Import restores it — on any device, in any browser.</li>
+<li><strong>Clearing site data erases it.</strong> Private/incognito windows, and browsers that block third-party storage, can stop the game saving at all. If writes are not sticking, the title screen says so rather than letting you find out later.</li>
+</ul>
+
+<p>Saves do not travel between where you play. A save made here lives with this page; the export file is the bridge.</p>
+
+<p><strong>To play offline — and to get the sturdiest save</strong> — open the game at <a href="https://farcarry.vulpecula.games/">farcarry.vulpecula.games</a> and use your browser's <em>Install app</em> / <em>Add to Home Screen</em>. Installed, it runs with no connection and the browser stops treating your progress as disposable. (An app cannot be installed from inside an embedded page, which is why that link is outside this one.)</p>
+
+
+<!--
+  ============================================================================
+  BLOCK B — append to the DETAILS box, via the <> source button.
+  ============================================================================
+-->
+
+<h2>Playing &amp; saving</h2>
+
+<p>Runs in the browser — desktop or phone, no install, no account. Pull back to load the swing and release, or play the whole game from the keyboard (← → aim, ↑ ↓ power, Shift for fine steps). Readable-text scaling, reduced motion, screen-reader narration and left-handed control mirroring are all in Settings.</p>
+
+<p>Progress saves to your own device and never leaves it. <strong>Export a backup from Settings → Save data</strong> — one file with every campaign, your run and your settings, importable anywhere. Clearing your browser's site data will erase the save, and some private-browsing modes block saving outright (the title screen tells you if that is happening, rather than letting you lose a campaign to it).</p>
+
+<p>For offline play and the most durable save, install it from <a href="https://farcarry.vulpecula.games/">farcarry.vulpecula.games</a> — same game, same build, added to your home screen.</p>
+
+
+<!--
+  ============================================================================
+  BLOCK C — ONLY once an Android APK is uploaded as a second file. Paste into
+  Block A, above the "play offline" paragraph.
+
+  BUILD IT RIGHT, or the SECOND release is the one that breaks:
+    android/app/build.gradle:26 reads ANDROID_VERSION_CODE from the environment
+    and falls back to 1. `npm run android:apk:release` sets neither, so every
+    hand-built APK ships versionCode 1 / versionName 1.0 — and Android refuses an
+    update whose versionCode is not higher. Players would have to uninstall,
+    which wipes their save. Stamp it, or build through the `android` workflow:
+
+      ANDROID_VERSION_CODE=2 ANDROID_VERSION_NAME=1.0.1 npm run android:apk:release
+
+    It must stay assembleRelease signed with the upload key — a debug APK carries
+    a different certificate and can never update a release install.
+    (docs/decisions/android-packaging.md)
+
+  <p><strong>Android (APK)</strong> — download the <code>.apk</code> and open it. Your phone
+  will warn you about installing an app from outside the Play Store and ask you to
+  allow it for your browser; that is expected for a sideloaded app. It is the same
+  game as the browser version, packaged to run with no connection at all.</p>
+
+  <p>The Android save is separate from the browser save, and lives with the app —
+  clearing your browser changes nothing, and only uninstalling removes it. Move
+  progress between the two with Settings → Save data → Export / Import.</p>
+  ============================================================================
+-->
