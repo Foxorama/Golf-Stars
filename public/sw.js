@@ -18,7 +18,7 @@
  * share a constant (this file is standalone, and the page's guard runs before any module), so
  * `tests/brand.test.ts` asserts all three spell it the same.
  */
-var VERSION = 'fc-pwa-1.1.0'; // bump per deploy to retire the previous offline snapshot
+var VERSION = 'fc-pwa-%GS_VERSION%'; // stamped from package.json at build time (GS-sw-version)
 var CACHE = 'far-carry-' + VERSION;
 
 // The app is a single inlined index.html plus the install assets — precache the shell so a

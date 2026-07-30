@@ -1,5 +1,7 @@
 /// <reference types="node" />
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 
@@ -29,6 +31,13 @@ const base = process.env.VITE_BASE ?? './';
 // already-built game rather than wiping it.
 const HUB = process.env.VITE_HUB === '1';
 
+// Where the built worker lands, and the placeholder it carries (GS-sw-version). The token is spelled
+// ONCE here and once in public/sw.js; `tests/brand.test.ts` asserts they still agree.
+// `fileURLToPath`, never `URL.pathname` — on Windows the latter yields `/C:/…`, which `resolve`
+// then treats as a rooted path and the worker is written to the wrong drive root.
+const outDir = fileURLToPath(new URL('./dist/', import.meta.url));
+const SW_VERSION_TOKEN = '%GS_VERSION%';
+
 export default defineConfig({
   base,
   // Down-level modern syntax (??, ?., object spread, …) so the bundle PARSES on older
@@ -49,6 +58,35 @@ export default defineConfig({
       name: 'gs-version-html',
       transformIndexHtml(html: string): string {
         return html.split('%GS_VERSION%').join(pkgVersion);
+      },
+    },
+    {
+      // …and into the SERVICE WORKER, for exactly the same reason (GS-sw-version).
+      //
+      // `public/sw.js` carried `var VERSION = 'fc-pwa-1.1.0'` under a `// bump per deploy` comment —
+      // the last hand-bumped constant in the repo, and the same failure mode `%GS_VERSION%` was
+      // introduced to kill for the watchdog. Forgetting it means returning offline players keep the
+      // PREVIOUS build's snapshot one boot longer, which is silent, and only visible offline.
+      //
+      // It cannot use `define` (the worker is not part of the module graph) or `transformIndexHtml`
+      // (it is not HTML), and it is copied verbatim out of `public/`. So the substitution happens on
+      // the WRITTEN file, after the public dir has been copied.
+      //
+      // ⚠️ The cache PREFIX is deliberately not touched: it is one decision written in three files
+      // that cannot share a constant (GS-release-identity, asserted by `tests/brand.test.ts`). Only
+      // the version part is stamped, so the prefix stays a literal in all three places, agreeing.
+      name: 'gs-version-sw',
+      apply: 'build' as const,
+      closeBundle(): void {
+        const sw = resolve(outDir, 'sw.js');
+        if (!existsSync(sw)) return; // the hub build emits no worker
+        const src = readFileSync(sw, 'utf8');
+        if (!src.includes(SW_VERSION_TOKEN)) {
+          // Loud, not silent: a renamed placeholder would ship a worker whose version never moves,
+          // and the whole point of this plugin is that nobody has to remember.
+          throw new Error(`sw.js no longer contains ${SW_VERSION_TOKEN} — the build cannot stamp its version.`);
+        }
+        writeFileSync(sw, src.split(SW_VERSION_TOKEN).join(pkgVersion));
       },
     },
   ],

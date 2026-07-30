@@ -22,3 +22,6 @@ art/generated/
 # `npm run android:assets`. The DOWNSCALED per-density output under android/app/src/main/res/
 # IS committed (CI packages it without regenerating); these oversized intermediates are not.
 assets/
+
+# Vite writes these beside a TS config while loading it; they are transient build artifacts.
+vite.config.ts.timestamp-*.mjs
