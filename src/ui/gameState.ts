@@ -212,6 +212,8 @@ export interface UiState {
   /** Finished-run counter (GS-clubhouse-lounge) — bumped once per run end; seeds where the golfers stand
    *  in the Clubhouse lounge, so they appear to have milled around while you were away. Cosmetic only. */
   clubhouseVisit: number;
+  /** GS-backup-nudge: `clubhouseVisit` when the player last exported a backup. Absent ⇒ never. */
+  lastExportRun?: number;
   /** Most holes ever survived in one Unending-Universe run (GS-unending) — persisted; the key the
    *  Evergreen cosmetic unlocks + the title-card progress read. */
   endlessBestHoles: number;
@@ -654,6 +656,7 @@ export type Action =
   | { type: 'setCharacterBagTier'; tier: BagTier } // pick the managed golfer's Unending-Universe starting bag tier (GS-wardrobe-bagtier)
   | { type: 'requestExit' } // GS-android-back: raise the "leave this round?" confirm (back pressed in a run)
   | { type: 'cancelExit' } // GS-android-back: dismiss that confirm and stay in the round
+  | { type: 'backupExported' } // GS-backup-nudge: a backup actually landed — stamp the run counter
   | { type: 'toTitle' } // back to the title from anywhere (GS-settings-nav) — an underway run stays resumable
   | { type: 'restart'; seed?: number | string };
 
@@ -677,6 +680,7 @@ export interface MetaProgress {
   bagTierByCharacter?: Record<string, BagTier>;
   unlockedClubsByCharacter?: Record<string, string[]>;
   clubhouseVisit?: number;
+  lastExportRun?: number;
   endlessBestHoles?: number;
   marmotBartender?: boolean;
   marmotTips?: number;

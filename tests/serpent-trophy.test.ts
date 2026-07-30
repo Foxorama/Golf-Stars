@@ -124,7 +124,7 @@ describe('the reducer bout', () => {
 
 describe('the tally is on the MAIN save, where a golfer pick cannot erase it', () => {
   it('v32 seeds the tally at zero and carries it through a round trip', () => {
-    expect(SAVE_VERSION).toBe(33);
+    expect(SAVE_VERSION).toBe(34);
     const d = defaultSave();
     expect(d.serpentBouts).toBe(0);
     expect(d.serpentWins).toBe(0);

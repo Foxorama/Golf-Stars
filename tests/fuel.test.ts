@@ -276,7 +276,7 @@ describe('save v17 → v18 (GS-fuel)', () => {
     const s = migrate(v17);
     const { readSlot } = await import('../src/sim/rpg/runSlots');
     expect(s.version).toBe(SAVE_VERSION);
-    expect(SAVE_VERSION).toBe(33);
+    expect(SAVE_VERSION).toBe(34);
     // GS-save-slots: the parked run now lives in its own mode/golfer slot (this one predates golfers).
     const parked = readSlot(s.runSlots, 'voyage', undefined)!;
     expect(parked.fuel).toBeUndefined(); // the stamp adds nothing…

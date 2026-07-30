@@ -155,7 +155,7 @@ describe('a run belongs to exactly one mode, and the format says which', () => {
 // ─────────────────────────────────────────────────────────────────────────────────────────────────
 describe('save v32 → v33 loses nobody a run', () => {
   it('files the single activeRun into its own slot and points CONTINUE at it', () => {
-    expect(SAVE_VERSION).toBe(33);
+    expect(SAVE_VERSION).toBe(34);
     const v32 = {
       ...defaultSave(),
       version: 32,

@@ -100,6 +100,10 @@ Design notes:
 
 ### The one remaining hand-bump
 
+~~`public/sw.js` still carries a hand-bumped `VERSION`.~~ ✅ **Shipped** — GS-sw-version: a build plugin
+stamps it from package.json, and `brand.test.ts` guards both the source placeholder and the built
+output. The original note follows.
+
 `public/sw.js` still carries `var VERSION = 'fc-pwa-1'` with a `// bump per deploy` comment. That is
 a constant somebody has to remember — the same failure mode `%GS_VERSION%` was introduced to kill
 for the boot watchdog (GS-release-identity). It should be substituted at build time from
@@ -225,10 +229,12 @@ the screen where it matters.
    goes READ-ONLY rather than overwrite anything it could not fully read, and offers the stored
    bytes as a download. It also closed a hole in item 3's neighbour: a bundle whose *inner* save was
    newer imported as empty **while reporting success**. See `docs/decisions/save-integrity.md`.
-5. **Make export a habit, not a memory test.** A "last backed up N runs ago" nudge on the settings
+5. ~~**Make export a habit, not a memory test.**~~ ✅ **Shipped** — GS-backup-nudge (save v34). A "N runs
+   since your last backup" nudge on the settings
    screen, driven off a counter that already exists in the save.
 
-Item 5 remains open and is a follow-up, not a blocker on a release.
+Items 4–5 are both shipped. What remains open on this list is the itch page's password restriction
+(admin UI) and the devlog, neither of which is code.
 
 ### What is still true after that PR
 
@@ -241,7 +247,7 @@ Pages/custom-domain build is the one worth pointing committed players at.
 
 ```
 [ ] main is green and Pages looks right at https://foxorama.github.io/Golf-Stars/
-[ ] public/sw.js VERSION bumped            (until it is derived from package.json)
+[x] public/sw.js VERSION — now stamped from package.json automatically (GS-sw-version)
 [ ] npm version patch|minor -m "..."       (bumps package.json + tags)
 [ ] git push && git push --tags            (the tag fires .github/workflows/itch.yml)
 [ ] workflow green; game loads from the itch page

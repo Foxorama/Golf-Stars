@@ -261,6 +261,19 @@ This game lives or dies on three axes — put every change through all three bef
   than offering nothing. NO new key (a quarantine copy would double the blob in a shared quota and owe
   PRIVACY.md a row), no save bump, no new hook. Guarded by `tests/save-integrity.test.ts` +
   `tests/save-integrity-browser.test.ts`.
+  **AN EXPORT IS THE ONLY DURABLE COPY, AND NOTHING EVER ASKED FOR ONE** (GS-backup-nudge, save v34,
+  `save/backup.ts backupNudge` pure). `localStorage` is the only copy the game keeps, every browser
+  evicts (iOS Safari clears script-writeable storage after 7 idle days) and on itch the quota is
+  SHARED with the platform — so the players who most need a backup are exactly the ones who have never
+  opened Settings. `lastExportRun` stores `clubhouseVisit` (already bumped once per finished run) AT
+  THE MOMENT OF EXPORT, so the nudge counts RUNS, not days: the unit a player feels is progress made,
+  and a counter needs no clock, no timezone and no trust in the device's date. **What the tests mostly
+  guard is the SILENCE** — null for a save with no finished run behind it (nothing to lose) and for one
+  exported this run (nagging someone who just did the thing is how a warning becomes wallpaper, in the
+  very section holding the alert that must never be ignored); urgent only past
+  `BACKUP_NUDGE_URGENT_RUNS`. Stamped ONLY on a CONFIRMED success (`downloadBackup` returning true, a
+  clipboard write resolving) — a nudge silenced by a backup that never landed is worse than one that
+  never fired. A counter that ran backwards reads as up-to-date, never as a huge overdue.
   **A backup is a BUNDLE, not a save** (GS-save-transfer, `save/backup.ts` pure · `app/saveTransfer.ts`
   the localStorage/DOM half). Progress lives in THREE blobs (`fc_save` + `fc_story` + `fc_settings`) and
   localStorage is per-ORIGIN, so the website and the Capacitor shell (`https://localhost`) cannot see

@@ -2800,6 +2800,10 @@ function wireSaveTransfer(root: ParentNode): void {
         // manager wired up), so we never claim success we can't observe — a failure points at the
         // clipboard button, which does work there.
         const ok = downloadBackup(freshJSON());
+        // GS-backup-nudge: stamp the run counter only on a CONFIRMED success. `downloadBackup`
+        // returns false when the environment gives us no way to write a file, and a nudge silenced
+        // by a backup that never landed is worse than one that never fired.
+        if (ok) dispatch({ type: 'backupExported' });
         note(
           ok
             ? '✅ Saved to your downloads. Keep the file somewhere safe.'
@@ -2810,14 +2814,15 @@ function wireSaveTransfer(root: ParentNode): void {
       }
       if (what === 'copy') {
         const json = freshJSON();
-        void copyBackupToClipboard(json).then((ok) =>
+        void copyBackupToClipboard(json).then((ok) => {
+          if (ok) dispatch({ type: 'backupExported' }); // GS-backup-nudge: confirmed success only
           note(
             ok
               ? '✅ Copied. Paste it somewhere safe — it’s long, so check the whole thing arrived.'
               : '⚠ The clipboard was blocked. Try “Export save” instead.',
             !ok,
-          ),
-        );
+          );
+        });
         return;
       }
       if (what === 'rescue') {

@@ -27,7 +27,7 @@ import {
   type RunSlots,
 } from '../sim/rpg/runSlots';
 
-export const SAVE_VERSION = 33;
+export const SAVE_VERSION = 34;
 
 /** v1 — the vertical-slice save (kept for the migration path). */
 export interface SaveV1 {
@@ -526,8 +526,29 @@ export type SaveV33 = Omit<SaveV32, 'version' | 'activeRun'> & {
   lastPlayed?: LastPlayed;
 };
 
+/**
+ * v34 (GS-backup-nudge) — WHEN the player last exported a backup, measured in RUNS rather than days.
+ *
+ * `localStorage` is the only copy of a save and every browser can evict it (iOS Safari clears
+ * script-writeable storage after 7 idle days), so an export is the only durable copy that exists. It
+ * is also entirely invisible: nothing has ever asked for one, so the players who most need it are the
+ * ones who have never opened Settings.
+ *
+ * Stored as the `clubhouseVisit` value AT THE MOMENT OF EXPORT — a counter that already exists and is
+ * bumped once per finished run — so the nudge can say "12 runs since your last backup". Runs beat days
+ * here: the unit the player feels is progress made, not time passed, and a counter needs no clock, no
+ * timezone and no assumption that a device's date is honest.
+ *
+ * Absent = never exported, which is the honest reading for every save written before this shipped.
+ */
+export type SaveV34 = Omit<SaveV33, 'version'> & {
+  version: 34;
+  /** `clubhouseVisit` when the player last exported. Absent ⇒ they never have. */
+  lastExportRun?: number;
+};
+
 /** The current save shape (alias so call sites don't pin a version number). */
-export type Save = SaveV33;
+export type Save = SaveV34;
 
 export function defaultSave(): Save {
   return {
@@ -1037,6 +1058,12 @@ export type SaveRead =
  * asserted directly in `tests/save-integrity.test.ts`, because a refactor of this function that
  * quietly changed one input's outcome is a save-losing bug wearing a tidy-up's clothes.
  */
+/** v33 → v34 (GS-backup-nudge): adds `lastExportRun`. Nothing to carry — an absent field reads as
+ *  "never exported", which is the honest answer for a save written before the nudge existed. */
+function v33ToV34(s: SaveV33): SaveV34 {
+  return { ...s, version: 34 };
+}
+
 export function readSave(raw: unknown): SaveRead {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ok: false, why: 'foreign' };
   const stamped = (raw as { version?: unknown }).version;
@@ -1079,6 +1106,7 @@ export function readSave(raw: unknown): SaveRead {
   if (s.version === 30) s = v30ToV31(s as unknown as SaveV30) as unknown as typeof s;
   if (s.version === 31) s = v31ToV32(s as unknown as SaveV31) as unknown as typeof s;
   if (s.version === 32) s = v32ToV33(s as unknown as SaveV32) as unknown as typeof s;
+  if (s.version === 33) s = v33ToV34(s as unknown as SaveV33) as unknown as typeof s;
 
   if (s.version !== SAVE_VERSION) {
     // A finite version at or below ours that the chain has no step for (0, a negative, a fraction, a
@@ -1087,7 +1115,7 @@ export function readSave(raw: unknown): SaveRead {
   }
 
   // Defensive backfill so a partial blob can't crash the loader.
-  const v14 = s as unknown as Partial<SaveV33>;
+  const v14 = s as unknown as Partial<SaveV34>;
   const ownedShips = v14.ownedShips && v14.ownedShips.length ? v14.ownedShips : [DEFAULT_SHIP_ID];
   const ownedApparel = v14.ownedApparel ?? [];
   const bagTier: BagTier = v14.bagTier ?? 'common';
@@ -1140,6 +1168,12 @@ export function readSave(raw: unknown): SaveRead {
     // hand-edited key can't file a Voyage under Star Tour and have the picker offer it there.
     runSlots: migrateRunSlots(v14.runSlots),
     lastPlayed: migrateLastPlayed(v14.lastPlayed),
+    // GS-backup-nudge: absent (or nonsense) reads as "never exported", which is the safe direction —
+    // the nudge appears rather than being silently suppressed by a corrupt number.
+    lastExportRun:
+      typeof v14.lastExportRun === 'number' && Number.isFinite(v14.lastExportRun) && v14.lastExportRun >= 0
+        ? Math.floor(v14.lastExportRun)
+        : undefined,
     savedAt: v14.savedAt,
   };
   return { ok: true, save };
