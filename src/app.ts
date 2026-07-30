@@ -73,6 +73,7 @@ import { showAceCelebration, showBirdCelebration, showEndlessMilestone, showSect
 import { characterScreen, ordinal, leaderboardHTML } from './render/golferCards';
 import { state, setState, btn, header, seedFromUrl, freshRunSeed } from './app/ctx';
 import { playFrameHTML, type PlayFrameParts } from './app/playFrame';
+import { holeIsNewToAnimator } from './app/playAnim';
 import { clubPickerOverlay } from './app/clubPicker';
 import {
   burst,
@@ -2935,7 +2936,10 @@ function render(): void {
   // own body (controls vs "watching") based on whether shots are pending animation.
   let animatingPlay: ReturnType<typeof pendingAnimation> = null;
   if (state.screen === 'playing' && state.play) {
-    if (state.play.holeIndex !== animHoleIndex) {
+    // GS-anim-counter-stale: "same hole index" is not "same hole". A resume lands you on the hole you
+    // left and a Story world replays from its first tee, so the index alone let the animator carry a
+    // previous visit's tallies into a fresh hole and skip that many shots.
+    if (holeIsNewToAnimator(state.play, { holeIndex: animHoleIndex, shots: animatedShots, putts: animatedPutts })) {
       animatedShots = 0;
       animatedPutts = 0;
       animHoleIndex = state.play.holeIndex;
