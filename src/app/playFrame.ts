@@ -65,6 +65,12 @@ export interface PlayFrameParts {
   rows: string[];
   /** The panel's bottom-most primary action button — always present, disabled when it can't fire. */
   commit: string;
+  /** What the keyboard does in THIS state, as one sentence, announced with the commit button
+   *  (GS-a11y-stroke-focus). The stroke is aimed and powered by keys that live on `window`, not on
+   *  any control, so nothing on the screen said they existed — the drawn aim cone is the whole
+   *  affordance and it is invisible to a screen reader. Required, so a new play state has to decide
+   *  what its keys do; `''` for a state with no decision left to make (the watch animations). */
+  commitHint: string;
   /** The caddy on the bag, for the permanent slot. Undefined ⇒ the empty reserved slot. */
   caddyId?: string;
   /** True when the caddy is on the bag but has no role in THIS state (e.g. Driver Dan on the green):
@@ -167,22 +173,36 @@ function actionColumnHTML(p: PlayFrameParts): string {
     </div>`;
 }
 
-/** Compose the whole play screen from the fixed frame + this state's contents. */
+/** The id the commit button's `aria-describedby` points at — one node, one name, so a state cannot
+ *  describe its keys under a spelling nothing reads. */
+export const STROKE_KEYS_ID = 'gs-stroke-keys';
+
+/**
+ * Compose the whole play screen from the fixed frame + this state's contents.
+ *
+ * DOM ORDER IS TAB ORDER, and the stroke is the game (GS-a11y-stroke-focus). The nav column used to
+ * be emitted SECOND — so 🗺 and ⚙, the two least-used controls on the screen, were the first two tab
+ * stops of every single shot, and the Swing button was third at best and sixth on a green. It is
+ * emitted LAST now: it is `position:absolute` with its own `z-index`, so where it sits in the string
+ * decides nothing but the tab order it hands the keyboard. Combined with `focusPlayStroke` (which
+ * puts focus ON the commit button as each stroke's decision mounts) the keyboard now arrives at the
+ * stroke and tabs OUTWARD from it — commit, then the shot-shaping column, then the map furniture.
+ */
 export function playFrameHTML(p: PlayFrameParts): string {
   const rows = p.rows.filter(Boolean).join('');
   return `
     <div class="gs-shot gs-shot--full${p.lefty ? ' gs-shot--lefty' : ''}" data-playmode="${p.mode}">
       ${p.map}
-      ${navColumnHTML(p.nav)}
       ${p.top}
       <div class="gs-hud gs-hud-bottom">
         ${caddySlotHTML(p.caddyId, !!p.caddyOffDuty)}
         <div class="gs-hud-controls gs-glass${rows ? '' : ' gs-hud-controls--slim'}">
           ${rows}
-          <div class="gs-hud-commit">${p.commit}</div>
+          <div class="gs-hud-commit">${p.commit}${p.commitHint ? `<span class="gs-sr-only" id="${STROKE_KEYS_ID}">${p.commitHint}</span>` : ''}</div>
         </div>
         ${actionColumnHTML(p)}
       </div>
+      ${navColumnHTML(p.nav)}
     </div>
     ${p.after ?? ''}`;
 }

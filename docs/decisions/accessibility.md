@@ -425,6 +425,93 @@ Recorded here so the audit isn't lost:
 
 ---
 
+## GS-a11y-stroke-focus — the keyboard arrives on the stroke (2026-07-31)
+
+### The problem
+
+Play-test report: *"the Swing and Putt action bars are painful to get to with a keyboard… current tab
+order starts top left and makes you go through at least half a dozen tabs every shot to get to the
+swing/putt button — on every shot."*
+
+Two independent faults compounded, and both were structural rather than cosmetic.
+
+**DOM order is tab order, and the map furniture was first.** `playFrameHTML` emitted the nav column
+(🗺 whole-hole toggle, ⚙ settings) SECOND, right after the map — so the two least-used controls on
+the screen were the first two tab stops of every single shot. Measured on the built game: aiming gave
+`🗺 · ⚙ · 🏌 Swing · aim mode · » · bag` and the green gave `⚙ · ◄ · ► · pace meter · ⛳ Putt · »` —
+**three tabs to Swing, five to Putt**.
+
+**And focus reset to `<body>` after every stroke.** `render()` replaces `#app.innerHTML` wholesale, so
+the focused node is destroyed on every shot and `document.activeElement` falls back to the document.
+The three-to-five tabs were therefore not a one-off cost of learning the screen: they were paid again
+on every stroke, for eighteen holes, in a game that is *entirely* golf strokes.
+
+**Plus a dead tab stop on every putt.** The pace-meter canvas declared `role="button"`, which
+`wireRoleButtonKeys` (GS-a11y-focus) correctly rewarded with a tab stop and an Enter/Space binding
+that synthesises a `click` — and the canvas only ever listened for `pointerdown`. So a keyboard
+player landed on something announced as a button, pressed Enter, and nothing happened. The report:
+*"the putter power bar is also in the tab focus order, but can't be interacted with; it needs to be
+in speech text, but not in the tab order."*
+
+### The fix
+
+**The stroke is where the keyboard lands, without tabbing at all.** `focusPlayStroke` (in `focus.ts`,
+beside the overlay pass, because it is the same shape) focuses the panel's commit button as each
+stroke's decision mounts. It is the play-screen twin of `applyOverlayFocus`: move focus in ONCE per
+"open", put it back if a re-render knocks it loose, and never fight a layer that has a better claim.
+
+- **The key is the DECISION, not the render** — `hole : shots : putts : lie`. A re-render inside one
+  decision (a club change, an aim-mode tap, the map toggle) leaves focus exactly where the player put
+  it; only a genuinely new stroke moves it.
+- **Same decision, focus knocked loose** ⇒ restore the control the player was on, via the selector
+  `captureFocusOrigin()` grabbed immediately before the `innerHTML` swap. Without this, tapping the
+  aim mode bounced you to the commit button every time.
+- **It stands down for any covering layer**, and asks the DOM rather than a flag. This is where the
+  first cut shipped a bug: the guard read `awaitingShotPopup`, which stays TRUE through a putt render
+  that draws no popup at all (the popup rides the aim body's `after` slot; the putt frame has none) —
+  so the tee focused and the green did not. The shot-result card and the scramble choice now carry
+  `data-gs-overlay`, the marker `OVERLAY_SELECTOR` already looks for. They still are not dialogs to
+  `applyOverlayFocus` (it only backgrounds direct children of the app root, deliberately) — but
+  "something is covering the decision" is one question, and it has one answer, in the DOM.
+- **`preventScroll: true`.** The play screen is a full-bleed fixed frame, and GS-embed-scroll makes
+  the page itself scrollable inside an iframe — scrolling to "reveal" a button already on screen is
+  pure jitter.
+
+**The nav column is emitted LAST.** It is `position:absolute` with its own `z-index`, so where it
+sits in the string decides nothing except the tab order it hands the keyboard. Combined with the
+auto-focus, the keyboard now arrives at the stroke and tabs OUTWARD from it: `🏌 Swing · aim mode ·
+» · bag · 🗺 · ⚙`. Zero tabs to the primary action, in every state.
+
+**The pace meter is spoken, never tabbed.** `role="img"` with a label that names the control which
+actually stops it ("…Activate the Putt button to stop it in the make band"). Nothing is lost —
+`⛳ Putt` has always committed the meter's live pace, and it is now the focused control when the putt
+mounts, so Enter plays the putt.
+
+**And the arrow keys say they exist.** GS-a11y-keyboard put the aim and the power on the arrows, but
+they live on `window`, not on any control, and the aim cone is a picture — so they were invisible to
+exactly the players who need them. `PlayFrameParts.commitHint` is a required field (a new play state
+has to decide what its keys do) rendered as one `.gs-sr-only` node in the commit row, which both live
+commit buttons point at with `aria-describedby`.
+
+### What was checked and found already working
+
+The same report said the putt's ◄/► arrows did not work. Driven in a real browser on `main` they
+**do**, at every focus position (body, a nudge button, the pace-meter canvas), on the first putt and
+the second, with the drawn putt line moving through the surgical `puttAimRefresh` — so no fix was
+made and none is pending. The one case where they are genuinely silent is **by design**: a
+green-reading caddy or a piece of read gear owns the line, and the nudges render disabled and without
+their `data-putt-aim` hook, so the arrows go quiet exactly where the buttons do.
+
+### Verified
+
+In a real browser (`tests/a11y-keyboard.test.ts`, pinned seed `kb1`): focus is on `[data-swing]` the
+instant the tee decision mounts; a same-stroke re-render leaves it on the control that was clicked;
+after playing to the green focus is on `[data-putt-commit]`; the meter is `role="img"`, carries a
+label, and is absent from the computed tab order; the commit is `aria-describedby` the key hint; and
+Enter on the focused button strikes the putt.
+
+---
+
 ## GS-a11y-sheet-scroll / GS-a11y-tight-fit — the settings have to survive a phone (2026-07-26)
 
 The scale ladder shipped having verified exactly one property: *the play screen's commit row stays

@@ -1420,6 +1420,32 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     return** — bound naively each render stacks another `window` listener and one press steps the aim N
     times; and the early returns are exactly the cases where the decision screen went away (putt, popup,
     another screen). Guarded by `tests/a11y-keyboard.test.ts`.
+  - **THE KEYBOARD ARRIVES ON THE STROKE — ZERO TABS, ON EVERY STROKE** (GS-a11y-stroke-focus,
+    `focus.ts focusPlayStroke`). DOM order IS tab order, and `playFrameHTML` emitted the nav column
+    SECOND, so 🗺 and ⚙ — the two least-used controls on the screen — were the first two tab stops of
+    every shot: measured, **3 tabs to Swing and 5 to ⛳ Putt**, and paid AGAIN every stroke because
+    `render()` replaces `#app.innerHTML` and drops focus to `<body>`. In a game that is entirely golf
+    strokes, that is the whole game behind a tab dance. The nav column is emitted LAST (it is
+    `position:absolute` with its own `z-index`, so its place in the string decides nothing but the tab
+    order) and the panel's commit button is FOCUSED as each decision mounts — the play-screen twin of
+    `applyOverlayFocus`: in once per "open", restored when a re-render knocks it loose, never fighting a
+    layer with a better claim. Tab order is now `Swing · aim · » · bag · 🗺 · ⚙`, outward from the stroke.
+    **The key is the DECISION** (`hole:shots:putts:lie`), so a same-stroke re-render leaves focus where
+    the player put it (restored via `captureFocusOrigin`'s selector, or the aim-mode tap bounces you to
+    the commit every time). **A COVERING LAYER IS THE DOM'S QUESTION, NEVER A FLAG** — the first cut
+    guarded on `awaitingShotPopup`, which stays TRUE through a putt render that draws no popup (the card
+    rides the AIM body's `after`; the putt frame has none), so the tee focused and the green did not; the
+    shot card + scramble choice now carry `data-gs-overlay`, the marker `OVERLAY_SELECTOR` already reads.
+    `preventScroll` always: the frame is fixed, and GS-embed-scroll makes the page scrollable in an iframe.
+    **The pace meter is SPOKEN, NEVER TABBED** — `role="button"` earned it a tab stop AND
+    `wireRoleButtonKeys`' Enter/Space→`click`, an event that canvas never listened for, so it was a dead
+    stop on every putt; it is `role="img"` naming the control that does stop it (⛳ Putt, which is now the
+    focused one). And `PlayFrameParts.commitHint` (required — a new play state must decide what its keys
+    do) is the one `.gs-sr-only` node both live commit buttons `aria-describedby`, because the arrow keys
+    live on `window`, not on a control, and the aim cone is a picture. ⚠️ The putt's ◄/► arrows were
+    reported dead and are NOT — driven in a real browser at every focus position they work; the one
+    silence is BY DESIGN (a caddy/gear green read renders the nudges disabled and hookless). Guarded by
+    `tests/a11y-keyboard.test.ts`.
   - **CSS classes / DOM ids are GLOBAL and screens can't see each other's names** — new screen chrome gets
     its OWN prefix (bridge HUD `.gs-bhud`, resume `.gs-resume`, lore `.gs-lore`, star-tour content
     `.gs-sthud` — NEVER the play screen's `.gs-hud`, which the #353 map-blur regression proved). Grep the

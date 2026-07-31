@@ -57,6 +57,7 @@ describe('the persistent play HUD frame (GS-hud-frame)', () => {
       top: '<div class="gs-hud gs-hud-top gs-glass"></div>',
       rows: mode === 'putt' ? ['<div class="gs-puttrow"></div>'] : [],
       commit: '<button class="gs-btn gs-btn--primary">go</button>',
+      commitHint: mode === 'watch' ? '' : 'Arrow keys aim.',
       caddyId,
       caddyOffDuty,
       nav: { whole: false, viewDisabled: mode !== 'aim', settingsDisabled: mode === 'watch' },

@@ -363,7 +363,7 @@ export function scrambleChoiceOverlay(): string {
   const labelA = isPreview ? 'Vision A' : isMulligan ? 'Tee shot A' : 'Your ball';
   const labelB = isPreview ? 'Vision B' : isMulligan ? 'Tee shot B' : `${partnerName ?? 'Partner'}'s ball`;
   return `
-    <div style="position:fixed;inset:0;background:rgba(5,7,11,0.82);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px;overflow:auto;">
+    <div data-gs-overlay="scramble" style="position:fixed;inset:0;background:rgba(5,7,11,0.82);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px;overflow:auto;">
       <div style="display:flex;flex-direction:column;gap:11px;max-width:360px;width:100%;">
         <div style="text-align:center;">
           <div style="font-size:13px;font-weight:800;letter-spacing:.08em;color:#ffce54;">${heading.title}</div>
@@ -379,7 +379,15 @@ export function scrambleChoiceOverlay(): string {
 }
 
 /** Modal shot-result popup: the just-played shot's card + a Continue, shown after the shot has
- *  settled so each shot gets its own beat before the next decision. */
+ *  settled so each shot gets its own beat before the next decision.
+ *
+ *  `data-gs-overlay` marks it as a layer COVERING the screen (GS-a11y-stroke-focus). Both this and
+ *  the scramble choice live inside `<main>`, so `applyOverlayFocus` still ignores them (it only
+ *  backgrounds direct children of the app root, deliberately) — but `focusPlayStroke` has to stand
+ *  down while either is up, and asking the DOM "is something covering the decision?" is one question
+ *  with one answer. The JS flag is not that answer: `awaitingShotPopup` stays true through a render
+ *  that draws no popup at all (the putt frame has no `after` slot), which is exactly how the putt
+ *  went unfocused while the flag said a card was up. */
 export function shotPopupOverlay(): string {
   const play = state.play!;
   const last = play.shots[play.shots.length - 1];
@@ -388,7 +396,7 @@ export function shotPopupOverlay(): string {
   // The whole backdrop is a dismiss target so a tap anywhere advances — one less precise tap
   // per shot on a phone. The card itself sits above it with the explicit Continue button.
   return `
-    <div data-popup-continue="1" style="position:fixed;inset:0;background:rgba(5,7,11,0.72);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;overflow:auto;cursor:pointer;">
+    <div data-popup-continue="1" data-gs-overlay="shot-result" style="position:fixed;inset:0;background:rgba(5,7,11,0.72);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;overflow:auto;cursor:pointer;">
       <div style="display:flex;flex-direction:column;align-items:stretch;gap:12px;max-width:300px;width:100%;">
         ${shotCardHTML(last, { distToPin })}
         <button class="gs-btn gs-btn--primary" data-popup-continue="1" style="text-align:center;font-size:16px;padding:12px;">Continue →</button>
