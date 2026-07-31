@@ -948,6 +948,27 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     camera-proof (GS-biome-relief). Per-world identity (flora, OB, decor, ambient air, wind tint, water/sand
     palettes) is ALL archetype-keyed table+dispatch (`tests/biome-identity.test.ts` guards full coverage); a
     flora variant consumes EXACTLY the classic two draws.
+  - **A PICTURE THAT CANNOT HAVE CHANGED IS NOT REDRAWN** (GS-shot-lag, `playView.ts drawStatic`).
+    Painting the world is **~100,000 canvas ops** — two orders of magnitude past the ~1,500 prims
+    `buildScene` returns, because most of it lives inside `clip` groups, and it peaks at the PUTT
+    camera where the green's mow/apron/isolines/relief all resolve at maximum zoom. `drawStatic` cached
+    the built prims by projector identity but re-stroked all of them every frame anyway: the putt watch
+    ran at **3.3 fps** (12× throttle) and the green was the laggiest screen in the game. Three rules
+    now. **The painted scene is cached in an offscreen canvas and blitted while the projector is
+    unchanged** — byte-identical by construction (same prims, same painter, different surface), and a
+    MOVING camera skips the offscreen entirely because painting it as well as the frame is strictly
+    more work. **The follow-cam must be able to ARRIVE**: the ease is exponential and `buildProj()`
+    mints a new projector every frame, so the key changed on every frame of every shot for ever — under
+    `CAMERA_SETTLE_PX` (0.05 **screen** px; a yard threshold means something different at every zoom)
+    it SNAPS onto the ball and stops. And **`hashHole` is memoized** — a hole is immutable but its art
+    seed was re-derived hundreds of times per scene (once per ground patch via `patchRng`), measured at
+    **13.4% of ALL CPU**. Putt watch **3.3 → 59.9 fps**, shot watch **12 → 30**, steady-state ops/frame
+    **97,477 → 128**. ⚠️ The offscreen takes `canvas.width`, NEVER a re-derived `width * dpr`: `dpr`
+    folds in the UI zoom and is fractional, a canvas width attribute TRUNCATES, and a device-pixel
+    disagreement resamples the whole world. ⚠️ **It is not a leak** — rAF loops, DOM nodes, listeners
+    and post-GC heap were all measured flat/falling (`scripts/leak-probe.mjs`); what grows with a
+    session is hole wildness and SoC temperature. Guarded by `tests/play-scene-cache.test.ts` (a
+    canvas-op census, confirmed to fail at 97,477 on the old path — never a frame-rate assertion).
   - **THE BALL IS A BALL** (GS-ball-art, `render/ball.ts` — pure geometry + spin maths, node-tested;
     painters take a ctx and nothing else). It was `ctx.arc(x,y,3)` filled `#fff` at three sites, at a
     FIXED 3px whatever the camera did — so it could never look like it was ROLLING (a featureless disc

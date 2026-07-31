@@ -204,6 +204,28 @@ The persistent frame landed (see Done). Left on the table, all cosmetic and none
 - Landscape / tablet has had no pass: the frame is phone-portrait tuned.
   *(The "top info bar is four lines" bullet is retired — GS-hud-compass made it one row of pods.)*
 
+**GS-shot-lag-pan — the follow-cam still rebuilds and repaints the world every frame** *(follow-on from
+the shipped GS-shot-lag, medium, changes drawn output)*
+GS-shot-lag fixed the STILL camera (putt watch 3.3 → 59.9 fps at 12× throttle) and the tail of every shot,
+by blitting a cached paint of the scene while the projector is unchanged. While the ball is MOVING the
+scene is still rebuilt and re-stroked every frame — ~100,000 canvas ops — which is why the shot watch is
+30 fps and not 60. The case for fixing it is measured (`scripts/scene-pan-check.ts`): under a pure pan the
+projector differs only by a screen-space translation, and **99.84%** of prims are either screen-anchored
+(byte-identical — the sky) or an exact rigid translation (37,896 translate, 6,160 anchored). Only **70 of
+44,126** are neither, and they are all the mow-stripe `clip` groups (regenerated across the clip's screen
+bbox) plus the `inView`-culled ground detail. So a translate-and-blit cache is *nearly* exact — and would
+arguably look BETTER, since stripes would ride the turf instead of the screen — but it is not exact, it
+changes drawn output on every world, and it needs the `camera-stability` contract rethought and eyes-on
+across the gallery. A feature of its own. Do NOT bolt it onto a perf PR.
+
+**GS-scene-prim-weight — 100,000 canvas ops to paint one hole** *(diagnosis done, no fix scoped)*
+The number GS-shot-lag surfaced is worth attacking at the source rather than caching around: a green at
+the putt camera resolves ~100k drawing operations, most of them inside `clip` groups (mow bands, apron
+rings, isolines, relief). Even one paint of that is a visible hitch on a phone at the moment a shot is
+released. Worth a census of which painters dominate (`scripts/paint-census.mjs` samples by call site) and
+whether any of them can be drawn as a pattern/sprite rather than N strokes. Balance-neutral by definition
+— it is pure render — but it is an art-fidelity conversation, not just a perf one.
+
 **Deferred out of the 2026-07-25 quick-win batch** (both looked small, both are bigger than they read):
 - **GS-story-briefing-beat** — the first-visit Parrot briefing currently advertises itself with a gold ❗ on
   the bar hotspot (`storySpaceport.ts`, gated on `chapter <= 1 && !seenStoryBeats['story-bar-briefing']`),

@@ -2308,3 +2308,124 @@ phone and asserts the drawn cone is below the bar. Confirmed to FAIL on the old 
 
 **Verification:** 2545 tests / 212 files green, 0 skipped; `tsc` clean; both builds (game + hub).
 Eyes-on before/after at four viewports via `scripts/play-frame-shot.mjs`.
+
+---
+
+## GS-shot-lag — the play view repainted a world that could not have changed (2026-07-31)
+
+**The report.** *"The golf shot lag… it's been investigated before, but it's still an issue. It seems
+to happen when you play a few holes in a row and don't stop. Play a few holes quickly and it starts to
+lag, especially on the putting-watch make window, it gets very laggy. If you play a couple of holes and
+then leave the phone open on the screen for a bit, it then seems less laggy. If you play a hole or two,
+go to title or close and reopen the app, the next hole is fine."*
+
+Three of those four clues point at a LEAK, and that is what the previous passes went looking for — the
+orphaned-rAF fix in `render()` (see the comment there) came out of one. So this pass started by ruling
+a leak out, with numbers, before optimising anything.
+
+### It is not a leak
+
+`scripts/leak-probe.mjs` plays holes back-to-back in the built game and samples, per hole: live rAF
+callbacks bucketed by the site that requested them, live intervals, CDP DOM counters (which count
+detached-but-retained nodes), listener counts, WebAudio node creations, and the JS heap **after a
+forced GC**. Over a run: rAF loops constant at **1**, DOM nodes and listeners *falling*, heap +0.6 MB
+per hole and decelerating (a run legitimately accumulates history). Nothing accumulates.
+
+⚠️ `performance.memory` is bucketed for fingerprinting reasons and reads as a suspiciously constant
+number — it reported an identical `9.54MB` for five consecutive samples and would have "proved" there
+was no leak for the wrong reason. `Runtime.getHeapUsage` after `HeapProfiler.collectGarbage` is the
+precise one.
+
+So the lag is STEADY-STATE COST, and the accumulation the player feels is the two things that scale
+with it: holes get heavier as wildness rises with depth, and a phone held at 100% CPU throttles
+thermally — which also explains why idling helps and why a relaunch does not (a fresh run is shallow
+again, and the SoC has cooled).
+
+### The number
+
+`scripts/paint-census.mjs` counts every `fill`/`stroke`/`clip`/`drawImage` the page issues, split by
+target canvas. On a putt watch, before this pass:
+
+**97,477 canvas paint operations per frame.**
+
+That is one full paint of the world, every frame. Two orders of magnitude more than the ~1,000–1,900
+prims `buildScene` returns, because most of the world lives inside `clip` groups and the census counts
+their children. At a putt camera the green's mow bands, apron rings, contour isolines and relief are
+all resolved at maximum zoom, which is why the GREEN is the worst screen in the game and not the tee.
+
+Measured end-to-end in a CPU-throttled browser (`scripts/putt-watch-profile.mjs`, 12× throttle, three
+seeds), the putt watch ran at **3.3 fps**.
+
+### What was actually wrong
+
+`drawStatic` cached the built prims by projector identity — so it already skipped the BUILD on a still
+camera. It never skipped the PAINT. Every frame re-stroked all ~100,000 ops to produce a picture that
+was, provably, the same picture.
+
+And on a follow-cam shot the cache never hit at all, ever: the camera eases exponentially
+(`camera += (target − camera) · 0.2`), so it converges on the ball and never arrives, and `buildProj()`
+mints a fresh projector object every frame regardless. The cache key changed on every frame of every
+shot — including long after the ball had stopped and the picture had visibly frozen.
+
+### The fix, in three parts
+
+1. **`hashHole` is memoized** (`style/shared.ts`, a `WeakMap` on the hole). A hole is immutable once
+   generated, but its art seed was asked for hundreds of times per built scene — a dozen art streams
+   plus once per scattered ground patch (`patchRng`) — each time re-walking every feature and hazard
+   poly and allocating two throwaway arrays for the walk. Profiled on a real watched shot it was
+   **13.4% of ALL CPU**, the single largest line in the frame. `buildScene` went 36.4% → 23.9% of frame
+   CPU and idle headroom 3.2% → 11%. The hash value is unchanged, so every seeded art stream is
+   byte-for-byte identical.
+2. **The painted scene is cached in an offscreen canvas and blitted** while the projector is unchanged.
+   Byte-identical by construction — the same prims through the same painter, into a different surface —
+   so it cannot change *what* is drawn, only how often. A moving camera skips the offscreen entirely
+   (painting it as well as the frame would be strictly more work) and the first still frame after a pan
+   pays one extra paint to fill it.
+3. **The follow-cam is allowed to ARRIVE.** Below `CAMERA_SETTLE_PX` (0.05 SCREEN px — a measure in
+   yards would mean something different at every zoom) the pan is not a pan: the camera snaps onto the
+   ball, the projector is reused, and the cache holds for the whole tail of the shot — the run-out, the
+   rest, the beat before the card. It SNAPS rather than freezing a fraction short, so the resting frame
+   is a definite picture rather than the limit of a series.
+
+⚠️ The offscreen takes the play canvas's OWN `canvas.width`/`height`, never a re-derived `width * dpr`:
+`dpr` folds in the UI zoom (GS-a11y-readable-text) and is routinely fractional, while a canvas's width
+attribute TRUNCATES — so the two disagree by a device pixel and the blit resamples the entire world.
+The blit destination is `canvas.width / dpr` for the same reason.
+
+### Measured
+
+CPU-throttled 12×, three seeds, the built game:
+
+| | before | after |
+|---|---|---|
+| putt watch | **3.3 fps** | **59.9 fps** |
+| shot watch (follow-cam) | **12.0 fps** | **30.0 fps** |
+| putt-watch canvas ops/frame (steady state) | **97,477** | **128** |
+
+### The guard
+
+`tests/play-scene-cache.test.ts`. A frame-rate assertion in CI is a flake waiting to happen, so the
+browser guard is STRUCTURAL: it counts the canvas paint ops the page actually makes per frame during a
+real putt watch, after the one legitimate start-up paint. Steady state is tens of ops; a re-stroked
+world is ~100,000. The threshold (400) sits two and a half orders of magnitude from both, and the test
+is **confirmed to fail on the old behaviour** — with the bitmap disabled it reports 97,477 ops/frame,
+which is the only way to know a regression test is one. Source scans alongside it pin the parts that
+cannot be observed from outside: that the cache still keys on projector identity (two ways of asking
+"has the camera moved" is the second-description bug this codebase keeps paying for), that a rebuilt
+scene invalidates the bitmap in the SAME branch, and that the bitmap takes the canvas's own dimensions.
+
+**Eyes-on:** `scripts/playview-capture.mjs` captures the flight / rest / putt-watch frames before and
+after; the drawn world is the same picture, differing only in animation phase.
+
+### What is still on the table
+
+The follow-cam path still rebuilds and repaints the scene every frame while the ball is moving, which
+is why the shot watch is 30 fps and not 60. `scripts/scene-pan-check.ts` measured the case for fixing
+it: under a pure pan **99.84%** of prims are either screen-anchored (identical) or an exact rigid
+translation — 37,896 translate, 6,160 are anchored sky, and only **70 of 44,126** are neither. Those 70
+are mow-stripe `clip` groups (regenerated across the clip's screen bbox) and the `inView`-culled ground
+detail. So a translate-and-blit cache is *nearly* exact but not exact, and it would change drawn output
+on every world — a feature of its own, not a rider on this one. Filed as `GS-shot-lag-pan` in IDEAS.
+
+**Verification:** full suite green, 0 skipped; `tsc` clean; measurements above reproduced on three
+seeds each.
