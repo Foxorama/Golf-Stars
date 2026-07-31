@@ -100,7 +100,71 @@ cannot fly (`carryableBefore`).
 - Feel beats literal accuracy here — the play-test was explicit that *"the important part is that it
   'feels' accurate"* — but the fences in contract 4 are still the fences.
 
+---
+
+## DECIDED: close the gap by planning FEWER, BIGGER hops — not by inflating the tail
+
+A second measurement pass settled which way to close it, and it rules one option out on physics
+rather than taste.
+
+**The apex is not free to grow.** `runout.ts:422` caps every hop at `want * apexOverLen`, and
+`apexOverLen` is `tan(descent)/4` — DERIVED, not tuned (GS-runout-visible). A driver landing at 38°
+gets 0.195, so a hop can never be more than about a fifth as tall as it is long. Hop LENGTH then
+decays as `kh²` (`runout.ts:426`), so a driver's sixth hop is ~1.6yd long, which caps its apex at
+~0.31yd ≈ **1.5 drawn px, under a 3px ball**. Working it back, that hop would have to stay ~4yd long
+to clear the bar, and six hops of 4yd do not fit in the 21.7yd the run-out gives to bouncing.
+Softening the length decay to `kh^1.2` still only reaches ~1.9px.
+
+So a driver's late bounces are GENUINELY scuffs, and raising `hopDrawBoost` or overriding the
+`tan(descent)/4` cap to show them would mean abandoning the derived apex rule that exists precisely
+to stop this area being tuned by feel — and turning skips into pop-ups, which CLAUDE.md warns about
+directly. **Rejected.**
+
+**Chosen instead:** bring `planned` DOWN to meet what can actually be drawn, so every hop the model
+plans is a hop the player sees.
+
+### The actual complaint is the MIDDLE of the bag, on the FAIRWAY
+
+Refined from the play-test: *"I'm fine with the driver keeping the same number of bounces, it's
+primarily the middle range of clubs that just land and stop on the fairway."* That re-points the
+work, because the driver was never the problem — it is the only club whose first skip is big enough
+to read.
+
+The mid-bag on a firm fairway, from the table above:
+
+| club | roll | hop% of run | planned | **seen** |
+|---|---|---|---|---|
+| 4H @1.0 | 13.6 | 45% | 3 | **2** |
+| 4H @0.7 | 9.5 | 45% | 3 | **1** |
+| 3i @1.0 | 10.7 | 67% | 4 | **2** |
+| 7i @1.0 | 7.7 | 44% | 2 | **1** |
+
+A 4-hybrid at 0.7 power splits 45% of 9.5yd — about 4.3yd — across THREE hops, so they come out
+roughly 2.1 / 1.4 / 0.8yd. At `tan(descent)/4` those last two cannot clear the ball. Split the same
+4.3yd across TWO hops (≈2.6 / 1.7yd) and both are drawable. **Nothing about the distance changes —
+only how many pieces it is cut into.** That is the whole of lever 1, and it is still render-only:
+no carry, no harness.
+
+Note the mid-bag also gives hops a SMALLER share than the long clubs (44–45% for 4H/7i against
+57–67% for D/3W/3i). Raising that share for those classes is the second half of the same lever, and
+also costs nothing — it moves ground from the closing roll into the bounce, not from carry.
+
+### Levers, in order
+
+1. **`hopMinYd` up** — kills the sub-visible scraps at the end of a train, which is what converts a
+   3-hop plan into 2 real bounces. Cheapest and most direct.
+2. **`RUNOUT_BY_CLASS[hybrid|ironLong|ironShort].len` up** — longer individual hops for exactly the
+   classes in the complaint, leaving driver/wood alone as asked.
+3. **Per-class hop share** — move ground from the closing roll into the hop train for the mid-bag.
+
+Do NOT touch `hopDrawBoost` (5.4) or `apexOverLenFor`. Apex was never the problem — it measures
+5–12px against a 3px ball on almost every row.
+
 ## Definition of done
 
-`seen` ≥ 2 for every club from driver through 9-iron on the firm fairway, and ≥ 2 for the long clubs
-on the soft green, with the SW partials still free to plop. Both tables in the commit message.
+- **Mid-bag on the FIRM FAIRWAY is the target**: `4H`, `3i` and `7i` show `seen == planned` at every
+  power, with `planned` allowed to fall to 2–3.
+- **Driver and 3W keep their current visible count** — explicitly not a goal to raise them.
+- `SW @0.7/0.55/0.4` stay free to plop (a 30–52yd partial with ~1yd of roll correctly has no bounce).
+- No `seen` REGRESSES on either surface.
+- Both firmness tables in the commit message, and no carry moved.
