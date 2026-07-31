@@ -251,7 +251,10 @@ function friendStandeeSI(ch: Character, count: number, i: number): string {
 }
 
 const SI_STYLE = `<style>
-  .si-scene{container-type:inline-size;position:relative;width:100%;aspect-ratio:4/3;max-width:620px;margin:0 auto;
+  /* isolation:isolate — see .gs-sclub-scene: a figure scene confines its own stacking to its frame so
+     it can never paint over the app's fixed overlays (z-index 60+). NOTE: this block is inside a JS
+     template literal, so no backticks in here — one closes the string. */
+  .si-scene{container-type:inline-size;position:relative;isolation:isolate;width:100%;aspect-ratio:4/3;max-width:620px;margin:0 auto;
     border:1px solid #2a3346;border-radius:16px;overflow:hidden;background:#0b0f18;box-shadow:0 8px 30px -12px #000a;}
   .si-roomlabel{position:absolute;top:3%;left:50%;transform:translateX(-50%);font-family:Georgia,serif;font-weight:800;
     font-size:clamp(11px,2.8cqw,15px);letter-spacing:.03em;color:#eaf2ff;background:#0b1018cc;padding:3px 12px;border-radius:20px;

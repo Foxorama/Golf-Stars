@@ -1498,6 +1498,22 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     `.gs-sthud` — NEVER the play screen's `.gs-hud`, which the #353 map-blur regression proved). Grep the
     class before adding a rule; add a browser layout smoke test for new screen chrome. Between-screen views
     are reachable headless via `?screen=…` deep-links (GS-screen-deeplink, real reducer transitions).
+  - **A FIGURE SCENE CONFINES ITS OWN STACKING** (GS-scene-isolate, `tests/scene-stacking.test.ts`). The
+    clubhouse / lounge / spaceport / ship-interior rooms place their people and ships by the FEET and order
+    them by depth, so they legitimately mint z-indices in the hundreds (lounge golfers reach ~1000, berthed
+    ships ~230). Those numbers mean something only INSIDE the room: without `isolation:isolate` on the frame
+    they are ordinary members of the ROOT stacking context and paint over every fixed overlay the app owns —
+    the settings sheet at z-index 60, the ace/eagle/victory takeovers at 60–62. That is the reported "four
+    golfers and their parked cars standing on the settings sheet". **Two things look like they already handle
+    it and do NOT**: `overflow:hidden` clips GEOMETRY, never paint order; and **`container-type` is not a
+    stacking context** — a query container reads exactly like a self-contained room, and the computed
+    `contain` on these frames is `none`. The rule is stated for the CLASS (every container-query scene frame
+    isolates), so on a scene whose figures top out at 24 it is a no-op today and still the thing that stops
+    the next one being raised into the overlay layer. ⚠️ **`elementFromPoint` is the WRONG instrument for
+    this** — opening an overlay seals the app with `inert` (GS-a11y-focus), and an inert subtree is dropped
+    from HIT-TESTING while painting exactly where it did, so the first probe reported the sheet on top at
+    every viewport while a screenshot of the same page showed the golfers across it; the guard strips `inert`
+    first, which restores hit order ≡ paint order.
   - **Default aim** is a smart assist (GS-default-aim, `Settings.aimMode` default `'auto'`) resolved by the
     shared `aimTargetOf`/`autoAimTarget` so `previewShot`/`takeShot`/auto-finish stay byte-identical
     (contract 2); the default CLUB is `autoAimClub` in lockstep (a forced-carry drive picks

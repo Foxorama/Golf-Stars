@@ -1008,7 +1008,9 @@ function spaceportArt(marmotAway = false): string {
 function spaceportHTML(golfers: LoungeGolfer[], rng: Rng, marmotAway = false): string {
   const berths = shuffle([...BERTHS], rng).slice(0, golfers.length);
   const ships = golfers.map((g, i) => shipAt(g, berths[i] ?? BERTHS[i % BERTHS.length]!)).join('');
-  return `<div style="container-type:inline-size;position:relative;width:100%;aspect-ratio:40/23;max-width:680px;
+  // isolation:isolate — see the note on the lounge frame below. The berthed ships are feet-anchored the
+  // same way (z up to ~230), so they escape into the overlay layer the same way without it.
+  return `<div style="container-type:inline-size;position:relative;isolation:isolate;width:100%;aspect-ratio:40/23;max-width:680px;
       margin:10px auto 0;border:1px solid #232c42;border-radius:16px;overflow:hidden;background:#0a0d1f;">
       ${spaceportArt(marmotAway)}
       ${ships}
@@ -1040,8 +1042,16 @@ export function clubhouseLoungeHTML(
   const away = marmot && tips > 0 && balls === 0;
   // Taller 4:3 frame that grows to fill the screen (was a squat 20:11 letterbox at 520px that left a lot
   // of dead space above/below on a phone). The extra height is foreground floor the golfers stand on.
+  // isolation:isolate confines the golfers' feet-anchored z-indices (up to ~1000) to this frame's own
+  // stacking context. Without it they are ordinary members of the ROOT stacking context and paint over
+  // every fixed overlay the app owns — the settings sheet at z-index 60, the ace / eagle / victory
+  // takeovers at 60–62 — which is the "four golfers and their parked cars standing on the settings
+  // sheet" bug. Two things that look like they already handle it and do NOT:
+  //   `overflow:hidden`         clips GEOMETRY; paint order is z-index.
+  //   `container-type`          computes `contain: none` in Chrome — a query container is NOT a
+  //                             stacking context, however much it reads like a self-contained room.
   return `${loungeStyle()}
-    <div style="container-type:inline-size;position:relative;width:100%;aspect-ratio:4/3;max-width:680px;
+    <div style="container-type:inline-size;position:relative;isolation:isolate;width:100%;aspect-ratio:4/3;max-width:680px;
       margin:0 auto;border:1px solid #3a2f1f;border-radius:16px;overflow:hidden;background:#140d07;">
       ${loungeArt(marmot, balls, away, thorHammer)}
       ${figures}
