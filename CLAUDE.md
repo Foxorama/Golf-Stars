@@ -1043,6 +1043,23 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     pins the scene's prim count across a pan). Close-then-OPEN, in that order — a flush join weaves for a
     few yards and drawn literally that is a row of dashes. Guarded by `tests/fairway-silhouette.test.ts`;
     eyes-on `scripts/fairway-outline-preview.mjs` (the gallery BURIES loose lanes — that is how it shipped).
+    **AND A FAIRWAY POLYGON IS NOT THE SHAPE OF THE CUT GRASS** (GS-fairway-ink-break) — the corridor runs
+    on UNDER the green, and hazards are cut out of it and painted OVER it, so an outline that asks only
+    "does another FAIRWAY bury this?" draws ink across the putting surface, along a bunker floor and
+    through a creek. Measured over 2,925 holes: **2.28% of all ink length inside a green (77% of holes)
+    and 7.86% inside a hazard (87%)** — every family, led by bunkers/creeks/water — now **0%** and
+    **0.06%** (the remainder is the ≤4yd close stitching over a nick, which is the anti-dashing rule
+    doing its job). `fairwayEdgeRuns` takes OCCLUDERS that bury edge exactly as a neighbouring fairway
+    does, grown by the same `bleed` so ink stops just short of a rim instead of leaving specks along the
+    sand. They are the SAME bodies the painters get — `mergedHazardsFor` + the roughened liquid banks,
+    hoisted to the top of `buildScene` (both are course-space, CACHED and rng-free, so no draw is
+    reordered and every seeded scene is byte-for-byte). **TREES ARE DELIBERATELY NOT OCCLUDERS**: a
+    canopy is a sprite with gaps over turf that is still cut grass, and burying edge under one shreds the
+    outline into dashes wherever a grove overhangs. No occluders passed ⇒ byte-for-byte, so the
+    single-poly early return survives — but it now yields when an occluder crosses a lone fairway, which
+    it used to swallow. ⚠️ Most of the removed ink was ALREADY INVISIBLE (hazards and the green paint
+    over the fairway pass): the pixel win is small and real — ~500px on a whole-hole map, concentrated
+    exactly at the green — while the structural win is that the silhouette now means what it says.
   - **A WORLD WITH NO GROUND LIGHTS ITS OWN PLAY SURFACES, AND THE GLOW IS A ROW** (GS-cetus-void-glow,
     `style/glow.ts`). Void and Cetus are one design idea — off the cut turf is the open deep, so what the
     player looks at is a lit shape floating in it. That is a LIGHTING problem, and it was being solved by

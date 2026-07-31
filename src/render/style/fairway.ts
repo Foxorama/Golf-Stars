@@ -170,6 +170,20 @@ export interface EdgeRun {
  * every OTHER piece of cut grass shipped with no outline at all: a split fairway drawn as a bare
  * green smear beside an inked corridor (the player report).
  *
+ * A fairway polygon is NOT the same shape as the cut grass the player can see, and that is the second
+ * half of the rule (GS-fairway-ink-break). The corridor runs on UNDER the green, and hazards are cut
+ * out of it and painted over it — so an outline that asks only "does another fairway bury this?" draws
+ * ink across the putting surface, along the floor of a bunker and through a creek. Measured over 2,925
+ * generated holes it was **2.3% of all ink length inside a green (77% of holes) and 7.9% inside a
+ * hazard (87%)** — every hazard family in the game, led by bunkers, creeks and water. So the
+ * occluders — the green and the drawn hazard bodies — bury edge exactly as a neighbouring fairway
+ * does. The player put it best: it should be on the fairway itself, and *definitely* not on the green
+ * even if the fairway art runs under the green.
+ *
+ * TREES ARE DELIBERATELY NOT OCCLUDERS. A canopy is a sprite with gaps drawn over the turf, not a
+ * body cut out of it — the ground under it is still cut grass, and burying edge there would shred the
+ * outline into dashes wherever a grove overhangs the fairway.
+ *
  * Both wants are the same rule: **the fairway system has ONE silhouette, and the ink traces it.**
  * Walk each polygon's own edge and keep the runs no other fairway polygon buries. A piece that
  * stands alone returns its whole ring (byte-for-byte the old closed stroke); the apron keeps only
@@ -179,8 +193,8 @@ export interface EdgeRun {
  * width of ground and the sample count comes out of the ground length, so panning and zooming move
  * the runs and change nothing about how many there are.
  */
-export function fairwayEdgeRuns(sps: Vec[][], scale = 1): EdgeRun[][] {
-  if (sps.length <= 1) return sps.map((p) => [{ closed: true, pts: p }]);
+export function fairwayEdgeRuns(sps: Vec[][], scale = 1, occluders: Vec[][] = []): EdgeRun[][] {
+  if (sps.length <= 1 && !occluders.length) return sps.map((p) => [{ closed: true, pts: p }]);
   // Yards → this camera's pixels. Deliberately UNCLAMPED (unlike `turfPx`, which floors a band so it
   // stays visible): a clamp is a camera-dependent decision, and these numbers decide structure.
   const pxPerYd = scale > 0 ? scale : 1;
@@ -190,6 +204,11 @@ export function fairwayEdgeRuns(sps: Vec[][], scale = 1): EdgeRun[][] {
   const stepPx = OUTLINE_STEP_YD * pxPerYd;
   const grown = sps.map((p) => offsetPoly(p, -bleed));
   const boxes = grown.map(bboxOf);
+  // The OCCLUDERS (GS-fairway-ink-break) — the green and the hazard bodies, which are painted ON TOP
+  // of the fairway pass. Grown by the same `bleed` as a neighbouring fairway, so an edge running
+  // along a bunker's rim stops just short of it instead of leaving a row of specks along the sand.
+  const grownOcc = occluders.map((p) => offsetPoly(p, -bleed));
+  const occBoxes = grownOcc.map(bboxOf);
   return sps.map((poly, i) => {
     const n = poly.length;
     if (n < 3) return [{ closed: true, pts: poly }];
@@ -199,6 +218,11 @@ export function fairwayEdgeRuns(sps: Vec[][], scale = 1): EdgeRun[][] {
         const b = boxes[j]!;
         if (p[0] < b.minX || p[0] > b.maxX || p[1] < b.minY || p[1] > b.maxY) continue;
         if (pointInPoly(p, grown[j]!)) return true;
+      }
+      for (let j = 0; j < grownOcc.length; j++) {
+        const b = occBoxes[j]!;
+        if (p[0] < b.minX || p[0] > b.maxX || p[1] < b.minY || p[1] > b.maxY) continue;
+        if (pointInPoly(p, grownOcc[j]!)) return true;
       }
       return false;
     };
