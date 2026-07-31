@@ -90,6 +90,9 @@ export type Screen =
   // GS-story-yggdrasil: the finale — the Jörmungandr battle briefing and its victory/defeat recap.
   | 'storyFinale'
   | 'storyFinaleResult'
+  // GS-story-credits: the "where are they now" credits roll a WON campaign ends on (the finale recap's
+  // "Roll the credits ›" used to go straight to the title). Only ever reached from a victory.
+  | 'storyCredits'
   // GS-story-chapters: The Choice after Chapter 3 — stay a Warden or join the Coil (become a Herald).
   | 'storyChoice'
   // GS-story-midchapter: the emotional interlude between the route majors (win a friend back / sever one).
@@ -609,7 +612,8 @@ export type Action =
   | { type: 'openStoryFinale' } // GS-story-yggdrasil: open the finale battle briefing (five Sigils in hand)
   | { type: 'exitStoryFinale' } // GS-story-yggdrasil: back to the clubhouse from the briefing
   | { type: 'engageStoryFinale'; strike?: 'clean' | 'graze'; outcome?: 'won' | 'lost' } // GS-story-yggdrasil/-battle-2: resolve the battle → recap (strike = finisher quality; outcome = the live fight's own result, clamped under the gate verdict — an armed loss is a costless 'repelled')
-  | { type: 'storyFinaleContinue' } // GS-story-yggdrasil: dismiss the recap (to clubhouse; victory → title)
+  | { type: 'storyFinaleContinue' } // GS-story-yggdrasil: dismiss the recap (to clubhouse; victory → the credits roll)
+  | { type: 'endStoryCredits' } // GS-story-credits: leave the "where are they now" roll → the title
   | { type: 'chooseAlignment'; alignment: 'warden' | 'herald' } // GS-story-chapters: The Choice after Ch.3
   | { type: 'storyInterludeContinue' } // GS-story-midchapter: dismiss the emotional interlude (apply its outcome)
   | { type: 'openStoryBar' } // GS-story-parrot-bar: enter the Parrot's cantina from the clubhouse

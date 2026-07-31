@@ -1795,6 +1795,76 @@ as a Coil unlocks the Coil ship and a Coil outfit."*
     reason the Thor block sits where it does. Guarded by `tests/story-champion-cosmetics.test.ts`; eyes-on
     `scripts/champion-outfit-preview.mjs`.
 
+## Phase O — the credits roll (GS-story-credits)
+
+*The player's ask: "there's a roll credits button, but no credits roll. Can we do some style of Mallrats
+movie ending where we list each character and what they're getting up to afterwards?"*
+
+- **GS-story-credits** — ✅ *shipped* (`sim/rpg/storyCredits.ts` pure content ·
+  `render/castPortrait.ts` the extracted portrait seam · `app/storyCreditsScreens.ts` the screen ·
+  `ui/game.ts` + `ui/back.ts` the routing · the rAF crawl in `app.ts`).
+  - **The button was already there and had always lied.** `storyFinaleResultScreen` has offered
+    *"Roll the credits ›"* since GS-story-yggdrasil shipped, and `storyFinaleContinue` sent a winner
+    straight to the title. The last promise a campaign makes was the one thing it never delivered. A
+    `storyCredits` screen now sits between the two; `endStoryCredits` is what finally lands on the title.
+  - **Every card carries TWO epilogues, because there are two endings.** A Warden win reseals the serpent
+    and the galaxy wakes up; a Herald win feeds it and the lights go out world by world. One shared set
+    would be false on whichever road the player did not take — a credits roll that lies about the ending
+    it is rolling on is worse than no credits at all — so every row carries `warden` and `herald`, a test
+    asserts no epilogue is shared between them, and `creditsRoll` picks by `story.alignment`.
+  - **A golfer's card is decided by the ROLE the campaign cast them in, and the roll ASKS the campaign
+    rather than deciding for itself.** On the Warden road one friend heard the whisper and ran
+    (`betrayerId`), two stayed; on the Coil road you severed one (`heraldSeveredId`) and the other two
+    came for you at the Ark. Both are existing single seams — the same ones the ending recap one screen
+    earlier reads — so the roll can never name a different traitor than the ending just did. Six
+    epilogues per golfer (hero / the two friend roles × two paths); a fallback keeps a future roster
+    golfer honest rather than blank.
+  - **The protagonist's card is written in the SECOND PERSON.** The hero is a PICK — Feather (she/her) ·
+    Woo (he/she/they) · Larry (he/him) · Bo (they/them) — so *"he went home to Perth"* is true for a
+    quarter of the players who reach this screen (GS-story-neutral-address). *"You went home to Perth"* is
+    true for all of them, and warmer besides. A test walks all four heroes on both paths and forbids
+    **any** third-person pronoun on that card; every other card is third-person about a specific named
+    character and correctly carries their own pronouns.
+  - **The dedication is pinned by a test.** `SPECIAL_THANKS` is a const, not inline markup, and both the
+    pure suite and the browser smoke assert it names Unity_Starfish, the 356 holes and the Unending
+    Universe. It is the one piece of copy on the screen that is a promise to a real person, and a future
+    refactor of this screen must not be able to drop it quietly.
+  - **The token→portrait rule MOVED rather than being copied** (GS-one-description). `app/loreScreens.ts`
+    had resolved `golfer:<id>` / `caddy:<id>` / a bare lore id into art privately since GS-story-doubt;
+    the roll is the second asker, so the rule is now `render/castPortrait.ts` and both read it. It gained
+    one token, `agent:<id>`, which resolves a Coil agent through **its own `HeraldAgent` row** (`portrait`
+    + `tint`) — so Ouros and Ecdysis are drawn and told apart by the data that already said how, and no
+    screen authors that a second time. Each surface passes its OWN `uidPrefix`, because SVG ids are
+    document-global.
+  - **The crawl is a rAF loop, deliberately not a CSS animation.** `.gs-reduced` collapses every
+    animation DURATION to near-zero (GS-a11y-motion), so a keyframed crawl would SNAP TO THE END for
+    exactly the players who asked for less motion. The loop simply never starts under reduced motion and
+    the roll is read by hand — same markup, same content. It self-terminates when its element leaves the
+    document (which is the whole cleanup story, since `render()` replaces `#app.innerHTML`), every
+    listener sits on the element itself so nothing stacks on `window` (GS-a11y-keyboard's trap), and any
+    real input hands control to the player for good so it can never fight somebody who is reading. The
+    scroll position and the "player has taken over" flag live at module scope, or opening the settings
+    sheet over the credits would restart the roll from the top.
+  - **The roll scrolls INSIDE itself, and its floor is deliberately low.** On the itch embed the page
+    frame cannot scroll at all (GS-embed-scroll), so a crawl taller than the viewport would be unreachable
+    content. `--gs-dvh` already divides by the UI scale, so the 210px reserve is a constant number of
+    UNITS — but a floor is not: at 320×568 on the top Readable-text rung the frame is only 392 units tall
+    and a 280px floor pushed the roll clean off the bottom of the screen. A media query cannot see
+    `--gs-uiscale` (GS-a11y-scale-wrap), so the floor has to be right at every rung.
+  - **One art frame, two aspects.** The cast is drawn as head-and-shoulders busts (320×340) for the crew
+    and the Coil and as full-body figures (120×240) for the golfers. Left to size themselves the golfer
+    cards came out nearly twice as tall as everything around them; a fixed 96×120 frame letterboxes both
+    (no `preserveAspectRatio` ⇒ `xMidYMid meet`) with no crop and no squash, and every card in the roll
+    stands the same height.
+  - **BACK is a navigate, not a swallow.** The campaign is already complete and banked by the time the
+    roll starts, so there is nothing left for a back press to skip — it means what the footer button
+    means. `endStoryCredits` is screen-guarded like every other navigation action, so a stray dispatch
+    can never become a way out of a run.
+  - No save bump, no sim rng, no new hook (the `?screen=storycredits` / `storycreditsherald` deep-links
+    are new VALUES of the existing `?screen=` param, which the hub's auto-discovery keys on by NAME).
+    Guarded by `tests/story-credits.test.ts` + two deep-link smokes and a crawl/reachability test in
+    `tests/build.test.ts`.
+
 ## Open questions / deferred (revisit as chunks land)
 - **A genuinely-new gas-giant BIOME** (play on gas cloud-tops) — the player's optional "if we need to add
   more" ask. Deferred as its OWN focused session: a new `BiomeArchetype` fans out to ~16 compile-forced
