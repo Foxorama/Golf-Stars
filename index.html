@@ -65,6 +65,13 @@
            Every viewport-locked box uses these instead of raw 100vh/100dvh. */
         --gs-vh: calc(100vh / var(--gs-uiscale));
         --gs-dvh: calc(100dvh / var(--gs-uiscale));
+        /* THE PORTRAIT FRAME, in ONE place (GS-play-desktop-frame · GS-startour-frame).
+           The game is composed portrait. On anything that is not phone-portrait it keeps a portrait
+           frame rather than growing sideways, and the frame's width is a fraction of the viewport
+           HEIGHT so the composition scales with the display instead of being pinned to a px count.
+           Two surfaces now use it — the full-bleed play screen and the free-roam star chart — which
+           is exactly when it stops being a number and becomes a decision with one home. */
+        --gs-portrait-w: calc(var(--gs-dvh) * 0.52);
       }
 
       * { box-sizing: border-box; }
@@ -1329,11 +1336,20 @@
          container carries the map, the HUD and the controls with it. Nothing on this screen is
          fixed to the viewport, so nothing can fall out of step with the frame. */
       @media (min-aspect-ratio: 3 / 4) {
-        .gs-main--bleed {
-          max-width: calc(var(--gs-vh) * 0.52);
-          max-width: calc(var(--gs-dvh) * 0.52);
-          margin-inline: auto;
-        }
+        .gs-main--bleed { max-width: var(--gs-portrait-w); margin-inline: auto; }
+        /* …AND THE STAR CHART, which used to escape it (GS-startour-frame).
+           `.gs-startour` is `position: fixed; inset: 0`, so capping its `.gs-main--bleed` parent did
+           nothing to it: coming off a 600px-wide portrait hole you landed on a 1920px-wide chart,
+           which is a jarring change of format mid-run and left the mobile-composed HUD stranded —
+           tiny buttons flung to opposite corners of the display, planets lost in the middle.
+           `inset: 0` already pins left AND right, so a definite width plus `margin-inline: auto`
+           centres it with no transform (which would have made every fixed descendant position
+           against this box instead of the viewport). The whole HUD is a CHILD of `.gs-startour`, so
+           it comes along for free — there is nothing else to bound.
+           This is the mobile-first call, taken deliberately: an expanded desktop chart does read
+           better once its chrome is designed for the room, and that is a bigger piece of work than
+           a frame. Revisit when desktop players ask, not before. */
+        .gs-startour { width: var(--gs-portrait-w); margin-inline: auto; }
       }
       .gs-main--wide { max-width: 1180px; }
       /* Character-select locks to the viewport on phones (GS-select-onescreen): the page frame becomes a
