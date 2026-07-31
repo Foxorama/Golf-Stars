@@ -163,6 +163,16 @@ function earthClubhouseArt(): string {
 
     <!-- warm ceiling lamp + glow -->
     <ellipse cx="200" cy="70" rx="150" ry="90" fill="url(#ec-lamp)"/>
+
+    <!-- WALL CAST SHADOWS (GS-clubhouse-floor). The cabinet, the window and the leaderboard were drawn
+         flat onto the panelling, so the room read as a printed backdrop with four people standing in
+         front of it. One soft offset slab behind each, down-and-right off the shared upper-left key,
+         buys them thickness. Drawn BEFORE the pieces so each sits on its own shadow. -->
+    <g fill="#000" opacity="0.3">
+      <rect x="24" y="74" width="74" height="150" rx="4"/>
+      <rect x="119" y="35" width="170" height="110" rx="5"/>
+      <rect x="310" y="74" width="76" height="96" rx="3"/>
+    </g>
     <line x1="200" y1="0" x2="200" y2="16" stroke="#1c130a" stroke-width="2"/>
     <path d="M182,16 L218,16 L212,30 L188,30 Z" fill="#2a1c0e"/>
     <ellipse cx="200" cy="30" rx="15" ry="3.4" fill="#ffcf7a"/>
@@ -204,6 +214,11 @@ function earthClubhouseArt(): string {
           <path d="M-4,-11 C-8,-11 -8,-6 -4,-6 M4,-11 C8,-11 8,-6 4,-6" fill="none" stroke="#f0c64e" stroke-width="1.2"/>
           <rect x="-1.2" y="-3" width="2.4" height="3" fill="#c99a2e"/><rect x="-3.4" y="0" width="6.8" height="2" rx="0.6" fill="#a97b25"/>
         </g>`).join('')}
+      <!-- GS-clubhouse-floor: the cabinet met the floor line dead flat with nothing beneath it. A PLINTH
+           that oversails the carcass, lit along its top edge, gives the eye a horizontal surface exactly
+           where the case meets the boards — the cue that separates standing furniture from wall art. -->
+      <rect x="17" y="214" width="80" height="9" rx="2" fill="#150e06"/>
+      <rect x="17" y="214" width="80" height="2.2" fill="#4a3520" opacity="0.9"/>
     </g>
 
     <!-- chalk leaderboard, right wall -->
@@ -218,6 +233,10 @@ function earthClubhouseArt(): string {
     <rect x="0" y="222" width="400" height="78" fill="url(#ec-floor)"/>
     ${[0, 50, 100, 150, 200, 250, 300, 350].map((x) => `<line x1="${x}" y1="222" x2="${x - 20}" y2="300" stroke="#00000030" stroke-width="1.4"/>`).join('')}
     <line x1="0" y1="222" x2="400" y2="222" stroke="#1c120a" stroke-width="3"/>
+    <!-- CONTACT SHADOWS (GS-clubhouse-floor): the golfers were the only things casting onto the boards.
+         Drawn AFTER the floor so they darken it, tight and soft at the foot of each standing piece. -->
+    <ellipse cx="57" cy="224" rx="46" ry="8" fill="#000" opacity="0.36"/>
+    <ellipse cx="106" cy="250" rx="17" ry="5" fill="#000" opacity="0.3"/>
     <ellipse cx="200" cy="252" rx="150" ry="16" fill="#ffd98a" opacity="0.06"/>
 
     <!-- a golf bag leaning by the cabinet, foreground dressing -->

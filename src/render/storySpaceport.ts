@@ -29,6 +29,18 @@ import { betrayerId, betrayerHasDefected } from '../sim/rpg/storyBetrayal';
 import { characterQuestOfferable } from '../sim/rpg/characterQuests';
 import type { Character } from '../sim/rpg/characters';
 
+/**
+ * Where the back wall stops and the deck begins, in the 400×300 room frame — shared by the Mothership
+ * and the Coil sanctum, which are the same room dressed twice.
+ *
+ * GS-clubhouse-floor: this is a named constant because the play-test report was that everything in the
+ * room looked "velcro'd to the wall" — and the literal cause was furniture whose bottom edge stopped
+ * SHORT of this line (the bar counter ended thirty units clear of it, hanging in mid-air). Anything
+ * that stands ON the deck derives its height from this rather than carrying a hand-counted one, so a
+ * standing unit cannot silently drift off the floor again.
+ */
+const DECK_Y = 222;
+
 /** The Parrot's lore bust, made embeddable at 320×340 inside a positioned `<g transform>` (the Crow's Nest
  *  idiom) so the bird behind the bar is unmistakably the same character. */
 function embeddableParrotBust(): string {
@@ -118,6 +130,17 @@ function spaceportArt(shipId: string, herald: boolean): string {
     <!-- warm ceiling glow -->
     <ellipse cx="215" cy="150" rx="150" ry="96" fill="url(#sc-lamp)"/>
 
+    <!-- WALL CAST SHADOWS (GS-clubhouse-floor). Everything bolted to the back wall was drawn flat onto
+         it, so the bay, the viewport and the back-bar read as decals printed on the panelling. One soft
+         offset slab behind each, down-and-right off the scene's shared upper-left key (LIGHT_UL), gives
+         them thickness for four rects. Drawn here, BEFORE the units, so each sits on its own shadow. -->
+    <g fill="#000" opacity="0.28">
+      <rect x="9" y="43" width="100" height="104" rx="7"/>
+      <rect x="13" y="155" width="92" height="66" rx="4"/>
+      <rect x="121" y="31" width="128" height="106" rx="9"/>
+      <rect x="262" y="74" width="136" height="52" rx="3"/>
+    </g>
+
     <!-- ══ HANGAR BAY (upper-left): open bay onto space, the parked ship ══ -->
     <g>
       <rect x="4" y="38" width="100" height="104" rx="7" fill="#0a0f1e" stroke="#39455f" stroke-width="3"/>
@@ -136,15 +159,22 @@ function spaceportArt(shipId: string, herald: boolean): string {
       <rect x="9" y="140" width="90" height="6" rx="2" fill="#2a3651"/>
     </g>
 
-    <!-- ══ LOCKER BANK (lower-left) ══ -->
+    <!-- ══ LOCKER BANK (lower-left) ══
+         GS-clubhouse-floor: the bank met the deck line dead flat, with no base and nothing under it —
+         a flat rectangle butted against the wall/floor seam, which is the "velcro'd to the wall" tell.
+         It now stands on a PLINTH that oversails the carcass slightly and carries a lit top edge, so
+         the eye gets a horizontal surface where the unit meets the deck. -->
     <g>
-      <rect x="8" y="150" width="92" height="72" rx="4" fill="#1b2333" stroke="#33405a" stroke-width="2"/>
+      <rect x="8" y="150" width="92" height="66" rx="4" fill="#1b2333" stroke="#33405a" stroke-width="2"/>
       ${[8, 39, 70].map((lx) => `<g>
-        <rect x="${lx + 3}" y="154" width="26" height="64" rx="3" fill="#232d40" stroke="#3a4864" stroke-width="1.4"/>
+        <rect x="${lx + 3}" y="154" width="26" height="58" rx="3" fill="#232d40" stroke="#3a4864" stroke-width="1.4"/>
         <rect x="${lx + 6}" y="159" width="20" height="9" rx="1.5" fill="#151c2b"/>
-        <circle cx="${lx + 24}" cy="188" r="1.6" fill="#8a97ad"/>
+        <circle cx="${lx + 24}" cy="186" r="1.6" fill="#8a97ad"/>
       </g>`).join('')}
       <rect x="8" y="150" width="92" height="6" fill="#2a3651"/>
+      <!-- plinth: oversails the carcass by 2 either side, lit along the top, dark at the deck -->
+      <rect x="6" y="${DECK_Y - 7}" width="96" height="7" rx="1.5" fill="#151d2c"/>
+      <rect x="6" y="${DECK_Y - 7}" width="96" height="1.8" fill="#46567a" opacity="0.8"/>
     </g>
 
     <!-- ══ STAR-CHART VIEWPORT (centre-back) ══ -->
@@ -188,18 +218,29 @@ function spaceportArt(shipId: string, herald: boolean): string {
       ${bottle(272, '#7fe0a0', 24)}${bottle(288, '#e8c25a', 20)}${bottle(304, '#6ab6ff', 26)}${bottle(356, '#ff6b6b', 22)}${bottle(372, '#4fd8c8', 24)}
       <!-- the Parrot behind the counter (his lore bust) -->
       <g transform="translate(300 78) scale(0.30)">${bust}</g>
-      <!-- bar counter -->
+      <!-- bar counter. GS-clubhouse-floor: the front panel used to stop at y=192, thirty units clear of
+           the deck at 222 — a bar hanging on the wall. It now runs DOWN TO THE DECK with a recessed toe
+           kick, so it is a solid standing against the floor rather than a shelf stuck to the panelling. -->
       <rect x="252" y="150" width="146" height="12" rx="4" fill="#8a6034"/>
       <rect x="252" y="150" width="146" height="4" rx="2" fill="#b9884a"/>
-      <rect x="256" y="162" width="140" height="30" fill="url(#sc-counter)"/>
+      <rect x="256" y="162" width="140" height="${DECK_Y - 162}" fill="url(#sc-counter)"/>
+      <!-- toe kick: the shadowed recess a real cabinet stands on, and the cue that sells floor contact -->
+      <rect x="256" y="${DECK_Y - 10}" width="140" height="10" fill="#0d0a06" opacity="0.55"/>
+      <rect x="256" y="${DECK_Y - 11}" width="140" height="1.6" fill="#000" opacity="0.4"/>
       <!-- a full glass left for you -->
       <g transform="translate(300 150)"><path d="M-6 -14 L6 -14 L4 0 L-4 0 Z" fill="#7fe0a0" opacity="0.85"/><ellipse cx="0" cy="0" rx="5" ry="1.6" fill="#0c0906"/></g>
     </g>
 
     <!-- ══ DECK ══ -->
-    <rect x="0" y="222" width="400" height="78" fill="url(#sc-floor)"/>
+    <rect x="0" y="${DECK_Y}" width="400" height="78" fill="url(#sc-floor)"/>
     <line x1="0" y1="222" x2="400" y2="222" stroke="#0c111c" stroke-width="3"/>
     ${[40, 110, 180, 250, 320, 390].map((x) => `<line x1="${x}" y1="222" x2="${x - 26}" y2="300" stroke="#00000033" stroke-width="1.3"/>`).join('')}
+    <!-- CONTACT SHADOWS (GS-clubhouse-floor). The golfers were the only things in the room that cast
+         onto the deck, so everything else read as printed on the back wall. These pool ON the floor at
+         the foot of each standing unit — drawn AFTER the deck so they darken it, and kept tight and
+         soft, because a contact shadow is what says "this object occupies the room". -->
+    <ellipse cx="54" cy="224" rx="52" ry="9" fill="#000" opacity="0.34"/>
+    <ellipse cx="326" cy="224" rx="76" ry="9" fill="#000" opacity="0.34"/>
     <ellipse cx="200" cy="250" rx="150" ry="15" fill="#ffd98a" opacity="0.05"/>
   </svg>`;
 }
@@ -320,12 +361,13 @@ function coilSanctumArt(shipId: string): string {
       <path d="M4,38 L104,38 L98,48 L92,40 L84,50 L76,40 L68,50 L60,40 L52,50 L44,40 L36,50 L28,40 L20,50 L12,40 L4,50 Z" fill="#0a0614" opacity="0.85"/>
     </g>
 
-    <!-- ══ RELIQUARY (lower-left) — stone niches with relics, not lockers ══ -->
+    <!-- ══ RELIQUARY (lower-left) — stone niches with relics, not lockers ══
+         GS-clubhouse-floor: stands on a stepped stone PLINTH rather than meeting the flagstones flat. -->
     <g>
-      <rect x="8" y="150" width="92" height="72" rx="4" fill="url(#cs-stone)" stroke="#3a2456" stroke-width="2"/>
+      <rect x="8" y="150" width="92" height="66" rx="4" fill="url(#cs-stone)" stroke="#3a2456" stroke-width="2"/>
       ${[8, 39, 70].map((lx, i) => `<g>
-        <rect x="${lx + 3}" y="154" width="26" height="64" rx="12" fill="#0c0618" stroke="#4a2f6a" stroke-width="1.4"/>
-        <ellipse cx="${lx + 16}" cy="212" rx="11" ry="3" fill="#7fe0a0" opacity="0.12"/>
+        <rect x="${lx + 3}" y="154" width="26" height="58" rx="12" fill="#0c0618" stroke="#4a2f6a" stroke-width="1.4"/>
+        <ellipse cx="${lx + 16}" cy="208" rx="11" ry="3" fill="#7fe0a0" opacity="0.12"/>
         ${
           i === 0
             ? `<g transform="translate(${lx + 16} 190)"><circle r="7" fill="#d8d2c0"/><circle cx="-2.5" cy="-1" r="1.6" fill="#0a0410"/><circle cx="2.5" cy="-1" r="1.6" fill="#0a0410"/><rect x="-4" y="4" width="8" height="3" fill="#0a0410"/></g>` // a skull
@@ -335,6 +377,8 @@ function coilSanctumArt(shipId: string): string {
         }
       </g>`).join('')}
       <rect x="8" y="150" width="92" height="6" fill="#3a2456"/>
+      <rect x="6" y="${DECK_Y - 7}" width="96" height="7" rx="1.5" fill="#0a0514"/>
+      <rect x="6" y="${DECK_Y - 7}" width="96" height="1.8" fill="#4a2f6a" opacity="0.85"/>
     </g>
 
     <!-- ══ SHRINE TO THE WORLD-EATER (centre) — a great serpent eye in a stone arch ══ -->
@@ -398,17 +442,23 @@ function coilSanctumArt(shipId: string): string {
       <rect x="262" y="99" width="128" height="3" fill="#2a1a3a"/>
       ${jar(272, '#7fe0a0', 24)}${jar(288, '#9a6bd0', 20)}${jar(304, '#4fd8c8', 26)}${jar(356, '#c05a8a', 22)}${jar(372, '#6fe0a0', 24)}
       <g transform="translate(300 78) scale(0.30)">${bust}</g>
-      <!-- obsidian counter -->
+      <!-- obsidian counter. GS-clubhouse-floor: like the Mothership bar it stopped thirty units clear of
+           the deck. Carried down to the stone with a shadowed recess at its foot. -->
       <rect x="252" y="150" width="146" height="12" rx="4" fill="#241436"/>
       <rect x="252" y="150" width="146" height="4" rx="2" fill="#3a2456"/>
-      <rect x="256" y="162" width="140" height="30" fill="url(#cs-stone)"/>
+      <rect x="256" y="162" width="140" height="${DECK_Y - 162}" fill="url(#cs-stone)"/>
+      <rect x="256" y="${DECK_Y - 10}" width="140" height="10" fill="#080410" opacity="0.6"/>
+      <rect x="256" y="${DECK_Y - 11}" width="140" height="1.6" fill="#000" opacity="0.45"/>
       <g transform="translate(300 150)"><path d="M-6 -14 L6 -14 L4 0 L-4 0 Z" fill="#7fe0a0" opacity="0.85"/><ellipse cx="0" cy="0" rx="5" ry="1.6" fill="#0c0906"/></g>
     </g>
 
     <!-- ══ DECK — dark stone flags + a glowing ritual circle ══ -->
-    <rect x="0" y="222" width="400" height="78" fill="url(#cs-floor)"/>
+    <rect x="0" y="${DECK_Y}" width="400" height="78" fill="url(#cs-floor)"/>
     <line x1="0" y1="222" x2="400" y2="222" stroke="#050208" stroke-width="3"/>
     ${[40, 110, 180, 250, 320, 390].map((x) => `<line x1="${x}" y1="222" x2="${x - 26}" y2="300" stroke="#00000040" stroke-width="1.3"/>`).join('')}
+    <!-- CONTACT SHADOWS (GS-clubhouse-floor) — see the Mothership deck. -->
+    <ellipse cx="54" cy="224" rx="52" ry="9" fill="#000" opacity="0.4"/>
+    <ellipse cx="326" cy="224" rx="76" ry="9" fill="#000" opacity="0.4"/>
     <g transform="translate(200 264)">
       <ellipse rx="150" ry="26" fill="#7fe0a0" opacity="0.06"/>
       ${coilSigil(30, '#7fe0a0', 0.5)}
