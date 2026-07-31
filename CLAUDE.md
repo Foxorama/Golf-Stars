@@ -906,6 +906,32 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     seen. With `hopLenK` 0.05→0.07 (a decisive first skip, not a stutter) and `runoutMaxMs` 2400→3100 (the
     longer run was being played at 2× speed), invisible bounces went **6/40 → 3/40** and the three left are
     30–52yd sand-wedge partials with ~1yd of roll, which is a plop and correctly has none.
+  - **A HOP'S LENGTH IS `sin(2·descent)`, AND WHETHER IT IS PLANNED IS A QUESTION ABOUT PIXELS**
+    (GS-runout-seen). Two faults behind *"woods, hybrids and long irons don't really have any bounce
+    animation, they land and just stick"* — hops PLANNED and then not DRAWN (firm fairway: a driver
+    planned 6 and drew 2, a 4H planned 3 and drew 1; on a green `seen` was **1 on all 40 rows**).
+    **The length term was `cos²(θ)`, which is neither half of the projectile pair the module already
+    relies on**: a projectile ranges `v²sin2θ/g` and peaks at `v²sin²θ/2g`, and `apexOverLenFor` has
+    been their RATIO (`tan θ/4`) since GS-runout-visible — so the geometry was right in two places and
+    contradicted in the third. `sin2θ` is FLAT across the bag (0.97 at 38° → 0.99 at 50°) where `cos²θ`
+    collapses (0.62 → 0.41), so every steep-landing club was charged a penalty the physics does not —
+    **on top of the one `RUNOUT_BY_CLASS.len` already charges for the same steepness.** `hopBite` is
+    that relation; `hopLenK` 0.07 → **0.0448** is a re-normalisation pinned so the DRIVER is
+    arithmetically unchanged (it already read right — a test says so, and moving `hopLenK` moves the
+    driver). `ironShort.len` 0.8 → 0.93 follows, because with `cos²` gone the class row is the only
+    place a short iron's bite is expressed. And **a length in YARDS cannot answer "will this be seen"**
+    — the camera frames the shot, so 0.75yd is 3.7px behind a 9-iron and 0.8px behind a drive, and
+    neither a yard floor nor a share-of-the-run-out floor separates the measured pair (keep a 9i's
+    0.744yd at 3.6px, drop a 4H's 0.761yd at 1.8px). Rather than re-derive the camera from `carry` — a
+    second description of `project.ts` — the caller passes `Landing.ballYd`, the drawn ball's radius in
+    yards of modelled apex, i.e. the play view's own `height·scale·heightExaggeration·hopDrawBoost` run
+    BACKWARDS. A hop under it is not planned and its ground goes to the ROLL; the FIRST hop is exempt
+    (a ball out of the sky does not begin by rolling) and ABSENT ⇒ the old `hopMinYd` floor, which is
+    what keeps the pure tests measuring the untrimmed MODEL. Result: `seen == planned` on **all 40**
+    firm rows (driver→9i all draw 2 on a full swing; the 1s are 30–66yd partials and the wedges) and an
+    honest 1-and-roll on all 40 green rows. **Render-only — no sim module imports `runout.ts`, zero
+    carry moved, the harness has nothing to weigh.** Guarded by `tests/runout.test.ts`; eyes-on
+    `scripts/landing-preview.mjs` (which now passes `ballYd`, so the sheet shows what SHIPS).
   - **THE BALL STAYS ON THE SCREEN, AND A SHADOW UNDER THE BALL IS NO SHADOW** (GS-landing-real). The
     play view drew NOTHING once every shot and putt had played, so the ball blinked out and the player
     watched an empty fairway until the screen changed; it is now drawn at rest until unmount (cleared

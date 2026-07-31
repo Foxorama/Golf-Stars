@@ -11,7 +11,7 @@
  * sim said the ball rests, however the time is parameterised.
  */
 import { describe, it, expect } from 'vitest';
-import { planRunout, sampleRunout, apexOverLenFor, DEFAULT_RUNOUT_FEEL, RUNOUT_BY_CLASS, type Landing, type RunoutPlan } from '../src/render/runout';
+import { planRunout, sampleRunout, apexOverLenFor, hopBite, DEFAULT_RUNOUT_FEEL, RUNOUT_BY_CLASS, type Landing, type RunoutPlan } from '../src/render/runout';
 import { arcApex, ARC_FEEL, arcShapeOf, arrivalAngleDeg, descentAngleDeg, flightCarryScale } from '../src/sim/flight';
 import { sampleCurvedFlight, flightDurationMs, flightGroundAt } from '../src/render/trajectory';
 import { flightGroundFrac, flightParamAt } from '../src/sim/flight';
@@ -558,5 +558,113 @@ describe('the bounce is VISIBLE at the cameras the game uses (GS-runout-visible)
     const driver = planRunout({ dist: 23, firm: 0.85, v0: 0.3, carry: 272, descentDeg: 35, clubId: 'D', vary: 0.5 });
     const first = driver.hops[0]!;
     expect((first.apex * 0.55 * DEFAULT_RUNOUT_FEEL.hopDrawBoost) / first.dist).toBeLessThan(0.55);
+  });
+});
+
+/**
+ * GS-runout-seen — *"woods, hybrids and long irons don't really have any bounce animation, they land
+ * and just stick"*, refined to *"I'm fine with the driver keeping the same number of bounces, it's
+ * primarily the middle range of clubs."*
+ *
+ * Measured (`scripts/runout-frames.ts`), the model PLANNED hops it then could not DRAW: on a firm
+ * fairway a driver planned six and drew two, a 4-hybrid planned three and drew one, and on a soft
+ * green `seen` was 1 on all forty rows. Two separate faults, and they are fixed separately here:
+ * the mid-bag's opening skip was too SHORT (the angle term), and the tail was fiction (the plan had
+ * no way to ask whether a hop could be seen).
+ */
+describe('the middle of the bag lands and BOUNCES (GS-runout-seen)', () => {
+  /** What the play view draws a modelled apex as, at a given camera. Mirrors `playView.ts`. */
+  const HEIGHT_EXAGGERATION = 0.55;
+  const drawnPx = (apexYd: number, pxPerYd: number): number =>
+    apexYd * pxPerYd * HEIGHT_EXAGGERATION * DEFAULT_RUNOUT_FEEL.hopDrawBoost;
+  /** The inverse — what `Landing.ballYd` is, and the only conversion either side may use. */
+  const ballYdAt = (ballPx: number, pxPerYd: number): number =>
+    ballPx / (pxPerYd * HEIGHT_EXAGGERATION * DEFAULT_RUNOUT_FEEL.hopDrawBoost);
+  /** The measured camera band (GS-ball-art): a drive is watched from far out, a wedge from close in. */
+  const cameraFor = (carry: number): number => (carry > 200 ? 1.6 : carry > 120 ? 3.0 : 5.0);
+
+  it('the hop LENGTH term is the range relation, and it is the SAME geometry the apex ratio comes from', () => {
+    // A projectile launched at θ ranges v²·sin2θ/g and peaks at v²·sin²θ/2g. `apexOverLenFor` is the
+    // RATIO of those two (tan θ / 4) and has been derived since GS-runout-visible; the length term was
+    // written as cos²(θ), which is neither half of that pair. One projectile, one geometry:
+    for (const deg of [30, 38, 45, 50, 57, 62]) {
+      const rad = (deg * Math.PI) / 180;
+      expect(hopBite(deg), `${deg}deg`).toBeCloseTo(Math.sin(2 * rad), 12);
+      // apex / length, built from the two terms independently, must BE the ratio we already derive.
+      expect((Math.sin(rad) ** 2 / 2) / hopBite(deg), `${deg}deg`).toBeCloseTo(Math.tan(rad) / 4, 12);
+    }
+  });
+
+  it('the angle term no longer charges a steep arrival twice', () => {
+    // The old cos²(θ) collapsed by a THIRD across the bag's arrival angles while the real range term
+    // barely moves — a bounce trades forward speed for height and back again. That penalty landed on
+    // exactly the clubs the play-test named, on top of the one `RUNOUT_BY_CLASS.len` already charges.
+    const cos2 = (d: number): number => Math.cos((d * Math.PI) / 180) ** 2;
+    expect(cos2(50) / cos2(38)).toBeLessThan(0.7); // the old term: a 7-iron docked a third
+    expect(hopBite(50) / hopBite(38)).toBeGreaterThan(0.98); // the real one: flat across the bag
+    expect(hopBite(45)).toBeCloseTo(1, 12); // …and it peaks at 45°, as a range must
+  });
+
+  it('the driver is arithmetically unchanged — `hopLenK` is re-based on its own arrival', () => {
+    // The play-test was explicit that the driver already reads right, so the constant is a pure
+    // renormalisation pinned at the driver's ~38° landing. If you move `hopLenK`, you have moved the
+    // driver, and this is where you find out.
+    const OLD_K = 0.07; // …against cos²(descent)
+    expect(DEFAULT_RUNOUT_FEEL.hopLenK * hopBite(38)).toBeCloseTo(OLD_K * Math.cos((38 * Math.PI) / 180) ** 2, 4);
+  });
+
+  it('every club from driver to 9-iron draws TWO hops that clear the ball on a firm fairway', () => {
+    // The report, as a measurement. `land()` here is the real bag through the real flight, and the
+    // threshold is the drawn ball at the camera that club is watched from — not a yard count.
+    for (const id of ['D', '3W', '4H', '3i', '7i', '9i']) {
+      const ar = arrival(id);
+      const px = cameraFor(ar.carry);
+      const plan = land(id, runOf(id), 0.85, { ballYd: ballYdAt(3, px) });
+      const seen = plan.hops.filter((h) => drawnPx(h.apex, px) >= 3).length;
+      expect(seen, `${id} draws ${seen} visible hop(s) of ${plan.hops.length} planned`).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('a hop that cannot be drawn is NOT planned — the model never promises what the camera cannot show', () => {
+    // The whole defect in one assertion: planned and seen are the same number, on both surfaces and
+    // at every power. A wedge's plop is exempt at the FIRST hop only (a ball out of the sky does not
+    // begin by rolling), which is why the first is skipped here.
+    for (const id of ['D', '3W', '4H', '3i', '7i', '9i', 'PW', 'SW']) {
+      for (const firm of [0.85, 0.45]) {
+        for (const power of [1, 0.7, 0.4]) {
+          const ar = arrival(id);
+          const px = cameraFor(ar.carry * power);
+          const ballYd = ballYdAt(3, px);
+          const plan = land(id, runOf(id) * power, firm, { ballYd, carry: ar.carry * power });
+          for (const h of plan.hops.slice(1)) {
+            expect(drawnPx(h.apex, px), `${id} @${power} firm ${firm}: planned an invisible hop`).toBeGreaterThanOrEqual(3);
+          }
+        }
+      }
+    }
+  });
+
+  it('trimming the tail never moves the ball — it goes to the ROLL, not to nowhere (contract 5)', () => {
+    for (const id of ['D', '4H', '7i']) {
+      const dist = runOf(id);
+      const loose = land(id, dist, 0.85);
+      const tight = land(id, dist, 0.85, { ballYd: 0.9 }); // an absurdly big ball ⇒ one hop
+      expect(tight.hops.length, id).toBeLessThanOrEqual(loose.hops.length);
+      expect(tight.hops.length, id).toBeGreaterThanOrEqual(1);
+      for (const p of [loose, tight]) {
+        expect(sampleRunout(p, 1).s, id).toBeCloseTo(dist, 6);
+        expect(p.rollDist + p.hops.reduce((a, h) => a + h.dist, 0), id).toBeCloseTo(dist, 6);
+      }
+      // The hops it DID keep are untouched — trimming is a decision about the tail, not a re-cut.
+      expect(tight.hops[0]!.dist, id).toBeCloseTo(loose.hops[0]!.dist, 9);
+    }
+  });
+
+  it('a caller that cannot say how big the ball is drawn gets the old yard floor, unchanged', () => {
+    // `ballYd` is optional on purpose: every pure caller (and every test above) still exercises the
+    // untrimmed model, which is what the bounce PHYSICS is measured against.
+    const plan = land('D', runOf('D'), 0.85);
+    expect(plan.hops.length).toBeGreaterThanOrEqual(4);
+    for (const h of plan.hops) expect(h.dist).toBeGreaterThan(DEFAULT_RUNOUT_FEEL.hopMinYd);
   });
 });

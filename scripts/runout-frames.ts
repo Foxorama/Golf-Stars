@@ -69,11 +69,14 @@ function measure(clubId: string, power: number, firm: number): Row {
   const carry = c.carry * flightScaleFor(pr, c.carry) * power;
   const roll = carry * rollFractionFor(pr, c.carry);
   const a = arrival(carry, c.carry, clubId);
+  const scale = scaleFor(carry);
+  // The play view tells the plan how big the ball is DRAWN, so a hop it could not show is never
+  // planned (GS-runout-seen). Same conversion the pixel columns below use, run backwards.
+  const ballYd = VISIBLE_PX / (scale * HEIGHT_EXAGGERATION * HOP_DRAW_BOOST);
   const plan = planRunout(
-    { dist: Math.abs(roll), firm, v0: a.v0, carry, descentDeg: a.descentDeg, clubId, vary: 0.5, checking: roll < -0.3 },
+    { dist: Math.abs(roll), firm, v0: a.v0, carry, descentDeg: a.descentDeg, clubId, vary: 0.5, checking: roll < -0.3, ballYd },
     DEFAULT_RUNOUT_FEEL,
   );
-  const scale = scaleFor(carry);
 
   // The drawn track: walk the run-out at 60fps through `sampleRunout`, converting to pixels the way
   // playView does. `s` is course yards along the sim's roll path; the ball's on-screen vertical lift is

@@ -51,20 +51,30 @@ export interface RunoutFeel {
    *  comes back as height. Soft ground absorbs it (a plop); firm ground returns it (a skip). */
   bounceSoft: number;
   bounceFirm: number;
-  /** First hop LENGTH as a fraction of `carry · cos²(descent)` — the ball's own flight decides how
+  /** First hop LENGTH as a fraction of `carry · sin(2·descent)` — the ball's own flight decides how
    *  far it skips, so a long flat drive skips a long way and a short steep wedge barely moves.
    *
    *  A real driver's first bounce carries 15–20yd of its 30yd run-out; the first pass here modelled
    *  7 and spent the rest on a stuttering tail. The ceiling is the run-out itself (`airBudget`), so
    *  this only decides how the available ground is DIVIDED — bigger means a decisive first skip and
-   *  a shorter tail, which is the shape a landing actually has. */
+   *  a shorter tail, which is the shape a landing actually has.
+   *
+   *  RE-BASED BY GS-runout-seen when the angle term was corrected (see `hopBite`): the constant is
+   *  a normalisation of a term whose scale changed, and it is set so the DRIVER's skip is
+   *  arithmetically unchanged — the play-test was explicit that the driver is the one club that
+   *  already reads right. */
   hopLenK: number;
   /** First hop APEX as a fraction of `carry · sin²(descent)` — the STEEPER the arrival, the higher
    *  the pop, which is why a wedge bounces up and a driver skids along. Plus a ceiling in yards. */
   hopApexK: number;
   hopApexMax: number;
   /** Stop hopping once a hop is shorter than this (yards), or after this many hops. There is always
-   *  at least ONE hop: every full shot arrives out of the air. */
+   *  at least ONE hop: every full shot arrives out of the air.
+   *
+   *  `hopMinYd` is the FALLBACK floor, used only when the caller cannot say how big the ball is
+   *  drawn (`Landing.ballYd`). A length in yards cannot answer "will this be seen" on its own — the
+   *  camera frames the shot, so the same 0.75yd hop is four pixels behind a wedge and half a pixel
+   *  behind a drive. See `Landing.ballYd`. */
   hopMinYd: number;
   hopMax: number;
   /** Floor on a single hop's DURATION (ms). A wedge's hop is under a yard, which at the run-out's own
@@ -167,7 +177,7 @@ export const DEFAULT_RUNOUT_FEEL: RunoutFeel = {
   restitutionFirm: 0.74,
   bounceSoft: 0.16,
   bounceFirm: 0.62,
-  hopLenK: 0.07,
+  hopLenK: 0.0448,
   hopApexK: 0.05,
   hopApexMax: 6,
   hopMinYd: 0.35,
@@ -218,14 +228,25 @@ export interface RunoutClassProfile {
  * Driver skips long, low and often; a wood does nearly the same; a hybrid comes in steeper and
  * bounces less but still releases; a long iron is the low runner; a short iron lands steep and
  * checks; a wedge plops once and stops, which is where the backspin build takes over.
+ *
+ * `len` CARRIES THE WHOLE OF A CLUB'S BITE NOW (GS-runout-seen). It used to sit beside a `cos²(θ)`
+ * angle term that was itself a steepness penalty — so a steep club was charged twice, and the
+ * ones charged hardest were the ones the play-test said never bounced. With `hopBite` in its place
+ * the angle term is near-flat across the bag, and this row is the only place the club's spin and
+ * face are expressed. The mid-bag went UP (`ironShort` 0.8 → 0.93, measured against a real 7-iron's
+ * ~4.5yd first bounce off firm turf); `wedge` went DOWN by the same factor the term itself moved
+ * (0.55 → 0.28), which is what HOLDS the wedge exactly where it was — its modelled skip stays under
+ * `hopFirstMinShare`'s net, so every PW/SW landing AND the backspin check's skid are byte-for-byte.
+ * That is deliberate: a wedge plopping once is the design, and it is where GS-backspin-optin's tuned
+ * check lives.
  */
 export const RUNOUT_BY_CLASS: Record<FlightClass, RunoutClassProfile> = {
   driver: { restitution: 1.1, bounce: 0.88, len: 1.15 },
   wood: { restitution: 1.06, bounce: 0.92, len: 1.08 },
   hybrid: { restitution: 0.98, bounce: 1.02, len: 0.95 },
   ironLong: { restitution: 1.03, bounce: 0.96, len: 1.05 },
-  ironShort: { restitution: 0.9, bounce: 1.08, len: 0.8 },
-  wedge: { restitution: 0.7, bounce: 1.2, len: 0.55 },
+  ironShort: { restitution: 0.9, bounce: 1.08, len: 0.93 },
+  wedge: { restitution: 0.7, bounce: 1.2, len: 0.28 },
   putter: { restitution: 0.6, bounce: 0.6, len: 0.3 },
 };
 
@@ -298,6 +319,23 @@ export interface Landing {
    */
   vary?: number;
   /**
+   * The DRAWN ball's radius, expressed in yards of modelled hop apex (GS-runout-seen) — i.e. the
+   * play view's own `height · scale · heightExaggeration · hopDrawBoost` run backwards from the
+   * ball's drawn radius. A hop whose apex is under it never lifts the ball clear of itself, so it
+   * is not a bounce the player can see, and it is NOT PLANNED: the ground goes to the closing roll
+   * instead of to a ≥`hopMinMs` segment of sub-pixel scuffing.
+   *
+   * Drawability is a question about PIXELS, and the model cannot answer it in yards. The camera
+   * frames the shot, so a 0.75yd hop is a clearly-read 3.7px behind a 9-iron and an invisible 0.8px
+   * behind a drive — measured, and the reason a yard floor could never separate the two (a driver
+   * planned SIX hops and drew TWO while a 4-hybrid planned three and drew one). Rather than
+   * re-derive the camera here from carry — a second description of a decision `project.ts` owns —
+   * the caller passes what it is about to draw.
+   *
+   * Absent ⇒ the fixed `hopMinYd` floor, exactly as before.
+   */
+  ballYd?: number;
+  /**
    * Firmness of the ground `along` yards into the run-out. This is how a HAZARD gets to act on the
    * bounce: a ball that skips into a bunker loses the rest of its train there instead of skipping
    * merrily across it. Absent ⇒ the landing firmness the whole way.
@@ -310,10 +348,11 @@ export interface Landing {
  *
  * The hop train is ballistic and built from the shot itself. At each contact the ball keeps a share
  * of its forward speed (`restitution`, from the surface and the club) and a share of its downward
- * speed as height (`bounce`). A hop's LENGTH scales with `carry · cos²(descent)` — how far it flew
- * and how flat it arrived — and its APEX with `carry · sin²(descent)` — how steeply. That one
- * distinction is most of what makes clubs feel different on the ground: a driver at 36° skips long
- * and low several times, a wedge at 62° pops up once and sits down.
+ * speed as height (`bounce`). A hop's LENGTH scales with `carry · sin(2·descent)` — the projectile
+ * range relation, see `hopBite` — and its APEX with `carry · sin²(descent)`, so a steep arrival
+ * pops up where a shallow one skips along. Most of what makes clubs feel different on the ground is
+ * carried by the CLASS profile and by how much of its speed each keeps: a driver skips long and low
+ * several times, a wedge pops up once and sits down.
  *
  * Three rules hold whatever the numbers say:
  *  - **every airborne shot bounces at least once.** A ball arriving from the sky does not begin by
@@ -344,6 +383,30 @@ export function apexOverLenFor(descentDeg: number, feel: RunoutFeel = DEFAULT_RU
   return clamp(t, feel.apexOverLenMin, feel.apexOverLenMax);
 }
 
+/**
+ * How far a hop leaving the turf at `descentDeg` CARRIES, as an angle term (GS-runout-seen).
+ *
+ * A projectile launched at θ ranges `v²·sin(2θ)/g`, and that is the other half of the relation
+ * `apexOverLenFor` already derives from: `H/R = (v²sin²θ/2g) / (v²sin2θ/g) = tan(θ)/4`. So the
+ * module has always held the correct geometry — it simply wrote the LENGTH term as `cos²(θ)`,
+ * which is neither the range relation nor consistent with its own apex ratio.
+ *
+ * That single disagreement is the play-test report. `sin(2θ)` is almost FLAT across the bag's
+ * arrival angles (0.97 at the driver's 38°, 1.00 at 45°, 0.99 at a 7-iron's 50°) because a bounce
+ * trades forward speed for height and back again; `cos²(θ)` falls away steeply (0.62 → 0.41 over
+ * the same range), so it charged every steep-landing club a penalty the physics does not, on top of
+ * the one `RUNOUT_BY_CLASS.len` already charges. The clubs it hit hardest are exactly the ones the
+ * play-test named: *"woods, hybrids and long irons don't really have any bounce animation, they land
+ * and just stick."* A short iron's modelled first skip comes out ~1.5x longer for it; the driver's
+ * is unchanged, because `hopLenK` is re-based on the driver's own arrival (see there).
+ *
+ * NOT a balance change: this re-cuts the roll the sim already computed between hops and the closing
+ * roll. The ball still stops exactly where `rollOut` put it.
+ */
+export function hopBite(descentDeg: number): number {
+  return Math.sin(2 * ((clamp(descentDeg, 5, 85) * Math.PI) / 180));
+}
+
 export function planRunout(landing: Landing, feel: RunoutFeel = DEFAULT_RUNOUT_FEEL): RunoutPlan {
   const f = clamp(landing.firm, 0, 1);
   const speed = Math.max(0.02, landing.v0); // yd/ms; guard a degenerate zero-carry shot
@@ -352,7 +415,7 @@ export function planRunout(landing: Landing, feel: RunoutFeel = DEFAULT_RUNOUT_F
   const cls = RUNOUT_BY_CLASS[flightClassOf(landing.clubId)];
   const vary = clamp(landing.vary ?? 0.5, 0, 1);
   const rad = (clamp(landing.descentDeg, 5, 85) * Math.PI) / 180;
-  const cosD = Math.cos(rad);
+  const bite = hopBite(landing.descentDeg);
   const sinD = Math.sin(rad);
   // How tall a hop is allowed to be relative to its length, from the arrival angle (GS-runout-visible).
   const apexOverLen = apexOverLenFor(landing.descentDeg, feel);
@@ -367,7 +430,7 @@ export function planRunout(landing: Landing, feel: RunoutFeel = DEFAULT_RUNOUT_F
   const lenVary = 1 + (vary * 2 - 1) * feel.varyLen;
   const apexVary = 1 + ((vary * 7.3) % 1 * 2 - 1) * feel.varyApex; // a second, decorrelated draw
   const fromTheAir = carry >= feel.minAirCarry;
-  let hopLen = feel.hopLenK * carry * cosD * cosD * cls.len * kh * lenVary;
+  let hopLen = feel.hopLenK * carry * bite * cls.len * kh * lenVary;
   // Whatever the club, the first bounce takes a real share of the ground the ball has left. A sand
   // wedge's modelled skip is four inches: true, and completely unwatchable.
   if (fromTheAir) hopLen = Math.max(hopLen, Math.min(D * feel.hopFirstMinShare, feel.hopFloorMax));
@@ -420,6 +483,11 @@ export function planRunout(landing: Landing, feel: RunoutFeel = DEFAULT_RUNOUT_F
     // …and a hop is never taller than it is long by much, or the ball reads as bouncing vertically
     // off the turf instead of skipping along it.
     const apex = Math.max(0.05, Math.min(hopApex, want * apexOverLen));
+    // A HOP THAT CANNOT BE DRAWN IS NOT PLANNED (GS-runout-seen). Its ground goes to the closing
+    // roll, where it is at least seen as motion, rather than to a `hopMinMs` segment of the ball
+    // scuffing along under its own radius. The first hop is exempt for the same reason it is above:
+    // a ball out of the sky does not begin by rolling, whatever the camera.
+    if (i > 0 && landing.ballYd !== undefined && apex < landing.ballYd) break;
     hops.push({ dist: want, ms: Math.max(feel.hopMinMs, want / Math.max(0.01, v)), apex });
     used += want;
     v *= khRun;
