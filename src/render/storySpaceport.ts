@@ -651,7 +651,10 @@ function crewStandee(caddyId: string, spot: { left: number; top: number }, activ
 }
 
 const SPACEPORT_STYLE = `<style>
-  .gs-sclub-scene{container-type:inline-size;position:relative;width:100%;aspect-ratio:4/3;max-width:620px;
+  /* isolation:isolate — a figure scene confines its own stacking to its frame, so a hovered caddy or
+     friend can never paint over the app's fixed overlays (settings sheet / takeovers, z-index 60+).
+     These figures top out at 24 today; the rule is what stops the next one being raised into them. */
+  .gs-sclub-scene{container-type:inline-size;position:relative;isolation:isolate;width:100%;aspect-ratio:4/3;max-width:620px;
     margin:0 auto;border:1px solid #2a3346;border-radius:16px;overflow:hidden;background:#0f1420;
     box-shadow:0 8px 30px -12px #000a;}
   .gs-sclub-hot{position:absolute;background:none;border:1px solid transparent;border-radius:12px;padding:0;
