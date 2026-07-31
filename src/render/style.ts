@@ -28,6 +28,7 @@ import { meteorScorch as meteorScorchFor } from '../sim/scorch';
 import { effectPatches as effectPatchesFor, type PatchKind } from '../sim/patches';
 import { themeById, archetypeFor, type BiomeArchetype } from '../sim/course/themes';
 import type { Projector } from './project';
+import { cupRadiusPx } from './ball';
 import {
   accentFor,
   turfShade,
@@ -810,7 +811,19 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   const [tx, ty] = proj.project(hole.tee);
   prims.push({ t: 'circle', c: [tx, ty], r: 5, fill: '#ffffff', stroke: '#000', sw: 1 });
   const [gx, gy] = proj.project(hole.pin ?? hole.green);
-  prims.push({ t: 'circle', c: [gx, gy + 1], r: 2.2, fill: 'rgba(0,0,0,0.25)' }); // base shadow
+  // THE CUP. This was a `r: 2.2` base shadow and nothing else — a fixed size that ignored the
+  // camera, so at the putt view the drawn BALL (up to 3.3) was larger than the hole it dropped into
+  // and a holed putt read as a ball parked on a dot. `cupRadiusPx` derives it from the sim's own
+  // `HOLE_OUT_RADIUS` (contract 5: the graphic IS the physics), scaled in yards and bounded against
+  // the drawn ball. Rim first, then the dark mouth, so the hole reads as cut INTO the green.
+  const cupR = cupRadiusPx(proj.scale);
+  // Cut INTO the turf, not stamped on it: a soft seat shadow, a mouth in the green's own dark rather
+  // than flat black, and a sliver of lit FAR wall (the near wall is what you'd be looking down past,
+  // so the light catches the back of the liner). A pure-black disc with a bright rim reads as a
+  // sticker; this reads as a hole.
+  prims.push({ t: 'circle', c: [gx, gy + cupR * 0.14], r: cupR * 1.1, fill: 'rgba(0,0,0,0.13)' });
+  prims.push({ t: 'circle', c: [gx, gy], r: cupR, fill: '#16240f', stroke: 'rgba(0,0,0,0.35)', sw: 0.6 });
+  prims.push({ t: 'circle', c: [gx, gy - cupR * 0.26], r: cupR * 0.58, fill: 'rgba(150,178,120,0.13)' });
   prims.push({ t: 'line', a: [gx, gy], b: [gx, gy - 14], stroke: '#1a1a1a', sw: 1.4, round: true });
   prims.push({ t: 'poly', pts: [[gx, gy - 14], [gx + 9, gy - 11], [gx, gy - 8]], fill: '#ff3b3b', stroke: '#7a1414', sw: 0.8 });
 

@@ -13,9 +13,9 @@
 
 import type { Hole, Vec } from '../sim/course/contract';
 import type { PuttLog, ShotLog } from '../sim/round';
-import type { ShotRedirect } from '../sim/shot';
+import type { ShotRedirect, PenaltyKind } from '../sim/shot';
 import { playBoundsCorners, surfaceFirmness } from '../sim/round';
-import { lieAt } from '../sim/shot';
+import { lieAt, PEN_INFO } from '../sim/shot';
 import { inScorch, meteorScorch as meteorScorchFor } from '../sim/scorch';
 import { effectPatches as effectPatchesFor, inPatch, PATCH_SPECS, type PatchKind } from '../sim/patches';
 import { TENT_LINES } from '../sim/tents';
@@ -53,6 +53,7 @@ import {
   advanceFlightSpin,
   advanceRollPhase,
   ballRadiusPx,
+  cupRadiusPx,
   drawBall,
   drawBallShadow,
   ballSkinFor,
@@ -162,6 +163,13 @@ function fabricateRedirect(
 
 /** Tiny deterministic PRNG (mulberry32) — the house style, so the ambient FX are stable. */
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
+
+/** Where in a holed putt's roll the ball starts dropping into the cup (GS-ball-swallow). Late, so
+ *  the drop reads as the ball falling in at the end rather than shrinking on its way there. */
+const PUTT_DROP_FROM = 0.86;
+/** Where in a swallowing hazard's run-out the ball starts sinking out of sight. Earlier than the
+ *  putt's, because the splash/burst FX fires at the end and the ball should be gone under it. */
+const SINK_FROM = 0.72;
 
 /** Total length of a flight polyline (the derelict's pinball carom) — the GROUND the arc spans, so
  *  its arrival angle is measured against the same run a parkland shot's carry is. */
@@ -1330,19 +1338,32 @@ export function mountPlayView(
         // The BALL. In the air on its flight it carries steady BACKSPIN (a struck ball does, and its
         // screen displacement there is 40 rad a frame, which is neither true nor watchable); the
         // moment it is running out it rolls off its own screen movement instead.
-        ballRest = ground;
+        //
+        // A HAZARD THAT TAKES THE BALL TAKES IT (GS-ball-swallow). `ballRest = ground` was
+        // unconditional, so a ball hit into water played its splash and then sat ON the surface,
+        // fully visible, until the screen changed — and the same for lava and for the void. Whether
+        // a hazard swallows is a fact about the hazard, so it is a `PEN_INFO` row (compile-forced
+        // for a new `PenaltyKind`), not a list of strings kept in the renderer. An OB or unplayable
+        // ball is still lying there in plain sight and correctly does NOT vanish.
+        const swallowed = !!PEN_INFO[shot.penalty as PenaltyKind]?.swallows;
+        const sink = swallowed ? clamp01((elapsed - flightDur - runDur * SINK_FROM) / Math.max(1, runDur * (1 - SINK_FROM))) : 0;
+        ballRest = swallowed ? null : ground;
         if (rollPhase) rollBallTo(ground, (q) => proj.project(q), ballR);
         else {
           ballPhase = advanceFlightSpin(ballPhase, dt, F);
           ballPrev = ground;
         }
-        drawBall(ctx, gx, ballY, ballR, {
-          phase: ballPhase,
-          dirX: ballDir[0],
-          dirY: ballDir[1],
-          skin: ballSkin,
-          feel: F,
-        });
+        // Sinking: shrink away and settle a little further down-screen, so it goes UNDER rather than
+        // simply switching off. Fully gone before the splash FX lands on top of it.
+        if (sink < 1) {
+          drawBall(ctx, gx, ballY + ballR * 0.5 * sink, ballR * (1 - sink * sink), {
+            phase: ballPhase,
+            dirX: ballDir[0],
+            dirY: ballDir[1],
+            skin: ballSkin,
+            feel: F,
+          });
+        }
 
         hudText = `${shot.club.name} · ${Math.round(carry)} yds${shot.holed ? ' · IN! 🎉' : ''}${shot.penalty ? ` · ${shot.penalty.toUpperCase()}!` : ''}`;
 
@@ -1424,7 +1445,15 @@ export function mountPlayView(
       const puttR = ballRadiusPx(proj.scale, 0, F);
       ballRest = putt.holed ? null : cur; // a holed putt is IN the cup, not sitting beside it
       rollBallTo(cur, (q) => proj.project(q), puttR);
-      drawBall(ctx, gx[0], gx[1], puttR, {
+      // A HOLED PUTT DROPS IN (GS-ball-swallow). It used to be drawn at full size sitting on the cup
+      // and then simply cut when the segment ended, so the ball never went anywhere — it blinked
+      // out. Over the last stretch of the roll it now sinks: the radius falls away and the ball
+      // settles a touch down-screen into the mouth of the hole, so the last thing you see is the
+      // ball going IN. Purely drawn — `putt.holed` and the resolved path are the sim's, untouched.
+      const drop = putt.holed ? clamp01((t - PUTT_DROP_FROM) / (1 - PUTT_DROP_FROM)) : 0;
+      const dropR = puttR * (1 - 0.82 * drop * drop);
+      const dropY = gx[1] + cupRadiusPx(proj.scale) * 0.34 * drop;
+      drawBall(ctx, gx[0], dropY, dropR, {
         phase: ballPhase,
         dirX: ballDir[0],
         dirY: ballDir[1],

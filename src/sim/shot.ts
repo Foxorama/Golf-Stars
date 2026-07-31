@@ -497,18 +497,30 @@ export interface PenaltyInfo {
   /** true = stroke-and-distance (replay from previous spot). */
   replay: boolean;
   label: string;
+  /**
+   * Does the hazard TAKE the ball? Pure presentation — nothing in the sim reads it — but it lives
+   * here because it is a fact about the hazard, and a `Record<PenaltyKind, …>` makes a new penalty
+   * kind decide it at COMPILE time rather than defaulting to "the ball just sits there".
+   *
+   * The play view drew the ball at rest wherever the shot finished, unconditionally, so a ball hit
+   * into water played its splash and then sat ON the surface, still visible, until the screen
+   * changed (GS-ball-swallow). `true` is "it went under / fell away / is gone"; `false` is "it is
+   * still lying there, it is just costing you a stroke" — an OB or unplayable ball is somewhere you
+   * can see, and vanishing it would be a lie in the other direction.
+   */
+  swallows: boolean;
 }
 
 export const PEN_INFO: Record<PenaltyKind, PenaltyInfo> = {
-  water: { strokes: 1, replay: false, label: 'Water hazard' },
-  ob: { strokes: 1, replay: true, label: 'Out of bounds' },
-  lost: { strokes: 1, replay: true, label: 'Lost ball' },
-  unplayable: { strokes: 1, replay: false, label: 'Unplayable' },
-  lava: { strokes: 1, replay: false, label: 'Lava' },
-  void: { strokes: 1, replay: true, label: 'Lost to the void' },
-  voidlost: { strokes: 1, replay: false, label: 'Lost to the void' },
-  ravine: { strokes: 1, replay: false, label: 'Ravine' },
-  cetuslost: { strokes: 1, replay: false, label: 'Lost to the star-ocean' },
+  water: { strokes: 1, replay: false, label: 'Water hazard', swallows: true },
+  ob: { strokes: 1, replay: true, label: 'Out of bounds', swallows: false },
+  lost: { strokes: 1, replay: true, label: 'Lost ball', swallows: true },
+  unplayable: { strokes: 1, replay: false, label: 'Unplayable', swallows: false },
+  lava: { strokes: 1, replay: false, label: 'Lava', swallows: true },
+  void: { strokes: 1, replay: true, label: 'Lost to the void', swallows: true },
+  voidlost: { strokes: 1, replay: false, label: 'Lost to the void', swallows: true },
+  ravine: { strokes: 1, replay: false, label: 'Ravine', swallows: true },
+  cetuslost: { strokes: 1, replay: false, label: 'Lost to the star-ocean', swallows: true },
 };
 
 // --- Lie lookup against a hole ----------------------------------------------
