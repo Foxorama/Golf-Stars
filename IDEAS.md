@@ -11,6 +11,41 @@ under the new format). Avenue (1), a full top-down RPG shell, stays deferred unt
 
 ## Now / next
 
+**GS-decision-frame-carry — the shot camera is framed on the CARRY, and the ball finishes at the
+TOTAL** *(surfaced by the 2026-07-31 desktop play-test: "default zoom for holes after tee off is too
+zoomed in, the arc of the shot is off-screen")*
+`decisionReach(spray.carryHigh) = max(30, carryHigh * 0.36)` (`app.ts`), and its own comment says it
+was tuned "so the full arc for the longest club lands at ~16% from the top". But **`carryHigh` is a
+CARRY**: since GS-runout-ladder the ball then RUNS `runFrac` further — driver **+14%**, wood 10.5%,
+hybrid 7.5%, long iron 6.5%, short iron 5.5% — and on a driver the run-out is about a third of the
+drawn animation. So the frame is sized for where the ball LANDS and the ball keeps going past it.
+The sim already knows the difference and says so out loud: `round.ts` carries
+`highTotal(c) = carryHigh * (1 + rollFractionFor(...))` with the comment "it's the total that has to
+reach the flag". This is exactly the trap GS-carry-roll-real names — *a test that compares a club's
+number against a required CARRY is asking the wrong question*.
+Shape: feed `decisionReach` the TOTAL, then re-tune the `0.36` down, because the input just grew by
+up to 14% and the framing was tuned against the old one. **Not a free change**: it moves the camera
+on every full shot, so it wants eyes-on play, a fresh look at `DMAP_BIAS`/`clearOfPanelBias`
+(GS-play-hud-space), and a check that the watch camera's stored `decisionRadius` still agrees.
+Verified NOT the cause: a club change calls a full `render()`, so the camera does re-frame on a
+swap — the frame is not stale.
+
+**GS-ui-display-scale — the portrait game does not grow with the display** *(surfaced by the
+2026-07-31 desktop play-test: "the inround and endround info screens don't scale at all", and the
+same complaint underneath the star-chart HUD one)*
+Two families behave differently and the difference is visible side by side. The lore/beat screens are
+`.gs-main--bleed`, whose width is `var(--gs-portrait-w)` — a fraction of the viewport HEIGHT — so they
+grow with the display and fill it. The ordinary flow screens are `.gs-main` at a **fixed 820px**, with
+inner caps like `.gs-strres { max-width: 460px }` and fixed-px type. Measured at 1920x1080 the Star
+Tour round recap is a **460x390 island of phone-sized UI**: 32% dead below and ~76% dead across.
+Nothing about it is height-derived, so nothing about it grows.
+Shape: a DISPLAY-scale multiplier composed with the player's own `--gs-uiscale`, never replacing it —
+**the player owns their type** (GS-a11y-readable-text), so this must multiply, and `--gs-vh`/`--gs-dvh`
+must keep dividing by the COMBINED value or every viewport-locked box breaks (GS-a11y-scale-wrap).
+Fixes the recap screens, the 68%-empty menu margins in fullscreen, and (once the chart is unbounded
+again) the star-map HUD complaint that GS-startour-frame currently side-steps. Wants eyes-on across
+every screen, and a decision on the ceiling — a 4K display should not render the HUD at 3x.
+
 **GS-embed-letterbox — half the itch embed's width is undressed background on the play screen**
 *(surfaced by the 2026-07-31 itch-embed layout sweep; deliberately NOT done there, because it is a
 camera decision wearing a CSS bug's clothes — see `reports/itch-embed-layout-2026-07-31.md`)*
