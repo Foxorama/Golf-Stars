@@ -97,6 +97,40 @@ describe('reader type tokens', () => {
     expect(offenders, `raw viewport heights in TS style strings:\n${offenders.join('\n')}`).toEqual([]);
   });
 
+  it('no flex SCROLLER centres its item with a bare `center` — it must be `safe center`', () => {
+    // GS-a11y-sheet-scroll's rule, applied to SCREEN BODIES rather than only to overlays. A centred
+    // flex item taller than its scroller overflows BOTH ways, and the half above the top edge cannot
+    // be scrolled to — the scrollbar's range starts at the container's top, and the item now begins
+    // above it. `safe center` centres while it fits and falls back to flex-start when it stops.
+    //
+    // `.gs-lore` shipped with a bare `center` and lost the opening lines of a long story beat at a
+    // large UI scale (fullscreen drives --gs-uiscale to 1.5), where they could not be reached at
+    // all. The overlay rules already followed the rule; the screen bodies were never checked.
+    const scrollersCentringUnsafely = (sheet: string): string[] => {
+      const out: string[] = [];
+      for (const m of sheet.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const body = m[2]!;
+        if (!/display\s*:\s*(inline-)?flex/.test(body)) continue;
+        if (!/overflow(-[xy])?\s*:\s*(auto|scroll)/.test(body)) continue;
+        // `safe center` / `unsafe center` are both explicit decisions; a BARE center is the bug.
+        if (/align-items\s*:\s*center/.test(body)) out.push(m[1]!.trim().split('\n').pop()!.trim());
+      }
+      return out;
+    };
+
+    // Prove the detector on a sample of exactly what it bans — a scan that matches nothing passes
+    // for ever, and would have kept passing through the bug it exists to catch (GS-one-description).
+    expect(scrollersCentringUnsafely('.sample { display: flex; overflow-y: auto; align-items: center; }')).toEqual([
+      '.sample',
+    ]);
+    expect(scrollersCentringUnsafely('.ok { display: flex; overflow-y: auto; align-items: safe center; }')).toEqual([]);
+
+    const offenders = scrollersCentringUnsafely(css);
+    expect(offenders, `flex scrollers centring unsafely (use \`align-items: safe center\`): ${offenders.join(', ')}`).toEqual(
+      [],
+    );
+  });
+
   it('ships NO font file and NO @font-face — the readable mode is spacing + system faces', () => {
     // A bundled webfont would be a third-party binary asset in a build that inlines everything
     // into one index.html; the letterform evidence does not justify it. See

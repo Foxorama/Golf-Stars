@@ -426,6 +426,14 @@ function stHud(): string {
           <div class="gs-sthud__fuel" id="gs-st-fuel">${starTourFuelHTML()}</div>
         </div>
       </div>
+      <!-- Zoom pair, at the map's edge rather than in the console row: the console is six controls on
+           a ~395px portrait frame (GS-startour-frame) and a seventh crowds it, and a map's zoom
+           belongs at the map's edge anyway. Inside .gs-bhud so the fly-on-tap handler already
+           ignores it. -->
+      <div class="gs-sthud__zoom">
+        <button class="gs-sthud__zoombtn" data-startour-zoom="in" title="Zoom in" aria-label="Zoom in">+</button>
+        <button class="gs-sthud__zoombtn" data-startour-zoom="out" title="Zoom out" aria-label="Zoom out">−</button>
+      </div>
     </div>`;
 }
 
