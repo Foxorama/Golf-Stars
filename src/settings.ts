@@ -148,5 +148,8 @@ export function applyReaderSettings(s: Settings = getSettings()): void {
   // GS-a11y-motion: the CSS `@media (prefers-reduced-motion)` blocks can only see the OS. This is
   // how the in-app toggle reaches the stylesheet.
   root.classList.toggle('gs-reduced', !!s.reducedMotion);
-  root.style.setProperty('--gs-uiscale', String(clampUiScale(s.uiScale)));
+  // The READER half of the root zoom (GS-ui-display-scale). `--gs-uiscale` is the PRODUCT of this
+  // and `--gs-displayscale`, so writing that combined token here would clobber the display's share
+  // with an inline style the stylesheet's `calc()` can never win back.
+  root.style.setProperty('--gs-readerscale', String(clampUiScale(s.uiScale)));
 }
