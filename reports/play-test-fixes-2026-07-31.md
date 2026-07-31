@@ -137,6 +137,59 @@ build — an outward-facing action, and the release call is the author's. The ta
 
 ---
 
+---
+
+## 5. Two follow-ups after 1.3.0 shipped — 1.3.1
+
+Both came straight back off the released build.
+
+### The people were still velcro'd to the wall (GS-clubhouse-floor, #706)
+
+The furniture pass fixed the room and left the cast where it was. `FRIEND_SPOTS` put the three friend
+golfers at 67–72% of the scene against a deck starting at **74%**, so their feet landed **7.4 to 12.4
+points up the back wall** while the player stood on the floor. A person is the one object in a room
+whose height the eye already knows, so it read worse than any piece of furniture had.
+
+**The trap: the spot number is not the foot position.** A standee is feet-anchored
+(`translate(-50%,-100%)`) but the nameplate hangs *below* the feet inside the same button — measured,
+~5.5 points of slack. A spot set exactly to the deck line still hovers, and a guard reading the spot
+table checks the wrong number. The guard drives a browser and measures the drawn figure.
+
+The `left`s had to move too: at the old height the middle friend cleared the player vertically; at
+deck depth they collided, and a friend you cannot see is one you cannot tap.
+
+Measured rather than assumed: **every caddy was already fine** (+6 to +18 points, Warden and Herald),
+and so were the Earth clubhouse's `EARTH_SPOTS` (83–91%). Nothing to move — but nothing was stopping
+a future spot drifting up either, so the guard now covers every standee in every room.
+
+### The cup was drawn bigger than the hole (GS-cup-oversize, #707)
+
+*"It's great on the green, but it's overly large at fairway and chip zooms. The ball will now roll
+over the black circle and not go in."*
+
+`cupRadiusPx` was clamped **between** `ball × 1.6` and `ball × 2.8`. Below ~4 px/yd the **floor** is
+what wins, so the drawn cup reached **6.00× the catch radius on the whole-hole map**, 2.50× at a long
+approach, 1.26× mid-approach. A circle wider than the radius that catches lets the ball's drawn centre
+sit inside the hole while the sim correctly does not hole it — contract 5 violated outright.
+
+Bounded above only now. Shot cameras go to exactly 1.00×; **every putt camera is unchanged to the last
+decimal**, because the ball-proportion cap already bound there. That is precisely the reported split —
+the green was right, the fairway was not.
+
+**The cost, taken deliberately:** at wide cameras the cup is now smaller than the drawn ball, the very
+thing the floor existed to prevent. The two exaggerations cannot both be honoured — the ball has its
+own hard 2.25px floor — so any cup floor above the catch radius re-creates the lie. At 300 yards the
+flag marks the pin, not the cup.
+
+⚠️ **The rule was already written in the guard and only checked where it held for free.**
+`cup-and-swallow.test.ts` contained *"it must never be drawn LARGER than the radius that catches …
+would be the reverse lie"* — asserted over `PUTT_CAMERAS` only, which is exactly the set where the cap
+binds and the rule costs nothing. Every shot camera broke it and nothing caught that. **A rule
+asserted only where it already holds is a description, not a guard** — the same shape as
+GS-browser-test-gate's silently-skipped tests, one level up.
+
+---
+
 ## Loose ends spotted, not fixed
 
 - **`scripts/*-preview.mjs` carry their own Linux-only Chromium lookup** — `PLAYWRIGHT_BROWSERS_PATH`
