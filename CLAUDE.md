@@ -1542,7 +1542,17 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     the question of the **UNIT, not each rectangle** — a carcass sitting on a plinth correctly stops above
     the deck and it is the plinth that lands on it. `clubhouseLounge.ts` was already right (floor-standing
     furniture + contact shadows), which is exactly why it reads best; the rest of the art here is
-    judgement that only eyes-on settles.
+    judgement that only eyes-on settles. **AND THE PEOPLE STAND ON IT TOO** — the furniture pass left the
+    cast behind and the play-test came straight back: `FRIEND_SPOTS` sat at 67–72% against a deck at
+    **74%**, so your three friends' feet were 7.4–12.4 points UP THE BACK WALL while you stood on the
+    floor. A person is the one object in the room whose height the eye already knows, so it read worse
+    than any furniture did. ⚠️ **A spot's number is NOT the foot position** — a standee is feet-anchored
+    (`translate(-50%,-100%)`) but the NAMEPLATE hangs BELOW the feet inside the same button, ~5.5 points
+    of slack, so a spot set exactly to the deck line still hovers and a test reading the spot table tests
+    the wrong number: the guard drives a browser and measures the DRAWN figure. Moving them down forced
+    the `left`s too (at the old height the middle friend cleared the player vertically; at deck depth they
+    collided, and a friend you cannot see is one you cannot tap). Caddies were already clear (+6 to +18)
+    and `EARTH_SPOTS` too — the rule is now measured for every standee in every room.
   - **Default aim** is a smart assist (GS-default-aim, `Settings.aimMode` default `'auto'`) resolved by the
     shared `aimTargetOf`/`autoAimTarget` so `previewShot`/`takeShot`/auto-finish stay byte-identical
     (contract 2); the default CLUB is `autoAimClub` in lockstep (a forced-carry drive picks
