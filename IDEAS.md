@@ -11,25 +11,6 @@ under the new format). Avenue (1), a full top-down RPG shell, stays deferred unt
 
 ## Now / next
 
-**GS-decision-frame-carry — the shot camera is framed on the CARRY, and the ball finishes at the
-TOTAL** *(surfaced by the 2026-07-31 desktop play-test: "default zoom for holes after tee off is too
-zoomed in, the arc of the shot is off-screen")*
-`decisionReach(spray.carryHigh) = max(30, carryHigh * 0.36)` (`app.ts`), and its own comment says it
-was tuned "so the full arc for the longest club lands at ~16% from the top". But **`carryHigh` is a
-CARRY**: since GS-runout-ladder the ball then RUNS `runFrac` further — driver **+14%**, wood 10.5%,
-hybrid 7.5%, long iron 6.5%, short iron 5.5% — and on a driver the run-out is about a third of the
-drawn animation. So the frame is sized for where the ball LANDS and the ball keeps going past it.
-The sim already knows the difference and says so out loud: `round.ts` carries
-`highTotal(c) = carryHigh * (1 + rollFractionFor(...))` with the comment "it's the total that has to
-reach the flag". This is exactly the trap GS-carry-roll-real names — *a test that compares a club's
-number against a required CARRY is asking the wrong question*.
-Shape: feed `decisionReach` the TOTAL, then re-tune the `0.36` down, because the input just grew by
-up to 14% and the framing was tuned against the old one. **Not a free change**: it moves the camera
-on every full shot, so it wants eyes-on play, a fresh look at `DMAP_BIAS`/`clearOfPanelBias`
-(GS-play-hud-space), and a check that the watch camera's stored `decisionRadius` still agrees.
-Verified NOT the cause: a club change calls a full `render()`, so the camera does re-frame on a
-swap — the frame is not stale.
-
 **GS-ui-display-scale — the portrait game does not grow with the display** *(surfaced by the
 2026-07-31 desktop play-test: "the inround and endround info screens don't scale at all", and the
 same complaint underneath the star-chart HUD one)*
@@ -690,6 +671,15 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-decision-frame-carry** — the shot camera frames where the ball FINISHES, into the clear band
+  (`docs/decisions/render.md`). Two compounding faults: `decisionReach` was fed `spray.carryHigh` when the
+  ball then runs `runFrac` further (driver +14%), and it was a CONSTANT when the room the HUD leaves is a
+  property of the device — the play frame is capped to `--gs-portrait-w`, so a desktop container is a short
+  portrait strip. `round.ts sprayTotalHigh` is now the ONE carry→total fold (camera + club suggestion), and
+  `project.ts radiusForSpan` solves the radius from the measured span instead of tuning a magic number.
+  Measured on the built game: the drawn cone's clearance under the info bar went −54 → **+90px** on a
+  320×568 phone, +51 → **+147** on the itch embed, +52 → **+149** on a 1366×768 laptop, while the
+  composed-for phone barely moves. Browser guard confirmed to fail on the old camera.
 - **GS-story-battle-topdown** — the portrait fight draws the fleet from ABOVE
   (`docs/decisions/story-mode.md`). Reported: *"the side-on spaceships look really weird in portrait mode,
   I keep trying to crane my neck sideways."* The case where turning the camera genuinely breaks, unlike the

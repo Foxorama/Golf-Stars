@@ -13,11 +13,11 @@ import { installDecorProbe } from './render/decorProbe';
 import { applyViewportFit, watchViewportFit } from './app/viewportFit';
 import { applySpaceSky } from './render/spaceSky';
 import { renderHoleSVG, renderPuttOverlaySVG, PUTT_OVERLAY_ID, renderShotOverlaySVG, SHOT_OVERLAY_ID } from './render/holeView';
-import { bandCentreBias, clearOfPanelBias, fitFrame, type ProjectOptions } from './render/project';
+import { bandCentreBias, clearOfPanelBias, fitFrame, radiusForSpan, type ProjectOptions } from './render/project';
 import { shotView, previewShot, previewBackspin, resolveAimTarget, awaitingPutt, canPuttFringe, type AimMode } from './sim/rpg/play';
 import { mountPuttMeter, type PuttMeterHandle } from './render/puttMeter';
 import { drawStoryFigure, hasStoryFigure } from './render/storyFigure';
-import { biomeCarryMult, pinOf, clubRollFraction, DEFAULT_MANUAL_BAND, DEFAULT_PUTT_RANGE, MANUAL_IDEAL_PACE, puttBreakYd, puttBreakBow, puttBandDistanceFactor, idealPuttAim, puttPathPreview } from './sim/round';
+import { biomeCarryMult, pinOf, clubRollFraction, sprayTotalHigh, DEFAULT_MANUAL_BAND, DEFAULT_PUTT_RANGE, MANUAL_IDEAL_PACE, puttBreakYd, puttBreakBow, puttBandDistanceFactor, idealPuttAim, puttPathPreview } from './sim/round';
 import { puttSkillOf } from './sim/rpg/economy';
 import { archetypeFor } from './sim/course/themes';
 import { bearing, dist, type Vec } from './sim/course/contract';
@@ -1283,15 +1283,45 @@ const DMAP_H = 640;
 // nearly the whole frame is the shot AHEAD. At 0.72 the ball read too high and the top of a
 // max-distance shot landed at ~4% from the top, tucked behind the top info-chip / at the very top
 // edge, forcing a manual zoom-out on every full swing. Dropping it to 0.84 reclaims the wasted
-// space that was showing terrain BEHIND the ball, so the full arc for the longest club lands at
-// ~16% from the top — clear of the HUD and visible without zooming out. (The ball still clears the
-// bottom panel, which floats over roughly the bottom ~10% of the map.)
+// space that was showing terrain BEHIND the ball. It is now the CAP on the measured
+// `clearOfPanelBias` (GS-play-hud-space), and the ball's row is one of the two ends of the span
+// `decisionReach` frames the shot into — the other being the top of the clear band.
 const DMAP_BIAS = 0.84;
-/** View radius (course yds) framing a shot of max-carry `carryHigh`. Tuned with DMAP_BIAS so the
- *  contemplated shot nearly fills the height and the corridor fills the width — the rough/OB
- *  stretch off-screen (the "zoom in, let the hole run off the edges" ask). */
-function decisionReach(carryHigh: number): number {
-  return Math.max(30, carryHigh * 0.36);
+/** How much of the map's CLEAR band the contemplated shot is framed into. The rest is headroom above
+ *  the ball's furthest resting place — a shot framed to fill the band exactly would put its far end
+ *  ON the info bar's bottom edge, which reads as clipped. */
+const SHOT_BAND_FILL = 0.8;
+/** The reach factor used when the band has not been measured yet (first arrival on the play screen,
+ *  or a headless build with no HUD): the classic constant, which framed a shot into a fixed fraction
+ *  of the whole frame and knew nothing about the HUD floating over it. */
+const DMAP_REACH = 0.36;
+/**
+ * View radius (course yds) framing a shot that finishes `reachYd` up-screen — the ball's furthest
+ * resting place, NOT its landing (GS-decision-frame-carry: `carryHigh` is a carry, and the ball then
+ * runs `runFrac` further).
+ *
+ * Framed into the map's CLEAR BAND rather than into a fixed fraction of the frame — the other half of
+ * GS-play-hud-space. `clearOfPanelBias` moved the ball clear of the bottom panel, but nothing ever
+ * looked at `band.top`, so the camera happily drew the far end of the cone behind the top info bar:
+ * measured on the built game, a driver's furthest resting point landed 2px UNDER the bar on the itch
+ * embed's 820×760 frame and 96px behind it on a 320×568 phone. A constant cannot fix that, because how
+ * much room the HUD leaves is a property of the DEVICE — the same 0.36 that leaves 130 frame units
+ * spare on a tall phone runs out entirely on a short desktop window. Reading the band instead means
+ * each device gets the tightest zoom that still shows the whole shot.
+ */
+function decisionReach(reachYd: number): number {
+  const band = bandFor('aim');
+  const frame = mapFrame();
+  const containerH = mapContainerPx().h;
+  if (band && containerH > 0) {
+    // The ball's row and the top of the band, both in FRAME units (the band is measured in container
+    // px, and the frame is the design frame grown to the container's aspect — GS-play-fullframe).
+    const ballU = playFocusBias() * frame.height;
+    const topU = (band.top * frame.height) / containerH;
+    const span = (ballU - topU) * SHOT_BAND_FILL;
+    if (span > 1) return Math.max(30, radiusForSpan(reachYd, span, frame.width));
+  }
+  return Math.max(30, reachYd * DMAP_REACH);
 }
 
 // The container size `mapFrameCache` was fitted for ("390x844"), and the fitted frame itself. The
@@ -1417,7 +1447,9 @@ function resetMapView(): void {
 function decisionView(play: NonNullable<UiState['play']>, spray: ShotSpread, aimTarget: Vec): ProjectOptions {
   const base: ProjectOptions = { ...mapFrame() };
   if (mapView === 'whole') return base; // whole-hole fit — see the green + full layout (tee→green up)
-  const reach = decisionReach(spray.carryHigh) / mapZoom;
+  // Framed on where the ball FINISHES, not where it lands (GS-decision-frame-carry) — the sim's own
+  // fold, so the camera and the club suggestion cannot disagree about what a club's reach is.
+  const reach = decisionReach(sprayTotalHigh(spray)) / mapZoom;
   const focus: [number, number] = [play.ball[0] + mapPan[0], play.ball[1] + mapPan[1]];
   // Reorient so the AIM LINE is up-screen (GS-default-aim): the map points DOWN where THIS shot is
   // aimed — down the fairway corridor off the tee, at the flag on an approach — so the default framing
@@ -4112,10 +4144,11 @@ function render(): void {
         focus,
         // Start the watch-cam at the EXACT zoom the decision map was framed at (the player was just
         // looking at it — release must not skip-jump), falling back to the travel-framed reach when
-        // no decision preceded this animation (resume, auto-advance). The radius holds for the whole
-        // animation; the follow-cam pans to keep up with the ball either way. A putts-only animation
-        // keeps the PUTT screen's framing the same way (puttViewRadius) — the old fixed 25 popped the
-        // camera out and back around every stroke on the green.
+        // no decision preceded this animation (resume, auto-advance) — `travel` is the ball's whole
+        // from→rest journey, which is exactly the TOTAL `decisionReach` now frames on. The radius
+        // holds for the whole animation; the follow-cam pans to keep up either way. A putts-only
+        // animation keeps the PUTT screen's framing the same way (puttViewRadius) — the old fixed 25
+        // popped the camera out and back around every stroke on the green.
         viewRadius: hadShots ? decisionRadius ?? decisionReach(travel) : puttViewRadius ?? 25,
         // The bias the player was just LOOKING at, exactly as viewRadius above (GS-play-hud-space):
         // it is measured off the HUD now, and this state's panel is not the aim/putt panel, so

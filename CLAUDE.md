@@ -1181,6 +1181,27 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     per state — and the resolved bias is **STORED** (`decisionBias`/`puttViewBias`, the twins of
     `decisionRadius`/`puttViewRadius`) for the watch camera to REUSE, since re-deriving it at release reads
     the watch panel and pops the camera on every swing. Guarded by `tests/map-frame.test.ts`.
+  - **AND THE OTHER END OF THE BAND IS THE CAMERA'S REACH** (GS-decision-frame-carry, `decisionReach` ·
+    `project.ts radiusForSpan`). The rule above framed the ball clear of the BOTTOM panel and nothing ever
+    read `band.top`, so the far end of the shot was drawn straight through the info bar. Two faults
+    compounded. **The reach was fed a CARRY when the ball finishes at the TOTAL** — `spray.carryHigh`, when
+    since GS-runout-ladder a driver runs a further 14% of it (wood 10.5%, hybrid 7.5%, iron 5.5–6.5%, wedge
+    ≈0): the exact trap GS-carry-roll-real names, and the sim already had the fold two files away. It is now
+    ONE seam, `round.ts sprayTotalHigh`, asked by the club suggestion (does the ball stop by the back?) and
+    by the camera (where does it come to rest?). **And the reach was a CONSTANT**, which cannot work,
+    because how much room the HUD leaves is a property of the DEVICE: the play frame is capped to
+    `--gs-portrait-w`, so a desktop container is a SHORT strip and the same 0.36 that left 130 frame units
+    spare on a 390×844 phone ran out entirely on the itch embed's 820×760. Measured on the built game
+    (`scripts/play-frame-probe.mjs`), the drawn cone sat **54px behind the bar** on a 320×568 phone and a
+    driver's furthest resting point **2px under it** on the embed. The radius is now solved from the span
+    the HUD actually leaves — ball row to band top, `SHOT_BAND_FILL` 0.8 of it, the rest headroom (fill it
+    exactly and the far end sits ON the bar's edge, which reads as clipped). Each device gets the tightest
+    zoom that still shows the whole shot: cone clearance 320×568 **−54 → +90px**, embed +51 → **+147**,
+    laptop +52 → **+149**, and the composed-for phone barely moves (+127 → +168, a 9.5% zoom-out) because it
+    had the room all along. Falls back to the classic constant while the band is unmeasured. ⚠️ A pure test
+    can only re-derive the rule from its two measured inputs — that is a SECOND DESCRIPTION, so the guard
+    that matters is the BROWSER one (`tests/map-frame.test.ts`, the itch embed + the 320px phone): it fails
+    on the old camera with the measured −54px. Eyes-on `scripts/play-frame-shot.mjs`.
   - **HUD height is bought back from WRAPPING, never from type size** (GS-play-hud-space). The readouts were
     sized on a play-test verdict that they were too small; the space was going to wrapped rows instead — a
     one-line stats row measuring 49px, and a controls column squeezed into 240 of 390px by its flanking

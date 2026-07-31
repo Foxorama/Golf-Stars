@@ -2226,3 +2226,85 @@ the parkland band, since a surface with no complex around it reads smaller than 
 derelict included), before/after at the play framing the report came from. Vibrance held while the sky
 went dark — cetus 60.7 → **60.9** colourfulness, void 34.9 → **34.8** — which is the point: *vibrant
 and dark*, not vibrant *because* bright. Guarded by the new blocks in `tests/biome-glow.test.ts`.
+
+---
+
+## GS-decision-frame-carry — the camera framed the landing, and the ball kept going (2026-07-31)
+
+**The report** (desktop play-test, 2026-07-31): *"default zoom for holes after tee off is too zoomed
+in, the arc of the shot is off-screen."*
+
+### Two faults, compounding
+
+`decisionReach(carryHigh) = max(30, carryHigh * 0.36)`, and its own comment said it was tuned "so the
+full arc for the longest club lands at ~16% from the top".
+
+**1. `carryHigh` is a CARRY.** Since GS-runout-ladder the ball then RUNS `runFrac` further — driver
+**14%**, wood 10.5%, hybrid 7.5%, long iron 6.5%, short iron 5.5%, wedge ≈0 — and on a driver the
+run-out is about a third of the drawn animation. The frame was sized for where the ball LANDS. This is
+exactly the trap GS-carry-roll-real names, and the sim already knew the difference two files away:
+`round.ts`'s club suggestion carried `highTotal(c) = carryHigh * (1 + rollFractionFor(…))` with the
+comment *"it's the total that has to reach the flag"*.
+
+**2. It was a CONSTANT, and the room the HUD leaves is a property of the DEVICE.** GS-play-hud-space
+framed the ball clear of the BOTTOM panel (`clearOfPanelBias`) and nothing ever read `band.top`, so the
+camera happily drew the far end of the cone through the info bar. The play frame is capped to
+`--gs-portrait-w` (0.52·dvh), so a desktop container is a short PORTRAIT STRIP — 395×760 on the itch
+embed, 399×768 on a 1366×768 laptop — where the same 0.36 that leaves ~130 frame units spare on a
+390×844 phone runs out completely.
+
+### What was measured
+
+`scripts/play-frame-probe.mjs` drives the BUILT game to a real driver-off-the-tee decision at five
+viewports and reads the info bar, the control panel and the drawn aim overlay (`#gs-shot-overlay` — the
+spray cone, its carry labels and the run-out line, i.e. what the player is actually looking at). The
+clearance column is how far the top of the cone sits BELOW the bar; negative means it is drawn behind it.
+
+| viewport | play frame | cone clearance before | after |
+|---|---|---|---|
+| iPhone 14 390×844 | 390×844 | +127px | **+168** |
+| 320×568 phone | 320×568 | **−54px** | **+90** |
+| itch embed 820×760 | 395×760 | +51px | **+147** |
+| laptop 1366×768 | 399×768 | +52px | **+149** |
+| desktop 1920×1080 | 562×1080 | +113px | **+221** |
+
+The *resting* point is worse than the cone's own top, because the run is drawn past it: on the embed a
+driver's furthest resting place landed **2px UNDER the bar**, and on the 320px phone 96px behind it.
+
+### The fix
+
+**One seam for the fold.** `round.ts sprayTotalHigh(spray)` = `carryHigh · (1 + rollFractionFor(flight,
+nominalCarry))`. Two callers now — the club suggestion (does the ball stop by the back of the green?)
+and the shot camera (where does it come to REST?) — which is exactly the admission bar for one
+description rather than two.
+
+**The reach is solved, not tuned.** `project.ts radiusForSpan(reach, spanUnits, frameW)` reads straight
+off `holeProjector`'s focus branch: the scale is width-limited on a portrait frame, so a yard is
+`(frameW − 2·padding)/(2R)` frame units and a point `reach` yards ahead sits `reach·scale` above the
+ball. `decisionReach` measures the span the HUD leaves — the ball's own row (`playFocusBias`, already
+measured) down from the top of the clear band — spends `SHOT_BAND_FILL` **0.8** of it on the shot, and
+solves for R. Each device then gets the tightest zoom that still shows the whole shot, which is why the
+composed-for phone barely moves (+9.5%) while the short desktop strip opens up 25% and the 320px phone
+60%: they are the ones that were short of room.
+
+The 0.2 headroom is not slack. Fill the band exactly and the ball's furthest resting place sits ON the
+bar's bottom edge, which reads as clipped — and the cone's outer band labels ("2%") legitimately sit
+outside the ball's line. With the band unmeasured (first arrival on the play screen, a headless build
+with no HUD) it falls back to the classic 0.36 constant.
+
+**Nothing else moved.** The 30yd floor for short shots is unchanged, so chips and pitches frame exactly
+as they did. The watch camera still reuses the stored `decisionRadius` (GS-play-hud-space), and its
+fallback `decisionReach(travel)` gets *more* correct for free — `travel` is the ball's whole from→rest
+journey, which is the total the function now frames on. Render/interactive only: zero sim rng, no
+`GENERATOR_VERSION` or save bump, death-spiral harness untouched.
+
+### The guard
+
+The pure tests in `tests/map-frame.test.ts` can only re-derive the rule from its two measured inputs —
+which is a SECOND DESCRIPTION, so they prove the geometry and nothing about the wiring. The guard that
+matters is the BROWSER one in the same file: it drives the built game at the itch embed and the 320×568
+phone and asserts the drawn cone is below the bar. Confirmed to FAIL on the old camera with the measured
+`−54px`, which is the only way to know a regression test is one.
+
+**Verification:** 2545 tests / 212 files green, 0 skipped; `tsc` clean; both builds (game + hub).
+Eyes-on before/after at four viewports via `scripts/play-frame-shot.mjs`.

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Rng } from '../src/sim/rng';
 import { generateCourse } from '../src/sim/course/generate';
-import { chipInPath, hasBackspin, playCourse, playHole, pinOf, HOLE_OUT_RADIUS } from '../src/sim/round';
+import { chipInPath, hasBackspin, playCourse, playHole, pinOf, shotSpread, sprayTotalHigh, HOLE_OUT_RADIUS } from '../src/sim/round';
 import { characterShotMods } from '../src/sim/rpg/characters';
 import { CLUBS } from '../src/sim/clubs';
 import { dist, type Vec } from '../src/sim/course/contract';
@@ -161,6 +161,44 @@ describe('a Dr Chipinski chip-in actually rolls to the hole (GS-chipin-roll)', (
     expect(dist(a.path[a.path.length - 1]!, pinOf(hole))).toBeCloseTo(0, 9);
     expect(a.path[0]).toEqual(from);
     expect(a.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * GS-decision-frame-carry — `sprayTotalHigh` is the ONE fold from a cone's far CARRY to where the ball
+ * actually FINISHES. Two callers now ask it (the club suggestion, which needs to know the ball stops by
+ * the back of the green, and the shot camera, which has to frame where the ball comes to rest), and
+ * they had drifted apart: the camera was framing on the bare `carryHigh`.
+ */
+describe('where a sprayed shot finishes (GS-decision-frame-carry)', () => {
+  const hole = generateCourse(4242, { holes: 1 }).holes[0]!;
+  const sprayFor = (id: string) =>
+    shotSpread(hole, hole.tee, 'tee', hole.green, CLUBS.find((c) => c.id === id)!);
+
+  it('is the far carry PLUS the run the club’s family releases — never the carry alone', () => {
+    for (const id of ['D', '3W', '5i', '9i']) {
+      const sp = sprayFor(id);
+      expect(sprayTotalHigh(sp), `${id} must finish past its landing`).toBeGreaterThan(sp.carryHigh);
+    }
+  });
+
+  it('ladders with the run, so the driver gains most and the wedge barely moves', () => {
+    const gain = (id: string) => {
+      const sp = sprayFor(id);
+      return sprayTotalHigh(sp) / sp.carryHigh - 1;
+    };
+    // GS-runout-ladder: driver 14% ▸ wood 10.5% ▸ hybrid 7.5% ▸ long iron 6.5% ▸ short iron 5.5% ▸
+    // wedge = the legacy taper. The camera's zoom-out is exactly this, club by club.
+    expect(gain('D')).toBeCloseTo(0.14, 6);
+    expect(gain('D')).toBeGreaterThan(gain('3W'));
+    expect(gain('3W')).toBeGreaterThan(gain('5i'));
+    expect(gain('5i')).toBeGreaterThan(gain('9i'));
+    expect(gain('SW')).toBeLessThan(0.05); // a wedge lands and holds — nothing to reframe for
+  });
+
+  it('is a pure read of the spray — no rng, same answer every call', () => {
+    const sp = sprayFor('D');
+    expect(sprayTotalHigh(sp)).toBe(sprayTotalHigh(sp));
   });
 });
 
