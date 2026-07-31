@@ -2252,19 +2252,47 @@ function wireStarTourGestures(vp: HTMLElement): void {
   };
   vp.addEventListener('pointerup', up);
   vp.addEventListener('pointercancel', up);
-  // Desktop: Ctrl/⌘ + wheel zooms about the cursor; a plain wheel keeps native scroll.
+  // Desktop: THE WHEEL ZOOMS about the cursor, like every map application. It used to require
+  // Ctrl/⌘ and leave a plain wheel to native scroll, which meant that on a desktop mouse the chart
+  // had no discoverable zoom at all — pinch covers touch, and the chord was written down nowhere
+  // (GS-star-map-zoom-wheel). Panning is the drag, which is what the grab cursor advertises, so the
+  // wheel was the lesser of the two ways to move and the only way to zoom. Ctrl/⌘ still zooms, so
+  // the old chord keeps working for anyone who found it. SHIFT pans sideways — a horizontal scan
+  // without grabbing the map.
   vp.addEventListener(
     'wheel',
     (e) => {
-      // Any wheel input is manual navigation (native scroll or ⌘/Ctrl zoom) — release the chase-cam so it
-      // doesn't fight the wheel (GS-star-map-jerky-movement).
+      // Any wheel input is manual navigation — release the chase-cam so it doesn't fight the wheel
+      // (GS-star-map-jerky-movement).
       starTourView.following = false;
-      if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
+      if (e.shiftKey) {
+        vp.scrollLeft += e.deltaY;
+        starTourView.scrollX = vp.scrollLeft;
+        return;
+      }
       setZoom((starTourView.zoom || 1) * (e.deltaY < 0 ? 1.1 : 0.9), e.clientX, e.clientY);
     },
     { passive: false },
   );
+  // The on-screen zoom pair. A gesture nobody can see is a feature only its author has: pinch is
+  // touch-only and the wheel needs a mouse, so a keyboard or switch player had no zoom whatever.
+  // These live INSIDE `.gs-bhud`, which is how the map's fly-on-tap handler already knows to ignore
+  // them (it skips `target.closest('.gs-bhud, .gs-st-sheet')`) — no second exemption list.
+  vp.parentElement?.querySelectorAll<HTMLElement>('[data-startour-zoom]').forEach((el) => {
+    el.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      starTourView.following = false; // same release as any other manual navigation
+      const rect = vp.getBoundingClientRect();
+      // Zoom about the middle of the viewport: a button press has no cursor to key on, and the
+      // centre is what the player is looking at.
+      setZoom(
+        (starTourView.zoom || 1) * (el.getAttribute('data-startour-zoom') === 'in' ? 1.25 : 0.8),
+        rect.left + rect.width / 2,
+        rect.top + rect.height / 2,
+      );
+    });
+  });
 }
 
 // STAR TOUR ship flight (GS-star-tour-2): the ship orients toward a tapped point/world and cruises
@@ -2706,7 +2734,15 @@ function stepStarTour(): void {
   // freeze the map off-centre until the next tap, so rapid "tap to keep moving" taps stuttered freeze→lurch.
   // Following instead keeps the cam easing across the gaps, so it glides — and once the ship is idle+centred
   // the ease converges to a no-op, so it never fights a resting view.
-  if ((cruising || v.refuel || v.following) && vp) {
+  // ⚠️ Gated on `v.following` ALONE (plus the scripted refuel), never on `cruising`. The two are not
+  // the same question: `following` is "the camera should chase", `cruising` is "the ship is in
+  // flight" — and this line used to OR them, which quietly defeated the release above. Every manual
+  // pan/pinch/wheel sets `following = false` (GS-star-map-jerky-movement), but a ship mid-flight is
+  // still cruising, so the cam kept easing and yanked the map straight back to the ship: you could
+  // not fly somewhere and scan ahead at the same time (GS-star-map-scan-ahead). Every fly* sets
+  // `following = true`, so nothing is lost by dropping `cruising` — a flight the player has not
+  // taken manual control of still follows.
+  if ((v.following || v.refuel) && vp) {
     const z = v.zoom || 1;
     const m = starTourChartMargins(vp, z);
     const tx = m.mx + v.shipX * z - vp.clientWidth / 2;
