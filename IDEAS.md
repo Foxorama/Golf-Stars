@@ -11,17 +11,10 @@ under the new format). Avenue (1), a full top-down RPG shell, stays deferred unt
 
 ## Now / next
 
-> **THE 1.3.0 PLAY-TEST ITEMS ARE DONE.** GS-runout-seen, GS-fairway-ink-break and GS-scene-isolate
-> have all shipped (see Done); GS-clubhouse-floor is the last of them and is below.
+> **THE 1.3.0 PLAY-TEST ITEMS ARE ALL DONE** — GS-runout-seen, GS-fairway-ink-break,
+> GS-clubhouse-floor and GS-scene-isolate have shipped (see Done). The entries below are the
+> standing backlog, none of them release blockers.
 
-**GS-clubhouse-floor — the clubhouse furnishings are velcro'd to the wall** *(art pass, needs
-eyes-on)*
-Play-test: *"the Story Tour and Star Tour clubhouse has a bunch of things sitting on the wall and
-not the floor — your character is standing on the floor and everything else looks like it's velcro'd
-to the wall."* `render/storyClubhouse.ts` + `render/clubhouseLounge.ts` place furniture without the
-floor perspective the golfers are drawn with, so the two read as different spaces. Art judgement
-rather than a testable rule; `scripts/storyclub-preview.mjs` and `scripts/clubhouse-preview.mjs`
-are the rigs.
 
 **GS-ui-display-wide — the flow screens are bigger now, but still islands** *(the follow-up
 GS-ui-display-scale deliberately left; see `docs/decisions/accessibility.md`)*
@@ -701,6 +694,13 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-clubhouse-floor** — the clubhouse furniture stands on the floor. Two literal causes behind
+  "velcro'd to the wall": nothing but the golfers cast onto the deck, and the bar counter stopped
+  **thirty units clear of it**, hanging. Counters now run down to the deck with a toe kick, the
+  locker bank / reliquary stand on plinths, wall units cast onto the wall, and contact shadows pool
+  at every foot. The deck line is a named `DECK_Y` that standing furniture derives from. The LOUNGE
+  needed nothing — it already had floor-standing furniture and contact shadows, which is why it read
+  best of the three. (#704)
 - **GS-fairway-ink-break** — the fairway outline no longer runs over greens, hazards and rough.
   `fairwayEdgeRuns` gained OCCLUDERS (the green + the drawn hazard bodies, the same ones the painters
   get) that bury edge exactly as a neighbouring fairway does. Measured over 2,925 holes: ink inside a
