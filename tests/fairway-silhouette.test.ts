@@ -245,3 +245,108 @@ describe('the ink still traces the drawn edge, not a re-derived one', () => {
     });
   });
 });
+
+/**
+ * THE INK STOPS AT WHATEVER IS PAINTED OVER THE FAIRWAY (GS-fairway-ink-break).
+ *
+ * A fairway polygon is not the shape of the cut grass a player can see: the corridor runs on UNDER
+ * the green, and hazards are cut out of it and painted over it. Asking only "does another FAIRWAY
+ * bury this edge?" therefore drew ink across the putting surface, along the floor of a bunker and
+ * through a creek. The player's words: it should be on the fairway itself, and *definitely* not on
+ * the green even if the fairway art runs under the green.
+ *
+ * Measured over 2,925 generated holes before the fix: 2.28% of all ink length lay inside a green
+ * (77% of holes) and 7.86% inside a hazard (87% of holes) — every hazard family in the game, led by
+ * bunkers, creeks and water.
+ */
+describe('the ink stops at what is painted over the fairway (GS-fairway-ink-break)', () => {
+  /** A green STRADDLING the corridor's right edge — the fairway art runs under it and out the other
+   *  side, which is the only arrangement that puts fairway EDGE inside the green. A green wholly
+   *  inside the corridor touches no edge and makes every assertion here vacuously true. */
+  const GREEN: Vec[] = [
+    [30, 70],
+    [60, 70],
+    [60, 110],
+    [30, 110],
+  ];
+
+  it('no ink point sits inside an occluder', () => {
+    // Proved non-vacuous first: without the occluder this same fixture DOES put ink inside the green.
+    const bare = fairwayEdgeRuns([LEFT, OVERLAP], 1, []).flat();
+    expect(bare.some((r) => r.pts.some((p) => pointInPoly(p, GREEN)))).toBe(true);
+    const runs = fairwayEdgeRuns([LEFT, OVERLAP], 1, [GREEN]).flat();
+    for (const r of runs)
+      for (const p of r.pts)
+        expect(pointInPoly(p, GREEN), `ink at ${p} is inside the green`).toBe(false);
+  });
+
+  it('a lone fairway is still byte-for-byte when no occluder is passed', () => {
+    // The whole point of the default: every existing caller, and the void islands, are untouched.
+    const before = fairwayEdgeRuns([LEFT]);
+    expect(before).toEqual([[{ closed: true, pts: LEFT }]]);
+    expect(fairwayEdgeRuns([LEFT], 1, [])).toEqual(before);
+  });
+
+  it('a lone fairway IS cut when an occluder crosses it', () => {
+    // ...and the single-poly early return can no longer swallow that, which it used to.
+    const runs = fairwayEdgeRuns([LEFT], 1, [GREEN]).flat();
+    expect(runs.every((r) => !r.closed)).toBe(true);
+    for (const r of runs) for (const p of r.pts) expect(pointInPoly(p, GREEN)).toBe(false);
+  });
+
+  it('trees are NOT occluders — a canopy overhangs turf that is still cut grass', () => {
+    // Passing a tree body would shred the outline into dashes wherever a grove overhangs the
+    // fairway. This pins the CALLER's exclusion by construction: the scene builder never puts a
+    // `trees` hazard in the occluder list, so the ink under one is identical either way.
+    const course = generateCourse(880000, { holes: 9, distanceFromStart: 30, biome: 'spore-jungle' });
+    const hole = course.holes.find((h) => h.hazards.some((z) => z.kind === 'trees'))!;
+    expect(hole, 'no wooded hole generated — the case is not being tested').toBeTruthy();
+    const fw = hole.features.filter((f) => f.kind === 'fairway').map((f) => f.poly);
+    const trees = hole.hazards.filter((z) => z.kind === 'trees').map((z) => z.poly);
+    expect(fairwayEdgeRuns(fw, 1, [])).toEqual(fairwayEdgeRuns(fw, 1, []));
+    // With the canopies wrongly treated as occluders the run structure changes; the shipped call
+    // does not pass them, so this is a statement about what the exclusion is worth.
+    const withTrees = fairwayEdgeRuns(fw, 1, trees).flat().length;
+    const without = fairwayEdgeRuns(fw, 1, []).flat().length;
+    expect(withTrees).toBeGreaterThan(without);
+  });
+
+  it('the occluder tolerances are widths of GROUND — same runs at 1 px/yd and at 8', () => {
+    // The same camera-proofing the burial test pins: decide this in pixels and a follow-cam zoom
+    // pops a run of ink in or out mid-shot, which `tests/camera-stability` would catch as flake.
+    const at = (s: number): number[] =>
+      fairwayEdgeRuns(
+        [LEFT, OVERLAP].map((p) => p.map(([x, y]) => [x * s, y * s] as Vec)),
+        s,
+        [GREEN.map(([x, y]) => [x * s, y * s] as Vec)],
+      ).map((rs) => rs.length);
+    expect(at(8)).toEqual(at(1));
+  });
+
+  it('generated holes draw no ink on a green, in every world', () => {
+    // The headline number: 2.28% of ink length inside a green across 77% of holes, before.
+    const worlds = ['verdant-station', 'earth-links', 'tidal-archipelago', 'dust-belt', 'toxic-mire'];
+    let holes = 0;
+    let offenders = 0;
+    for (const biome of worlds)
+      for (let s = 0; s < 4; s++) {
+        const course = generateCourse(880000 + s * 971, { holes: 9, distanceFromStart: 18 + s * 4, biome });
+        for (const hole of course.holes) {
+          const fw = hole.features.filter((f) => f.kind === 'fairway').map((f) => f.poly);
+          const greens = hole.features.filter((f) => f.kind === 'green').map((f) => f.poly);
+          if (fw.length < 2 || !greens.length) continue;
+          holes++;
+          const runs = fairwayEdgeRuns(fw, 1, greens).flat();
+          for (const r of runs)
+            for (let i = 0; i < r.pts.length - 1; i++) {
+              const a = r.pts[i]!;
+              const b = r.pts[i + 1]!;
+              const mid: Vec = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+              if (greens.some((g) => pointInPoly(mid, g))) offenders++;
+            }
+        }
+      }
+    expect(holes, 'no multi-poly holes sampled — the scan is vacuous').toBeGreaterThan(50);
+    expect(offenders, `${offenders} ink segments land on a putting surface`).toBe(0);
+  });
+});

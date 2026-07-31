@@ -11,23 +11,8 @@ under the new format). Avenue (1), a full top-down RPG shell, stays deferred unt
 
 ## Now / next
 
-> **TWO OPEN 1.3.0 ITEMS REMAIN — THE TOP TWO ENTRIES BELOW.** They came out of one play-test on
-> the itch build (2026-07-31) and are the last things between here and the release tag. Each is
-> scoped, measured where measuring was needed, and independent of the other — take ONE per session
-> (CLAUDE.md's one-feature rule; `playView.ts` / `style/fairway.ts` are hot files). The third,
-> GS-runout-seen, has shipped (see Done).
-
-**GS-fairway-ink-break — the fairway outline runs over greens, hazards and rough at a break**
-*(diagnosed, not started)*
-Play-test: *"the fairway line covers hazards and greens and rough when there's a break in the
-fairway, it should only be on the fairway itself and should definitely not be on the green even if
-the fairway art runs under the green."* `fairwayEdgeRuns` (`style/fairway.ts:182`) only asks whether
-a run is buried by ANOTHER FAIRWAY POLY — it has no knowledge of the green or the hazards, so at a
-break it outlines the gap over whatever is underneath. Fix: subtract the green polygon and the
-hazard bodies from the runs, with GS-fairway-silhouette's care intact — tolerances are widths of
-GROUND and deliberately UNCLAMPED (a px decision pops a run in/out on a follow-cam zoom, which
-`tests/camera-stability` pins), and the runs must stay exactly on the DRAWN polys rather than a
-re-derived outline. Eyes-on rig already exists: `scripts/fairway-outline-preview.mjs`.
+> **THE 1.3.0 PLAY-TEST ITEMS ARE DONE.** GS-runout-seen, GS-fairway-ink-break and GS-scene-isolate
+> have all shipped (see Done); GS-clubhouse-floor is the last of them and is below.
 
 **GS-clubhouse-floor — the clubhouse furnishings are velcro'd to the wall** *(art pass, needs
 eyes-on)*
@@ -716,6 +701,16 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-fairway-ink-break** — the fairway outline no longer runs over greens, hazards and rough.
+  `fairwayEdgeRuns` gained OCCLUDERS (the green + the drawn hazard bodies, the same ones the painters
+  get) that bury edge exactly as a neighbouring fairway does. Measured over 2,925 holes: ink inside a
+  green **2.28% → 0%** (77% of holes → 0), inside a hazard **7.86% → 0.06%**. Trees deliberately
+  excluded. No occluders ⇒ byte-for-byte. (#703)
+- **GS-scene-isolate** — the clubhouse golfers and their parked cars stopped standing on the settings
+  sheet. Feet-anchored figures mint z-indices up to ~1000; without `isolation:isolate` those join the
+  ROOT stacking context and paint over every fixed overlay (settings 60, takeovers 60–62). `overflow`
+  clips geometry, and `container-type` is not a stacking context. Rule stated for the class: every
+  container-query scene frame isolates. (#702)
 - **GS-ui-display-scale** — every display lays out as the phone the game is composed for
   (`docs/decisions/accessibility.md`). `--gs-uiscale` becomes
   `calc(var(--gs-readerscale) * var(--gs-displayscale))`; `viewportFit.ts` writes

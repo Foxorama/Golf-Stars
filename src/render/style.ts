@@ -530,6 +530,15 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // Fairways draw as ONE grouped pass FIRST (under tee/green/scatter) so the green apron blends into
   // the main corridor — see `styleFairways`. Everything else keeps its original per-feature order.
   const fairwaySps = hole.features.filter((f) => f.kind === 'fairway').map((f) => projPoly(f.poly, proj));
+  // The DRAWN hazard bodies, hoisted (they used to be built down in the hazard pass). Both the hazard
+  // painters and the fairway ink (GS-fairway-ink-break) need them, and two constructions of "where is
+  // the water" is exactly the second description this codebase keeps paying for. Safe to move: both
+  // helpers are course-space and CACHED, and neither touches `rng` — so no draw is reordered and every
+  // seeded scene is byte-for-byte (contract 1).
+  const merged = mergedHazardsFor(hole);
+  const waterPolys: Vec[][] = merged.water.map((p) => projPoly(roughenHazardCached(p, 'water'), proj));
+  const lavaPolys: Vec[][] = merged.lava.map((p) => projPoly(roughenHazardCached(p, 'lava'), proj));
+  const sandPolys: Vec[][] = merged.sand.map((p) => projPoly(p, proj));
   // Rainbow Road: extrude EVERY play surface (fairway/green/tee) into a prismatic layered CLIFF
   // (GS-rainbow-polish) — the same side-on depth treatment Cetus/Void get — so the road reads as a
   // raised glowing track floating in space, not a flat decal. Drawn FIRST (behind every ribbon: the
@@ -565,7 +574,33 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // ONE silhouette for the whole fairway system (GS-fairway-silhouette), walked once and shared: the
     // ink edge + first-cut ease inside `styleFairways` and the void/cetus rims below all describe the
     // SAME edge, so none of them can cut back across turf another piece of fairway has covered.
-    const fwRuns = fairwayEdgeRuns(fairwaySps, proj.scale);
+    //
+    // GS-fairway-ink-break: the silhouette also stops at whatever is painted ON TOP of the fairway —
+    // the green (the corridor runs on under it) and the hazard bodies (cut out of it, painted over
+    // it). These are the SAME polygons the painters below are handed, never a re-derivation: the
+    // merged sand/water/lava families come out of the hoisted `merged*` bodies, so a change to how a
+    // hazard is drawn moves the ink with it. Trees are excluded on purpose — a canopy is a sprite
+    // with gaps over turf that is still cut grass, and burying edge under one would shred the
+    // outline into dashes wherever a grove overhangs the fairway.
+    const inkOccluders: Vec[][] = [
+      ...hole.features.filter((f) => f.kind === 'green').map((f) => projPoly(f.poly, proj)),
+      ...sandPolys,
+      ...waterPolys,
+      ...lavaPolys,
+      ...hole.hazards
+        .filter(
+          (f) =>
+            f.kind !== 'trees' &&
+            !WATER_KINDS.has(f.kind) &&
+            !LAVA_KINDS.has(f.kind) &&
+            f.kind !== 'bunker' &&
+            f.kind !== 'waste' &&
+            f.kind !== 'sand' &&
+            f.kind !== 'pot',
+        )
+        .map((f) => projPoly(f.poly, proj)),
+    ];
+    const fwRuns = fairwayEdgeRuns(fairwaySps, proj.scale, inkOccluders);
     prims.push(
       ...styleFairways(fairwaySps, art, fwShade, fwFringe, arch, groundedFw ? fwCollar : undefined, proj.scale, fwRuns),
     );
@@ -660,12 +695,10 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // + cached): touching bunkers/pots/waste fuse into ONE excavated complex with a single rim, a
   // creek + its mouth lake into one water body. Merging in COURSE space keeps the merged-body count
   // (and thus the family passes' rng draw counts) camera-proof.
-  const merged = mergedHazardsFor(hole);
-  // GS-hazard-edges: roughen the DRAWN bank of each liquid body (course space, zero rng) so a
-  // crossing river/lava flow reads as a natural meandering/cracked hazard, not a uniform band-aid.
-  const waterPolys: Vec[][] = merged.water.map((p) => projPoly(roughenHazardCached(p, 'water'), proj));
-  const lavaPolys: Vec[][] = merged.lava.map((p) => projPoly(roughenHazardCached(p, 'lava'), proj));
-  const sandPolys: Vec[][] = merged.sand.map((p) => projPoly(p, proj));
+  // `merged` / `waterPolys` / `lavaPolys` / `sandPolys` are built once at the top of the scene — the
+  // fairway ink reads the same bodies these painters do (GS-fairway-ink-break). GS-hazard-edges: the
+  // liquid banks are roughened there (course space, zero rng) so a crossing river/lava flow reads as a
+  // natural meandering/cracked hazard, not a uniform band-aid.
   const treeHaz: Feature[] = [];
   const fescueHaz: Feature[] = [];
   const deepRoughHaz: Feature[] = [];
