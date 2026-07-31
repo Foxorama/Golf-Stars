@@ -164,7 +164,20 @@
         height: var(--gs-dvh);
         overflow-y: auto;
         overscroll-behavior-y: contain;
+        /* Dressed like the game, not like the OS — the same slim treatment the viewport-locked
+           roster already uses (`.gs-charwrap`). This scrollbar is INSIDE the frame, on the game's
+           own dark chrome, so a default 15px light-grey one reads as browser furniture dropped on
+           the art. It is also the reason to prefer this over the host's own scrollbars: those sit
+           outside the game and cannot be styled from in here at all. */
+        scrollbar-width: thin;
+        scrollbar-color: var(--gs-line) transparent;
       }
+      html[data-gs-embed] .gs-main::-webkit-scrollbar { width: 6px; }
+      html[data-gs-embed] .gs-main::-webkit-scrollbar-track { background: transparent; }
+      html[data-gs-embed] .gs-main::-webkit-scrollbar-thumb {
+        background: var(--gs-line); border-radius: 3px;
+      }
+      html[data-gs-embed] .gs-main::-webkit-scrollbar-thumb:hover { background: #3a4356; }
       /* Headings keep their extra tracking ON TOP of the reader's, never instead of it. */
       .gs-main h1, .gs-main h2, .gs-main h3 { letter-spacing: calc(var(--gs-track) + .2px); }
       ::selection { background: #5fd45a44; }
