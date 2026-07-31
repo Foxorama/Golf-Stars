@@ -63,12 +63,19 @@ const { chromium } = await import('playwright-core');
 const browser = await chromium.launch({ executablePath: chromePath, args: ['--no-sandbox'] });
 
 /**
- * The itch embed's default desktop viewport — the shape a visitor actually sees the game in, and
- * therefore the shape every portrait moment is shot at. Must stay >= 660 tall or `data-gs-fit`
- * flips to `tight` and the HUD sheds detail (GS-a11y-tight-fit), which would be a screenshot of a
- * layout most visitors never see.
+ * The itch embed's viewport — the shape a visitor actually sees the game in, and therefore the shape
+ * every portrait moment is shot at. **This must track the Viewport dimensions set on itch → Edit
+ * game → Embed options**, or the screenshots advertise a layout nobody is served: they are currently
+ * 600x860 (manually set), not itch's 820x760 default.
+ *
+ * Height must stay >= 660 or `data-gs-fit` flips to `tight` and the HUD sheds detail
+ * (GS-a11y-tight-fit). Note 600 wide is under GS-select-card-room's 760 floor, so the roster shoots
+ * its COMPACT cards — correct, because that is what the embed serves.
  */
-const EMBED = { width: 820, height: 760 };
+const EMBED = {
+  width: Number(process.env.SHOTS_W ?? 600),
+  height: Number(process.env.SHOTS_H ?? 860),
+};
 /** The battle is authored landscape; 16:9 is the shape it composes to. */
 const WIDE = { width: 1280, height: 720 };
 /** Retina: itch serves the file as-is and browsers downscale it cleanly. */

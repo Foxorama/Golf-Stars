@@ -290,10 +290,22 @@ export function manualPutt(
   if (Math.abs(paceErr) <= effBand && Math.abs(netLat) <= HOLE_OUT_RADIUS) {
     return { from, to: pinPt, holed: true, path: curvedPathTo(pinPt) };
   }
-  // Missed: it travels `pace × d` along the line with the net lateral offset (short/long + off-line).
+  // Missed the make band: it travels `pace × d` along the line with the net lateral offset
+  // (short/long + off-line).
   const travel = pace * d;
   const to: Vec = [from[0] + ux * travel + rperp[0] * netLat, from[1] + uy * travel + rperp[1] * netLat];
-  return { from, to, holed: dist(to, pinPt) <= HOLE_OUT_RADIUS, path: curvedPathTo(to) };
+  // ...but it can still finish inside the cup's catch radius, and then it IS holed. In that case the
+  // ball must END AT THE CUP, exactly like the make branch above (GS-putt-holed-position).
+  //
+  // It used to be reported holed while resting wherever it stopped — up to HOLE_OUT_RADIUS (1.2yd)
+  // away, which at the putt camera is 9–20 screen pixels. So the ball was drawn sitting BESIDE the
+  // hole with a visible gap and the round counted it as in: reported as "the hole here and the ball
+  // there, a pretty big discrepancy". A holed ball is in the hole — there is no resting spot next to
+  // it to draw. This is contract 5 (the graphic IS the physics) at the one moment it matters most.
+  if (dist(to, pinPt) <= HOLE_OUT_RADIUS) {
+    return { from, to: pinPt, holed: true, path: curvedPathTo(pinPt) };
+  }
+  return { from, to, holed: false, path: curvedPathTo(to) };
 }
 
 /**
