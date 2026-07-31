@@ -1531,6 +1531,18 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     from HIT-TESTING while painting exactly where it did, so the first probe reported the sheet on top at
     every viewport while a screenshot of the same page showed the golfers across it; the guard strips `inert`
     first, which restores hit order ≡ paint order.
+  - **A ROOM IS A ROOM, NOT A BACKDROP** (GS-clubhouse-floor, `tests/clubhouse-floor.test.ts`). The
+    illustrated interiors (Mothership / Coil sanctum / Earth clubhouse / lounge) read as *"everything is
+    velcro'd to the wall — only your character is on the floor"* for two literal reasons, both cheap to
+    get wrong again: **nothing but the golfers cast onto the floor** (they carry a contact shadow; the
+    furniture was drawn flat onto the wall), and **the bar counter stopped 30 units clear of the deck**,
+    hanging. So: a unit that STANDS reaches the deck line (`DECK_Y`, a named constant its height derives
+    from — not a hand-counted rect) with a toe kick or a plinth, and every standing unit pools a contact
+    shadow on the floor; wall-mounted pieces cast a soft slab behind them for thickness. ⚠️ The guard asks
+    the question of the **UNIT, not each rectangle** — a carcass sitting on a plinth correctly stops above
+    the deck and it is the plinth that lands on it. `clubhouseLounge.ts` was already right (floor-standing
+    furniture + contact shadows), which is exactly why it reads best; the rest of the art here is
+    judgement that only eyes-on settles.
   - **Default aim** is a smart assist (GS-default-aim, `Settings.aimMode` default `'auto'`) resolved by the
     shared `aimTargetOf`/`autoAimTarget` so `previewShot`/`takeShot`/auto-finish stay byte-identical
     (contract 2); the default CLUB is `autoAimClub` in lockstep (a forced-carry drive picks
