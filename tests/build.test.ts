@@ -287,6 +287,10 @@ describe('build output (real browser)', () => {
     // the root you mean to open — so the briefing names the Ark, not the serpent.
     { screen: 'storyfinaleherald', sel: '.gs-fin-gate', text: 'Warden Ark', label: 'the Herald finale briefing (the Warden Ark blockade)' },
     { screen: 'storyfinaleresult', sel: '.gs-storyres', text: 'Universe', label: 'the Story finale victory recap' },
+    // GS-story-credits: the "where are they now" roll a WON campaign ends on. Both roads, because the two
+    // sets of epilogues are the whole point of the feature — and the dedication must be IN the markup.
+    { screen: 'storycredits', sel: '.gs-cred__roll', text: 'Unity_Starfish', label: 'the Story credits roll (the Reseal)' },
+    { screen: 'storycreditsherald', sel: '.gs-cred__roll', text: 'Ragnarök', label: 'the Story credits roll (the Long Rest)' },
     { screen: 'storychoice', sel: '.gs-choice-grid', text: 'The Choice', label: 'the Story alignment fork (The Choice)' },
     { screen: 'storyinterlude', sel: '.gs-inter-dialogue', text: 'The Severing', label: 'the Story emotional interlude' },
     { screen: 'storyaftermath', sel: '.gs-lore', text: 'The Sting Withdraws', label: 'the Story post-Sigil confrontation beat (Scorpius withdraws)' },
@@ -327,6 +331,64 @@ describe('build output (real browser)', () => {
       60_000,
     );
   }
+
+  // GS-story-credits — the credits roll is a SCROLLER, and the crawl over it is an enhancement.
+  //
+  // Two properties, and the second is the one that would rot silently. (1) The crawl actually runs: it is a
+  // rAF loop in `app.ts`, not a CSS animation, precisely so that reduced motion can leave it off instead of
+  // snapping it to the end — a loop that never starts looks identical to a static list, so nothing else
+  // would notice. (2) Everything in the roll is reachable BY HAND, because on the itch embed the page
+  // itself cannot scroll (GS-embed-scroll) and under reduced motion nothing scrolls it for you: the
+  // dedication and the roll's own "The End" button must both be reachable from inside the box.
+  it.runIf(chromePath)(
+    'the credits roll crawls itself, and everything in it is reachable by hand (GS-story-credits)',
+    async () => {
+      const { chromium } = await import('playwright-core');
+      const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
+      try {
+        const page = await browser.newPage({ viewport: { width: 414, height: 896 } });
+        await page.goto('file://' + dist + '?screen=storycredits&intro=0&seed=42', { waitUntil: 'load' });
+        await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', { timeout: 8000 });
+        const box = await page.evaluate(() => {
+          const roll = document.querySelector<HTMLElement>('.gs-cred__roll')!;
+          return { top: roll.scrollTop, scrollable: roll.scrollHeight > roll.clientHeight + 40 };
+        });
+        expect(box.scrollable, 'the roll must scroll inside itself, not spill down the page').toBe(true);
+        // The crawl runs at ~34px/s; 1.5s of it is ~50px. Assert only that it ADVANCED from wherever it
+        // had already reached — a rate assertion would be a second description of a feel constant, and
+        // flaky on a loaded CI box besides. (Measured from `box.top`, never from 0: by the time the probe
+        // lands the loop has typically already moved a pixel or two, which is itself the proof it runs.)
+        await page.waitForTimeout(1500);
+        const crawled = await page.evaluate(() => document.querySelector<HTMLElement>('.gs-cred__roll')!.scrollTop);
+        expect(crawled - box.top, 'the credits never started crawling').toBeGreaterThan(20);
+        // …and by hand, the far end of the roll holds the dedication and its own exit.
+        const end = await page.evaluate(() => {
+          const roll = document.querySelector<HTMLElement>('.gs-cred__roll')!;
+          roll.scrollTop = roll.scrollHeight;
+          const box = roll.getBoundingClientRect();
+          const inside = (el: Element | null): boolean => {
+            if (!el) return false;
+            const r = el.getBoundingClientRect();
+            return r.top >= box.top - 1 && r.bottom <= box.bottom + 1;
+          };
+          return {
+            thanks: (document.querySelector('.gs-cred__thanks')?.textContent ?? '').includes('Unity_Starfish'),
+            endInView: inside(document.querySelector('.gs-cred__end button')),
+            footInView: (() => {
+              const f = document.querySelector('.gs-cred__foot button')!.getBoundingClientRect();
+              return f.bottom <= window.innerHeight;
+            })(),
+          };
+        });
+        expect(end.thanks, 'the dedication is not in the roll').toBe(true);
+        expect(end.endInView, 'the roll’s own "The End" button is unreachable').toBe(true);
+        expect(end.footInView, 'the credits footer button is off the bottom of the screen').toBe(true);
+      } finally {
+        await browser.close();
+      }
+    },
+    60_000,
+  );
 
   // STAR/STORY TOUR skips the arc briefing (GS-story-tour). The strokeplay round intro used to open on the
   // arc "Change golfer" lobby — an out-of-place extra step before a records chase / campaign round (and on

@@ -9,11 +9,8 @@
 
 import { state, btn } from './ctx';
 import { loreEventById, resolveLoreTokens, type LoreLine } from '../sim/rpg/lore';
-import { lorePortraitSVG } from '../render/loreArt';
-import { caddyPortraitSVG } from '../render/caddyPortraits';
-import { getCharacter } from '../sim/rpg/characters';
+import { castPortraitSVG } from '../render/castPortrait';
 import { betrayerName } from '../sim/rpg/storyBetrayal';
-import { golferPreviewSVG } from '../render/apparelArt';
 import type { Action } from '../ui/game';
 
 const DEFAULT_ACCENT = '#ffd97a';
@@ -67,28 +64,11 @@ function loreLineHTML(l: LoreLine, resolve: (t: string) => string): string {
 
 /** GS-story-doubt: a beat spoken by one of the PLAYABLE golfers carries a `golfer:<id>` portrait — drawn
  *  as their real figure (the cast is the portrait). GS-story-caddy-quest-dialogue: a `caddy:<id>` portrait
- *  draws the ally's roster bust (the caddy-quest mid-round beat). Everything else resolves through
- *  `lorePortraitSVG`. */
+ *  draws the ally's roster bust (the caddy-quest mid-round beat). The token→art rule itself lives in the
+ *  shared `render/castPortrait.ts` seam (GS-story-credits), because the credits roll asks the same
+ *  question; the `lore` uid prefix + 150×300 figure are this SURFACE's own framing. */
 function lorePortrait(portrait: string): string {
-  if (portrait.startsWith('caddy:')) {
-    const svg = caddyPortraitSVG(portrait.slice('caddy:'.length));
-    if (svg) return svg;
-  }
-  if (portrait.startsWith('golfer:')) {
-    const ch = getCharacter(portrait.slice('golfer:'.length));
-    if (ch) {
-      return golferPreviewSVG(undefined, undefined, undefined, {
-        skin: ch.style.skin,
-        shirtBase: ch.style.shirt,
-        capColor: ch.style.cap,
-        hair: ch.style.hair,
-        uid: `lore${ch.id.replace(/[^a-z0-9]/gi, '')}`,
-        w: 150,
-        h: 300,
-      });
-    }
-  }
-  return lorePortraitSVG(portrait);
+  return castPortraitSVG(portrait, { uidPrefix: 'lore', w: 150, h: 300 });
 }
 
 /** Render the pending lore beat. Defensive fallback (a Continue button) if the id doesn't resolve, so a

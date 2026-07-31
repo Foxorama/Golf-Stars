@@ -1563,11 +1563,22 @@ export function reduce(state: UiState, action: Action): UiState {
     }
 
     case 'storyFinaleContinue': {
-      // GS-story-yggdrasil: dismiss the recap. A defeat returns to the clubhouse for a rematch; a victory
-      // returns to the title (the campaign is complete — Star Tour is unlocked there).
+      // GS-story-yggdrasil: dismiss the recap. A defeat returns to the clubhouse for a rematch.
+      // GS-story-credits: a VICTORY rolls the credits — the recap's button has said "Roll the credits ›"
+      // since the finale shipped, and until now it went straight to the title. The roll reads the live
+      // `story` (its alignment picks the ending, its partner tally picks who ran), so the campaign is
+      // deliberately still loaded here; `endStoryCredits` is what finally lands on the title.
       if (state.screen !== 'storyFinaleResult') return state;
       const won = state.lastStoryFinale?.won === true;
-      return { ...state, screen: won ? 'title' : 'story', lastStoryFinale: undefined };
+      return { ...state, screen: won ? 'storyCredits' : 'story', lastStoryFinale: undefined };
+    }
+
+    case 'endStoryCredits': {
+      // GS-story-credits: the end of the roll (and of the campaign) — the title, where Star Tour is now
+      // unlocked. Guarded to the screen like every other navigation action, so a stray dispatch from
+      // anywhere else is a no-op rather than a way out of a run.
+      if (state.screen !== 'storyCredits') return state;
+      return { ...state, screen: 'title' };
     }
 
     case 'playYggdrasilRealm': {

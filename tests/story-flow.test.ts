@@ -1031,10 +1031,15 @@ describe('Story finale flow (GS-story-yggdrasil)', () => {
     expect(won.screen).toBe('storyFinaleResult');
     expect(won.lastStoryFinale!.won).toBe(true);
     expect(won.story!.completed).toBe(true);
+    // GS-story-credits: a win rolls the CREDITS, and the campaign is still loaded there (the roll reads
+    // its alignment + partner tally); leaving the roll is what lands on the title.
     const back = reduce(won, { type: 'storyFinaleContinue' });
-    expect(back.screen).toBe('title'); // a win → roll credits to the title (Star Tour now unlocked)
+    expect(back.screen).toBe('storyCredits');
     expect(back.story!.completed).toBe(true);
     expect(back.starTourUnlocked).toBe(true); // GS-story-startour-unlock: the permanent main-save flag is set
+    const titled = reduce(back, { type: 'endStoryCredits' });
+    expect(titled.screen).toBe('title');
+    expect(titled.starTourUnlocked).toBe(true);
   });
 
   it('the Star Tour unlock is PERMANENT — a new campaign never relocks it (GS-story-startour-unlock)', () => {

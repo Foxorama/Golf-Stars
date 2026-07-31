@@ -112,6 +112,7 @@ import { storyShipyardScreen } from './app/storyShipyardScreens';
 import { shipInteriorScreen } from './app/shipInteriorScreens';
 import { storyTournamentScreen, storyTournamentPopScreen, storyTournamentResultScreen, storyTournamentAftermathScreen } from './app/storyTournamentScreens';
 import { storyFinaleScreen, storyFinaleResultScreen } from './app/storyFinaleScreens';
+import { storyCreditsScreen } from './app/storyCreditsScreens';
 import { storyChoiceScreen } from './app/storyChoiceScreens';
 import { storyInterludeScreen } from './app/storyInterludeScreens';
 import { storyBarScreen } from './app/storyBarScreens';
@@ -220,7 +221,7 @@ function boot(): void {
  *     come fast on the wide ribbon and the Bifröst trigger fires authentically when you make one).
  *   • `?asgard=1`  — jump STRAIGHT into the Bifröst interlude (the Himinbjörg map → cross → the nine-hole
  *     tournament → win/lose → return), from a real suspended run so "Return to your journey" works.
- *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storymidbeat|storyquestbeat|storyquestoffer|storyshop|storylocker|storyshipyard|shipinterior|storytournament|storyfinale|storyfinaleherald|storychoice|storyinterlude|storyaftermath|storyqualresult|storyqualmatch|storyqualmatchlive|storyqualpick|storybar` (GS-screen-deeplink) — mount a between-stop
+ *   • `?screen=travel|shop|starmart|trademarket|clubhouse|lore|storymidbeat|storyquestbeat|storyquestoffer|storyshop|storylocker|storyshipyard|shipinterior|storytournament|storyfinale|storyfinaleherald|storycredits|storycreditsherald|storychoice|storyinterlude|storyaftermath|storyqualresult|storyqualmatch|storyqualmatchlive|storyqualpick|storybar` (GS-screen-deeplink) — mount a between-stop
  *     screen directly, so the browser LAYOUT smoke tests (tests/build.test.ts) can reach the travel /
  *     shop / market / clubhouse / lore surfaces WITHOUT playing a full stop (shot animations + watch screens
  *     are flaky to script). The report's highest-risk uncovered surface — the journey map was
@@ -485,10 +486,16 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
     }
     case 'storyfinale':
     case 'storyfinaleherald':
-    case 'storyfinaleresult': {
+    case 'storyfinaleresult':
+    case 'storycredits':
+    case 'storycreditsherald': {
       // GS-story-yggdrasil: reach the finale by seeding a five-Sigil campaign directly (the honest tournament
       // grind is long; the finale gate is `keyToOtherRealm`, which we set via trophies). `storyfinaleresult`
       // engages to land on the recap. This bypasses the cinematic (a render-only feel layer).
+      // GS-story-credits: `storycredits*` goes one step further and dismisses that WON recap through its own
+      // `storyFinaleContinue`, so the roll is reached by the real routing rather than mounted by hand.
+      const herald = screen === 'storyfinaleherald' || screen === 'storycreditsherald';
+      const others = CHARACTERS.filter((c) => c.id !== CHARACTERS[0]!.id).map((c) => c.id);
       const base = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
       const armed: UiState = base.story
         ? {
@@ -496,10 +503,15 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
             story: {
               ...base.story,
               chapter: 5,
-              // GS-story-warden-ark: `storyfinaleherald` seeds the COIL path, whose finale is a different
-              // enemy entirely — the Warden Ark blockade, not the serpent — so the layout smoke reaches it.
-              ...(screen === 'storyfinaleherald' ? { alignment: 'herald' as const } : {}),
+              // GS-story-warden-ark: the `*herald` variants seed the COIL path, whose finale is a different
+              // enemy entirely — the Warden Ark blockade, not the serpent — so the layout smoke reaches it
+              // (and whose credits roll is the other set of epilogues entirely).
+              ...(herald ? { alignment: 'herald' as const } : {}),
               trophyIds: ['sigil-emerald', 'sigil-ember', 'sigil-storm', 'sigil-abyssal', 'sigil-serpent'],
+              // Both team-Sigil partners picked, so the credits roll casts a real odd-one-out rather than
+              // falling back to the first tour-mate.
+              sigil1Partner: others[0],
+              sigil2Partner: others[0],
               // arm the ship so the finale is winnable (the result deep-link lands on the victory recap)
               ownedShipUpgradeIds: ['upg:weapon:scatter', 'upg:weapon:railgun', 'upg:engine:ion', 'upg:shield:deflector', 'upg:shield:aegis'],
             },
@@ -507,7 +519,9 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
         : base;
       const briefing = reduce({ ...armed, screen: 'story' }, { type: 'openStoryFinale' });
       if (screen === 'storyfinale' || screen === 'storyfinaleherald') return briefing;
-      return reduce(briefing, { type: 'engageStoryFinale' });
+      const recap = reduce(briefing, { type: 'engageStoryFinale' });
+      if (screen === 'storyfinaleresult') return recap;
+      return reduce(recap, { type: 'storyFinaleContinue' });
     }
     case 'storychoice': {
       // GS-story-chapters: mount The Choice by seeding a post-Chapter-3 campaign (three Sigils, chapter 4,
@@ -2936,6 +2950,62 @@ function refreshSettings(): void {
   });
 }
 
+/**
+ * GS-story-credits — the credits crawl.
+ *
+ * How far the roll has scrolled, kept OUTSIDE the DOM because `render()` replaces `#app.innerHTML`
+ * wholesale: opening the settings sheet over the credits builds a brand-new (scrollTop 0) element, and
+ * without this the roll would restart from the top every time. Reset the moment the screen is left, so
+ * a second campaign's credits open at the beginning.
+ */
+let creditsTop = 0;
+/** Whether the crawl is still driving itself. Module-scope for the same reason as `creditsTop`: once
+ *  the player has taken the scrollbar, a re-render must not hand it back and start crawling again. */
+let creditsAuto = true;
+
+/**
+ * Start (or resume) the crawl on the credits roll, if one is mounted.
+ *
+ * Runs off ONE rAF loop that self-terminates when its element leaves the document — which is the whole
+ * cleanup story, because `render()` detaches the old element and mounts a fresh one. No window listener
+ * (GS-a11y-keyboard's stacking trap); every listener sits on the element itself and dies with it. Any
+ * real input — wheel, drag, keyboard — hands control to the player and the crawl stops for good, so it
+ * can never fight somebody who is reading.
+ */
+function wireCreditsRoll(): void {
+  if (state.screen !== 'storyCredits') {
+    creditsTop = 0;
+    creditsAuto = true;
+    return;
+  }
+  const roll = document.querySelector<HTMLElement>('[data-cred-roll]');
+  if (!roll) return;
+  roll.scrollTop = creditsTop;
+  if (reducedMotion()) return; // read it by hand — a collapsed CSS crawl would just snap to the end
+  const stop = (): void => {
+    creditsAuto = false;
+  };
+  // `wheel`/`touchmove` are passive: we never preventDefault, we only stand aside.
+  roll.addEventListener('wheel', stop, { passive: true });
+  roll.addEventListener('touchmove', stop, { passive: true });
+  roll.addEventListener('pointerdown', stop);
+  roll.addEventListener('keydown', stop);
+  const CRAWL_PX_PER_MS = 0.034; // ~34px/s — a readable card every few seconds
+  let last = performance.now();
+  const step = (now: number): void => {
+    if (!roll.isConnected) return; // the screen was re-rendered or left: this loop is done
+    const dt = Math.min(120, now - last); // a backgrounded tab must not lurch the roll forward
+    last = now;
+    if (creditsAuto) {
+      const end = roll.scrollHeight - roll.clientHeight;
+      if (roll.scrollTop < end) roll.scrollTop = Math.min(end, roll.scrollTop + CRAWL_PX_PER_MS * dt);
+    }
+    creditsTop = roll.scrollTop;
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
 function render(): void {
   const app = document.getElementById('app');
   if (!app) return;
@@ -3144,6 +3214,8 @@ function render(): void {
       ? storyFinaleScreen()
       : state.screen === 'storyFinaleResult'
       ? storyFinaleResultScreen()
+      : state.screen === 'storyCredits'
+      ? storyCreditsScreen()
       : state.screen === 'storyChoice'
       ? storyChoiceScreen()
       : state.screen === 'storyInterlude'
@@ -4049,6 +4121,12 @@ function render(): void {
     drawStoryFigure(ctx, id!, cv.width / 2, cv.height - 8, cv.height * 0.92, performance.now(), lefty());
   });
 
+  // GS-story-credits: crawl the credits roll. Deliberately an ENHANCEMENT over an ordinary scrollable
+  // region rather than a CSS keyframe animation: `.gs-reduced` collapses every animation DURATION to
+  // near-zero (GS-a11y-motion), so a keyframed crawl would SNAP to the end for exactly the players who
+  // asked for less motion. Under reduced motion the loop simply never starts and the roll is read by
+  // hand — same markup, same content, same "The End" button at the bottom of it.
+  wireCreditsRoll();
 
   // Mount the animated play view on the result screen.
   if (state.screen === 'result' && state.played) {

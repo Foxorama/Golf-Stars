@@ -643,6 +643,28 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     SCAN of the story/lore modules' source (a row nobody wired an accessor for — bug two was a beat TITLE),
     and a generic-masculine SCAN of the WHOLE sim/app/render surface (bug three was in the bar, not a beat).
     Exceptions are an allowlist that NAMES whose line each one is — if you add one, say who.
+  - **THE CREDITS ROLL IS A CARD PER CHARACTER, AND EVERY CARD KNOWS WHICH ENDING IT IS ROLLING ON**
+    (GS-story-credits, `sim/rpg/storyCredits.ts` pure · `app/storyCreditsScreens.ts` the `.gs-cred*` screen).
+    The finale recap has offered *"Roll the credits ›"* since the finale shipped and went straight to the
+    title — the campaign's last promise was the one thing it never delivered. A Mallrats "where are they now"
+    card per cast member now sits between them (`storyCredits` → `endStoryCredits` → title). **Every row
+    carries BOTH epilogues** (a Warden win wakes the galaxy, a Herald win puts it to sleep — one shared set
+    would be false on whichever road you didn't take, and a credits roll that lies about its own ending is
+    worse than none; machine-checked that no epilogue is shared). **A friend's ROLE is asked, never
+    re-derived** — `betrayerId` on the Warden road, `heraldSeveredId` on the Coil one, the same seams the
+    ending recap read one screen earlier, so the roll can't name a different traitor than the ending did.
+    **The hero's card is SECOND PERSON**: the protagonist is a PICK, so any third-person pronoun misgenders
+    three quarters of the players (GS-story-neutral-address) — a test forbids all of them on that card. The
+    token→portrait rule MOVED out of `loreScreens.ts` into the shared `render/castPortrait.ts` (two askers,
+    GS-one-description) and gained `agent:<id>`, which reads a Coil agent's bust + tint off its OWN
+    `HeraldAgent` row. **The crawl is a rAF loop, never a CSS animation** — `.gs-reduced` collapses every
+    animation DURATION, so a keyframed crawl would SNAP TO THE END for exactly the players who asked for
+    less motion; it never starts under reduced motion and the roll still reads, scrolls and reaches its own
+    "The End" by hand. It scrolls INSIDE itself (the embed's page frame can't — GS-embed-scroll) with a
+    deliberately LOW height floor: `--gs-dvh` divides by the UI scale so the reserve is constant in UNITS
+    but a px floor is not, and 280px pushed the roll off a 320×568 screen at the top reader rung. Back is a
+    NAVIGATE, not a swallow — the campaign is banked before the roll starts, so there is nothing to skip.
+    Guarded by `tests/story-credits.test.ts` + `?screen=storycredits|storycreditsherald` smokes.
 
 - **Putting** — `docs/decisions/putting.md`
   - Manual pace-meter by default; AUTO only via the Penelope Putter caddy (`takePutt(…, control?)`;

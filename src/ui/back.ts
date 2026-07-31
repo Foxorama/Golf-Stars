@@ -130,6 +130,11 @@ function screenIntent(state: UiState): BackIntent {
       return { kind: 'navigate', action: { type: 'exitStoryFinale' } };
     case 'storyBar':
       return { kind: 'navigate', action: { type: 'exitStoryBar' } };
+    case 'storyCredits':
+      // GS-story-credits: NOT forward-only, unlike the beats below — the campaign is already complete
+      // and banked by the time the roll starts, so there is nothing left for a back press to skip. It
+      // means what the screen's own footer button means: leave the roll, land on the title.
+      return { kind: 'navigate', action: { type: 'endStoryCredits' } };
 
     // ── Forward-only: results, rewards and story beats absorb back ───────────────────────────────
     // These advance the run/campaign when dismissed, so treating back as "continue" would let a
