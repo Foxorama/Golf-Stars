@@ -84,20 +84,42 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
+/**
+ * Memo for `hashHole` (GS-shot-lag). A hole is IMMUTABLE once generated, so its art seed is a
+ * constant — but it is asked for hundreds of times per built scene (a dozen art streams, plus once
+ * per scattered ground patch via `patchRng`), and the play view's follow-cam rebuilds the whole
+ * scene every frame. Profiled on a real watched shot, re-walking every feature and hazard poly on
+ * each call was **13.4% of all CPU** — the single largest line in the frame. Keyed weakly on the
+ * hole's identity so the entry dies with the hole.
+ */
+const HOLE_HASH = new WeakMap<Hole, number>();
+
 /** Stable hash of a hole's geometry → an art seed (independent of the sim's seeded stream). */
 export function hashHole(h: Hole): number {
+  const memo = HOLE_HASH.get(h);
+  if (memo !== undefined) return memo;
   let s = 2166136261 >>> 0;
   const mix = (x: number) => {
     s ^= Math.round(x * 1000) | 0;
     s = Math.imul(s, 16777619) >>> 0;
   };
   mix(h.tee[0]); mix(h.tee[1]); mix(h.green[0]); mix(h.green[1]); mix(h.par);
-  for (const f of [...h.features, ...h.hazards]) {
+  // Features then hazards, in place: the old `[...h.features, ...h.hazards]` built two throwaway
+  // arrays on EVERY call — i.e. per patch, per frame — for a walk that never needed the copy. The
+  // visited order (and so the hash) is unchanged.
+  for (const f of h.features) {
     mix(f.poly.length);
     mix(f.poly[0]![0]);
     mix(f.poly[0]![1]);
   }
-  return s >>> 0;
+  for (const f of h.hazards) {
+    mix(f.poly.length);
+    mix(f.poly[0]![0]);
+    mix(f.poly[0]![1]);
+  }
+  s = s >>> 0;
+  HOLE_HASH.set(h, s);
+  return s;
 }
 
 export function centroidOf(pts: Vec[]): Vec {

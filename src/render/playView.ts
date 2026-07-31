@@ -205,6 +205,11 @@ const TENT_CALLOUT_MS = 1100; // virtual ms a trade-tent "Ow!" bubble (GS-tents)
 const REDIRECT_FIRE_FRAC = 0.28; // flight progress where the caddy looses the laser/boomerang
 const REDIRECT_HIT_FRAC = 0.5; // flight progress where it meets the ball (the would-be miss point)
 const REDIRECT_ZOOM = 0.6; // viewRadius multiplier at the impact (smaller = zoomed in)
+/** Follow-cam pan (in SCREEN px) below which the camera is treated as settled, so the projector —
+ *  and with it the whole static-scene cache — is reused (GS-shot-lag). A twentieth of a pixel is
+ *  under a quarter of a device pixel at any dpr the game runs at: invisible, and it is what lets an
+ *  exponentially-easing camera actually ARRIVE instead of converging forever. */
+const CAMERA_SETTLE_PX = 0.05;
 
 function feel(): PlayFeel {
   const override = (window as unknown as { _gsFeel?: Partial<PlayFeel> })._gsFeel ?? {};
@@ -371,6 +376,13 @@ export function mountPlayView(
         })
       : holeProjector(hole, { width, height, extra });
   let proj = buildProj();
+  /** The `cineZoom` `proj` was built at. The follow-cam may now hold the projector still across
+   *  frames (GS-shot-lag), so "the camera has not moved" must account for the redirect cinematic's
+   *  live viewRadius multiplier too — otherwise a zoom that eases while the ball happens to be
+   *  settled would never reach the projector, and the cinematic would stall at whatever zoom it had
+   *  when the pan stopped. In practice the ball is in flight throughout a redirect, so this is a
+   *  guarantee rather than an observed bug — which is exactly why it should not be left implicit. */
+  let projZoom = cineZoom;
 
   // --- animation state ---
   let shotIndex = 0;
@@ -618,12 +630,66 @@ export function mountPlayView(
 
   let cachedProj: typeof proj | null = null;
   let cachedScene: Prim[] = [];
+  // The PAINTED scene at `cachedProj`, kept so a still camera can blit instead of re-stroking the
+  // world (GS-shot-lag). Built lazily — a mount whose camera never settles never allocates it.
+  let sceneBitmap: HTMLCanvasElement | null = null;
+  let bitmapProj: typeof proj | null = null;
+  /**
+   * Paint the static world.
+   *
+   * Two caches, and the second is the one that matters. The scene PRIMS are cached by projector
+   * identity (a whole-hole fit builds once; a panning follow-cam rebuilds), but that only skips the
+   * BUILD — the world was still stroked, filled, clipped and gradient-ed into the canvas every single
+   * frame, even when the camera had not moved a pixel and the picture was provably identical.
+   * MEASURED, because the top-level prim count badly understates it: `buildScene` returns ~1,000–1,900
+   * prims, but most of the world lives inside `clip` groups, and painting a green at the PUTT camera
+   * issues about **97,000 canvas operations** — every frame. On a putts-only watch, where the camera
+   * is deliberately STILL (`follow: hadShots`, see app.ts), 100% of that was waste, and the green ran
+   * at 3.3 fps under a 12× CPU throttle: the laggiest screen in the game.
+   *
+   * So: while the projector is unchanged the scene is painted ONCE into an offscreen canvas and
+   * blitted. Byte-identical output by construction — the same prims through the same painter, just
+   * into a different surface — so this can never change what is drawn, only how often it is drawn.
+   * A moving camera skips the offscreen entirely (painting it as well as the frame would be strictly
+   * more work), and the first still frame after a pan pays one extra paint to fill it.
+   *
+   * The offscreen takes the play canvas's OWN device dimensions and is blitted back at exactly those
+   * dimensions in CSS units, so under `ctx`'s dpr scale the copy is 1:1 and cannot soften. It must be
+   * `canvas.width`, never a re-derived `width * dpr`: `dpr` folds in the UI zoom (GS-a11y-readable-
+   * text) and is routinely fractional, and a canvas's width attribute TRUNCATES — so the two would
+   * disagree by a device pixel and resample the whole world. Drawn at 0,0 under whatever transform
+   * the caller has set, so the screen-shake translate applies to the blit exactly as it applied to
+   * the prims. Nothing is cleared first, for the same reason the direct path never was: the scene's
+   * own space base covers the frame, and where it doesn't, source-over leaves what the prims left.
+   */
   function drawStatic(): void {
     if (proj !== cachedProj) {
       cachedScene = buildScene(hole, proj, { width, height, biome: opts.biome, themeId: opts.themeId, rainbow: opts.rainbow, tradeTents: opts.tradeTents, meteorScorch: opts.meteorScorch, groundPatch: opts.groundPatch, animateCetus: isCetus });
       cachedProj = proj;
+      bitmapProj = null; // the bitmap now shows the wrong camera
+      drawScenePrims(ctx, cachedScene);
+      return;
     }
-    drawScenePrims(ctx, cachedScene);
+    if (bitmapProj !== proj) {
+      if (!sceneBitmap) {
+        sceneBitmap = document.createElement('canvas');
+        sceneBitmap.width = canvas.width;
+        sceneBitmap.height = canvas.height;
+      }
+      const bctx = sceneBitmap.getContext('2d');
+      if (!bctx) {
+        // No second context (an exhausted canvas budget on a low-end device): fall back to the
+        // classic per-frame paint rather than dropping the world off the screen.
+        sceneBitmap = null;
+        drawScenePrims(ctx, cachedScene);
+        return;
+      }
+      bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      bctx.clearRect(0, 0, width, height);
+      drawScenePrims(bctx, cachedScene);
+      bitmapProj = proj;
+    }
+    ctx.drawImage(sceneBitmap!, 0, 0, canvas.width / dpr, canvas.height / dpr);
   }
 
   function drawHUD(text: string): void {
@@ -715,10 +781,33 @@ export function mountPlayView(
 
     // Follow-cam: ease the camera toward the ball's last position and rebuild the projector,
     // so the view pans to keep up with the ball (one-frame lag is imperceptible).
+    //
+    // The ease is exponential, so once the ball is at rest the camera CONVERGES on it and never
+    // arrives — and `buildProj()` mints a fresh projector object every frame regardless, which is
+    // the cache key `drawStatic` compares on. So the world was rebuilt and repainted 60×/second to
+    // draw a picture that had stopped changing (GS-shot-lag). Below a twentieth of a SCREEN PIXEL
+    // the pan is not a pan: the camera settles, the projector is reused, and the scene cache holds
+    // for the whole tail of the shot — the run-out, the rest, the beat before the card. Measured in
+    // px, not yards, because that is what "the picture moved" means at any zoom.
     if (followMode && opts.follow) {
-      camera = [camera[0] + (lastGround[0] - camera[0]) * 0.2, camera[1] + (lastGround[1] - camera[1]) * 0.2];
-      proj = buildProj();
-      weather.setWind(windScreenDir()); // keep the wind reading true as the camera pans
+      const nx = camera[0] + (lastGround[0] - camera[0]) * 0.2;
+      const ny = camera[1] + (lastGround[1] - camera[1]) * 0.2;
+      const stepPx = Math.hypot(nx - camera[0], ny - camera[1]) * proj.scale;
+      const arrived = camera[0] === lastGround[0] && camera[1] === lastGround[1];
+      if (stepPx > CAMERA_SETTLE_PX || cineZoom !== projZoom) {
+        camera = [nx, ny];
+        proj = buildProj();
+        projZoom = cineZoom;
+        weather.setWind(windScreenDir()); // keep the wind reading true as the camera pans
+      } else if (!arrived) {
+        // The final step: SNAP onto the ball rather than freezing a fraction of a pixel short of it.
+        // One more rebuild, and then the camera is exactly where it was easing to and stays there —
+        // so the resting frame is a definite picture rather than the limit of a series.
+        camera = [lastGround[0], lastGround[1]];
+        proj = buildProj();
+        projZoom = cineZoom;
+        weather.setWind(windScreenDir());
+      }
     }
 
     // Screen-shake offset (deterministic decay). Reduced motion zeroes the AMPLITUDE rather than
@@ -1437,6 +1526,11 @@ export function mountPlayView(
     destroy(): void {
       cancelAnimationFrame(raf);
       container.innerHTML = '';
+      // Drop the cached world bitmap explicitly. It is a full-screen device-resolution surface and a
+      // round of golf mounts one of these per stroke, so leaving it to be collected with the closure
+      // is a lot of GPU-backed memory to hold on a phone (GS-shot-lag).
+      sceneBitmap = null;
+      cachedScene = [];
     },
   };
 }
