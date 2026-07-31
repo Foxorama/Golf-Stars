@@ -25,7 +25,28 @@ Shape: a DISPLAY-scale multiplier composed with the player's own `--gs-uiscale`,
 must keep dividing by the COMBINED value or every viewport-locked box breaks (GS-a11y-scale-wrap).
 Fixes the recap screens, the 68%-empty menu margins in fullscreen, and (once the chart is unbounded
 again) the star-map HUD complaint that GS-startour-frame currently side-steps. Wants eyes-on across
-every screen, and a decision on the ceiling — a 4K display should not render the HUD at 3x.
+every screen.
+**Scoped 2026-07-31 — the two open questions are now settled, so the next session builds rather than
+re-argues.**
+- **THE RULE: every display lays out as the phone the game is composed for.** `scale =
+  clamp(1, innerHeight / 844, 1.5)` — 844 is the iPhone 14 the composition is tuned against, so a
+  1080p display lays out in 844 units drawn 1.28x. **The ceiling is 1.5** (decided): 1440p and 4K cap
+  there rather than rendering the HUD at 1.71x/2.56x, and a capped 1440p still lays out as a
+  960-unit-tall phone-shaped screen, which is comfortably bigger without becoming a billboard.
+- **The insertion point is ONE token, and every existing consumer is untouched.** `--gs-uiscale`
+  becomes `calc(var(--gs-readerscale) * var(--gs-displayscale))` — settings writes the reader half,
+  `viewportFit.ts` (the ONLY module allowed to compute a scaled viewport — GS-a11y-tight-fit) writes
+  the display half. `zoom`, `--gs-vh`, `--gs-dvh`, `--gs-portrait-w` and `data-gs-fit` all already
+  read the combined token.
+- **`--gs-portrait-w` must be MULTIPLIED by the display half, and then the play screen and star chart
+  come out LAYOUT-IDENTICAL** — not merely unharmed, byte-for-byte in layout units, drawn bigger. It
+  is `0.52 · dvh` and `--gs-dvh` divides by the scale, so multiplying it back means the portrait frame
+  grows by exactly the factor its contents do. Miss this and the play HUD's controls inflate inside a
+  frame whose rendered width never moved — the map's clear band pays for it, and GS-decision-frame-carry
+  has just spent a whole pass buying that band back.
+- **Not a media query.** A breakpoint could see the raw viewport here (the usual GS-a11y-scale-wrap
+  warning is the other direction), but it can only STEP, and a visible jump mid-resize is worse than
+  the smooth ramp `viewportFit.ts` already has a resize path for.
 
 **GS-embed-letterbox — half the itch embed's width is undressed background on the play screen**
 *(surfaced by the 2026-07-31 itch-embed layout sweep; deliberately NOT done there, because it is a
