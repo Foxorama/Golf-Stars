@@ -1,17 +1,9 @@
-import { readdirSync, existsSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { build } from 'esbuild';
-import { chromium } from 'playwright-core';
+import { writeFileSync } from 'node:fs';
 
-function findChromium() {
-  const bases = [process.env.PLAYWRIGHT_BROWSERS_PATH, '/opt/pw-browsers', `${homedir()}/AppData/Local/ms-playwright`].filter(Boolean);
-  for (const base of bases) {
-    let dirs;
-    try { dirs = readdirSync(base).filter((x) => x.startsWith('chromium-') && !x.includes('headless')); } catch { continue; }
-    for (const d of dirs) for (const bin of [`${base}/${d}/chrome-linux/chrome`]) if (existsSync(bin)) return bin;
-  }
-  return null;
-}
+import { build } from 'esbuild';
+
+
+
 
 const entry = `
 import { golferPreviewSVG } from './src/render/apparelArt';
@@ -60,15 +52,14 @@ const result = await build({ stdin: { contents: entry, resolveDir: process.cwd()
 const html = `<!doctype html><html><head><meta charset="utf8"></head><body style="margin:0;padding:16px;background:#0b0d12;"><script>${result.outputFiles[0].text}</script></body></html>`;
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { launchChromium } from './chromium.mjs';
 const pngPath = process.env.CLUBHOUSE_PREVIEW_PNG ?? join(tmpdir(), 'clubhouse-preview.png');
-try {
-  const exe = findChromium();
-  if (!exe) throw new Error('no chromium');
-  const browser = await chromium.launch({ executablePath: exe });
-  const page = await browser.newPage({ viewport: { width: 900, height: 1200 }, deviceScaleFactor: 2 });
-  await page.setContent(html, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(400);
-  await page.screenshot({ path: pngPath, fullPage: true });
-  await browser.close();
-  console.log('wrote ' + pngPath);
-} catch (e) { console.log('(screenshot skipped: ' + e.message + ')'); }
+// A failure here is LOUD (GS-preview-chromium): the old catch printed "(screenshot skipped)" and
+// exited 0, so the rig reported success having drawn nothing.
+const browser = await launchChromium();
+const page = await browser.newPage({ viewport: { width: 900, height: 1200 }, deviceScaleFactor: 2 });
+await page.setContent(html, { waitUntil: 'networkidle' });
+await page.waitForTimeout(400);
+await page.screenshot({ path: pngPath, fullPage: true });
+await browser.close();
+console.log('wrote ' + pngPath);

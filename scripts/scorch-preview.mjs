@@ -6,32 +6,16 @@
 //   node scripts/scorch-preview.mjs   → writes the PNG to the OS temp dir, prints the path
 
 import { createServer } from 'vite';
-import { writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { chromium } from 'playwright-core';
+import { launchChromium } from './chromium.mjs';
+
 
 const outPng = process.env.SCORCH_OUT ?? join(tmpdir(), 'gs-scorch.png');
 const outHtml = join(tmpdir(), 'gs-scorch.html');
 
-function findChromium() {
-  const bases = [
-    process.env.PLAYWRIGHT_BROWSERS_PATH,
-    process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'ms-playwright') : undefined,
-    process.env.HOME ? join(process.env.HOME, '.cache', 'ms-playwright') : undefined,
-    '/opt/pw-browsers',
-  ].filter(Boolean);
-  for (const base of bases) {
-    if (!existsSync(base)) continue;
-    for (const d of readdirSync(base)) {
-      if (!d.startsWith('chromium-') || d.includes('headless')) continue;
-      for (const bin of [join(base, d, 'chrome-win64', 'chrome.exe'), join(base, d, 'chrome-linux', 'chrome')]) {
-        if (existsSync(bin)) return bin;
-      }
-    }
-  }
-  return null;
-}
+
 
 const server = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' });
 const { generateCourse } = await server.ssrLoadModule('/src/sim/course/generate.ts');
@@ -70,8 +54,8 @@ const html = `<!doctype html><meta charset="utf8"><body style="margin:0;backgrou
 <style>figcaption{color:#cfd6e4;font-size:12px;margin-bottom:4px}figure{margin:0}</style>${cards}</body>`;
 writeFileSync(outHtml, html);
 
-const exe = findChromium();
-const browser = await chromium.launch(exe ? { executablePath: exe } : {});
+
+const browser = await launchChromium({ wrote: outHtml });
 const page = await browser.newPage({ viewport: { width: 960, height: 1100 }, deviceScaleFactor: 2 });
 await page.goto('file://' + outHtml.replace(/\\/g, '/'));
 await page.waitForTimeout(300);

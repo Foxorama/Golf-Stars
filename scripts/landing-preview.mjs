@@ -11,7 +11,8 @@ import http from 'node:http';
 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { chromium } from 'playwright-core';
+import { launchChromium } from './chromium.mjs';
+
 
 const outPng = process.env.OUT ?? join(tmpdir(), 'gs-landing.png');
 
@@ -116,11 +117,7 @@ const html = `<!doctype html><meta charset="utf8">
 </script></body>`;
 
 const vite = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' });
-// The ONE Chromium lookup (tests/chromium.ts). This script used to carry its own Linux-only copy, so
-// on Windows it found nothing and hard-failed — the exact second-description bug GS-browser-test-gate
-// is about, and it is why the eyes-on sheet for the landing could not be re-shot here. It is
-// TypeScript, so it comes through the vite server we already have.
-const { chromePath } = await vite.ssrLoadModule('/tests/chromium.ts');
+
 const srv = http.createServer((req, res) => {
   const path = req.url.split('?')[0];
   if (path === '/' || path === '/index.html') { res.setHeader('content-type', 'text/html'); res.end(html); return; }
@@ -128,8 +125,8 @@ const srv = http.createServer((req, res) => {
 });
 await new Promise((ok) => srv.listen(0, ok));
 const port = srv.address().port;
-if (!chromePath) throw new Error('no Chromium found — set CHROME_PATH (see tests/chromium.ts)');
-const browser = await chromium.launch({ executablePath: chromePath, args: ['--no-sandbox'] });
+
+const browser = await launchChromium({ args: ['--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 2 });
 page.on('pageerror', (e) => console.error('PAGE ERROR:', e.message));
 page.on('console', (m) => { if (m.type() === 'error') console.error('CONSOLE:', m.text()); });

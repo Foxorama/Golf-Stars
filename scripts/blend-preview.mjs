@@ -2,16 +2,12 @@
 // Renders several cetus & void holes (calm + deep island-hop) plus hazard-heavy parkland holes
 // (water + sand) so the stripe contrast and hazard edges can be compared side by side.
 import { createServer } from 'vite';
-import { writeFileSync, existsSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { launchChromium } from './chromium.mjs';
 const outPng = process.env.OUT ?? join(tmpdir(), 'gs-blend.png');
-async function findChromium() {
-  const base = process.env.PLAYWRIGHT_BROWSERS_PATH ?? '/opt/pw-browsers';
-  const { readdirSync } = await import('node:fs');
-  for (const d of readdirSync(base)) { if (!d.startsWith('chromium-') || d.includes('headless')) continue; const bin = join(base, d, 'chrome-linux', 'chrome'); if (existsSync(bin)) return bin; }
-  return null;
-}
+
 const server = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' });
 const { generateCourse } = await server.ssrLoadModule('/src/sim/course/generate.ts');
 const { renderHoleSVG } = await server.ssrLoadModule('/src/render/holeView.ts');
@@ -40,9 +36,9 @@ for (const [biome,themeId,label,dist] of cases){
 }
 const html=`<!doctype html><html><body style="margin:0;background:#0b0d12;display:grid;grid-template-columns:repeat(3,280px);gap:8px;padding:12px">${cells}</body></html>`;
 const outHtml=join(tmpdir(),'gs-blend.html'); writeFileSync(outHtml,html);
-const { chromium } = await import('playwright-core');
-const exe = await findChromium();
-const browser = await chromium.launch({ executablePath: exe ?? undefined, args:['--no-sandbox'] });
+
+
+const browser = await launchChromium({ args: ['--no-sandbox'], wrote: outHtml });
 const page = await browser.newPage({ deviceScaleFactor: 2 });
 await page.goto('file://'+outHtml); await page.waitForTimeout(300);
 const el = await page.$('body'); await el.screenshot({ path: outPng });

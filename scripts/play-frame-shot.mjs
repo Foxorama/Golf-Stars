@@ -3,10 +3,11 @@
  * decision on the viewports the framing is tuned against. `node scripts/play-frame-shot.mjs <tag>`
  * writes `.tmp/frame-<tag>-<viewport>.png`.
  */
-import { chromium } from 'playwright-core';
+
 import { fileURLToPath } from 'node:url';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { launchChromium } from './chromium.mjs';
 
 const tag = process.argv[2] ?? 'now';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -21,7 +22,7 @@ const VIEWPORTS = [
   ['desktop', 1920, 1080],
 ];
 
-const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH, args: ['--no-sandbox'] });
+const browser = await launchChromium({ args: ['--no-sandbox'] });
 try {
   for (const [label, width, height] of VIEWPORTS) {
     const page = await browser.newPage({ viewport: { width, height } });

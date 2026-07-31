@@ -11,25 +11,13 @@
 //   SERVE=1 node scripts/campaign-picker-preview.mjs   just serve it, print the URL, stay up
 import { createServer } from 'vite';
 import http from 'node:http';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { launchChromium } from './chromium.mjs';
 
 const outPng = process.env.OUT ?? join(tmpdir(), 'gs-campaign-picker.png');
 const serveOnly = !!process.env.SERVE;
-function findChromium() {
-  const bases = [process.env.PLAYWRIGHT_BROWSERS_PATH, '/opt/pw-browsers', process.env.HOME ? join(process.env.HOME, '.cache', 'ms-playwright') : undefined].filter(Boolean);
-  for (const base of bases) {
-    if (!existsSync(base)) continue;
-    if (existsSync(join(base, 'chromium'))) return join(base, 'chromium');
-    for (const d of readdirSync(base)) {
-      if (!d.startsWith('chromium-') || d.includes('headless')) continue;
-      const bin = join(base, d, 'chrome-linux', 'chrome');
-      if (existsSync(bin)) return bin;
-    }
-  }
-  return null;
-}
 
 // The game's own stylesheet, verbatim — a preview with hand-written CSS proves nothing.
 const indexHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -88,8 +76,7 @@ const port = srv.address().port;
 if (serveOnly) {
   console.log(`serving http://127.0.0.1:${port}/ — ctrl-c to stop`);
 } else {
-  const { chromium } = await import('playwright-core');
-  const browser = await chromium.launch({ executablePath: findChromium(), args: ['--no-sandbox'] });
+  const browser = await launchChromium({ args: ['--no-sandbox'] });
   const page = await browser.newPage({ viewport: { width: 1280, height: 940 }, deviceScaleFactor: 2 });
   page.on('pageerror', (e) => console.error('PAGE ERROR:', e.message));
   page.on('console', (m) => { if (m.type() === 'error') console.error('CONSOLE:', m.text()); });

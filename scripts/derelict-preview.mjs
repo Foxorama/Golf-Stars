@@ -2,30 +2,15 @@
 //   node scripts/derelict-preview.mjs            → writes the PNG to the OS temp dir, prints the path
 //   DERELICT_OUT=/path/out.png node ...          → writes there instead
 import { createServer } from 'vite';
-import { writeFileSync, existsSync, readdirSync } from 'node:fs';
-import { tmpdir, homedir } from 'node:os';
+import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { launchChromium } from './chromium.mjs';
 
 const outPng = process.env.DERELICT_OUT ?? join(tmpdir(), 'gs-derelict.png');
 const outHtml = join(tmpdir(), 'gs-derelict.html');
 
-async function chromiumCandidates() {
-  const bases = [process.env.PLAYWRIGHT_BROWSERS_PATH, '/opt/pw-browsers', join(homedir(), '.cache', 'ms-playwright')].filter((b) => b && existsSync(b));
-  const out = [];
-  for (const base of bases) {
-    for (const d of readdirSync(base)) {
-      if (!d.startsWith('chromium-') || d.includes('headless')) continue;
-      const bin = join(base, d, 'chrome-linux', 'chrome');
-      if (existsSync(bin)) out.push(bin);
-    }
-    for (const d of readdirSync(base)) {
-      if (!d.startsWith('chromium_headless_shell-')) continue;
-      const bin = join(base, d, 'chrome-headless-shell-linux64', 'chrome-headless-shell');
-      if (existsSync(bin)) out.push(bin);
-    }
-  }
-  return out;
-}
+
 
 const server = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' });
 const { generateCourse } = await server.ssrLoadModule('/src/sim/course/generate.ts');
@@ -46,13 +31,11 @@ for (const dist of [4, 14, 22]) {
 const html = `<!doctype html><html><body style="margin:0;background:#05060a;display:grid;grid-template-columns:repeat(6,300px);gap:8px;padding:12px">${cells}</body></html>`;
 writeFileSync(outHtml, html);
 
-const candidates = await chromiumCandidates();
-const { chromium } = await import('playwright-core');
-let browser = null;
-for (const chromePath of candidates) {
-  try { browser = await chromium.launch({ executablePath: chromePath, args: ['--no-sandbox'] }); break; } catch { /* next */ }
-}
-if (!browser) { console.log('No launchable Chromium — wrote HTML only:', outHtml); await server.close(); process.exit(0); }
+
+
+
+const browser = await launchChromium({ args: ['--no-sandbox'], wrote: outHtml });
+
 const page = await browser.newPage({ viewport: { width: 1860, height: 1000 }, deviceScaleFactor: 2 });
 await page.goto('file://' + outHtml);
 await page.screenshot({ path: outPng, fullPage: true });

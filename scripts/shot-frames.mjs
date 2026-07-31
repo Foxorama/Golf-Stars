@@ -17,10 +17,11 @@
 //     band the whole way, never freezes mid-animation, and comes to rest instead of blinking out.
 //
 //   node scripts/shot-frames.mjs            (SEED=42 default; TRACK=1 to dump every frame)
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium } from 'playwright-core';
+import { launchChromium } from './chromium.mjs';
+
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dist = resolve(__dirname, '../dist/index.html');
@@ -31,34 +32,16 @@ const TRACK = !!process.env.TRACK;
 const R_FLOOR = 3;
 const R_CAP = 5.5;
 
-function findChromium() {
-  const bases = [
-    process.env.PLAYWRIGHT_BROWSERS_PATH,
-    '/opt/pw-browsers',
-    process.env.HOME ? join(process.env.HOME, '.cache', 'ms-playwright') : undefined,
-  ].filter(Boolean);
-  for (const base of bases) {
-    if (!existsSync(base)) continue;
-    for (const d of readdirSync(base)) {
-      if (!d.startsWith('chromium-') || d.includes('headless')) continue;
-      const bin = join(base, d, 'chrome-linux', 'chrome');
-      if (existsSync(bin)) return bin;
-    }
-  }
-  return null;
-}
 
-const chromePath = findChromium();
-if (!chromePath) {
-  console.error('no chromium found (PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers)');
-  process.exit(1);
-}
+
+
+
 if (!existsSync(dist)) {
   console.error('dist/index.html missing - run `npm run build` first');
   process.exit(1);
 }
 
-const browser = await chromium.launch({ executablePath: chromePath, args: ['--no-sandbox'] });
+const browser = await launchChromium({ args: ['--no-sandbox'] });
 let failures = 0;
 try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });

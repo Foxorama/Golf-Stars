@@ -106,6 +106,22 @@ sibling app. The VERSION suffix is a *separate* string from that prefix and only
 move — a pass that conflates them re-creates the exact bug the three-place guard exists to catch.
 Wants its own PR with a test that the built `sw.js` carries the package version.
 
+**GS-ball-radius-band-stale — `shot-frames.mjs` asserts the ball bounds GS-ball-art moved**
+*(surfaced 2026-08-01 by GS-preview-chromium, the first time this rig had ever run on Windows)*
+`scripts/shot-frames.mjs` pins `R_FLOOR = 3` / `R_CAP = 5.5` and calls them "the documented drawn-ball
+bounds (GS-ball-art)". They are the PRE-shrink bounds: CLAUDE.md's GS-ball-art bullet now documents a
+2.25px floor and a 3.3px cap, after the ball was reported too big twice and came down ~25%. Measured
+in the built game the rig reports **2.25–3.34px**, so it fails its own check on every run — the floor
+and cap are both stale, and the observed maximum sits a hair over the documented 3.3 (probably the rim
+hairline, which is stroked ON the silhouette, but that is a guess and the point is that nobody has
+checked).
+**Not fixed in the Chromium pass on purpose**: it is an assertion about an ART constant, and the two
+honest resolutions — re-pin the rig to 2.25/3.3 with whatever tolerance the rim actually needs, or
+decide the drawn ball has drifted off its documented cap — are a judgement call that wants eyes-on and
+the `scripts/ball-preview.mjs` sheet beside it, not a number quietly changed to make a red check green.
+Worth doing soon: it is the only rig that self-checks rather than just drawing, so it is the one whose
+red actually means something.
+
 **GS-a11y-charcard-nesting — the golfer card is invalid interactive HTML** *(small, but touches a
 viewport-locked screen)*
 `.gs-charcard` is a `<button>` containing `<p>`, `<div>`, and — since GS-a11y-focus — a focusable

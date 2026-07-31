@@ -1740,12 +1740,27 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
   in the second group, so its **50 tests were skipping EVERYWHERE — CI included, for months**. The
   tell was visible all along and read past every time: local and CI both reported exactly 60
   skipped. If it had merely been a Windows gap, CI's number would have been lower.
-  **There is now ONE lookup, `tests/chromium.ts`** — `CHROME_PATH` → Playwright caches → system
-  Chrome/Edge/macOS — always verifying the BINARY, never a directory (a `chromium-*` dir can exist
-  without one; testing the dir made `runIf` lie and hard-fail CI instead of skipping cleanly). It
-  needs no env var on any normal machine: **2344 passed / 0 skipped** locally, against the 2271/72
-  that used to read as green. A new browser test imports `chromePath` from there — **never
-  re-derive it**, that is the second description this whole entry is about.
+  **There is now ONE lookup, `scripts/chromium.mjs`** (`tests/chromium.ts` re-exports it) —
+  `CHROME_PATH` → Playwright caches → system Chrome/Edge/macOS — always verifying the BINARY, never a
+  directory (a `chromium-*` dir can exist without one; testing the dir made `runIf` lie and hard-fail
+  CI instead of skipping cleanly). It needs no env var on any normal machine: **2344 passed / 0
+  skipped** locally, against the 2271/72 that used to read as green. A new browser test imports
+  `chromePath` from there — **never re-derive it**, that is the second description this whole entry
+  is about. It is plain ESM so the `.mjs` rigs can import it with no build step; four of them had
+  been standing up a whole vite server just to `ssrLoadModule` the TypeScript one, and **a seam a
+  caller must boot a build tool to reach is one the next caller copy-pastes around instead**.
+  **AND THE SAME ROT HAD RUN THROUGH `scripts/` THE WHOLE TIME** (GS-preview-chromium) — 64 eyes-on
+  rigs, eight different shapes, **every copy Linux-only** (`chrome-linux/chrome` under a hand-built
+  cache path, no `CHROME_PATH`, no Windows, no macOS). It cost more there than in `tests/`, because a
+  rig fails SOFT: it printed `no chromium, wrote /tmp/….html` and **exited 0**, so on the author's
+  Windows machine every art preview this file points at as the eyes-on check silently rendered
+  nothing while reporting success. `launchChromium` is the seam's answer — it tries each candidate in
+  turn (existing on disk ≠ launching: the Windows Playwright download refuses to start with a
+  side-by-side error on a box whose system Chrome runs fine, which is why a system browser OUTRANKS a
+  cached download and why the headless shell is kept as a last resort) and **THROWS** if none start.
+  A rig that cannot show you the picture has failed at its only job and must exit non-zero.
+  ⚠️ The register scan bans DERIVING a path, not passing one — the browser tests hand `chromePath`
+  to `chromium.launch({executablePath})`, which is calling the seam, not duplicating it.
   ⚠️ **The 50 dead tests were hiding a stale assertion**: the finale test read
   `fc_story.completed`, but that blob is a ROSTER (`{campaigns:{id:StoryState}}`) since
   GS-story-campaign-slots, so it had been comparing `undefined` to `true`. A dead test rots without

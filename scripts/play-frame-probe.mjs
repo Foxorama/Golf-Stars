@@ -9,11 +9,12 @@
  * Reports, per viewport: the overlay's top edge in container px, and its clearance under the chip.
  * Negative clearance = the far arc of the cone is drawn BEHIND the top HUD bar.
  */
-import { chromium } from 'playwright-core';
+
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { launchChromium } from './chromium.mjs';
 
-const chromePath = process.env.CHROME_PATH;
+
 const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist/index.html');
 
 // The viewports that matter: the composed phone, the small phone, the itch embed's default desktop
@@ -27,7 +28,7 @@ const VIEWPORTS = [
 ];
 
 // Holes to sample: shot 1 (driver off the tee) and after one shot (an approach club).
-const browser = await chromium.launch({ executablePath: chromePath, args: ['--no-sandbox'] });
+const browser = await launchChromium({ args: ['--no-sandbox'] });
 const rows = [];
 try {
   for (const [label, width, height] of VIEWPORTS) {

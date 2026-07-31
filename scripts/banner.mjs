@@ -32,29 +32,18 @@
 //
 // Pure dev tool — ships nothing, imports no game logic. Re-run after a wordmark or palette change.
 
-import { createServer } from 'vite';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { launchChromium } from './chromium.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = process.env.BANNER_OUT ?? join(repoRoot, 'assets', 'itch');
 mkdirSync(outDir, { recursive: true });
 
-// THE one way this repo finds Chromium (GS-browser-test-gate) — a second copy of that lookup is
-// the exact bug tests/chromium.ts exists to prevent. It is TypeScript, so it comes through vite.
-const server = await createServer({
-  root: repoRoot,
-  server: { middlewareMode: true },
-  appType: 'custom',
-  logLevel: 'error',
-});
-const { chromePath } = await server.ssrLoadModule('/tests/chromium.ts');
-if (!chromePath) {
-  await server.close();
-  console.error('No launchable Chromium found. Set CHROME_PATH to a Chrome/Edge binary.');
-  process.exit(1);
-}
+// THE one way this repo finds Chromium (GS-browser-test-gate). This used to stand up a whole vite
+// server for the sole purpose of `ssrLoadModule`-ing the TypeScript copy of the lookup; the seam is
+// plain ESM now, so it is an import and no server is needed.
 
 // The game's tokens, verbatim from index.html's :root — never re-picked by eye.
 const INK = '#ecffe9'; // .gs-hero-title colour (a warmer white than --gs-ink)
@@ -319,8 +308,7 @@ const seamHTML = `<!doctype html><html><head><meta charset="utf-8"><style>
                   linear-gradient(0deg, transparent calc(50% - 1px), #ff004455 50%, transparent calc(50% + 1px)); }
 </style></head><body><div class="g"></div></body></html>`;
 
-const { chromium } = await import('playwright-core');
-const browser = await chromium.launch({ executablePath: chromePath, args: ['--no-sandbox'] });
+const browser = await launchChromium({ args: ['--no-sandbox'] });
 
 // `dpr` is 2 for the banner (it is scaled DOWN by the page, so it wants the extra pixels) and 1
 // for the tile: a repeating background is laid out at its INTRINSIC pixel size, so a 2x export
@@ -410,4 +398,3 @@ const bannerURI = `data:image/png;base64,${(await (async () => {
 await shoot(pageHTML.replace('__BANNER__', bannerURI), 1200, 1400, 'page-preview.png', false, 1);
 
 await browser.close();
-await server.close();

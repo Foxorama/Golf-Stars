@@ -5,20 +5,21 @@
  *
  * Writes PNGs to scripts/out/. Run on a stash of main and on the branch to compare by eye.
  */
-import { chromium } from 'playwright-core';
+
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { launchChromium } from './chromium.mjs';
 
-const chromePath = process.env.CHROME_PATH;
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist/index.html');
 const out = process.env.OUT ?? path.join(tmpdir(), 'gs-playview');
 const TAG = process.env.TAG || 'branch';
 mkdirSync(out, { recursive: true });
 
-const browser = await chromium.launch({ executablePath: chromePath, args: ['--no-sandbox'] });
+const browser = await launchChromium({ args: ['--no-sandbox'] });
 for (const [seed, biomeNote] of [['42', ''], ['7', ''], ['99', '']]) {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3 });
   await page.goto('file://' + dist + `?intro=0&seed=${seed}`, { waitUntil: 'load' });

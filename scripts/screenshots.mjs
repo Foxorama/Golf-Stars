@@ -28,7 +28,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
+import { launchChromium } from './chromium.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = process.env.SHOTS_OUT ?? join(repoRoot, 'assets', 'itch', 'shots');
@@ -44,23 +44,10 @@ if (!existsSync(dist)) {
 }
 mkdirSync(outDir, { recursive: true });
 
-// THE one way this repo finds Chromium (GS-browser-test-gate) — a second copy of that lookup is the
-// exact bug tests/chromium.ts exists to prevent. It is TypeScript, so it comes through vite.
-const server = await createServer({
-  root: repoRoot,
-  server: { middlewareMode: true },
-  appType: 'custom',
-  logLevel: 'error',
-});
-const { chromePath } = await server.ssrLoadModule('/tests/chromium.ts');
-if (!chromePath) {
-  await server.close();
-  console.error('No launchable Chromium found. Set CHROME_PATH to a Chrome/Edge binary.');
-  process.exit(1);
-}
-
-const { chromium } = await import('playwright-core');
-const browser = await chromium.launch({ executablePath: chromePath, args: ['--no-sandbox'] });
+// THE one way this repo finds Chromium (GS-browser-test-gate). This used to stand up a whole vite
+// server for the sole purpose of `ssrLoadModule`-ing the TypeScript copy of the lookup; the seam is
+// plain ESM now, so it is an import, and this script drives dist/ over file:// with no server at all.
+const browser = await launchChromium({ args: ['--no-sandbox'] });
 
 /**
  * The itch embed's viewport — the shape a visitor actually sees the game in, and therefore the shape
@@ -257,4 +244,3 @@ for (const name of chosen) {
 }
 
 await browser.close();
-await server.close();

@@ -6,27 +6,14 @@
  *
  *   node scripts/finale-box-preview.mjs   (OUT=/path/out.png to choose the file)
  */
-import { writeFileSync, existsSync, readdirSync } from 'node:fs';
-import { tmpdir, homedir } from 'node:os';
+import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { build } from 'esbuild';
-import { chromium } from 'playwright-core';
+import { launchChromium } from './chromium.mjs';
 
-function findChromium() {
-  const bases = [process.env.PLAYWRIGHT_BROWSERS_PATH, '/opt/pw-browsers', `${homedir()}/.cache/ms-playwright`].filter(Boolean);
-  for (const base of bases) {
-    let dirs; try { dirs = readdirSync(base); } catch { continue; }
-    for (const d of dirs) {
-      if (d.startsWith('chromium-') && !d.includes('headless')) {
-        const bin = join(base, d, 'chrome-linux', 'chrome'); if (existsSync(bin)) return bin;
-      }
-      if (d.startsWith('chromium_headless_shell-')) {
-        const bin = join(base, d, 'chrome-headless-shell-linux64', 'chrome-headless-shell'); if (existsSync(bin)) return bin;
-      }
-    }
-  }
-  return null;
-}
+
+
 
 const entry = `
 import { getCharacter } from './src/sim/rpg/characters';
@@ -109,9 +96,9 @@ const result = await build({ stdin: { contents: entry, resolveDir: process.cwd()
 const js = result.outputFiles[0].text;
 const html = `<!doctype html><html><head><meta charset="utf8"><style>${TOURN_STYLE}</style></head><body style="margin:0;padding:24px;background:#0a0d12;"><script>${js}</script></body></html>`;
 const outPng = process.env.OUT ?? join(tmpdir(), 'gs-finale-box.png');
-const exe = findChromium();
-if (!exe) { console.log('no chromium'); process.exit(0); }
-const browser = await chromium.launch({ executablePath: exe, args: ['--no-sandbox'] });
+
+
+const browser = await launchChromium({ args: ['--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 620, height: 900 }, deviceScaleFactor: 2 });
 await page.setContent(html, { waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
