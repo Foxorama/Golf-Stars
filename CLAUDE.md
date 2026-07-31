@@ -1209,6 +1209,20 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     one positive result resolved to SPACING, not shapes; so the toggle buys tracking/word-spacing/leading,
     kills italics and justification, and asks for legible faces already on the device. Guarded by
     `tests/accessibility.test.ts`.
+  - **THE PORTRAIT FRAME IS ONE DECISION WITH TWO CONSUMERS** (GS-startour-frame, `--gs-portrait-w`).
+    The game is composed portrait and keeps a portrait frame wherever it is not phone-portrait, sized
+    as a fraction of the viewport HEIGHT so the composition SCALES with the display instead of being
+    pinned to a px count. The free-roam star chart escaped it: `.gs-startour` is `position:fixed;
+    inset:0`, so capping its `.gs-main--bleed` parent did nothing and you came off a 600px portrait
+    hole onto a **1920px** chart — a change of format mid-run that stranded the mobile-composed HUD
+    (tiny buttons flung to opposite corners). `inset:0` already pins both edges, so a definite width
+    + `margin-inline:auto` centres it with NO transform (which would re-parent every fixed
+    descendant). The whole HUD is a CHILD of `.gs-startour`, so there is nothing else to bound. The
+    **journey map needs none of this** — it is `position:relative` inside `.gs-main`, already bounded,
+    and its height already scales. ⚠️ This is the MOBILE-FIRST call, taken deliberately: an expanded
+    desktop chart does read better once its chrome is designed for the room, which is a bigger piece
+    of work than a frame — revisit when desktop players ask. Guarded by `tests/portrait-frame.test.ts`,
+    which asserts the two surfaces AGREE rather than either number.
   - **IN AN EMBED THE PAGE SCROLLS ITSELF** (GS-embed-scroll, `app/viewportFit.ts applyEmbedFlag`).
     itch.io serves HTML5 games in an iframe with **`scrolling="no"`**, so the game's DOCUMENT cannot
     scroll — a wheel over the game scrolls the STORE PAGE behind it. Reproduced: the Pro Shop is
