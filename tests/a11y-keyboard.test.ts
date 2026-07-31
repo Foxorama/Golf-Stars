@@ -134,6 +134,95 @@ describe('the listener does not stack', () => {
   });
 });
 
+/**
+ * The keyboard arrives ON the stroke (GS-a11y-stroke-focus).
+ *
+ * `render()` replaces `#app.innerHTML`, so after every shot focus fell back to `<body>` and the
+ * keyboard player started again from the top of the page: Tab · Tab · Tab to 🏌 Swing on every shot,
+ * five or six to reach ⛳ Putt on every putt, for eighteen holes. In a game that is entirely golf
+ * strokes, the stroke has to be where the keyboard lands.
+ *
+ * Two halves: the DOM order stops putting the map furniture first, and the commit button is focused
+ * as each decision mounts.
+ */
+describe('the stroke is the keyboard focus', () => {
+  const frame = readFileSync(resolve(root, 'src/app/playFrame.ts'), 'utf8');
+  const focus = readFileSync(resolve(root, 'src/app/focus.ts'), 'utf8');
+
+  it('emits the nav column AFTER the controls, so 🗺 and ⚙ are not the first two tab stops', () => {
+    const compose = frame.slice(frame.indexOf('export function playFrameHTML('));
+    const nav = compose.indexOf('navColumnHTML(');
+    const bottom = compose.indexOf('gs-hud-bottom');
+    expect(nav).toBeGreaterThan(-1);
+    expect(bottom).toBeGreaterThan(-1);
+    expect(nav, 'the nav column is emitted before the play controls — it owns the tab order again')
+      .toBeGreaterThan(bottom);
+  });
+
+  it('announces what the arrow keys do, from the state that owns them', () => {
+    // The keys live on `window`, not on any control, and the aim cone is a picture — so without a
+    // description they are invisible to exactly the players who need them.
+    expect(frame).toContain('STROKE_KEYS_ID');
+    expect(frame).toMatch(/commitHint: string/);
+    // Both live commit buttons point at it; the disabled watch button has no keys to describe.
+    const swing = app.slice(app.indexOf('const swingBtn ='), app.indexOf('const swingBtn =') + 400);
+    expect(swing).toContain('aria-describedby="${STROKE_KEYS_ID}"');
+    const putt = app.slice(app.indexOf('data-putt-commit="1"'), app.indexOf('data-putt-commit="1"') + 600);
+    expect(putt).toContain('aria-describedby="${STROKE_KEYS_ID}"');
+  });
+
+  it('stands down for an overlay, a disabled commit, and a decision the player is already in', () => {
+    const fn = focus.slice(focus.indexOf('export function focusPlayStroke('), focus.indexOf('/** Focus the sheet'));
+    // A raised sheet owns the keyboard — applyOverlayFocus has just placed focus inside it.
+    expect(fn).toContain('OVERLAY_SELECTOR');
+    // Never onto a dead control: the watch states render the commit disabled, not absent.
+    expect(fn).toContain(":not([disabled])");
+    // Only on a NEW decision, or when a re-render knocked focus loose — never every render, which
+    // would haul the player back from whatever control they deliberately tabbed to.
+    expect(fn).toMatch(/if \(!isNew && !loose\) return;/);
+    // A full-bleed fixed frame must not be scrolled to "reveal" a button already on screen.
+    expect(fn).toContain('preventScroll: true');
+  });
+
+  it('runs after the overlay pass, and only for a live stroke decision', () => {
+    const tail = app.slice(app.indexOf('  wireRoleButtonKeys(app);'));
+    expect(tail.indexOf('applyOverlayFocus(app)')).toBeLessThan(tail.indexOf('focusPlayStroke('));
+    const call = tail.slice(tail.indexOf('const strokePlay ='), tail.indexOf('focusPlayStroke(') + 260);
+    for (const guard of ['animatingPlay', '.done']) {
+      expect(call, `focusPlayStroke is not guarded on ${guard}`).toContain(guard);
+    }
+    // The key has to change per STROKE, or a hole's second shot re-uses the first's decision.
+    expect(call).toMatch(/holeIndex.*shots\.length.*putts/s);
+  });
+
+  it('treats the shot card and the scramble choice as covering layers', () => {
+    // They live inside <main>, so `applyOverlayFocus` (direct children of #app only) ignores them —
+    // but focus must not land on a Swing button behind a card the player has to dismiss. The marker
+    // is on the DOM, because the FLAG lies: `awaitingShotPopup` stays true through a putt render
+    // that draws no popup, which is precisely how the putt shipped unfocused the first time.
+    const overlays = readFileSync(resolve(root, 'src/app/overlays.ts'), 'utf8');
+    const popup = overlays.slice(overlays.indexOf('export function shotPopupOverlay('));
+    expect(popup).toContain('data-gs-overlay=');
+    const scramble = overlays.slice(
+      overlays.indexOf('export function scrambleChoiceOverlay('),
+      overlays.indexOf('export function shotPopupOverlay('),
+    );
+    expect(scramble).toContain('data-gs-overlay=');
+  });
+
+  it('the pace meter is spoken but never tabbed', () => {
+    const meter = readFileSync(resolve(root, 'src/render/puttMeter.ts'), 'utf8');
+    // `role="button"` earned it a tab stop from wireRoleButtonKeys AND an Enter/Space binding that
+    // synthesises a `click` — which this canvas does not listen for. A dead stop on every putt.
+    expect(meter, 'the pace meter claims role=button again — that is a dead tab stop')
+      .not.toMatch(/setAttribute\('role', 'button'\)/);
+    expect(meter).toMatch(/setAttribute\('role', 'img'\)/);
+    // Still announced, and the label has to say which control actually stops it.
+    expect(meter).toMatch(/aria-label/);
+    expect(meter).toMatch(/Putt button/);
+  });
+});
+
 // --- real browser: arrows actually move the aim and the power ---------------------
 const dist = resolve(root, 'dist/index.html');
 
@@ -210,5 +299,106 @@ describe('arrow keys drive the shot (real browser)', () => {
       }
     },
     120_000,
+  );
+});
+
+describe('the stroke owns the keyboard (real browser)', () => {
+  it.runIf(chromePath)(
+    'focus lands on Swing at the tee and on Putt on the green, and the meter is not a tab stop',
+    async () => {
+      const { chromium } = await import('playwright-core');
+      const browser = await chromium.launch({ executablePath: chromePath!, args: ['--no-sandbox'] });
+      try {
+        const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+        // Pinned seed: the walk below has to reach a GREEN, and an unpinned run is a different hole
+        // every time. `kb1` tees off and is putting after two swings.
+        await page.goto('file://' + dist + '?intro=0&seed=kb1', { waitUntil: 'load' });
+        await page.waitForFunction(
+          () => document.getElementById('app')?.getAttribute('data-booted') === '1',
+          { timeout: 8000 },
+        );
+        await page.evaluate(() => document.querySelector<HTMLElement>('.gs-navtile')!.click());
+        await page.waitForSelector('.gs-charcard');
+        await page.evaluate(() => document.querySelector<HTMLElement>('.gs-charcard')!.click());
+        await page.evaluate(() =>
+          [...document.querySelectorAll<HTMLElement>('button')].find((b) => /First Tee/.test(b.textContent!))?.click(),
+        );
+        await page.evaluate(() =>
+          [...document.querySelectorAll<HTMLElement>('button')].find((b) => /Tee Off/.test(b.textContent!))?.click(),
+        );
+        await page.waitForSelector('#gs-shot-overlay polygon');
+
+        // The whole point: no tabbing at all. The decision mounts with the stroke already focused.
+        expect(
+          await page.evaluate(() => document.activeElement?.getAttribute('data-swing')),
+          'the shot decision did not put focus on the Swing button',
+        ).toBe('1');
+        // …and a re-render that is NOT a new stroke leaves focus where the player put it. (Focus
+        // first, then click: a scripted `.click()` does not focus, where a real mouse press does.)
+        await page.evaluate(() => {
+          const b = document.querySelector<HTMLElement>('[data-aimmode="1"]')!;
+          b.focus();
+          b.click();
+        });
+        await page.waitForTimeout(60);
+        expect(
+          await page.evaluate(() => document.activeElement?.getAttribute('data-aimmode')),
+          'a same-stroke re-render dropped focus instead of restoring the control that was clicked',
+        ).toBe('1');
+
+        // Swing down to the green. Bounded, and it bails the moment the play screen goes away, so a
+        // walkthrough that breaks fails loudly in seconds instead of grinding out the test timeout.
+        const mode = () => page.evaluate(() => document.querySelector<HTMLElement>('.gs-shot')?.dataset.playmode ?? null);
+        for (let i = 0; i < 8; i++) {
+          const m = await mode();
+          if (m === 'putt' || m === null) break;
+          await page.evaluate(() => document.querySelector<HTMLElement>('[data-swing]')?.click());
+          await page
+            .waitForFunction(
+              () =>
+                !document.querySelector('.gs-shot') ||
+                !!document.querySelector('.gs-shot[data-playmode="putt"]') ||
+                (!!document.querySelector('[data-swing]') && !document.querySelector('.gs-shot[data-playmode="watch"]')),
+              { timeout: 12_000 },
+            )
+            .catch(() => {});
+          await page.waitForTimeout(700);
+          await page.evaluate(() => document.querySelector<HTMLElement>('[data-popup-continue]')?.click());
+          await page.waitForTimeout(300);
+        }
+        expect(await mode(), 'never reached a putt — the walkthrough is broken, not the focus rule').toBe('putt');
+
+        const green = await page.evaluate(() => {
+          const sel = 'a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"])';
+          const order = [...document.querySelectorAll<HTMLElement>(sel)].filter(
+            (e) => !e.hasAttribute('disabled') && e.offsetParent !== null && !e.closest('[inert]'),
+          );
+          const canvas = document.querySelector<HTMLElement>('#puttmeter canvas');
+          return {
+            focused: document.activeElement?.getAttribute('data-putt-commit'),
+            meterRole: canvas?.getAttribute('role') ?? null,
+            meterTabbable: !!canvas && order.includes(canvas),
+            meterLabelled: !!canvas?.getAttribute('aria-label'),
+            described: document.activeElement?.getAttribute('aria-describedby'),
+            hint: document.getElementById('gs-stroke-keys')?.textContent ?? '',
+          };
+        });
+        expect(green.focused, 'the putt decision did not put focus on the Putt button').toBe('1');
+        expect(green.meterRole).toBe('img');
+        expect(green.meterTabbable, 'the pace meter is still a tab stop it cannot honour').toBe(false);
+        expect(green.meterLabelled, 'the pace meter is silent as well as unreachable').toBe(true);
+        expect(green.described).toBe('gs-stroke-keys');
+        expect(green.hint).toMatch(/arrow keys/i);
+
+        // Enter on the focused control must actually play the stroke — the whole chain is pointless
+        // if the button the keyboard lands on cannot be fired from the keyboard.
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(400);
+        expect(await mode(), 'Enter on the focused Putt button did not strike the putt').not.toBe('putt');
+      } finally {
+        await browser.close();
+      }
+    },
+    180_000,
   );
 });

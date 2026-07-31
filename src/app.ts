@@ -73,7 +73,7 @@ import { HAPTICS, haptic } from './render/haptics';
 import { showAceCelebration, showBirdCelebration, showEndlessMilestone, showSectorScan, showVoyageVictory } from './render/celebrations';
 import { characterScreen, ordinal, leaderboardHTML } from './render/golferCards';
 import { state, setState, btn, header, seedFromUrl, freshRunSeed } from './app/ctx';
-import { playFrameHTML, type PlayFrameParts } from './app/playFrame';
+import { playFrameHTML, STROKE_KEYS_ID, type PlayFrameParts } from './app/playFrame';
 import { holeIsNewToAnimator } from './app/playAnim';
 import { clubPickerOverlay } from './app/clubPicker';
 import {
@@ -126,7 +126,7 @@ import { storyMidBeatScreen, storyQuestBeatScreen, storyQuestOfferScreen } from 
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
 import { exitConfirmOverlay, priceNoticeOverlay, saveView, scrambleChoiceOverlay, settingsOverlay, settingsSheetInner, shotPopupOverlay } from './app/overlays';
-import { applyOverlayFocus, captureFocusOrigin, preservingFocus, wireRoleButtonKeys } from './app/focus';
+import { applyOverlayFocus, captureFocusOrigin, focusPlayStroke, preservingFocus, wireRoleButtonKeys } from './app/focus';
 import { announce, shotSentence, situationSentence } from './app/announce';
 import {
   BackupError,
@@ -1544,6 +1544,8 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
       }),
       rows: [],
       commit: `<button class="gs-btn gs-btn--primary gs-swing" disabled><span class="gs-swing__inner">${watchLabel}</span></button>`,
+      // Nothing to decide while the ball is in the air, so there are no keys to announce.
+      commitHint: '',
       caddyId: caddyId(),
       nav: { whole: mapView === 'whole', viewDisabled: true, settingsDisabled: true },
       autoFinishDisabled: true,
@@ -1842,7 +1844,12 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
         // caddy's confident line runs out.
         `<div class="gs-puttnote">${puttBreakLine(breakYd, doubleBreak)}${fringePutt ? ' · from the fringe' : ''}${puttReadFrac < 0.999 ? ` · read ends <b>${Math.round(puttReadRange)}y</b>` : ''}</div>`,
       ],
-      commit: `<button class="gs-btn gs-btn--primary" data-putt-commit="1">⛳ Putt</button>`,
+      commit: `<button class="gs-btn gs-btn--primary" data-putt-commit="1" aria-describedby="${STROKE_KEYS_ID}">⛳ Putt</button>`,
+      // The pace meter is a moving target with no keyboard axis of its own — this button IS how you
+      // stop it (GS-a11y-stroke-focus), and the arrows are the only pointer-free way to read a break.
+      commitHint: reads
+        ? 'Your caddy has read the line. A pace marker is sweeping the meter — activate this button to stop it in the make band.'
+        : 'Left and right arrow keys aim the putt. A pace marker is sweeping the meter — activate this button to stop it in the make band.',
       // The caddy keeps its slot on the green even when they have no read here (a distance/guard
       // caddy) — the badge dims instead of vanishing, so the bar's left edge never jumps.
       caddyId: caddyId(),
@@ -2034,7 +2041,7 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
   // the screen playable one-handed, and without a drag at all.
   // …and it carries the live power as a fill behind its own label, so the pull has a number without
   // a second row to put it on.
-  const swingBtn = `<button class="gs-btn gs-btn--primary gs-swing" data-swing="1" title="Swing at the previewed power — or pull down on the map to set it yourself"><span class="gs-swing__inner" id="gs-powerhud">${swingInner()}</span></button>`;
+  const swingBtn = `<button class="gs-btn gs-btn--primary gs-swing" data-swing="1" aria-describedby="${STROKE_KEYS_ID}" title="Swing at the previewed power — or pull down on the map to set it yourself"><span class="gs-swing__inner" id="gs-powerhud">${swingInner()}</span></button>`;
   // The one CONDITIONAL control in the action column: re-aim at the pin, which can only exist once the
   // player has dragged the aim off it. It lands ABOVE the three permanent buttons, so they never move.
   const extraActions = selFreeTarget
@@ -2051,6 +2058,10 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
     }),
     rows: [],
     commit: swingBtn,
+    // The pull gesture is pointer-only and the aim cone is a picture, so without this the arrow keys
+    // GS-a11y-keyboard added are undiscoverable to exactly the players who need them.
+    commitHint:
+      'Left and right arrow keys aim; up and down set the power. Hold Shift for finer steps.',
     caddyId: caddyId(),
     nav: { whole: mapView === 'whole', viewDisabled: false, settingsDisabled: false },
     autoFinishDisabled: false,
@@ -4412,6 +4423,20 @@ function render(): void {
   // backgrounding and focus placement for whatever overlay is up.
   wireRoleButtonKeys(app);
   applyOverlayFocus(app);
+  // …and then the play screen's own focus rule (GS-a11y-stroke-focus). AFTER the overlay pass, which
+  // has first claim: a raised sheet owns the keyboard, and `focusPlayStroke` stands down when any
+  // covering layer is up. The key identifies the STROKE DECISION — hole, stroke count, lie — so a
+  // re-render INSIDE one decision (club, aim mode, map toggle) never hauls focus back to the commit.
+  //
+  // What is on screen is the DOM's question, not this flag's: `awaitingShotPopup` stays true through
+  // a putt render that draws no popup, so the covering-layer refusal lives in `focusPlayStroke` and
+  // reads `[data-gs-overlay]`. All that is decided here is whether a stroke is live at all.
+  const strokePlay = state.screen === 'playing' ? state.play : null;
+  const strokeDecision = strokePlay && !animatingPlay && !strokePlay.done;
+  focusPlayStroke(
+    app,
+    strokeDecision ? `${strokePlay.holeIndex}:${strokePlay.shots.length}:${strokePlay.putts}:${strokePlay.lie}` : null,
+  );
 }
 
 /**

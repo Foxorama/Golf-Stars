@@ -138,8 +138,12 @@ describe('the meter is reachable by the reader settings', () => {
     for (const tok of ['--gs-accent', '--gs-ink', '--gs-dim']) expect(METER).toContain(tok);
   });
 
-  it('names itself for a screen reader — it is a control, not decoration', () => {
-    expect(METER).toContain("canvas.setAttribute('role', 'button')");
+  it('names itself for a screen reader — it is not decoration', () => {
+    // …but it is not a CONTROL either (GS-a11y-stroke-focus). It claimed `role="button"`, which
+    // earned it a tab stop and an Enter/Space binding from `wireRoleButtonKeys` that synthesises a
+    // `click` — an event this canvas never listens for. ⛳ Putt is the control that stops the sweep;
+    // the meter is the picture of it, so it is `role="img"`: announced, never tabbed.
+    expect(METER).toContain("canvas.setAttribute('role', 'img')");
     expect(METER).toContain('aria-label');
   });
 });

@@ -79,11 +79,18 @@ export function mountPuttMeter(container: HTMLElement, opts: PuttMeterOptions): 
   canvas.style.cursor = 'pointer';
   canvas.style.touchAction = 'none';
   canvas.style.borderRadius = '12px';
-  // The meter IS a control, so it carries the control's accessible name — the canvas itself is
-  // opaque to a screen reader (GS-a11y-announce's rule for decorative canvases, inverted: this one
-  // is not decorative).
-  canvas.setAttribute('role', 'button');
-  canvas.setAttribute('aria-label', 'Pace meter — tap to stop the marker in the make band');
+  // SPOKEN, NEVER TABBED (GS-a11y-stroke-focus). The meter used to claim `role="button"`, which
+  // `wireRoleButtonKeys` then handed a tab stop and an Enter/Space binding that synthesises a
+  // `click` — and this canvas only listens for `pointerdown`. So it was a dead stop in the tab order
+  // of every putt: a keyboard player landed on something announced as a button, pressed Enter, and
+  // nothing happened. It is a picture of a moving thing, not a control (⛳ Putt is the control that
+  // stops it), so it says so — `role="img"` is not focusable, and the label carries the instruction
+  // that makes the putt playable without sight of the sweep.
+  canvas.setAttribute('role', 'img');
+  canvas.setAttribute(
+    'aria-label',
+    'Pace meter: a marker sweeps between short and long. Activate the Putt button to stop it in the make band.',
+  );
   const font = token(container, '--gs-font', 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif');
   const accent = token(container, '--gs-accent', '#5fd45a');
   const ink = token(container, '--gs-ink', '#e8e8ea');

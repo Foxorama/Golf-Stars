@@ -183,6 +183,68 @@ export function applyOverlayFocus(app: HTMLElement): void {
   }
 }
 
+/** The stroke decision `focusPlayStroke` last placed focus for — so a re-render within the SAME
+ *  decision (a club change, an aim-mode tap, the map toggle) doesn't keep hauling focus back. */
+let lastStrokeKey: string | null = null;
+
+/**
+ * Put the keyboard ON the stroke (GS-a11y-stroke-focus).
+ *
+ * `render()` replaces `#app.innerHTML` wholesale, so after every single shot the focused node is
+ * destroyed and `document.activeElement` falls back to `<body>` — the keyboard player starts from
+ * the top of the page again. In a game that is *entirely* golf strokes, that meant Tab · Tab · Tab
+ * to Swing on every shot and five or six to reach ⛳ Putt on every putt, for the whole round.
+ *
+ * So the play screen's primary action is focused as its decision mounts. It is the same shape as the
+ * overlay pass above — move focus in ONCE per open, and put it back if a re-render knocks it loose —
+ * with the same two refusals: never while an overlay owns the screen, and never onto a disabled
+ * control (the watch states, where there is no decision to make).
+ *
+ * `key` identifies the DECISION, not the render: hole + stroke count + mode. `null` means "no stroke
+ * decision is on screen" (watching, or another screen entirely) and re-arms the next one.
+ *
+ * The commit button is found through `.gs-hud-commit`, which is `playFrameHTML`'s own name for the
+ * bottom-anchored commit row — the frame already guarantees exactly one, in every state, so this
+ * asks the frame rather than keeping a second list of which button is primary in which state.
+ */
+export function focusPlayStroke(app: HTMLElement, key: string | null): void {
+  try {
+    if (key === null) {
+      lastStrokeKey = null;
+      return;
+    }
+    // Any COVERING layer owns focus: a raised sheet (where `applyOverlayFocus` has just placed it,
+    // behind an inert page), and equally the shot-result card / scramble choice, which are not
+    // dialogs by that pass's definition — they live inside `<main>` — but are absolutely something
+    // the player has to answer first. The DOM is asked, never a flag: `awaitingShotPopup` stays true
+    // through a putt render that draws no popup at all.
+    if (app.querySelector(OVERLAY_SELECTOR)) return;
+
+    const isNew = key !== lastStrokeKey;
+    lastStrokeKey = key;
+    const active = document.activeElement as HTMLElement | null;
+    const loose = !active || active === document.body || !app.contains(active);
+    if (!isNew && !loose) return; // the player has put focus somewhere deliberately — leave it
+
+    // Same decision, focus knocked loose by a re-render: put it back where the player had it. The
+    // selector was captured immediately BEFORE the innerHTML swap, so it names the control they were
+    // on — without this, tapping the aim mode would bounce them to the commit every time.
+    if (!isNew && lastFocusSel) {
+      const back = app.querySelector<HTMLElement>(lastFocusSel);
+      if (back && back.closest('.gs-shot') && !back.hasAttribute('disabled') && back.offsetParent !== null) {
+        back.focus({ preventScroll: true });
+        return;
+      }
+    }
+    // `preventScroll` because the play screen is a full-bleed fixed frame: scrolling it to "reveal"
+    // a button that is already on screen is pure jitter (GS-embed-scroll makes the page scrollable
+    // in an iframe, so this is not hypothetical).
+    app.querySelector<HTMLElement>('.gs-hud-commit button:not([disabled])')?.focus({ preventScroll: true });
+  } catch {
+    /* focus is an enhancement — never let it break a render */
+  }
+}
+
 /** Focus the sheet's first control, falling back to the sheet itself. */
 function focusInto(sheet: HTMLElement): void {
   const first = focusablesIn(sheet)[0];
@@ -254,4 +316,5 @@ export function resetOverlayFocus(): void {
   restoreSel = null;
   lastFocusSel = null;
   openKey = null;
+  lastStrokeKey = null;
 }
