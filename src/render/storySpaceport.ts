@@ -40,6 +40,15 @@ import type { Character } from '../sim/rpg/characters';
  * standing unit cannot silently drift off the floor again.
  */
 const DECK_Y = 222;
+/** The room frame's height, and the deck line as a PERCENTAGE of the scene box — which is the unit the
+ *  figure spot tables below are written in. The scene is `aspect-ratio: 4/3` and the art is a 400×300
+ *  viewBox, so the two map 1:1 and the deck starts at 74% of the way down.
+ *
+ *  GS-clubhouse-floor: a figure is feet-anchored, so its spot's `top` must be at or below this or the
+ *  character is standing ON THE BACK WALL. Derived, not typed as `74`, so moving the deck moves the
+ *  floor everyone stands on with it. */
+const ROOM_H = 300;
+export const DECK_TOP_PCT = (DECK_Y / ROOM_H) * 100;
 
 /** The Parrot's lore bust, made embeddable at 320×340 inside a positioned `<g transform>` (the Crow's Nest
  *  idiom) so the bird behind the bar is unmistakably the same character. */
@@ -588,9 +597,23 @@ export function spaceportSceneHTML(story: StoryState): string {
  *  lower crew). Fixed (byte-stable) so identity is stable; clear of the player, the door hotspots + the
  *  active caddy at your side. */
 const FRIEND_SPOTS: { left: number; top: number }[] = [
-  { left: 34, top: 71 },
-  { left: 50, top: 67 },
-  { left: 66, top: 72 },
+  // GS-clubhouse-floor: these used to sit at 67–72%, i.e. ABOVE the 74% deck line — your three friends
+  // were standing on the back wall while you stood on the floor, which is the "velcro'd to the wall"
+  // read at its most obvious (a person is the one thing in the room the eye knows the height of).
+  // Measured feet landed 7.4–12.4 points high. They now stand at the BACK of the deck: still behind the
+  // caddies (whose feet measure 81–92%) and behind you at 92%, so the depth order is unchanged — they
+  // are simply on the floor that was always under them. `abandonedHatHTML` reads the same table, so the
+  // defector's cap stops lying against the wall too.
+  // ⚠️ `top` is the BUTTON's bottom, and the nameplate hangs BELOW the feet — measured, that is ~5.5
+  // points of slack at this figure size, so a spot set to the deck line lands the feet above it. These
+  // are chosen from measured FOOT positions (77–79%), not from the raw number.
+  // The lefts also had to move. At the old height the middle friend cleared the player vertically; down
+  // on the deck at the same depth they collided, and a friend you cannot see is a friend you cannot tap.
+  // These avoid the player's column (44%) and the active caddy's (58%) — a friend still stands BEHIND
+  // both, so partial occlusion is correct depth, but nobody is eclipsed.
+  { left: 26, top: 83 },
+  { left: 62, top: 82 },
+  { left: 82, top: 84 },
 ];
 
 /** One friend golfer as a feet-anchored standee (their signature look via `golferPreviewSVG`, drawn a touch
