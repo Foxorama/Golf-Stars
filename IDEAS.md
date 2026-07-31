@@ -21,23 +21,24 @@ a different job from a scale and should be taken screen by screen with eyes-on, 
 Related but separate: **GS-embed-letterbox** below is about what sits BESIDE the play frame; this is
 about what sits beside the menus.
 
-**GS-embed-letterbox — half the itch embed's width is undressed background on the play screen**
-*(surfaced by the 2026-07-31 itch-embed layout sweep; deliberately NOT done there, because it is a
-camera decision wearing a CSS bug's clothes — see `reports/itch-embed-layout-2026-07-31.md`)*
-On the itch.io embed's default desktop viewport (820×760) the play frame is capped to a **395px**
-portrait strip with ~210px of flat page background either side — 51% of the width. The cap itself is
-correct and must stay: `mapFrame()` grows the 360×640 design frame to the CONTAINER's aspect
-(GS-play-fullframe), so an uncapped wide container yields a wide camera and every shot reads as
-over-zoomed — which is exactly why GS-play-desktop-frame introduced the cap, keyed on aspect rather
-than width. What is wrong is only that the leftover is *nothing*: bare `--gs-bg` with the body
-vignette on it, so it reads as a broken embed rather than as a frame.
-Shapes: (a) dress the letterbox — the world's own sky/nebula palette bled out of the hole, so the
-strip sits in space rather than on a page; (b) put something there on a wide container (the shot
-card, the scoreboard, the caddy); (c) allow a modestly wider camera at wide aspects, which is a
-**physics-adjacent readability change** and would need eyes-on play plus a re-look at
-`clearOfPanelBias`/`playFocusBias` (GS-play-hud-space). (a) is cheap and safe; (c) is not.
-**Do NOT "fix" this by removing the aspect cap** — that re-creates the over-zoomed desktop camera the
-cap exists to prevent.
+**GS-embed-letterbox — mostly ANSWERED by GS-space-sky; what is left is a much smaller question**
+*(surfaced by the 2026-07-31 itch-embed layout sweep; downgraded 2026-07-31 after re-measuring the
+built embed while shooting `scripts/screenshots.mjs`)*
+The entry was written against a letterbox that was **bare `--gs-bg` with the body vignette**, i.e. it
+read as a broken embed. GS-space-sky (#682) landed after that sweep and put the seeded star tile on
+`body` — so on the itch embed's default desktop viewport (820×760) the ~210px either side of the
+395px play strip is now **dressed space, and the same sky as the store page background and the
+banner** (GS-itch-page-sky). Verified on the built artifact at 820×760; it is what the shipped store
+screenshots show, undoctored. Shape (a) is therefore delivered in its cheap form.
+What is still open, and it is minor: the strip is the GENERIC page sky, not the world's own
+sky/nebula palette bleeding out of the hole — so an ember world and an ice world letterbox
+identically. Also still open: (b) put something there on a wide container (the shot card, the
+scoreboard, the caddy).
+**Do NOT "fix" this by removing the aspect cap** — `mapFrame()` grows the 360×640 design frame to the
+CONTAINER's aspect (GS-play-fullframe), so an uncapped wide container yields a wide camera and every
+shot reads as over-zoomed, which is exactly why GS-play-desktop-frame introduced the cap. (c) a
+modestly wider camera at wide aspects remains a **physics-adjacent readability change** needing
+eyes-on play plus a re-look at `clearOfPanelBias`/`playFocusBias` (GS-play-hud-space) — not a CSS tweak.
 
 **GS-a11y-bridge-idpod — the travel bridge loses the golfer's name at a large scale** *(surfaced by
 the 2026-07-26 mobile-layout sweep; the one thing it left visibly wrong)*

@@ -248,6 +248,26 @@ async function driveStarMap(page) {
 // ── run ──────────────────────────────────────────────────────────────────────────────────────────
 
 const CLIPS = { intro: driveIntro, hole: driveHole, starmap: driveStarMap };
+
+/**
+ * The seconds of each recording worth turning into an autoplaying GIF, with optional per-clip
+ * `width`/`fps` overrides. No entry ⇒ no GIF.
+ *   hole    — the aim cone held, the swing, the ball's flight and where it comes down.
+ *   starmap — the ship actually under way; it parks near the spaceport after about six seconds.
+ *   intro   — the whole cinematic. It runs 13s, and MEASURED it converts to 3.6MB at the shared
+ *             settings and ~2.8MB at 320px, so the old "the intro is far too long to be a GIF" note
+ *             was wrong: it was written before the window + 128-colour palette work, back when the
+ *             whole 18s recording was converted at 380px. It is a poor STORE-RAIL GIF (a cinematic
+ *             shows nothing of what you do) and a good DEVLOG one, which is a different job.
+ */
+const GIF_WINDOW = {
+  hole: { ss: 0.8, t: 5 },
+  starmap: { ss: 0.5, t: 5 },
+  intro: { ss: 0, t: 13, width: 320 },
+};
+const GIF_FPS = 10;
+const GIF_WIDTH = 360;
+const GIF_BUDGET_MB = 3.5;
 const want = process.argv.slice(2).filter((a) => a in CLIPS);
 const chosen = want.length ? want : Object.keys(CLIPS);
 
@@ -279,21 +299,37 @@ if (!hasFfmpeg) {
     console.log(`  ${name}.mp4`);
     // GIF only for the SHORT clips — the itch screenshot rail autoplays GIFs, and that is the one
     // place a clip can move on the store page. The intro is far too long to be one.
-    if (name !== 'intro') {
+    //
+    // A GIF IS A MOMENT, NOT A CLIP. Converting the whole recording produced a 14.6MB file: the
+    // follow-cam means every pixel changes every frame, which is the worst case for inter-frame
+    // compression, and most of those frames were the walk to the tee or a parked ship. So each clip
+    // declares the WINDOW that is worth autoplaying, measured off its own contact sheet
+    // (`ffmpeg -i x.webm -vf "fps=1,scale=160:-1,tile=5x4" sheet.png` — re-shoot it if a drive
+    // changes, or the window silently slides onto the wrong seconds).
+    if (GIF_WINDOW[name]) {
+      const { ss, t, width = GIF_WIDTH, fps = GIF_FPS } = GIF_WINDOW[name];
       const gif = resolve(outDir, `${name}.gif`);
-      // A shared palette per clip: the default 216-colour web palette bands this game's gradients badly.
+      const pal = resolve(outDir, `.pal-${name}.png`);
+      // Measured on the hole clip at this window: 128 colours holds the turf gradients that the
+      // default 216-colour web palette bands badly, while 360px wide keeps the HUD legible in the
+      // rail. Together ~3.1MB. Dropping to 300px saves 0.9MB and is the fallback if itch complains.
+      const chain = `fps=${fps},scale=${width}:-1:flags=lanczos`;
       spawnSync(
         'ffmpeg',
-        ['-y', '-i', src, '-vf', 'fps=15,scale=380:-1:flags=lanczos,palettegen=stats_mode=diff', resolve(outDir, `.pal-${name}.png`)],
+        ['-y', '-ss', String(ss), '-t', String(t), '-i', src, '-vf', `${chain},palettegen=max_colors=128:stats_mode=diff`, pal],
         { stdio: 'ignore' },
       );
       spawnSync(
         'ffmpeg',
-        ['-y', '-i', src, '-i', resolve(outDir, `.pal-${name}.png`), '-lavfi', 'fps=15,scale=380:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=3', gif],
+        ['-y', '-ss', String(ss), '-t', String(t), '-i', src, '-i', pal,
+         '-lavfi', `${chain}[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=5`, gif],
         { stdio: 'ignore' },
       );
-      rmSync(resolve(outDir, `.pal-${name}.png`), { force: true });
-      console.log(`  ${name}.gif`);
+      rmSync(pal, { force: true });
+      // Reported against the budget, because a GIF that is too heavy still looks fine locally and
+      // only misbehaves on somebody else's connection.
+      const mb = statSync(gif).size / 1024 / 1024;
+      console.log(`  ${name}.gif  ${mb.toFixed(1)} MB${mb > GIF_BUDGET_MB ? `  ⚠ over the ${GIF_BUDGET_MB}MB budget — shorten the window or drop GIF_WIDTH` : ''}`);
     }
   }
 }
