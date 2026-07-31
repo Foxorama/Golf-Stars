@@ -154,6 +154,11 @@ breakpoint.
 - **No canvas computes its own `devicePixelRatio`.** Use `canvasRatio()`.
 - **Defaults are inert**: `--gs-track`/`--gs-wordspace` are `0em` and `--gs-uiscale` is `1`, so the
   untoggled game renders exactly as before. No save bump — `fc_settings` merges over defaults.
+  (Since GS-ui-display-scale it is `calc(var(--gs-readerscale) * var(--gs-displayscale))`, both
+  halves defaulting to `1` — the product is still `1` and the statement still holds.)
+- **Nothing writes the combined token.** `--gs-uiscale` is a product of two independently-owned
+  halves; an inline `setProperty('--gs-uiscale', …)` on the root beats the stylesheet outright, so
+  whichever writer ran last would silently delete the other's contribution. See below.
 
 Guarded by `tests/accessibility.test.ts`.
 
@@ -578,3 +583,121 @@ column is the one to read: content hanging off the screen is only a bug when it 
 - The console's fuel gauge drops its cell bar at a tight fit and shows `⛽ n` alone, because twelve
   cells in the width that is left works out at 8px total, which communicates nothing. The
   `aria-label` still carries "Fuel n of m".
+
+---
+
+## GS-ui-display-scale — every display lays out as the phone the game is composed for
+
+### The problem
+
+Surfaced by the 2026-07-31 desktop play-test: *"the inround and endround info screens don't scale at
+all"*, and the same complaint underneath the star-chart HUD one.
+
+Two families of screen behaved differently and the difference was visible side by side. The
+lore/beat screens are `.gs-main--bleed`, whose width is `var(--gs-portrait-w)` — a fraction of the
+viewport **height** — so they always grew with the display. The ordinary flow screens are `.gs-main`
+at a fixed **820px**, with inner caps like `.gs-strres { max-width: 460px }` and ~660 hard-px font
+sizes. Nothing about them is height-derived, so nothing about them grew.
+
+Measured on the built game at 1920×1080, the Star Tour round recap was a **460×442 island** — 24% of
+the width, 41% of the height. Phone-sized UI marooned in the middle of a desktop display.
+
+### Why a scale and not a layout pass
+
+Twenty-odd flow screens, each with its own caps and its own hard-px type. A per-screen pass is twenty
+chances to break a layout that works on the phone, and it would have to be redone for every new
+screen. A scale reaches all of them at once and keeps the phone as the single composition target.
+
+**The rule: `scale = clamp(1, min(w/390, h/844), 1.5)`.** 844 is the iPhone 14 the composition is
+tuned against, so a 1080p display lays out in 844 units drawn 1.28× larger.
+
+- **The ceiling is 1.5.** 1440p and 4K stop there rather than rendering the HUD at 1.71×/2.56×. A
+  capped 1440p still lays out as a 960-unit-tall phone-shaped screen — comfortably bigger without
+  becoming a billboard.
+- **It reads both axes.** Height alone is the axis that matters on every real display, but a
+  viewport proportionally *narrower* than the phone — a folded foldable at 344×882, a tall thin
+  window — would be zoomed on the strength of its height and handed even less width to lay out in:
+  329 units, which trips `TIGHT_W` and reflows the play HUD on a device that was fine. Taking the
+  smaller of the two ratios means the scale only fires with room in both directions.
+- **Not a media query.** A breakpoint *could* see the raw viewport here (this is the other direction
+  from the GS-a11y-scale-wrap warning above) but it can only STEP, and a visible jump mid-resize is
+  worse than the smooth ramp `viewportFit.ts`'s resize listener already gives.
+
+### The insertion point is one token
+
+`--gs-uiscale` becomes `calc(var(--gs-readerscale) * var(--gs-displayscale))`. `settings.ts` writes
+the reader half; `app/viewportFit.ts` — the only module allowed to compute a scaled viewport
+(GS-a11y-tight-fit) — writes the display half. `zoom`, `--gs-vh`, `--gs-dvh`, `--gs-portrait-w`,
+`data-gs-fit` and `canvasRatio()` all already read the combined value, so that is the whole change.
+
+**It multiplies, it never replaces.** The player owns their type (GS-a11y-readable-text): a display
+scale that overwrote the reader's choice would take away the setting on exactly the machines where it
+is easiest to read. `uiScaleOf()` is the single description of the product that the `calc()`
+expresses in CSS, and nothing may write `--gs-uiscale` itself — an inline property on the root beats
+the stylesheet, so whichever writer ran last would delete the other's half.
+
+⚠ **Nothing may read `--gs-uiscale` back, either.** It is an unregistered custom property, so its
+computed value is the token stream — `getPropertyValue()` returns the literal string
+`calc(1 * 1.2796…)` and `Number()` of that is `NaN`. The crash report was doing exactly this; it now
+asks `rootZoom()` for the zoom the browser actually applied, which is the truthful number anyway.
+
+### ⚠ `--gs-portrait-w` is deliberately NOT multiplied back
+
+This was the load-bearing decision, and the scoping note had it the other way round.
+
+The portrait frame is `0.52 · --gs-dvh`, and `--gs-dvh` already divides by the zoom — so the frame
+**renders at 0.52·H physical px whatever the display scale is.** Its drawn width and its 0.52 aspect
+are both unchanged; only its contents get bigger. That is exactly what is wanted, and it is why
+`tests/portrait-frame.test.ts` passes untouched (the star chart is still 562px wide at 1920×1080,
+still centred at the same x).
+
+Multiply it by the display half and the frame widens to `0.52·H·scale` — **562 → 719px at 1080p** —
+and the play camera's aspect goes 0.52 → 0.67. `mapFrame()` grows the design frame to the
+container's aspect (GS-play-fullframe), so that is a genuinely wider camera on every desktop shot:
+the thing GS-play-desktop-frame's cap exists to prevent.
+
+### Measured
+
+At 1920×1080, zoom 1.28. Content box of each flow screen, before → after:
+
+| Screen | before | after |
+|---|---|---|
+| Star Tour recap | 460×442 | **589×560** |
+| Trade Market | 788×389 | **1008×495** |
+| Star Mart | 788×478 | **1008×610** |
+| Character select | 1148×408 | **1469×524** |
+
+Play screen at 1920×1080, drawn map area **562×1080 px in both cases**; layout units 562×1080 →
+**439×844**, i.e. the composed-for phone. Bar 90 → 89 units, control panel 66 → 66.
+
+**The clear band pays 4.4 points: 84.1% → 79.7%.** That is the honest cost of the feature and not of
+the portrait-frame call above — the band is a vertical measure, so widening the frame would not have
+bought any of it back. 79.7% is the band the phone already gets (GS-hud-compass measured 80%), so
+what desktop loses is a bonus it had from being taller in units, not headroom the HUD was designed
+around. GS-decision-frame-carry re-solves the camera radius from the measured band, so the whole
+contemplated shot still draws clear of the info bar.
+
+Two consequences worth knowing, both "desktop now behaves like the phone":
+
+- The **star chart shows ~22% less** of the map at default zoom (439×844 units instead of 562×1080).
+  It is freely pannable and zoomable, so this is a framing change, not lost content.
+- **Tall content that just fitted may now scroll** — the Pro Shop's content goes 907 → 1157px in a
+  1080px frame. The page scrolls on desktop, and in an embed `data-gs-embed` already scrolls
+  `.gs-main` (GS-embed-scroll); the embed's own 820×760 is below the base phone, so it is untouched.
+
+### What was verified
+
+`npm run typecheck`, the full suite (**213 files / 2559 tests, 0 skipped**), `npm run build`. Eyes-on
+at 1920×1080 on the Star Tour recap, the free-roam star chart and a live tee shot, before and after.
+Every combination of the two halves checked in a real browser: at 390×844, 1920×1080 and 2560×1440,
+each at the top reader rung (combined zoom 1.45 / 1.855 / 2.175), the settings sheet keeps its top on
+screen and scrolls internally, and the document never overflows horizontally.
+
+Guarded by `tests/display-scale.test.ts`.
+
+### Still open
+
+The scale multiplies the caps; it does not remove them. The Star Tour recap is 31% of the width of a
+1920px display rather than 24% — better, but still an island. A screen that genuinely wants to use a
+wide desktop (a two-column recap, a wider board) is a per-screen composition job, and a different one
+from this.

@@ -58,7 +58,17 @@
            The spacing pair defaults to 0 so the normal theme is byte-for-byte the
            old rendering. See docs/decisions/accessibility.md. */
         --gs-font: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-        --gs-uiscale: 1;
+        /* THE ROOT ZOOM IS A PRODUCT OF TWO HALVES (GS-ui-display-scale). The player owns
+           their type, so the display's share MULTIPLIES their choice and never replaces it:
+             --gs-readerscale   the settings ladder, written by settings.ts
+             --gs-displayscale  how much bigger this display is than the composed-for phone,
+                                written by app/viewportFit.ts (the ONE module allowed to
+                                compute a scaled viewport — GS-a11y-tight-fit)
+           Everything downstream — `zoom`, --gs-vh, --gs-dvh, --gs-portrait-w, data-gs-fit —
+           already reads the combined token, so this is the whole insertion point. */
+        --gs-readerscale: 1;
+        --gs-displayscale: 1;
+        --gs-uiscale: calc(var(--gs-readerscale) * var(--gs-displayscale));
         --gs-track: 0em;
         --gs-wordspace: 0em;
         /* One screen height, expressed in the LAYOUT units a zoomed root lays out in.
@@ -70,7 +80,14 @@
            frame rather than growing sideways, and the frame's width is a fraction of the viewport
            HEIGHT so the composition scales with the display instead of being pinned to a px count.
            Two surfaces now use it — the full-bleed play screen and the free-roam star chart — which
-           is exactly when it stops being a number and becomes a decision with one home. */
+           is exactly when it stops being a number and becomes a decision with one home.
+           ⚠ IT IS DELIBERATELY NOT MULTIPLIED BY --gs-displayscale (GS-ui-display-scale). It is
+           0.52 of a screen height and --gs-dvh already divides by the zoom, so the frame RENDERS
+           at 0.52·H physical px whatever the display scale is: the frame keeps its 0.52 aspect and
+           its drawn width, and only its CONTENTS get bigger. Multiply it back and the frame widens
+           to 0.52·H·scale (562 → 719px at 1080p) and the play camera's aspect goes 0.52 → 0.67 —
+           a wider camera on every desktop shot, which is the exact thing GS-play-desktop-frame's
+           cap exists to prevent. */
         --gs-portrait-w: calc(var(--gs-dvh) * 0.52);
       }
 

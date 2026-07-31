@@ -1230,6 +1230,26 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     one positive result resolved to SPACING, not shapes; so the toggle buys tracking/word-spacing/leading,
     kills italics and justification, and asks for legible faces already on the device. Guarded by
     `tests/accessibility.test.ts`.
+  - **EVERY DISPLAY LAYS OUT AS THE PHONE THE GAME IS COMPOSED FOR** (GS-ui-display-scale,
+    `app/viewportFit.ts displayScale`). The lore/beat screens are `--gs-portrait-w` (a fraction of the
+    viewport HEIGHT) so they always grew; the ~20 ordinary flow screens are `.gs-main` at a fixed 820px
+    with inner caps and ~660 hard-px sizes, so NOTHING about them was height-derived and nothing grew —
+    at 1920×1080 the Star Tour recap was a **460×442 island of phone-sized UI**. `--gs-uiscale` is now
+    `calc(var(--gs-readerscale) * var(--gs-displayscale))`: settings writes the reader half,
+    `viewportFit.ts` (the ONLY module allowed to compute a scaled viewport) writes
+    `clamp(1, min(w/390, h/844), 1.5)`. It **MULTIPLIES, never replaces** — the player owns their type —
+    so nothing may write the combined token (an inline root property beats the stylesheet and would
+    delete the other half) and nothing may READ it (an unregistered custom property computes to its token
+    stream, so `Number(getPropertyValue(…))` is **NaN**; ask `rootZoom()`). BOTH axes, because a viewport
+    proportionally NARROWER than the phone would be zoomed on its height alone and handed 329 units of
+    width — under `TIGHT_W`, reflowing the play HUD on a device that was fine. ⚠ **`--gs-portrait-w` is
+    deliberately NOT multiplied back**: it is `0.52 · dvh` and `--gs-dvh` already divides by the zoom, so
+    the frame RENDERS at 0.52·H whatever the scale is — same drawn width, same 0.52 aspect, bigger
+    contents (the star chart is still 562px at 1080p). Multiply it and the frame goes 562 → 719px and the
+    play camera's aspect 0.52 → 0.67, which is the wider desktop camera GS-play-desktop-frame's cap
+    exists to prevent. The clear band pays 4.4 points (84.1% → **79.7%**, which is the band the phone
+    already gets) and that is the FEATURE's cost, not the frame's — a vertical measure a wider frame
+    could not buy back. Guarded by `tests/display-scale.test.ts`.
   - **THE PORTRAIT FRAME IS ONE DECISION WITH TWO CONSUMERS** (GS-startour-frame, `--gs-portrait-w`).
     The game is composed portrait and keeps a portrait frame wherever it is not phone-portrait, sized
     as a fraction of the viewport HEIGHT so the composition SCALES with the display instead of being

@@ -29,9 +29,63 @@ import { clampUiScale, getSettings } from '../settings';
 export const TIGHT_H = 660;
 export const TIGHT_W = 330;
 
+/**
+ * The phone the game is composed for (an iPhone 14) — the shape every display lays out AS.
+ *
+ * EVERY DISPLAY LAYS OUT AS THE PHONE THE GAME IS COMPOSED FOR (GS-ui-display-scale). The flow
+ * screens are `.gs-main` at a fixed 820px with inner caps and hard-px type, so nothing about them
+ * is height-derived and nothing about them grew: measured at 1920×1080 the Star Tour round recap
+ * was a **460×390 island of phone-sized UI** — 32% dead below it and ~76% dead across.
+ *
+ * The fix is not a per-screen layout pass but a scale: a display with 1080px of height lays out in
+ * 844 units drawn 1.28× larger. That reaches all ~20 flow screens at once, and it composes with —
+ * never replaces — the player's own choice, because the player owns their type
+ * (GS-a11y-readable-text): `--gs-uiscale` is the PRODUCT of the two halves.
+ *
+ * It reads BOTH axes. Height alone is the axis that matters on every real display, but a viewport
+ * NARROWER in proportion than the composed-for phone (a folded foldable at 344×882, a tall thin
+ * window) would be zoomed on the strength of its height and handed even less width to lay out in —
+ * 329 units, which trips `TIGHT_W` and reflows the play HUD on a device that was fine. So the scale
+ * is the SMALLER of the two ratios: it only ever fires when the display genuinely has more room
+ * than the phone in both directions.
+ */
+export const DISPLAY_BASE_W = 390;
+export const DISPLAY_BASE_H = 844;
+
+/**
+ * The ceiling. 1440p and 4K stop here rather than rendering the HUD at 1.71×/2.56×; a capped 1440p
+ * still lays out as a 960-unit-tall phone-shaped screen, which is comfortably bigger without
+ * becoming a billboard.
+ */
+export const DISPLAY_SCALE_MAX = 1.5;
+
+/**
+ * How much bigger this display is than the composed-for phone, clamped to [1, DISPLAY_SCALE_MAX].
+ *
+ * Never below 1 — a display SMALLER than the phone (the itch embed's 820×760, a 320×568 handset)
+ * must be left exactly as it is, and shrinking the UI there would be the opposite of the fix.
+ * Deliberately a smooth ramp rather than a breakpoint: a media query could see the raw viewport
+ * here — this is the other direction from the usual GS-a11y-scale-wrap warning — but it can only
+ * STEP, and a visible jump mid-resize is worse than the ramp the resize listener already gives.
+ */
+export function displayScale(w: number, h: number): number {
+  if (!Number.isFinite(w) || !Number.isFinite(h)) return 1;
+  const ratio = Math.min(w / DISPLAY_BASE_W, h / DISPLAY_BASE_H);
+  if (!Number.isFinite(ratio)) return 1;
+  return Math.min(DISPLAY_SCALE_MAX, Math.max(1, ratio));
+}
+
+/**
+ * THE root zoom: the reader's own scale MULTIPLIED by the display's. Pure, and the single
+ * description of the product that `--gs-uiscale`'s `calc()` expresses in CSS.
+ */
+export function uiScaleOf(readerScale: number, w: number, h: number): number {
+  return (clampUiScale(readerScale) || 1) * displayScale(w, h);
+}
+
 /** The viewport in LAYOUT units — physical CSS px divided by the root zoom. Pure given its inputs. */
-export function effectiveViewport(w: number, h: number, uiScale: number): { w: number; h: number } {
-  const s = clampUiScale(uiScale) || 1;
+export function effectiveViewport(w: number, h: number, readerScale: number): { w: number; h: number } {
+  const s = uiScaleOf(readerScale, w, h);
   return { w: w / s, h: h / s };
 }
 
@@ -41,12 +95,19 @@ export function isTightFit(v: { w: number; h: number }): boolean {
 }
 
 /**
- * Stamp `data-gs-fit` on `<html>`. Guarded like `applyReaderSettings` so the node-side sim and the
- * tests can import this module freely.
+ * Stamp the display's half of the root zoom and `data-gs-fit` on `<html>`. Guarded like
+ * `applyReaderSettings` so the node-side sim and the tests can import this module freely.
+ *
+ * The two go together and in this order: the fit attribute is a question about the viewport in
+ * LAYOUT units, and the scale is one of the two things that decides how many of those there are.
+ * `window.innerWidth/innerHeight` are the viewport in physical CSS px and root `zoom` does not
+ * change them, so there is no feedback loop between writing the scale and reading the viewport.
  */
 export function applyViewportFit(): void {
   if (typeof document === 'undefined' || typeof window === 'undefined') return;
-  const v = effectiveViewport(window.innerWidth, window.innerHeight, getSettings().uiScale);
+  const { innerWidth: w, innerHeight: h } = window;
+  document.documentElement.style.setProperty('--gs-displayscale', String(displayScale(w, h)));
+  const v = effectiveViewport(w, h, getSettings().uiScale);
   document.documentElement.setAttribute('data-gs-fit', isTightFit(v) ? 'tight' : 'roomy');
 }
 

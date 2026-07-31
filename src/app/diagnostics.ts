@@ -22,6 +22,7 @@
 
 import { buildCrashReport, crashKey, type CrashContext, type CrashRun } from '../crashReport';
 import { APP_VERSION } from '../brand';
+import { rootZoom } from '../render/pixelRatio';
 
 /** The persistent host in index.html — OUTSIDE `#app`, which `render()` overwrites wholesale. */
 const HOST_ID = 'gs-crash';
@@ -45,11 +46,14 @@ let hideTimer: ReturnType<typeof setTimeout> | undefined;
  *  explain a layout fault. No identifiers, nothing persistent, nothing personal. */
 function device(): CrashContext['device'] {
   try {
-    const scale = getComputedStyle(document.documentElement).getPropertyValue('--gs-uiscale').trim();
+    // The RESOLVED zoom, not `--gs-uiscale` — since GS-ui-display-scale that token is a `calc()` of
+    // the reader's half and the display's, and an unregistered custom property computes to its
+    // token stream, so reading it back gives the literal string `calc(1 * 1.28)` and `Number()` NaN.
+    // `rootZoom()` is what the browser actually applied, which is the truthful number for a report.
     return {
       ua: navigator.userAgent,
       viewport: `${window.innerWidth}×${window.innerHeight}`,
-      uiScale: scale ? Number(scale) : 1,
+      uiScale: rootZoom(),
       reducedMotion: document.documentElement.classList.contains('gs-reduced'),
     };
   } catch {
