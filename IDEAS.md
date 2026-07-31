@@ -11,6 +11,53 @@ under the new format). Avenue (1), a full top-down RPG shell, stays deferred unt
 
 ## Now / next
 
+> **THE THREE OPEN 1.3.0 ITEMS ARE THE TOP THREE ENTRIES BELOW.** They came out of one play-test on
+> the itch build (2026-07-31) and are the last things between here and the release tag. Each is
+> scoped, measured where measuring was needed, and independent of the others — take ONE per session
+> (CLAUDE.md's one-feature rule; `playView.ts` / `style/fairway.ts` are hot files).
+
+**GS-runout-seen — the middle of the bag lands and stops on the fairway** *(FULLY SCOPED AND
+DECIDED — read `reports/runout-bounce-handover-2026-07-31.md` FIRST, it holds both surface tables,
+the rejected option and the definition of done)*
+Play-test: *"woods, hybrids and long irons don't really have any bounce animation, they land and
+just stick"*, refined to *"I'm fine with the driver keeping the same number of bounces, it's
+primarily the middle range of clubs."* MEASURED with `npx tsx scripts/runout-frames.ts`: hops are
+PLANNED and then not DRAWN — on a firm fairway a driver plans 6 and draws 2, a 4H plans 3 and draws
+1–2; on a soft green `seen` is **1 on all forty rows**.
+**The apex is NOT the problem** (5–12px against a 3px ball) and the ball's drawn size is not eating
+it — that was the first hypothesis and the measurement killed it. Every hop is capped at
+`want * apexOverLen` where `apexOverLen` is `tan(descent)/4`, DERIVED, so late hops on a flat
+descent are genuinely sub-pixel. **Decided: bring `planned` DOWN to meet what can be drawn** (a 4H
+at 0.7 splits 4.3yd into three hops of ~2.1/1.4/0.8yd; the same 4.3yd as TWO is drawable
+throughout). Levers in order: `hopMinYd` ▸ `RUNOUT_BY_CLASS[hybrid|ironLong|ironShort].len` ▸ the
+per-class hop share (the mid-bag gets 44–45% of the run against the long clubs' 57–67%).
+**Render-only — it re-cuts the roll the sim already computed, so NO carry moves and the death-spiral
+harness has nothing to weigh.** Do NOT touch `hopDrawBoost` or `apexOverLenFor`.
+Done when: mid-bag `seen == planned` on the firm fairway (`planned` may fall to 2–3), driver/3W
+visibly unchanged, `SW @0.7/0.55/0.4` still free to plop, nothing regressing on either surface, both
+tables in the commit message.
+
+**GS-fairway-ink-break — the fairway outline runs over greens, hazards and rough at a break**
+*(diagnosed, not started)*
+Play-test: *"the fairway line covers hazards and greens and rough when there's a break in the
+fairway, it should only be on the fairway itself and should definitely not be on the green even if
+the fairway art runs under the green."* `fairwayEdgeRuns` (`style/fairway.ts:182`) only asks whether
+a run is buried by ANOTHER FAIRWAY POLY — it has no knowledge of the green or the hazards, so at a
+break it outlines the gap over whatever is underneath. Fix: subtract the green polygon and the
+hazard bodies from the runs, with GS-fairway-silhouette's care intact — tolerances are widths of
+GROUND and deliberately UNCLAMPED (a px decision pops a run in/out on a follow-cam zoom, which
+`tests/camera-stability` pins), and the runs must stay exactly on the DRAWN polys rather than a
+re-derived outline. Eyes-on rig already exists: `scripts/fairway-outline-preview.mjs`.
+
+**GS-clubhouse-floor — the clubhouse furnishings are velcro'd to the wall** *(art pass, needs
+eyes-on)*
+Play-test: *"the Story Tour and Star Tour clubhouse has a bunch of things sitting on the wall and
+not the floor — your character is standing on the floor and everything else looks like it's velcro'd
+to the wall."* `render/storyClubhouse.ts` + `render/clubhouseLounge.ts` place furniture without the
+floor perspective the golfers are drawn with, so the two read as different spaces. Art judgement
+rather than a testable rule; `scripts/storyclub-preview.mjs` and `scripts/clubhouse-preview.mjs`
+are the rigs.
+
 **GS-ui-display-wide — the flow screens are bigger now, but still islands** *(the follow-up
 GS-ui-display-scale deliberately left; see `docs/decisions/accessibility.md`)*
 The display scale multiplies the caps, it does not remove them: `.gs-main` is 820 LAYOUT px and
