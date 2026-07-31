@@ -7,25 +7,14 @@
 //   node scripts/putt-panel-preview.mjs        (OUT=/path.png)
 import { createServer } from 'vite';
 import http from 'node:http';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { chromium } from 'playwright-core';
+import { launchChromium } from './chromium.mjs';
+
 
 const outPng = process.env.OUT ?? join(tmpdir(), 'gs-putt-panel.png');
-function findChromium() {
-  const bases = [process.env.PLAYWRIGHT_BROWSERS_PATH, '/opt/pw-browsers', process.env.HOME ? join(process.env.HOME, '.cache', 'ms-playwright') : undefined].filter(Boolean);
-  for (const base of bases) {
-    if (!existsSync(base)) continue;
-    if (existsSync(join(base, 'chromium'))) return join(base, 'chromium');
-    for (const d of readdirSync(base)) {
-      if (!d.startsWith('chromium-') || d.includes('headless')) continue;
-      const bin = join(base, d, 'chrome-linux', 'chrome');
-      if (existsSync(bin)) return bin;
-    }
-  }
-  return null;
-}
+
 
 // The game's own stylesheet, verbatim — a preview with hand-written CSS proves nothing.
 const indexHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -102,7 +91,7 @@ const srv = http.createServer((req, res) => {
 });
 await new Promise((ok) => srv.listen(0, ok));
 const port = srv.address().port;
-const browser = await chromium.launch({ executablePath: findChromium(), args: ['--no-sandbox'] });
+const browser = await launchChromium({ args: ['--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 1260, height: 500 }, deviceScaleFactor: 2 });
 page.on('pageerror', (e) => console.error('PAGE ERROR:', e.message));
 page.on('console', (m) => { if (m.type() === 'error') console.error('CONSOLE:', m.text()); });

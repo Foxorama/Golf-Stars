@@ -5,8 +5,8 @@ import { createServer } from 'vite';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { existsSync, readdirSync } from 'node:fs';
-import { homedir } from 'node:os';
+
+import { launchChromium } from './chromium.mjs';
 
 const BIOME = process.env.BIOME ?? 'verdant-station';
 const THEME = process.env.THEME ?? 'crux';
@@ -30,20 +30,11 @@ for (const dist of [4, 14, 30, 60]) {
 const html = `<!doctype html><html><body style="margin:0;background:#0b0d12;display:grid;grid-template-columns:repeat(4,240px);gap:8px;padding:12px">${cells}</body></html>`;
 writeFileSync(outHtml, html);
 
-function chromiumCandidates() {
-  const bases = [process.env.PLAYWRIGHT_BROWSERS_PATH, '/opt/pw-browsers', join(homedir(), '.cache', 'ms-playwright')].filter((b) => b && existsSync(b));
-  const out = [];
-  for (const base of bases) for (const d of readdirSync(base)) {
-    if (!d.startsWith('chromium-') || d.includes('headless')) continue;
-    const bin = join(base, d, 'chrome-linux', 'chrome');
-    if (existsSync(bin)) out.push(bin);
-  }
-  return out;
-}
-const { chromium } = await import('playwright-core');
-let browser = null;
-for (const p of chromiumCandidates()) { try { browser = await chromium.launch({ executablePath: p, args: ['--no-sandbox'] }); break; } catch {} }
-if (!browser) { console.log('no chromium, wrote', outHtml); await server.close(); process.exit(0); }
+
+
+
+const browser = await launchChromium({ args: ['--no-sandbox'], wrote: outHtml });
+
 const page = await browser.newPage({ viewport: { width: 1024, height: 1700 }, deviceScaleFactor: 2 });
 await page.goto('file://' + outHtml);
 await page.screenshot({ path: outPng, fullPage: true });

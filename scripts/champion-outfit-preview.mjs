@@ -4,27 +4,15 @@
 // SAME `apparelArt.ts` painters, so a drift between "what you buy" and "what you wear" shows up here.
 // Mirrors coil-garb-preview.mjs's tooling.  OUT=<path> node scripts/champion-outfit-preview.mjs
 import { createServer } from 'vite';
-import { writeFileSync, readdirSync } from 'node:fs';
-import { tmpdir, homedir } from 'node:os';
+import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { launchChromium } from './chromium.mjs';
 
 const outPng = process.env.OUT ?? join(tmpdir(), 'gs-champion-outfits.png');
 const outHtml = join(tmpdir(), 'gs-champion-outfits.html');
 
-async function chromium() {
-  const bases = [process.env.PLAYWRIGHT_BROWSERS_PATH, '/opt/pw-browsers', join(homedir(), 'Library', 'Caches', 'ms-playwright')].filter(Boolean);
-  for (const b of bases) {
-    let entries = [];
-    try { entries = readdirSync(b); } catch { continue; }
-    for (const e of entries) {
-      if (!/^chromium/.test(e)) continue;
-      for (const p of [join(b, e, 'chrome-linux', 'chrome'), join(b, e, 'chrome-linux', 'headless_shell'), join(b, e, 'chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium')]) {
-        try { readdirSync(join(p, '..')); return p; } catch { /* next */ }
-      }
-    }
-  }
-  return null;
-}
+
 
 const server = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' });
 const { golferPreviewSVG, apparelCardSVG } = await server.ssrLoadModule('/src/render/apparelArt.ts');
@@ -65,10 +53,10 @@ const html = `<!doctype html><meta charset=utf8><style>
 </style>${blocks}`;
 writeFileSync(outHtml, html);
 
-const exe = await chromium();
-if (!exe) { console.log('no chromium; wrote HTML to', outHtml); await server.close(); process.exit(0); }
-const { chromium: pw } = await import('playwright-core');
-const browser = await pw.launch({ executablePath: exe, args: ['--no-sandbox'] });
+
+
+
+const browser = await launchChromium({ args: ['--no-sandbox'], wrote: outHtml });
 const page = await browser.newPage({ viewport: { width: 1200, height: 900 }, deviceScaleFactor: 2 });
 await page.goto('file://' + outHtml);
 await page.waitForTimeout(300);

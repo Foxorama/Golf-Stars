@@ -1,18 +1,11 @@
-import { readdirSync, existsSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { build } from 'esbuild';
-import { chromium } from 'playwright-core';
+import { launchChromium } from './chromium.mjs';
 
-function findChromium() {
-  const bases = [process.env.PLAYWRIGHT_BROWSERS_PATH, '/opt/pw-browsers', `${homedir()}/AppData/Local/ms-playwright`].filter(Boolean);
-  for (const base of bases) {
-    let dirs;
-    try { dirs = readdirSync(base).filter((x) => x.startsWith('chromium-') && !x.includes('headless')); } catch { continue; }
-    for (const d of dirs) for (const bin of [`${base}/${d}/chrome-linux/chrome`]) if (existsSync(bin)) return bin;
-  }
-  return null;
-}
+
+
 
 const entry = `
 import { setState } from './src/app/ctx';
@@ -73,16 +66,14 @@ const html = `<!doctype html><html><head><meta charset="utf8"><style>
 </style></head><body><script>${result.outputFiles[0].text}</script></body></html>`;
 
 const pngPath = process.env.LOCKER_PREVIEW_PNG ?? join(tmpdir(), 'locker-preview.png');
-try {
-  const exe = findChromium();
-  if (!exe) throw new Error('no chromium');
-  const browser = await chromium.launch({ executablePath: exe });
-  const page = await browser.newPage({ viewport: { width: 430, height: 1400 }, deviceScaleFactor: 2 });
-  page.on('console', (m) => { if (m.type() === 'error') console.log('PAGE ERR:', m.text()); });
-  page.on('pageerror', (e) => console.log('PAGE THROW:', e.message));
-  await page.setContent(html, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(400);
-  await page.screenshot({ path: pngPath, fullPage: true });
-  await browser.close();
-  console.log('wrote ' + pngPath);
-} catch (e) { console.log('(screenshot skipped: ' + e.message + ')'); }
+// A failure here is LOUD (GS-preview-chromium): the old catch printed "(screenshot skipped)" and
+// exited 0, so the rig reported success having drawn nothing.
+const browser = await launchChromium();
+const page = await browser.newPage({ viewport: { width: 430, height: 1400 }, deviceScaleFactor: 2 });
+page.on('console', (m) => { if (m.type() === 'error') console.log('PAGE ERR:', m.text()); });
+page.on('pageerror', (e) => console.log('PAGE THROW:', e.message));
+await page.setContent(html, { waitUntil: 'networkidle' });
+await page.waitForTimeout(400);
+await page.screenshot({ path: pngPath, fullPage: true });
+await browser.close();
+console.log('wrote ' + pngPath);

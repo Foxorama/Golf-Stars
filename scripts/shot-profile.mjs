@@ -6,15 +6,16 @@
  * measured rather than guessed. Build unminified first for readable names:
  *   npx vite build --minify false
  */
-import { chromium } from 'playwright-core';
+
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { launchChromium } from './chromium.mjs';
 
-const chromePath = process.env.CHROME_PATH;
+
 const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist/index.html');
 const CPU_THROTTLE = Number(process.env.THROTTLE || 1);
 
-const browser = await chromium.launch({ executablePath: chromePath, args: ['--no-sandbox'] });
+const browser = await launchChromium({ args: ['--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const cdp = await page.context().newCDPSession(page);
 await cdp.send('Profiler.enable');

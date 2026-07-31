@@ -58,23 +58,29 @@ import { resolve } from 'node:path';
 const root = resolve(__dirname, '..');
 const read = (p: string): string => readFileSync(resolve(root, p), 'utf8');
 
-/** Every `.ts` under a tree, as `[path, source]`. */
-function sourceFiles(dir: string): [string, string][] {
+/** Every source file under a tree, as `[path, source]`. */
+function sourceFiles(dir: string, exts = ['.ts']): [string, string][] {
   const out: [string, string][] = [];
   const walk = (d: string): void => {
     for (const entry of readdirSync(resolve(root, d), { withFileTypes: true })) {
       const p = `${d}/${entry.name}`;
       if (entry.isDirectory()) walk(p);
-      else if (entry.name.endsWith('.ts')) out.push([p, read(p)]);
+      else if (exts.some((e) => entry.name.endsWith(e))) out.push([p, read(p)]);
     }
   };
   walk(dir);
   return out;
 }
 
-const TREES: Record<'src' | 'tests', [string, string][]> = {
+type Tree = 'src' | 'tests' | 'scripts';
+
+// `scripts/` is dev tooling rather than shipped code, and it is scanned for exactly that reason: it
+// is the tree where nobody is watching, so a fact re-derived there rots for months (the ~40 eyes-on
+// rigs each carried their own Chromium lookup long after `tests/` was fixed).
+const TREES: Record<Tree, [string, string][]> = {
   src: sourceFiles('src'),
   tests: sourceFiles('tests'),
+  scripts: sourceFiles('scripts', ['.ts', '.mjs']),
 };
 
 /** This file, excluded from its own scans — see the note at the filter below. */
@@ -95,8 +101,8 @@ interface OneDescription {
   fact: string;
   home: string;
   answers: string;
-  /** Which tree a second description would appear in. A row scanning the wrong one passes vacuously. */
-  scan: 'src' | 'tests';
+  /** Which tree(s) a second description would appear in. A row scanning the wrong one passes vacuously. */
+  scan: Tree | Tree[];
   pattern: RegExp;
   allowed?: Record<string, string>;
   cost: string;
@@ -124,14 +130,27 @@ const REGISTER: OneDescription[] = [
   // pattern is weaker than the targeted ban that already exists. Duplicating it would break this
   // file's own header rule.
   {
-    fact: 'Where Chromium is, for a test that drives the built artifact',
-    home: 'tests/chromium.ts',
+    fact: 'Where Chromium is, and how it is launched',
+    home: 'scripts/chromium.mjs',
     answers: 'findChromium',
-    scan: 'tests',
-    pattern: /CHROME_PATH|chromium-\d|playwright[/\\]+chromium/i,
+    // BOTH trees. Fixing this in `tests/` and not in `scripts/` is the whole reason the row grew:
+    // the rule was written, obeyed in one tree, and the other went on rotting for months.
+    scan: ['tests', 'scripts'],
+    // Deliberately scoped to DERIVING a path, not to using one. The browser tests pass the seam's
+    // answer straight to `chromium.launch({ executablePath })`, which is calling the seam, not
+    // duplicating it — banning that word would flag 22 correct files and teach everyone to edit the
+    // guard, which the header rule says is worse than having none.
+    pattern: /CHROME_PATH|chrome-linux|ms-playwright|pw-browsers|chromium-\d/i,
+    allowed: {
+      // The re-export shim. It names the seam it forwards to and derives nothing.
+      'tests/chromium.ts': 'the TypeScript re-export of the home — it resolves no paths of its own',
+    },
     cost:
-      'Nine files each carried their own copy and they drifted into two different answers, so 50 tests ' +
-      'in build.test.ts reported SKIPPED everywhere — CI included — for months (GS-browser-test-gate).',
+      'Nine test files each carried their own copy and they drifted into two different answers, so 50 tests ' +
+      'in build.test.ts reported SKIPPED everywhere — CI included — for months. The same lookup was then ' +
+      'copy-pasted into 64 eyes-on rigs under scripts/, every copy Linux-only, and those fail SOFT: they ' +
+      'printed "no chromium" and exited 0, so on Windows every art preview the project relies on silently ' +
+      'rendered nothing while reporting success (GS-browser-test-gate).',
   },
   {
     fact: 'Whether the animator has already drawn this hole',
@@ -169,8 +188,9 @@ describe('one decision, one home (GS-one-description)', () => {
         );
       });
 
-      it(`is not described a second time anywhere in ${row.scan}/`, () => {
-        const offenders = TREES[row.scan].filter(([path, src]) => {
+      const trees = [row.scan].flat();
+      it(`is not described a second time anywhere in ${trees.join('/, ')}/`, () => {
+        const offenders = trees.flatMap((t) => TREES[t]).filter(([path, src]) => {
           if (path === row.home) return false;
           // THIS FILE names every banned shape in its own `pattern` literals, so it matches them all.
           // Naming a re-derivation is not performing one — the register documents the rule it enforces.
@@ -194,7 +214,7 @@ describe('one decision, one home (GS-one-description)', () => {
     for (const row of REGISTER) {
       expect(row.fact.length, `a row needs a fact: ${row.answers}`).toBeGreaterThan(10);
       expect(row.cost.length, `${row.answers} has no stated cost`).toBeGreaterThan(40);
-      expect(row.home.startsWith('src/') || row.home.startsWith('tests/')).toBe(true);
+      expect(['src/', 'tests/', 'scripts/'].some((t) => row.home.startsWith(t))).toBe(true);
     }
   });
 
@@ -212,7 +232,8 @@ describe('one decision, one home (GS-one-description)', () => {
     // rather than in six months when somebody re-derives the fact and nothing complains.
     const samples: Record<string, string> = {
       isBareCampaignBlob: "if (!obj.campaigns && typeof obj.characterId === 'string') return adopt(obj);",
-      findChromium: 'const p = process.env.CHROME_PATH ?? findLocalChromium();',
+      // The literal shape that was copy-pasted into 64 rigs — a hand-built Playwright cache path.
+      findChromium: "const bin = join(base, d, 'chrome-linux', 'chrome');",
       holeIsNewToAnimator: 'if (state.play.holeIndex !== animHoleIndex) { animatedShots = 0; }',
       readSave: 'if (s.version !== SAVE_VERSION) return defaultSave();',
     };

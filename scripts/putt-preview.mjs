@@ -1,53 +1,14 @@
 // One-off eyeball: render a few PUTT scenes (sloped green + the predicted break line) to a PNG so the
 // GS-greens-3 putting UI can be verified. Mirrors gallery.mjs' vite-node + chromium machinery.
 import { createServer } from 'vite';
-import { writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { launchChromium } from './chromium.mjs';
 
 const outPng = process.env.PUTT_OUT ?? join(tmpdir(), 'gs-putt.png');
 const outHtml = join(tmpdir(), 'gs-putt.html');
-// Chromium CANDIDATES, best first (the gallery.mjs walk): full chromium per platform, then the
-// headless shell (all a screenshot needs — on one Windows box the full download shipped a broken
-// side-by-side manifest while the headless shell ran fine). Caller tries each in turn.
-async function chromiumCandidates() {
-  const { homedir } = await import('node:os');
-  const bases = [
-    process.env.PLAYWRIGHT_BROWSERS_PATH,
-    '/opt/pw-browsers',
-    join(homedir(), 'AppData', 'Local', 'ms-playwright'),
-    join(homedir(), 'Library', 'Caches', 'ms-playwright'),
-    join(homedir(), '.cache', 'ms-playwright'),
-  ].filter((b) => b && existsSync(b));
-  const out = [];
-  for (const base of bases) {
-    for (const d of readdirSync(base)) {
-      if (!d.startsWith('chromium-') || d.includes('headless')) continue;
-      for (const rel of [
-        ['chrome-linux', 'chrome'],
-        ['chrome-win64', 'chrome.exe'],
-        ['chrome-win', 'chrome.exe'],
-        ['chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'],
-      ]) {
-        const bin = join(base, d, ...rel);
-        if (existsSync(bin)) out.push(bin);
-      }
-    }
-    for (const d of readdirSync(base)) {
-      if (!d.startsWith('chromium_headless_shell-')) continue;
-      for (const rel of [
-        ['chrome-headless-shell-linux64', 'chrome-headless-shell'],
-        ['chrome-headless-shell-win64', 'chrome-headless-shell.exe'],
-        ['chrome-headless-shell-mac-x64', 'chrome-headless-shell'],
-        ['chrome-headless-shell-mac-arm64', 'chrome-headless-shell'],
-      ]) {
-        const bin = join(base, d, ...rel);
-        if (existsSync(bin)) out.push(bin);
-      }
-    }
-  }
-  return out;
-}
+
 const server = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' });
 const { generateCourse } = await server.ssrLoadModule('/src/sim/course/generate.ts');
 const { renderHoleSVG } = await server.ssrLoadModule('/src/render/holeView.ts');
@@ -81,18 +42,9 @@ for (const [biome, label] of [['ice-ring', 'Frost (steep)'], ['verdant-station',
 }
 const html = `<!doctype html><html><body style="margin:0;background:#0b0d12;display:grid;grid-template-columns:repeat(3,260px);gap:8px;padding:12px">${cells}</body></html>`;
 writeFileSync(outHtml, html);
-const candidates = await chromiumCandidates();
-const { chromium } = await import('playwright-core');
-let browser = null;
-for (const chromePath of candidates) {
-  try {
-    browser = await chromium.launch({ executablePath: chromePath, args: ['--no-sandbox'] });
-    break;
-  } catch (e) {
-    console.log('launch failed, trying next candidate:', chromePath, '—', String(e).split('\n')[0]);
-  }
-}
-if (!browser) { console.log('no launchable chromium; wrote', outHtml); await server.close(); process.exit(0); }
+
+const browser = await launchChromium({ args: ['--no-sandbox'], wrote: outHtml });
+
 const page = await browser.newPage({ viewport: { width: 850, height: 1180 }, deviceScaleFactor: 2 });
 await page.goto('file://' + outHtml);
 await page.screenshot({ path: outPng, fullPage: true });

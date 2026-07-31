@@ -3,21 +3,14 @@
 // you can see whether the max-distance shot's landing clears the HUD without a manual zoom-out.
 // Mirrors putt-preview.mjs' vite-node + chromium machinery.
 import { createServer } from 'vite';
-import { writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { launchChromium } from './chromium.mjs';
 
 const outPng = process.env.CAM_OUT ?? join(tmpdir(), 'gs-camera.png');
 const outHtml = join(tmpdir(), 'gs-camera.html');
-async function findChromium() {
-  const base = process.env.PLAYWRIGHT_BROWSERS_PATH ?? '/opt/pw-browsers';
-  for (const d of readdirSync(base)) {
-    if (!d.startsWith('chromium-') || d.includes('headless')) continue;
-    const bin = join(base, d, 'chrome-linux', 'chrome');
-    if (existsSync(bin)) return bin;
-  }
-  return null;
-}
+
 const server = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' });
 const { generateCourse } = await server.ssrLoadModule('/src/sim/course/generate.ts');
 const { renderHoleSVG } = await server.ssrLoadModule('/src/render/holeView.ts');
@@ -66,9 +59,9 @@ for (const [bias, label] of [[0.72, 'OLD focusBias 0.72'], [0.84, 'NEW focusBias
 const html = `<!doctype html><meta charset=utf8><body style="margin:0;background:#0b0d12;display:flex;gap:16px;padding:16px;">${cells}</body>`;
 writeFileSync(outHtml, html);
 
-const chromePath = await findChromium();
-const { chromium: pw } = await import('playwright-core');
-const browser = await pw.launch({ executablePath: chromePath ?? undefined, args: ['--no-sandbox'] });
+
+
+const browser = await launchChromium({ args: ['--no-sandbox'], wrote: outHtml });
 const page = await browser.newPage({ deviceScaleFactor: 2 });
 await page.goto('file://' + outHtml);
 await page.waitForTimeout(300);

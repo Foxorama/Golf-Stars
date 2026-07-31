@@ -4,16 +4,17 @@
  *
  * Plays real tee shots and measures the frames while the ball is in the air and running out.
  */
-import { chromium } from 'playwright-core';
+
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { launchChromium } from './chromium.mjs';
 
-const chromePath = process.env.CHROME_PATH;
+
 const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist/index.html');
 const THROTTLE = Number(process.env.THROTTLE || 12);
 const SEEDS = (process.env.SEEDS || '42,7,99').split(',');
 
-const browser = await chromium.launch({ executablePath: chromePath, args: ['--no-sandbox'] });
+const browser = await launchChromium({ args: ['--no-sandbox'] });
 const all = [];
 for (const seed of SEEDS) {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });

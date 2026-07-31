@@ -7,6 +7,7 @@ import { createServer } from 'vite';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { launchChromium } from './chromium.mjs';
 
 const server = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' });
 const { ssrLoadModule } = server;
@@ -31,8 +32,7 @@ await server.close();
 
 // Rasterize to PNG with the pre-installed chromium so the result is directly viewable.
 try {
-  const { chromium } = await import('playwright-core');
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
+  const browser = await launchChromium();
   const page = await browser.newPage({ viewport: { width: 380 * 2 + 20, height: 640 * 3 + 40 } });
   const cells = svgs.map((s) => `<div style="display:inline-block">${s.svg}</div>`).join('');
   await page.setContent(`<body style="margin:0;background:#000;display:flex;flex-wrap:wrap;gap:10px;width:${380 * 2 + 20}px">${cells}</body>`);

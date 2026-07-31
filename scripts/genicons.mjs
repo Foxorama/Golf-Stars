@@ -7,27 +7,11 @@
  *
  *   node scripts/genicons.mjs public
  */
-import { readdirSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { launchChromium } from './chromium.mjs';
 
-// Find the installed Chromium binary the same way tests/build.test.ts does.
-function findChromium() {
-  const bases = [
-    process.env.PLAYWRIGHT_BROWSERS_PATH,
-    '/opt/pw-browsers',
-    process.env.HOME ? `${process.env.HOME}/.cache/ms-playwright` : undefined,
-  ].filter(Boolean);
-  for (const base of bases) {
-    let dirs;
-    try { dirs = readdirSync(base).filter((x) => x.startsWith('chromium-') && !x.includes('headless')); }
-    catch { continue; }
-    for (const d of dirs) {
-      const bin = `${base}/${d}/chrome-linux/chrome`;
-      if (existsSync(bin)) return bin;
-    }
-  }
-  return null;
-}
+
 
 // Deterministic seeded RNG (mulberry32) so the background starfield is byte-stable across runs —
 // same discipline as the render layer (never Math.random for anything drawn).
@@ -107,12 +91,12 @@ function ballSVG(size) {
 </svg>`;
 }
 
-const chrome = findChromium();
-if (!chrome) { console.error('No Chromium found'); process.exit(1); }
-const { chromium } = await import('playwright-core');
+
+
+
 const out = process.argv[2];
 mkdirSync(out, { recursive: true });
-const browser = await chromium.launch({ executablePath: chrome, args: ['--no-sandbox', '--force-device-scale-factor=1'] });
+const browser = await launchChromium({ args: ['--no-sandbox', '--force-device-scale-factor=1'] });
 try {
   const page = await browser.newPage();
   const sizes = [

@@ -5,30 +5,13 @@
  *
  *   node scripts/cosmetics-preview.mjs
  */
-import { readdirSync, existsSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { build } from 'esbuild';
-import { chromium } from 'playwright-core';
 
-function findChromium() {
-  const bases = [
-    process.env.PLAYWRIGHT_BROWSERS_PATH,
-    '/opt/pw-browsers',
-    `${homedir()}/AppData/Local/ms-playwright`,
-  ].filter(Boolean);
-  for (const base of bases) {
-    let dirs;
-    try { dirs = readdirSync(base).filter((x) => x.startsWith('chromium-') && !x.includes('headless')); }
-    catch { continue; }
-    for (const d of dirs) {
-      for (const bin of [`${base}/${d}/chrome-linux/chrome`, `${base}/${d}/chrome-win/chrome.exe`, `${base}/${d}/chrome-win64/chrome.exe`]) {
-        if (existsSync(bin)) return bin;
-      }
-    }
-  }
-  return null;
-}
+
+
 
 const entry = `
 import { SHIPS } from './src/sim/rpg/ships';
@@ -57,6 +40,7 @@ document.body.innerHTML =
 `;
 
 import { writeFileSync } from 'node:fs';
+import { launchChromium } from './chromium.mjs';
 const result = await build({
   stdin: { contents: entry, resolveDir: process.cwd(), loader: 'ts' },
   bundle: true,
@@ -71,17 +55,14 @@ const pngPath = join(tmpdir(), 'cosmetics-preview.png');
 writeFileSync(htmlPath, html);
 console.log('wrote ' + htmlPath + ' — open it in a browser to eyeball the cosmetics');
 
-// Try a headless screenshot too (skipped gracefully where the sandbox blocks a browser spawn).
-try {
-  const exe = findChromium();
-  if (!exe) throw new Error('no chromium');
-  const browser = await chromium.launch({ executablePath: exe });
-  const page = await browser.newPage({ viewport: { width: 1280, height: 1000 }, deviceScaleFactor: 2 });
-  await page.setContent(html, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(400);
-  await page.screenshot({ path: pngPath, fullPage: true });
-  await browser.close();
-  console.log('wrote ' + pngPath);
-} catch (e) {
-  console.log('(screenshot skipped — browser launch unavailable here: ' + e.message + ')');
-}
+// The screenshot is the point of the rig, so a failure here is LOUD (GS-preview-chromium). This used
+// to be wrapped in a catch that printed "(screenshot skipped)" and exited 0 — which is the same
+// silent-success bug as the old Chromium lookup, just one layer up: the rig reported fine and drew
+// nothing. The HTML above is written first and named, so a real failure still leaves you something.
+const browser = await launchChromium({ wrote: htmlPath });
+const page = await browser.newPage({ viewport: { width: 1280, height: 1000 }, deviceScaleFactor: 2 });
+await page.setContent(html, { waitUntil: 'networkidle' });
+await page.waitForTimeout(400);
+await page.screenshot({ path: pngPath, fullPage: true });
+await browser.close();
+console.log('wrote ' + pngPath);

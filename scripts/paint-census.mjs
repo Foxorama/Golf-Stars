@@ -13,11 +13,12 @@
  *
  * Read it as: steady-state ops/frame should be tens. Thousands means the world is being re-stroked.
  */
-import { chromium } from 'playwright-core';
+
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { launchChromium } from './chromium.mjs';
 
-const chromePath = process.env.CHROME_PATH;
+
 const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist/index.html');
 const SEED = process.env.SEED || '42';
 
@@ -58,7 +59,7 @@ const COUNTER = () => {
   raf(beat);
 };
 
-const browser = await chromium.launch({ executablePath: chromePath, args: ['--no-sandbox'] });
+const browser = await launchChromium({ args: ['--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 await page.addInitScript(COUNTER);
 await page.goto('file://' + dist + `?intro=0&seed=${SEED}`, { waitUntil: 'load' });

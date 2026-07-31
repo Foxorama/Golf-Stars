@@ -22,9 +22,10 @@
 //   ARCHES=void,cetus node scripts/biome-vibrance.mjs
 
 import { createServer } from 'vite';
-import { writeFileSync, existsSync, readdirSync } from 'node:fs';
-import { tmpdir, homedir } from 'node:os';
+import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { launchChromium } from './chromium.mjs';
 
 // One representative theme + biome per archetype (the archetype is resolved off the THEME when
 // present, so both must agree or the render falls back to verdant turf).
@@ -70,20 +71,11 @@ for (const [arch, themeId, biome] of rows) {
 }
 writeFileSync(outHtml, `<!doctype html><html><body style="margin:0;background:#000;display:flex;flex-wrap:wrap">${cells}</body></html>`);
 
-function chromiumCandidates() {
-  const bases = [process.env.PLAYWRIGHT_BROWSERS_PATH, '/opt/pw-browsers', join(homedir(), '.cache', 'ms-playwright')].filter((b) => b && existsSync(b));
-  const out = [];
-  for (const base of bases) for (const d of readdirSync(base)) {
-    if (!d.startsWith('chromium-') || d.includes('headless')) continue;
-    const bin = join(base, d, 'chrome-linux', 'chrome');
-    if (existsSync(bin)) out.push(bin);
-  }
-  return out;
-}
-const { chromium } = await import('playwright-core');
-let browser = null;
-for (const p of chromiumCandidates()) { try { browser = await chromium.launch({ executablePath: p, args: ['--no-sandbox'] }); break; } catch {} }
-if (!browser) { console.log('no chromium available; wrote', outHtml); await server.close(); process.exit(0); }
+
+
+
+const browser = await launchChromium({ args: ['--no-sandbox'], wrote: outHtml });
+
 const page = await browser.newPage({ viewport: { width: 1280, height: 1100 } });
 await page.goto('file://' + outHtml);
 

@@ -7,13 +7,14 @@
  *   - live intervals, WebAudio node creations, canvas/svg counts
  *   - frame times sampled DURING a shot/putt animation (where the lag is reported)
  *
- * Usage: CHROME_PATH=... node scripts/leak-probe.mjs   (HOLES=12 to go deeper)
+ * Usage: node scripts/leak-probe.mjs   (HOLES=12 to go deeper; the browser comes from chromium.mjs)
  */
-import { chromium } from 'playwright-core';
+
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { launchChromium } from './chromium.mjs';
 
-const chromePath = process.env.CHROME_PATH;
+
 const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist/index.html');
 const HOLES = Number(process.env.HOLES || 10);
 
@@ -90,7 +91,7 @@ const INSTRUMENT = () => {
   rawRAF(beat);
 };
 
-const browser = await chromium.launch({ executablePath: chromePath, args: ['--no-sandbox'] });
+const browser = await launchChromium({ args: ['--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const cdp = await page.context().newCDPSession(page);
 await cdp.send('HeapProfiler.enable');

@@ -7,31 +7,15 @@
 
 import { createServer } from 'vite';
 import http from 'node:http';
-import { existsSync, readdirSync } from 'node:fs';
+
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { chromium } from 'playwright-core';
+import { launchChromium } from './chromium.mjs';
+
 
 const outPng = process.env.WEATHER_OUT ?? join(tmpdir(), 'gs-weather.png');
 
-function findChromium() {
-  const bases = [
-    process.env.PLAYWRIGHT_BROWSERS_PATH,
-    process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'ms-playwright') : undefined,
-    process.env.HOME ? join(process.env.HOME, '.cache', 'ms-playwright') : undefined,
-    '/opt/pw-browsers',
-  ].filter(Boolean);
-  for (const base of bases) {
-    if (!existsSync(base)) continue;
-    for (const d of readdirSync(base)) {
-      if (!d.startsWith('chromium-') || d.includes('headless')) continue;
-      for (const bin of [join(base, d, 'chrome-win64', 'chrome.exe'), join(base, d, 'chrome-linux', 'chrome')]) {
-        if (existsSync(bin)) return bin;
-      }
-    }
-  }
-  return null;
-}
+
 
 // Each effect over an archetype whose events plausibly bring it, so the wind tint reads on-world.
 // The strike cases (GS-meteor-strikes) freeze the meteor-shower's landing meteor mid-dive and at
@@ -104,8 +88,8 @@ const srv = http.createServer((req, res) => {
 await new Promise((ok) => srv.listen(0, ok));
 const port = srv.address().port;
 
-const exe = findChromium();
-const browser = await chromium.launch(exe ? { executablePath: exe } : {});
+
+const browser = await launchChromium();
 const page = await browser.newPage({ viewport: { width: 1000, height: 1080 }, deviceScaleFactor: 2 });
 await page.goto(`http://127.0.0.1:${port}/`);
 await page.waitForFunction('window.__done === true');

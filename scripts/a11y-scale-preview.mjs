@@ -12,27 +12,13 @@
 //
 // `scrollAnc` in the report is the important column: content hanging off the screen is only a BUG
 // when it reads `none`. Run it before and after any change to a viewport-locked screen.
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { chromium } from 'playwright-core';
+import { launchChromium } from './chromium.mjs';
 
-function findChromium() {
-  const bases = [
-    process.env.PLAYWRIGHT_BROWSERS_PATH,
-    '/opt/pw-browsers',
-    process.env.HOME ? join(process.env.HOME, '.cache', 'ms-playwright') : undefined,
-  ].filter(Boolean);
-  for (const base of bases) {
-    if (!existsSync(base)) continue;
-    for (const d of readdirSync(base)) {
-      if (!d.startsWith('chromium-') || d.includes('headless')) continue;
-      const bin = join(base, d, 'chrome-linux', 'chrome');
-      if (existsSync(bin)) return bin;
-    }
-  }
-  return null;
-}
+
+
 
 const dist = 'file://' + resolve(process.cwd(), 'dist/index.html');
 if (!existsSync(resolve(process.cwd(), 'dist/index.html'))) {
@@ -46,7 +32,7 @@ const VW = Number(process.env.VW ?? 390);
 const VH = Number(process.env.VH ?? 844);
 const out = process.env.OUT ?? join(tmpdir(), `gs-a11y-${screen}-${scale}.png`);
 
-const browser = await chromium.launch({ executablePath: findChromium(), args: ['--no-sandbox'] });
+const browser = await launchChromium({ args: ['--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: VW, height: VH }, deviceScaleFactor: 2 });
 page.on('pageerror', (e) => console.error('PAGE ERROR:', e.message));
 page.on('console', (m) => { if (m.type() === 'error') console.error('CONSOLE:', m.text()); });

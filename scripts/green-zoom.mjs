@@ -1,9 +1,10 @@
 // Green close-up: render each world's green at PUTT zoom (not whole-hole) so the actual green SIZE +
 // contour + tucked pin read, with a ball placed a long way from the flag to show the two-putt.
 import { createServer } from 'vite';
-import { writeFileSync, existsSync, readdirSync } from 'node:fs';
-import { tmpdir, homedir } from 'node:os';
+import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { launchChromium } from './chromium.mjs';
 
 const outPng = process.env.OUT ?? join(tmpdir(), 'gs-green-zoom.png');
 const outHtml = join(tmpdir(), 'gs-green-zoom.html');
@@ -44,10 +45,10 @@ for (const [biome, themeId, label] of worlds) {
 const html = `<!doctype html><html><body style="margin:0;background:#0b0d12;display:grid;grid-template-columns:repeat(3,300px);gap:10px;padding:14px">${cells}</body></html>`;
 writeFileSync(outHtml, html);
 
-function chromiumCandidates(){const bases=[process.env.PLAYWRIGHT_BROWSERS_PATH,'/opt/pw-browsers',join(homedir(),'.cache','ms-playwright')].filter(b=>b&&existsSync(b));const out=[];for(const base of bases)for(const d of readdirSync(base)){if(!d.startsWith('chromium-')||d.includes('headless'))continue;const bin=join(base,d,'chrome-linux','chrome');if(existsSync(bin))out.push(bin);}return out;}
-const { chromium } = await import('playwright-core');
-let browser=null; for(const p of chromiumCandidates()){try{browser=await chromium.launch({executablePath:p,args:['--no-sandbox']});break;}catch{}}
-if(!browser){console.log('no chromium, wrote',outHtml);await server.close();process.exit(0);}
+
+
+const browser = await launchChromium({ args: ['--no-sandbox'], wrote: outHtml });
+
 const page=await browser.newPage({viewport:{width:960,height:1100},deviceScaleFactor:2});
 await page.goto('file://'+outHtml);
 await page.screenshot({path:outPng,fullPage:true});

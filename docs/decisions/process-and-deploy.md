@@ -9,6 +9,52 @@
 - CI: `.github/workflows/tests.yml` runs the suite on every push/PR. Keep new game logic inside
   `src/sim/` (pure) so it's reachable from tests.
 
+## The one Chromium lookup (GS-browser-test-gate → GS-preview-chromium)
+
+`scripts/chromium.mjs` is the single answer to "where is Chromium, and how do I launch it".
+`tests/chromium.ts` re-exports it. Nothing else may derive a browser path.
+
+**Why the home is a `.mjs` in `scripts/` and not the TypeScript file the rule was first written for.**
+The ~40 eyes-on rigs are plain ESM and cannot import TypeScript. When the seam lived only in `tests/`,
+four rigs reached it by standing up a whole vite server purely to `ssrLoadModule` a 40-line lookup,
+and the other sixty did the obvious thing instead: they copied it. A seam that costs a build tool to
+reach is one the next caller will copy-paste around, so the home moved to the file every caller can
+`import`, and the TypeScript side became a one-line re-export.
+
+**What the second description cost, twice.** In `tests/` it was 50 tests reporting SKIPPED everywhere
+including CI, for months — the original GS-browser-test-gate story. The fix landed there and nowhere
+else, so `scripts/` went on carrying **64 copies in eight different shapes, every one Linux-only**: a
+hand-built `chrome-linux/chrome` under a Playwright cache dir, no `CHROME_PATH`, no Windows or macOS
+path. That was worse, because **rigs fail soft**. With no browser a rig printed
+`no chromium, wrote /tmp/….html` and exited **0**. So on the author's Windows machine every eyes-on
+preview — the gallery, the fairway outline, the landing sheet, the clubhouse, all of them — silently
+rendered nothing for months while reporting success, and CLAUDE.md goes on pointing at those rigs as
+the eyes-on check for exactly the art changes the pure-sim suite is blind to. A green exit code said
+the preview was fine; there was no preview.
+
+**Three things the seam knows that a copy did not.**
+
+1. **Existing on disk is not launching.** The Windows Playwright download has been observed refusing
+   to start at all (*"the side-by-side configuration is incorrect"*) on a machine whose system Chrome
+   runs perfectly. So the lookup returns a ranked LIST, `launchChromium` tries each in turn, and a
+   system browser deliberately **outranks** a cached Playwright download. The headless shell is kept
+   as a genuine last resort — it is a different binary that some of the tests' viewport and focus
+   assertions do not behave identically under, but it rasterises a page perfectly well, which is all
+   any rig needs, and on that Windows box it was the download that DID run.
+2. **The first three ranks are load-bearing.** `findChromium` answers with rank 1 and the browser
+   suite gates `it.runIf` on it, so anything new goes at the END of the list unless what it does to
+   `tests/` has been measured. Rank 2 is the Linux-layout Playwright cache because that is what the
+   CI runner is.
+3. **A missing browser must be LOUD.** `launchChromium` throws, naming every candidate it tried and
+   the fallback HTML the rig already wrote. Non-zero exit, because a rig that cannot show you the
+   picture has failed at its only job.
+
+⚠️ The register scan (`tests/one-description.test.ts`) bans **deriving** a path — `CHROME_PATH`,
+`chrome-linux`, `ms-playwright`, `pw-browsers`, `chromium-<rev>` — across `tests/` AND `scripts/`. It
+deliberately does NOT ban `executablePath`: the browser tests pass the seam's own answer to
+`chromium.launch({ executablePath })`, which is calling the seam rather than duplicating it, and a
+guard that flags 22 correct files is one everybody learns to edit.
+
 ## Test & demo hub (GS-16 — `test.html` / `src/test/`)
 - **A second built page** (`test.html` → `src/test/hub.ts`) served beside the game on the same
   origin (`dist/test.html`). Two faces: a **Demo** that drives the REAL game in an `<iframe>` via

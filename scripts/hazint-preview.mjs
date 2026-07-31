@@ -1,10 +1,11 @@
 // Eyeball hazard INTERNALS (rake lines, depth bands) up close — render a few hazard-heavy holes big.
 import { createServer } from 'vite';
-import { writeFileSync, existsSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { launchChromium } from './chromium.mjs';
 const outPng = process.env.OUT ?? join(tmpdir(), 'gs-hazint.png');
-async function findChromium(){const base=process.env.PLAYWRIGHT_BROWSERS_PATH??'/opt/pw-browsers';const {readdirSync}=await import('node:fs');for(const d of readdirSync(base)){if(!d.startsWith('chromium-')||d.includes('headless'))continue;const bin=join(base,d,'chrome-linux','chrome');if(existsSync(bin))return bin;}return null;}
+
 const server=await createServer({server:{middlewareMode:true},appType:'custom',logLevel:'error'});
 const {generateCourse}=await server.ssrLoadModule('/src/sim/course/generate.ts');
 const {renderHoleSVG}=await server.ssrLoadModule('/src/render/holeView.ts');
@@ -23,8 +24,8 @@ for(const [biome,themeId,label,want] of cases){
   if(picked){cells+=`<figure style="margin:0"><figcaption style="color:#ccd;font:600 13px system-ui">${label}</figcaption>${renderHoleSVG(picked,{width:640,height:940,biome,themeId})}</figure>`;}
 }
 writeFileSync(join(tmpdir(),'gs-hazint.html'),`<!doctype html><body style="margin:0;background:#0b0d12;display:grid;grid-template-columns:repeat(3,640px);gap:8px;padding:12px">${cells}`);
-const {chromium}=await import('playwright-core');
-const browser=await chromium.launch({executablePath:await findChromium(),args:['--no-sandbox']});
+
+const browser = await launchChromium({ args: ['--no-sandbox'] });
 const page=await browser.newPage({deviceScaleFactor:2});
 await page.goto('file://'+join(tmpdir(),'gs-hazint.html'));await page.waitForTimeout(300);
 await (await page.$('body')).screenshot({path:outPng});

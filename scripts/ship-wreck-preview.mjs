@@ -4,16 +4,13 @@
 // + the "Starlit Wanderer" spray text can be eyeballed.  node scripts/ship-wreck-preview.mjs
 import { createServer } from 'vite';
 import http from 'node:http';
-import { existsSync, readdirSync } from 'node:fs';
+
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { chromium } from 'playwright-core';
+import { launchChromium } from './chromium.mjs';
+
 const outPng = process.env.OUT ?? join(tmpdir(), 'gs-ship-wreck.png');
-function findChromium() {
-  const bases = [process.env.PLAYWRIGHT_BROWSERS_PATH, process.env.HOME ? join(process.env.HOME, '.cache', 'ms-playwright') : undefined, '/opt/pw-browsers'].filter(Boolean);
-  for (const base of bases) { if (!existsSync(base)) continue; for (const d of readdirSync(base)) { if (!d.startsWith('chromium-') || d.includes('headless')) continue; const bin = join(base, d, 'chrome-linux', 'chrome'); if (existsSync(bin)) return bin; } }
-  return null;
-}
+
 const html = `<!doctype html><meta charset="utf8">
 <body style="margin:0;background:#04060b;display:flex;flex-wrap:wrap;gap:10px;padding:12px;font-family:sans-serif">
 <style>figcaption{color:#cfd6e4;font-size:12px;margin:0 0 4px}figure{margin:0}</style>
@@ -46,8 +43,8 @@ const vite = await createServer({ server: { middlewareMode: true }, appType: 'cu
 const srv = http.createServer((req, res) => { if (req.url === '/' || req.url === '/index.html') { res.setHeader('content-type', 'text/html'); res.end(html); return; } vite.middlewares(req, res); });
 await new Promise((ok) => srv.listen(0, ok));
 const port = srv.address().port;
-const exe = findChromium();
-const browser = await chromium.launch(exe ? { executablePath: exe, args:['--no-sandbox'] } : {});
+
+const browser = await launchChromium({ args: ['--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 1500, height: 820 }, deviceScaleFactor: 2 });
 page.on('pageerror', (e) => console.error('PAGE ERROR:', e.message));
 await page.goto(`http://127.0.0.1:${port}/`);

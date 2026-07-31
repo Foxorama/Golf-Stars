@@ -3,16 +3,13 @@
 //   node scripts/serpent-preview.mjs      (OUT=/path.png to choose the file)
 import { createServer } from 'vite';
 import http from 'node:http';
-import { existsSync, readdirSync } from 'node:fs';
+
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { chromium } from 'playwright-core';
+import { launchChromium } from './chromium.mjs';
+
 const outPng = process.env.OUT ?? join(tmpdir(), 'gs-serpent.png');
-function findChromium() {
-  const bases = [process.env.PLAYWRIGHT_BROWSERS_PATH, process.env.HOME ? join(process.env.HOME, '.cache', 'ms-playwright') : undefined, '/opt/pw-browsers'].filter(Boolean);
-  for (const base of bases) { if (!existsSync(base)) continue; for (const d of readdirSync(base)) { if (!d.startsWith('chromium-') || d.includes('headless')) continue; const bin = join(base, d, 'chrome-linux', 'chrome'); if (existsSync(bin)) return bin; } }
-  return null;
-}
+
 
 const html = `<!doctype html><meta charset="utf8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -57,8 +54,8 @@ const vite = await createServer({ server: { middlewareMode: true }, appType: 'cu
 const srv = http.createServer((req, res) => { const path = req.url.split('?')[0]; if (path === '/' || path === '/index.html') { res.setHeader('content-type', 'text/html'); res.end(html); return; } vite.middlewares(req, res); });
 await new Promise((ok) => srv.listen(0, ok));
 const port = srv.address().port;
-const exe = findChromium();
-const browser = await chromium.launch(exe ? { executablePath: exe, args: ['--no-sandbox'] } : {});
+
+const browser = await launchChromium({ args: ['--no-sandbox'] });
 const page = await browser.newPage({ viewport: { width: 1400, height: 920 }, deviceScaleFactor: 1 });
 page.on('pageerror', (e) => console.error('PAGE ERROR:', e.message));
 page.on('console', (m) => { if (m.type() === 'error') console.error('CONSOLE:', m.text()); });

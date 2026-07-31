@@ -6,6 +6,10 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
 
+    // `tests/chromium.ts` re-exports the plain-ESM `scripts/chromium.mjs` — the one Chromium lookup,
+    // which has to be .mjs so the `scripts/*-preview.mjs` rigs can import it without a build step.
+    // `checkJs` stays off: scripts/ is dev tooling, not shipped code, and is not type-checked.
+    "allowJs": true,
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,

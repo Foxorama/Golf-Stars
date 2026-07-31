@@ -1,27 +1,15 @@
 // Throwaway preview: render each golfer normally + as a Coil defector (coilGarb), side by side, and
 // screenshot to a PNG so the switched-sides costume can be eyeballed. Mirrors gallery.mjs's tooling.
 import { createServer } from 'vite';
-import { writeFileSync, readdirSync } from 'node:fs';
-import { tmpdir, homedir } from 'node:os';
+import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { launchChromium } from './chromium.mjs';
 
 const outPng = process.env.OUT ?? join(tmpdir(), 'gs-coil-garb.png');
 const outHtml = join(tmpdir(), 'gs-coil-garb.html');
 
-async function chromium() {
-  const bases = [process.env.PLAYWRIGHT_BROWSERS_PATH, '/opt/pw-browsers', join(homedir(), 'Library', 'Caches', 'ms-playwright')].filter(Boolean);
-  for (const b of bases) {
-    let entries = [];
-    try { entries = readdirSync(b); } catch { continue; }
-    for (const e of entries) {
-      if (!/^chromium/.test(e)) continue;
-      for (const p of [join(b, e, 'chrome-linux', 'chrome'), join(b, e, 'chrome-linux', 'headless_shell'), join(b, e, 'chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium')]) {
-        try { readdirSync(join(p, '..')); return p; } catch { /* next */ }
-      }
-    }
-  }
-  return null;
-}
+
 
 const server = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' });
 const { golferPreviewSVG } = await server.ssrLoadModule('/src/render/apparelArt.ts');
@@ -43,10 +31,10 @@ const html = `<!doctype html><meta charset=utf8><style>
 </style><div class="grid">${cells}</div>`;
 writeFileSync(outHtml, html);
 
-const exe = await chromium();
-if (!exe) { console.log('no chromium; wrote HTML to', outHtml); await server.close(); process.exit(0); }
-const { chromium: pw } = await import('playwright-core');
-const browser = await pw.launch({ executablePath: exe, args: ['--no-sandbox'] });
+
+
+
+const browser = await launchChromium({ args: ['--no-sandbox'], wrote: outHtml });
 const page = await browser.newPage({ viewport: { width: 1100, height: 720 }, deviceScaleFactor: 2 });
 await page.goto('file://' + outHtml);
 await page.waitForTimeout(300);

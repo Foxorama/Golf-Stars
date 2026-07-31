@@ -5,23 +5,19 @@
  *
  *   node scripts/club-icons-preview.mjs
  */
-import { readdirSync, existsSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { build } from 'esbuild';
-import { chromium } from 'playwright-core';
+import { launchChromium } from './chromium.mjs';
 
-function findChromium() {
-  const bases = [process.env.PLAYWRIGHT_BROWSERS_PATH, '/opt/pw-browsers'].filter(Boolean);
-  for (const base of bases) {
-    let dirs;
-    try { dirs = readdirSync(base).filter((x) => x.startsWith('chromium-') && !x.includes('headless')); }
-    catch { continue; }
-    for (const d of dirs) {
-      const bin = `${base}/${d}/chrome-linux/chrome`;
-      if (existsSync(bin)) return bin;
-    }
-  }
-  return null;
-}
+// `/tmp` is not a path on Windows — it resolves to `C:\tmp`, which does not exist, so this rig died
+// before it ever reached a browser. The rest of the rigs already use `tmpdir()`.
+const entryPath = join(tmpdir(), 'gs-club-entry.ts');
+const outPng = join(tmpdir(), 'gs-club-icons.png');
+
+
+
 
 const entry = `
 import { itemArtSVG } from './src/render/itemArt';
@@ -54,7 +50,7 @@ for (const [fam, t] of rewardTypes) {
 html += '</div>';
 document.body.innerHTML = html;
 `;
-writeFileSync('/tmp/club-entry.ts', entry);
+writeFileSync(entryPath, entry);
 
 const result = await build({
   stdin: { contents: entry, resolveDir: process.cwd(), loader: 'ts' },
@@ -65,11 +61,11 @@ const html = `<!doctype html><html><head><meta charset="utf8"></head>
 <body style="margin:0;padding:16px;background:#0b0d12;">
 <script>${js}</script></body></html>`;
 
-const exe = findChromium();
-const browser = await chromium.launch({ executablePath: exe });
+
+const browser = await launchChromium();
 const page = await browser.newPage({ viewport: { width: 900, height: 1400 }, deviceScaleFactor: 2 });
 await page.setContent(html, { waitUntil: 'networkidle' });
 await page.waitForTimeout(300);
-await page.screenshot({ path: '/tmp/club-icons.png', fullPage: true });
+await page.screenshot({ path: outPng, fullPage: true });
 await browser.close();
-console.log('wrote /tmp/club-icons.png');
+console.log('wrote', outPng);
