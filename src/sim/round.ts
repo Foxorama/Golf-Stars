@@ -1526,6 +1526,21 @@ export interface ShotSpread {
   flight: FlightProfile;
 }
 
+/**
+ * The furthest a sprayed shot can FINISH — the far edge of the cone's carry plus the run the club's
+ * family then releases (GS-carry-roll-real: `carryHigh` is a CARRY, and since GS-runout-ladder a
+ * driver runs a further 14% of it, a wood 10.5%, an iron 5.5–6.5%; a wedge keeps the legacy taper and
+ * barely moves).
+ *
+ * ONE description of that fold, because two things now ask it: the club suggestion (which has to know
+ * whether the ball stops by the back of the green) and the shot camera (which has to frame where the
+ * ball comes to REST, not where it lands — the frame was sized on the carry and the ball kept going
+ * past it, GS-decision-frame-carry). Pure.
+ */
+export function sprayTotalHigh(sp: ShotSpread): number {
+  return sp.carryHigh * (1 + rollFractionFor(sp.flight, sp.nominalCarry));
+}
+
 export function shotSpread(
   hole: Hole,
   from: Vec,
@@ -2099,10 +2114,7 @@ export function suggestPlayerClub(
     const sp = spreadOf(c);
     return sp.expectedCarry * (1 + rollFractionFor(sp.flight, sp.nominalCarry));
   };
-  const highTotal = (c: Club) => {
-    const sp = spreadOf(c);
-    return sp.carryHigh * (1 + rollFractionFor(sp.flight, sp.nominalCarry));
-  };
+  const highTotal = (c: Club) => sprayTotalHigh(spreadOf(c));
   const longest = cand.reduce((a, b) => (clubDist(b, opts.stats) > clubDist(a, opts.stats) ? b : a));
 
   // Unreachable: even the longest club's best TOTAL can't get to the front → swing the longest.

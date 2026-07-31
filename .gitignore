@@ -25,3 +25,6 @@ assets/
 
 # Vite writes these beside a TS config while loading it; they are transient build artifacts.
 vite.config.ts.timestamp-*.mjs
+
+# Scratch output from the preview/measurement scripts (screenshots, probe dumps).
+.tmp/

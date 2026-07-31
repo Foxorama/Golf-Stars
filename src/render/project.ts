@@ -87,6 +87,23 @@ export function bandCentreBias(bandTop: number, bandBottom: number, containerH: 
   return Math.max(0.3, Math.min(0.7, (bandTop + bandBottom) / 2 / containerH));
 }
 
+/**
+ * The focus radius (course yards) that puts a point `reach` yards up-screen exactly `spanUnits` FRAME
+ * UNITS above the ball — the other half of GS-play-hud-space, which framed the ball clear of the
+ * bottom panel (`clearOfPanelBias`) and then let the far end of the shot draw straight through the
+ * top info bar, because the camera's reach was a constant that knew nothing about the HUD.
+ *
+ * Read straight off `holeProjector`'s focus branch: the scale is width-limited on a portrait frame,
+ * so a yard is `(frameW − 2·padding)/(2R)` frame units and a point `reach` yards ahead sits
+ * `reach·scale` above the ball. Setting that to the span the HUD leaves and solving for R is the whole
+ * function. Pure — the caller supplies the measured span, so this stays node-testable.
+ */
+export function radiusForSpan(reach: number, spanUnits: number, frameW: number, padding = 24): number {
+  const half = (frameW - 2 * padding) / 2;
+  if (!(reach > 0) || !(spanUnits > 0) || !(half > 0)) return 0;
+  return (reach * half) / spanUnits;
+}
+
 export interface Projector {
   width: number;
   height: number;
