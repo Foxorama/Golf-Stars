@@ -185,14 +185,39 @@ export function ballRadiusPx(pxPerYard: number, loft = 0, feel: BallFeel = DEFAU
  * At the ordinary putt cameras (7.6–17 px/yd) the honest value wins and the drawn cup IS the catch
  * radius; only the extreme tap-in zoom reaches the cap.
  */
-export const CUP_MIN_RATIO = 1.6;
 /** Real golf: a ball's radius is about 0.36 of the cup's, i.e. the cup is ~2.8x the ball. Drawn at
  *  3.2 it read as a crater sticker on the green; at the real ratio it reads as a hole. */
 export const CUP_MAX_RATIO = 2.8;
 
+/**
+ * ⚠️ THERE IS NO FLOOR, AND THAT IS THE POINT (GS-cup-oversize).
+ *
+ * There used to be one — `ball × 1.6`, so the cup could never be drawn smaller than the ball. It
+ * reads as the safe direction and it is not: below ~4 px/yd the floor is what wins, so the drawn cup
+ * grew to **3x the catch radius on the whole-hole map and 1.6x at a mid approach**. A circle wider
+ * than the radius that catches means the ball's drawn centre can sit INSIDE the hole while the sim
+ * correctly does not hole it — the ball rolls over the black circle and carries on, which is the
+ * report ("it looks especially buggy when chipping") and is a straight violation of contract 5: the
+ * graphic IS the physics.
+ *
+ * So the cup is bounded ABOVE only:
+ *
+ *  - by the catch radius itself — never draw a hole bigger than the one that catches, at any camera;
+ *  - by `ball × CUP_MAX_RATIO` — the ball is drawn hugely oversized at low zoom (a real ball is a
+ *    third of a pixel at the putt camera), so an honest 1.2yd cup at a tap-in would be a crater with
+ *    a marble beside it. This is the cap that bites at every putt camera.
+ *
+ * THE COST, STATED: at the whole-hole and long-approach cameras the cup is now SMALLER than the
+ * drawn ball (0.6px against 2.25px at 0.5 px/yd) — the very thing the floor was added to prevent.
+ * That is accepted deliberately. The two exaggerations cannot both be honoured: the ball has a hard
+ * 2.25px floor of its own, so any cup floor above the catch radius re-creates the lie. From 300
+ * yards you should not be able to see the hole — the FLAG is what marks the pin at that range, and
+ * it is drawn. The case the floor was really protecting (a holed putt reading as a ball parked on a
+ * dot) lives at the putt cameras, where the catch radius is 9–42px and nothing is at risk.
+ */
 export function cupRadiusPx(pxPerYard: number, feel: BallFeel = DEFAULT_BALL_FEEL): number {
   const ball = ballRadiusPx(pxPerYard, 0, feel);
-  return clamp(HOLE_OUT_RADIUS * pxPerYard, ball * CUP_MIN_RATIO, ball * CUP_MAX_RATIO);
+  return Math.min(HOLE_OUT_RADIUS * pxPerYard, ball * CUP_MAX_RATIO);
 }
 
 /**
