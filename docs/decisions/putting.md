@@ -1818,3 +1818,159 @@ case rests — paired in the same test with the unchanged rule that a steep plan
 for no reason the player can see. That is the "could flow slightly better" half of the report, and it
 is a separate tuning question about friction versus slope with its own balance run: see
 `GS-creep-friction` in IDEAS.
+
+## GS-runout-seen — the middle of the bag landed and stopped (2026-07-31)
+
+Play-test on the itch build: *"it definitely seems like driver is the only club that visually shows a
+ball bounce… woods, hybrids and long irons don't really have any bounce animation, they land and just
+stick"*, refined to *"I'm fine with the driver keeping the same number of bounces, it's primarily the
+middle range of clubs."*
+
+The handover (`reports/runout-bounce-handover-2026-07-31.md`) had already measured it with
+`scripts/runout-frames.ts`, which reconstructs the drawn run-out frame by frame from the shipped
+functions: **hops were PLANNED and then not DRAWN.** On a firm fairway a driver planned six and drew
+two, a 4-hybrid planned three and drew one; on a soft green `seen` was **1 on all forty rows**. The
+apex was fine (5–12px against a ball drawn at ~3px) — GS-runout-visible had already fixed that. What
+was wrong was everything after the first skip.
+
+Two independent faults, and the measurement separates them cleanly.
+
+### Fault 1 — the angle term was not the range relation
+
+`hopLen` scaled with `carry · cos²(descent)`. That is neither half of the projectile pair this module
+already relies on. A projectile launched at θ ranges `v²·sin2θ/g` and peaks at `v²·sin²θ/2g`, and
+`apexOverLenFor` has been the RATIO of exactly those two — `tan(θ)/4` — since GS-runout-visible said
+*"there is nothing to tune here"*. So the module held the correct geometry in two of its three places
+and contradicted itself in the third.
+
+It matters because the two terms behave completely differently across the bag's arrival angles:
+
+| descent | 38° (driver) | 47° (hybrid) | 50° (7i) | 57° (SW) |
+|---|---|---|---|---|
+| `cos²θ` — what it used | 0.621 | 0.465 | 0.413 | 0.297 |
+| `sin2θ` — the range relation | 0.970 | 0.998 | 0.985 | 0.914 |
+
+`sin2θ` is essentially FLAT (a bounce trades forward speed for height and back again, and it peaks at
+45° as a range must); `cos²θ` falls away by a third. So every steep-landing club was docked a penalty
+the physics does not charge — **on top of** the one `RUNOUT_BY_CLASS.len` already charges for the same
+steepness. Double-counted, and the clubs it hit hardest are precisely the ones the play-test named.
+
+`hopBite(descentDeg)` is now that relation, and `hopLenK` is re-based (0.07 → **0.0448**) so the
+DRIVER's skip is arithmetically unchanged — the play-test was explicit that the driver already reads
+right, so the constant is pinned at its ~38° landing and a test says so. Everything else gets longer:
+a hybrid's opening skip 3.75 → **5.09yd**, a long iron's 3.92 → **5.38**, a 7-iron's 1.98 → **3.02**.
+
+With `cos²` gone, `RUNOUT_BY_CLASS.len` is the ONLY place a club's steep, spinny bite is expressed —
+the old values were set beside a term already punishing steepness — so two rows moved with the term.
+
+- **`ironShort` 0.8 → 0.93.** Measured against real first-bounce lengths on firm turf (driver ~13yd,
+  hybrid ~7, 7-iron ~4.5) the model runs ~0.75 of reality fairly uniformly, and `ironShort` was the
+  one row well under that at 0.67.
+- **`wedge` 0.55 → 0.28**, by exactly the factor the term itself moved, which HOLDS the wedge where it
+  was: its modelled skip drops back under `hopFirstMinShare`'s net, so every PW/SW landing on both
+  surfaces AND the backspin check's skid come out byte-for-byte. Deliberate — a wedge plopping once is
+  the design, the handover's done-condition names it, and it is where GS-backspin-optin's tuned check
+  lives.
+
+The wood is left alone: its own hold factor is 0.965, so its opening skip moves 8.50 → 8.75yd (apex
+8.1 → 8.4px), which is invisible — where the wedge's was a threshold crossing (2.7 → 3.1px against a
+3px ball). Holding a class is worth a row when it changes what the player sees, and noise otherwise.
+
+### Fault 2 — the plan had no way to ask whether a hop could be SEEN
+
+The tail was fiction. `hopMinYd` (0.35yd) is an absolute length, and **a length in yards cannot answer
+"will this be seen"** — the camera frames the shot, so the same 0.75yd hop is a clearly-read 3.7px
+behind a 9-iron and an invisible 0.8px behind a drive. Two measured hops from the same table make the
+point unanswerable: a 9-iron's 0.744yd second hop draws at 3.6px and must be kept, a 4-hybrid's 0.761yd
+third hop draws at 1.8px and must go. No yard floor separates those, and no share-of-the-run-out floor
+does either (the camera saturates at short range, so a 56yd 7-iron and a 120yd 7-iron want the same
+threshold in pixels off very different run-outs).
+
+Every alternative considered was a **second description of the camera** — reconstructing it inside the
+plan from `carry`, which is a decision `project.ts` owns. So the caller passes what it is about to
+draw: `Landing.ballYd`, the drawn ball's radius expressed in yards of modelled hop apex. It is the play
+view's own `height · scale · heightExaggeration · hopDrawBoost` run BACKWARDS through the identical
+expression, so the plan's question and the drawing are one description. A hop under it is not planned,
+and its ground goes to the closing ROLL — where it is at least seen as motion — instead of to a
+≥`hopMinMs` segment of the ball scuffing along under its own radius.
+
+Two rules hold it in place. The FIRST hop is exempt, for the same reason it already was: a ball out of
+the sky does not begin by rolling, whatever the camera. And `ballYd` is OPTIONAL — absent, the old
+`hopMinYd` floor applies unchanged, which is what keeps every pure test exercising the untrimmed bounce
+MODEL (the thing the physics is measured against) while the game draws the trimmed one.
+
+### Measured
+
+`npx tsx scripts/runout-frames.ts`, 40 club × power rows per surface.
+
+**Firm fairway (0.85) — `seen == planned` on all 40 rows**, against 2–6 planned / 0–3 seen before:
+
+| club | roll | planned before | seen before | planned after | **seen after** |
+|---|---|---|---|---|---|
+| D @1.0 | 38.1 | 6 | 2 | 2 | **2** |
+| D @0.7 | 26.7 | 6 | 3 | 3 | **3** |
+| 3W @1.0 | 27.2 | 5 | 2 | 2 | **2** |
+| 4H @1.0 | 13.6 | 3 | 2 | 2 | **2** |
+| 4H @0.7 | 9.5 | 3 | 1 | 2 | **2** |
+| 3i @1.0 | 10.7 | 4 | 2 | 2 | **2** |
+| 7i @1.0 | 7.7 | 2 | 1 | 2 | **2** |
+| 7i @0.55 | 4.3 | 2 | 1 | 2 | **2** |
+| 9i @0.7 | 4.6 | 2 | 1 | 2 | **2** |
+| PW @1.0 | 5.3 | 2 | 1 | 1 | **1** |
+
+Every club from driver through 9-iron draws two on a full swing. The rows that stay at 1 are the
+30–66yd partials (a 7-iron with 3.1yd of total run cannot fit two visible bounces at any split — the
+air budget is 2.17yd and two drawable hops need 2.53) and the wedges, which is the class comment's own
+*"plops once and stops"*.
+
+**Soft green (0.45) — `seen == planned == 1` on all 40 rows.** `seen` is unchanged from the baseline's
+1-everywhere; what went is the phantom. That is honest rather than disappointing: on soft ground the
+forward restitution is 0.45–0.55, so the second hop is 12–30% of the first and genuinely cannot be
+drawn. The surface kills the bounce through the physics, and now the plan agrees.
+
+One side effect worth naming: the driver's firm-fairway run-out **no longer hits the `runoutMaxMs`
+clamp** — rows whose animation clock differed from the sampler's went 6/40 → **3/40** on the fairway
+(the three left are the pre-existing short-SW stretches), so a drive now plays at its true speed
+instead of compressed 1.4×. Shots with no visible bounce stay **3/40**: the same three SW partials,
+untouched.
+
+An earlier cut of this change did NOT hold the wedge, and `SW @0.70` on a firm fairway crossed 2.7px →
+3.1px into showing a small skip. Defensible golf — but the done-condition names those three rows, and
+holding a class costs one number, so it was held rather than argued for.
+
+### Contracts
+
+- **No death spiral (4): nothing to weigh.** `src/render/runout.ts` is imported by no `src/sim/`
+  module (source-checked) and this re-cuts the roll `rollOut` already computed between hops and the
+  closing roll. Zero carry moved, zero rng draws moved, the ball still stops exactly where the sim put
+  it — asserted, with and without `ballYd`.
+- **The graphic IS the physics (5):** the point of the whole change. The length term now comes from
+  the same projectile as the apex ratio, and the drawability test is the inverse of the draw call.
+- Determinism (1) and auto ≡ interactive (2) are untouched — this is render-only and consumes nothing.
+
+`npm run typecheck` + `npx vitest run` green: **217 files, 2,608 tests, 0 skipped**, plus `npm run
+build`. (`npm run check`'s trailing hub build cannot run on Windows — see the process doc.)
+
+Guarded by a new block in `tests/runout.test.ts`, every assertion verified RED against the old code:
+the two terms are one projectile; the angle term no longer collapses across the bag; `hopLenK` is
+pinned to the driver's arrival; every club driver→9i draws two hops that clear the ball; no planned hop
+is invisible on either surface at any power; trimming conserves the ball's resting place and leaves the
+kept hops untouched; and a caller without `ballYd` still gets the old floor.
+
+Eyes-on re-shot: `scripts/landing-preview.mjs`, which also gained two fixes of its own — it now passes
+`ballYd` (so the sheet shows the hops the GAME plans, not the ones the model would like to) and it asks
+`rollFractionFor` for the run instead of re-deriving it off `carryFrac`, a form that has been wrong
+since GS-runout-ladder gave the run its own lever and was drawing a driver running 23yd where the game
+runs 38. Its private Linux-only `findChromium` copy is deleted in favour of `tests/chromium.ts` — the
+same second description GS-browser-test-gate is about, and the reason the sheet could not be re-shot on
+Windows at all.
+
+### Known, left alone deliberately
+
+- **`hopApexK` / `hopApexMax` are effectively vestigial.** Measured across all 80 rows, the apex cap
+  `want · apexOverLen` binds on EVERY hop, so `hopApex` never decides anything. That is not wrong (the
+  geometric ratio is the honest governor) but it is dead weight with a misleading doc comment.
+- **The drawn apex-to-length ratio of a steep club is 1:1.27** (`apexOverLen · heightExaggeration ·
+  hopDrawBoost` at a hybrid's 47°), close to the 1:1.4 line `hopDrawBoost`'s own comment calls the
+  point where a skip reads as a vertical bounce. Pre-existing and unchanged by this pass — the hops
+  got longer at a constant ratio — but it is the reason `hopDrawBoost` must stay modest.

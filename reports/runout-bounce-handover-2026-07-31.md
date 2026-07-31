@@ -1,5 +1,11 @@
 # The bounce reads as "lands and sticks" — measurement + handover
 
+> **CLOSED.** Shipped as GS-runout-seen — outcome and the after tables are in
+> `reports/runout-bounce-2026-07-31.md`, the story in `docs/decisions/putting.md`. Two things below
+> were superseded by the work: neither of the two levers named here was the one that mattered (see
+> that report's *Deviations*), and lever 2 (buying roll with carry) was never spent. The measurement
+> and the "rules to respect while tuning" still hold.
+
 **2026-07-31** · triggered by a play-test: *"it definitely seems like driver is the only club that
 visually shows a ball bounce… woods, hybrids and long irons don't really have any bounce animation,
 they land and just stick."*

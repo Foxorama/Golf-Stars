@@ -978,6 +978,14 @@ export function mountPlayView(
           clubId: shot.club.id,
           vary,
           firmAt,
+          // How big the ball is DRAWN, in the run-out's own height units, so a hop that could never
+          // lift it clear of itself is not planned (GS-runout-seen). This is the ball-draw below run
+          // BACKWARDS through the very same expression — `height * scale * heightExaggeration *
+          // hopDrawBoost` — so the plan's question and the drawing are one description, and neither
+          // has to guess what camera the shot is being watched at.
+          ballYd:
+            ballRadiusPx(proj.scale, 0, F) /
+            Math.max(1e-6, proj.scale * F.heightExaggeration * F.hopDrawBoost),
         };
         runoutPlan = planRunout(land, F);
       }

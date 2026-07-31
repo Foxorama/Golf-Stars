@@ -11,31 +11,11 @@ under the new format). Avenue (1), a full top-down RPG shell, stays deferred unt
 
 ## Now / next
 
-> **THE THREE OPEN 1.3.0 ITEMS ARE THE TOP THREE ENTRIES BELOW.** They came out of one play-test on
+> **TWO OPEN 1.3.0 ITEMS REMAIN — THE TOP TWO ENTRIES BELOW.** They came out of one play-test on
 > the itch build (2026-07-31) and are the last things between here and the release tag. Each is
-> scoped, measured where measuring was needed, and independent of the others — take ONE per session
-> (CLAUDE.md's one-feature rule; `playView.ts` / `style/fairway.ts` are hot files).
-
-**GS-runout-seen — the middle of the bag lands and stops on the fairway** *(FULLY SCOPED AND
-DECIDED — read `reports/runout-bounce-handover-2026-07-31.md` FIRST, it holds both surface tables,
-the rejected option and the definition of done)*
-Play-test: *"woods, hybrids and long irons don't really have any bounce animation, they land and
-just stick"*, refined to *"I'm fine with the driver keeping the same number of bounces, it's
-primarily the middle range of clubs."* MEASURED with `npx tsx scripts/runout-frames.ts`: hops are
-PLANNED and then not DRAWN — on a firm fairway a driver plans 6 and draws 2, a 4H plans 3 and draws
-1–2; on a soft green `seen` is **1 on all forty rows**.
-**The apex is NOT the problem** (5–12px against a 3px ball) and the ball's drawn size is not eating
-it — that was the first hypothesis and the measurement killed it. Every hop is capped at
-`want * apexOverLen` where `apexOverLen` is `tan(descent)/4`, DERIVED, so late hops on a flat
-descent are genuinely sub-pixel. **Decided: bring `planned` DOWN to meet what can be drawn** (a 4H
-at 0.7 splits 4.3yd into three hops of ~2.1/1.4/0.8yd; the same 4.3yd as TWO is drawable
-throughout). Levers in order: `hopMinYd` ▸ `RUNOUT_BY_CLASS[hybrid|ironLong|ironShort].len` ▸ the
-per-class hop share (the mid-bag gets 44–45% of the run against the long clubs' 57–67%).
-**Render-only — it re-cuts the roll the sim already computed, so NO carry moves and the death-spiral
-harness has nothing to weigh.** Do NOT touch `hopDrawBoost` or `apexOverLenFor`.
-Done when: mid-bag `seen == planned` on the firm fairway (`planned` may fall to 2–3), driver/3W
-visibly unchanged, `SW @0.7/0.55/0.4` still free to plop, nothing regressing on either surface, both
-tables in the commit message.
+> scoped, measured where measuring was needed, and independent of the other — take ONE per session
+> (CLAUDE.md's one-feature rule; `playView.ts` / `style/fairway.ts` are hot files). The third,
+> GS-runout-seen, has shipped (see Done).
 
 **GS-fairway-ink-break — the fairway outline runs over greens, hazards and rough at a break**
 *(diagnosed, not started)*
@@ -895,6 +875,17 @@ Terse log — full story in the linked report / `docs/decisions/` / git history.
   is tour-flat across the bag. A 9-iron crossed the screen 3× faster than a driver and spent 44ms on its
   closing tenth against a drive's 95. Keyed on apex plus a per-family `dragTaper` (driver 0.72 → wedge
   0.46), the closing tenth is now 95–108ms for every club. Pure render pacing; harness byte-identical.
+- **GS-runout-seen** — the middle of the bag landed and stopped (`docs/decisions/putting.md`,
+  `reports/runout-bounce-2026-07-31.md`). Hops were PLANNED and then not DRAWN. Two faults: the length
+  term was `cos²(descent)`, which is neither half of the projectile pair the module already relies on
+  (`apexOverLenFor` is their RATIO), and it collapses across the bag where the real range relation
+  `sin(2·descent)` is flat — so every steep club was charged for its steepness TWICE, `RUNOUT_BY_CLASS.len`
+  being the other charge. And `hopMinYd` asked "is this hop big enough" in YARDS, which cannot answer a
+  question about pixels. `hopBite` + `hopLenK` re-based on the driver (unchanged by construction), and
+  the play view passes `Landing.ballYd` — its own draw expression run backwards — so a hop it could not
+  show is never planned. `seen == planned` on all 40 firm rows (driver→9i all draw 2 on a full swing)
+  and an honest 1-and-roll on all 40 green rows; the driver's run-out also stopped hitting the
+  `runoutMaxMs` clamp. Render-only: no sim module imports `runout.ts`, zero carry moved.
 - **GS-runout-ladder** — the landing got its ground back (`docs/decisions/putting.md`). The run stopped
   being the flight's leftover: `carryFrac` is now purely the FLIGHT scale (unchanged, so zero carries
   moved) and `runFrac` is its own lever, because buying a driver's run out of its carry dropped its apex
