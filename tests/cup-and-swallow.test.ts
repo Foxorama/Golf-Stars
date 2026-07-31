@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { ballRadiusPx, cupRadiusPx, CUP_MIN_RATIO, CUP_MAX_RATIO } from '../src/render/ball';
+import { ballRadiusPx, cupRadiusPx, CUP_MAX_RATIO } from '../src/render/ball';
 import { HOLE_OUT_RADIUS, manualPutt, onePutt } from '../src/sim/putting';
 import { makeRng } from '../src/sim/rng';
 import { dist, type Vec } from '../src/sim/course/contract';
@@ -39,9 +39,15 @@ const SHOT_CAMERAS = [0.5, 1.2, 2.6, 5.7];
 const PUTT_CAMERAS = [7.6, 11, 17.1, 35];
 
 describe('the drawn cup', () => {
-  it('is never smaller than the ball that drops into it — at any camera', () => {
-    // The bug, stated as a property. A hole you can hide behind the ball cannot be seen to be holed.
-    for (const s of [...SHOT_CAMERAS, ...PUTT_CAMERAS]) {
+  it('is never smaller than the ball that drops into it — at the cameras you hole out at', () => {
+    // The original bug, stated as a property: a hole you can hide behind the ball cannot be seen to
+    // be holed. It belongs to the PUTT cameras, which is where a ball is watched dropping in.
+    //
+    // It is deliberately NOT asserted for the shot cameras any more (GS-cup-oversize). Holding it
+    // there needed a floor of `ball × 1.6`, and below ~4 px/yd that floor was what won — drawing a
+    // cup up to 6x the radius that actually catches. See the reverse-lie case below: the two cannot
+    // both be had, because the BALL has a hard 2.25px floor of its own.
+    for (const s of PUTT_CAMERAS) {
       expect(cupRadiusPx(s), `cup vanishes under the ball at ${s} px/yd`).toBeGreaterThan(ballRadiusPx(s, 0));
     }
   });
@@ -58,20 +64,35 @@ describe('the drawn cup', () => {
     // change — shrinking the catch radius, through the death-spiral harness (contract 4) — and is
     // deliberately not smuggled in behind a render fix.
     // It must never be drawn LARGER than the radius that catches — a cup you can visibly miss and
-    // still hole is the complaint; a cup bigger than the catch radius would be the reverse lie.
-    for (const s of PUTT_CAMERAS) {
+    // still hole is the complaint; a cup bigger than the catch radius is the reverse lie.
+    //
+    // ⚠️ THIS RULE WAS WRITTEN HERE BEFORE IT WAS TRUE, AND ONLY CHECKED WHERE IT ALREADY HELD.
+    // It ran over PUTT_CAMERAS alone — the cameras where the proportion cap binds and the rule is
+    // satisfied for free. Every SHOT camera broke it: the `ball × 1.6` floor drew the cup at 6.00x
+    // the catch radius on the whole-hole map, 2.50x at a long approach and 1.26x mid-approach, so
+    // the ball's drawn centre could sit inside the hole while the sim correctly did not hole it —
+    // "the ball will roll over the black circle and not go in" (GS-cup-oversize). Now enforced at
+    // EVERY camera, which is what makes it a rule rather than a description.
+    for (const s of [...SHOT_CAMERAS, ...PUTT_CAMERAS]) {
       expect(cupRadiusPx(s), `drawn cup exceeds the catch radius at ${s} px/yd`).toBeLessThanOrEqual(
         HOLE_OUT_RADIUS * s + 1e-9,
       );
     }
   });
 
-  it('stays in proportion to the ball rather than becoming a crater', () => {
+  it('never becomes a crater — the ball-proportion cap still bounds it above', () => {
     for (const s of [...SHOT_CAMERAS, ...PUTT_CAMERAS]) {
       const ratio = cupRadiusPx(s) / ballRadiusPx(s, 0);
-      expect(ratio).toBeGreaterThanOrEqual(CUP_MIN_RATIO - 1e-9);
-      expect(ratio).toBeLessThanOrEqual(CUP_MAX_RATIO + 1e-9);
+      expect(ratio, `cup is a crater at ${s} px/yd`).toBeLessThanOrEqual(CUP_MAX_RATIO + 1e-9);
     }
+  });
+
+  it('leaves the green exactly as it was — the fix is a shot-camera fix only', () => {
+    // The report was explicit that the cup reads right on the green and wrong at fairway/chip zooms.
+    // At every putt camera the proportion cap binds, so removing the floor cannot have moved them;
+    // these are the shipped values, pinned so a later tweak to the cup cannot quietly retune putting.
+    const onGreen = PUTT_CAMERAS.map((s) => +cupRadiusPx(s).toFixed(2));
+    expect(onGreen).toEqual([7.82, 8.21, 8.76, 9.24]);
   });
 
   it('grows with the camera — a fixed-size cup is what this replaced', () => {

@@ -1027,6 +1027,24 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     emitters share ONE `surfaceProjector`/`DIMPLES`/`bandPoint`, so the pattern can't change at the
     moment the swing starts, and `ballSVG` emits **no ids** (they are document-global — see
     `holeIdPrefix`). Guarded by `tests/ball.test.ts`; eyes-on `scripts/ball-preview.mjs`.
+  - **THE DRAWN CUP IS NEVER BIGGER THAN THE RADIUS THAT CATCHES** (GS-cup-oversize, `cupRadiusPx`).
+    `cupRadiusPx` is bounded ABOVE by two things and floored by NOTHING: by `HOLE_OUT_RADIUS ×
+    pxPerYard` (the sim's own catch radius — contract 5, the graphic IS the physics) and by
+    `ball × CUP_MAX_RATIO` (the ball is drawn hugely oversized, so an honest 1.2yd cup at a tap-in
+    would be a crater with a marble beside it; this is the bound that bites at EVERY putt camera).
+    There used to be a `ball × 1.6` FLOOR and it reads as the safe direction — it is not: below ~4
+    px/yd the floor is what won, drawing the cup at **6.00× the catch radius on the whole-hole map,
+    2.50× at a long approach and 1.26× mid-approach**, so the ball's drawn centre could sit inside the
+    hole while the sim correctly did not hole it (*"the ball will roll over the black circle and not go
+    in"*). ⚠️ **The cost is deliberate and stated**: at wide cameras the cup is now SMALLER than the
+    drawn ball — the very thing the floor existed to prevent. The two exaggerations cannot both be
+    honoured (the ball has its own hard 2.25px floor), and from 300 yards you should not be able to see
+    the hole; the FLAG marks the pin at that range. The case the floor really protected — a holed putt
+    reading as a ball parked on a dot — lives at the putt cameras, where the catch radius is 9–42px.
+    ⚠️ The rule was WRITTEN in `tests/cup-and-swallow.test.ts` before it was true and asserted only over
+    `PUTT_CAMERAS`, i.e. exactly where it already held for free; it now runs over every camera, which is
+    what makes it a rule rather than a description. Putt-camera values are pinned so a later cup tweak
+    cannot quietly retune putting.
   - **THE FAIRWAY SYSTEM HAS ONE SILHOUETTE, AND EVERY PIECE OF IT IS OUTLINED** (GS-fairway-silhouette,
     `fairwayEdgeRuns`). A hole's fairway is nearly always SEVERAL polygons — corridor + green flare +
     a split lane / broken-island segments (**94%** of holes; **25%** carry a piece touching nothing else) —
