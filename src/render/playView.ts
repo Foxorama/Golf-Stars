@@ -48,7 +48,7 @@ import {
   type FlightFeel,
 } from './trajectory';
 import { arcShapeOf, arrivalAngleDeg, flightProfileOf } from '../sim/flight';
-import { planRunout, sampleRunout, DEFAULT_RUNOUT_FEEL, type RunoutFeel, type RunoutPlan } from './runout';
+import { planRunout, sampleRunout, landingZoomFor, DEFAULT_RUNOUT_FEEL, type RunoutFeel, type RunoutPlan } from './runout';
 import {
   advanceFlightSpin,
   advanceRollPhase,
@@ -218,6 +218,11 @@ const REDIRECT_ZOOM = 0.6; // viewRadius multiplier at the impact (smaller = zoo
  *  under a quarter of a device pixel at any dpr the game runs at: invisible, and it is what lets an
  *  exponentially-easing camera actually ARRIVE instead of converging forever. */
 const CAMERA_SETTLE_PX = 0.05;
+/** The same rule for the cinematic ZOOM, as a fraction of the target radius. `cineZoom` is compared to
+ *  `projZoom` for exact equality, so without a settle an exponential ease keeps the projector — and the
+ *  scene cache — invalidated for ever. At 0.2% of the view radius the framing moves under a tenth of a
+ *  pixel at the frame edge, which is well inside `CAMERA_SETTLE_PX`'s own reasoning. */
+const CAMERA_SETTLE_ZOOM = 0.002;
 
 function feel(): PlayFeel {
   const override = (window as unknown as { _gsFeel?: Partial<PlayFeel> })._gsFeel ?? {};
@@ -384,6 +389,10 @@ export function mountPlayView(
         })
       : holeProjector(hole, { width, height, extra });
   let proj = buildProj();
+  /** The zoom the LANDING is watched at (GS-landing-camera) — asked ONCE, for the whole animation, and
+   *  read by both the push-in and the run-out plan's `ballYd`. `opts.viewRadius` is fixed for the
+   *  animation, so this is too; deriving it twice is how the plan and the camera come to disagree. */
+  const landingZoom = landingZoomFor(followMode ? opts.viewRadius : undefined, F);
   /** The `cineZoom` `proj` was built at. The follow-cam may now hold the projector still across
    *  frames (GS-shot-lag), so "the camera has not moved" must account for the redirect cinematic's
    *  live viewRadius multiplier too — otherwise a zoom that eases while the ball happens to be
@@ -405,6 +414,7 @@ export function mountPlayView(
   let lastRollClearShot = -1; // shot whose trail has been reset at the flight→roll transition
   let runoutShot = -1; // shot whose land/bounce/run-out plan is cached below (GS-runout-feel)
   let runoutPlan: RunoutPlan | null = null;
+  let zoomShot = -1; // shot whose camera zoom has been reset to its own framing (GS-landing-camera)
   // Ball ROLL (GS-ball-art). The phase advances off the ball's own SCREEN displacement, so it stops
   // turning exactly when the ball stops and reverses on its own through a backspin check — no special
   // case, and nothing for the two to disagree about. `ballDir` is the last non-trivial travel
@@ -906,6 +916,21 @@ export function mountPlayView(
       const groundAt = (u: number): number => flightGroundAt(u, F, taper);
       const bearing = shot.result.shotBearing;
       const flightDur = flightDurationMs(peak);
+      // A NEW SHOT IS FRAMED FROM SCRATCH (GS-landing-camera). The previous shot's landing left the
+      // camera pushed in and, unlike the redirect cinematic, nothing eases it back out — the redirect
+      // returns to 1 within the same flight, a landing zoom is the last thing that happens to its shot.
+      // Left standing it would hold through the next shot's WINDUP (which does not run the ease at all,
+      // being its own branch) and then pull out across the launch, so every shot after the first would
+      // be addressed at chip zoom. Reset before `proj` is read, so `proj.scale` below is the shot's own
+      // framing and the landing camera is a plain division by it.
+      if (zoomShot !== shotIndex) {
+        zoomShot = shotIndex;
+        if (cineZoom !== 1) {
+          cineZoom = 1;
+          proj = buildProj();
+          projZoom = 1;
+        }
+      }
       const [tdx, tdy] = proj.project(touchdown);
       const [rsx, rsy] = proj.project(rest);
       // The LAND → BOUNCE → RUN-OUT plan (GS-runout-feel). The sim already decided the roll distance
@@ -983,9 +1008,17 @@ export function mountPlayView(
           // BACKWARDS through the very same expression — `height * scale * heightExaggeration *
           // hopDrawBoost` — so the plan's question and the drawing are one description, and neither
           // has to guess what camera the shot is being watched at.
-          ballYd:
-            ballRadiusPx(proj.scale, 0, F) /
-            Math.max(1e-6, proj.scale * F.heightExaggeration * F.hopDrawBoost),
+          //
+          // …and the camera it is watched at is the LANDING camera, not the flight's (GS-landing-camera).
+          // `proj.scale` here is the framing the SHOT was composed at; the run-out is drawn after the
+          // push-in, at `1 / landingZoom` of it. Asking the visibility question at the wrong camera is
+          // how a push-in can arrive to find the tail of the train already thrown away — the plan would
+          // still be trimming for a ball that is, by then, three times smaller than the ground it is
+          // hopping over.
+          ballYd: (() => {
+            const cam = proj.scale / landingZoom;
+            return ballRadiusPx(cam, 0, F) / Math.max(1e-6, cam * F.heightExaggeration * F.hopDrawBoost);
+          })(),
         };
         runoutPlan = planRunout(land, F);
       }
@@ -1055,6 +1088,12 @@ export function mountPlayView(
         // running out ⇒ roll off its own screen displacement.
         const rollPhase = elapsed >= flightDur;
         let zoomTarget = 1; // redirect zoom-to-impact target (1 = no zoom); eased into cineZoom below
+        // THE LANDING CAMERA (GS-landing-camera): push in over the last beat of the flight and HOLD for
+        // the whole run-out, so the land → bounce → roll is drawn at a scale where a skip is a skip.
+        // It starts `landingZoomLeadMs` BEFORE touchdown so the camera has arrived by the time the ball
+        // has — a zoom that begins on the bounce is a lurch on the one frame the player is watching.
+        const landingCam = elapsed >= flightDur - F.landingZoomLeadMs;
+        let zoomEase = 0.2;
         if (elapsed < flightDur) {
           const tg = elapsed / flightDur;
           // GS-flight-pace: the SAMPLING parameter. `tg` stays the raw animation progress (the caddy
@@ -1272,9 +1311,26 @@ export function mountPlayView(
         }
 
         lastGround = ground; // feed the follow-cam
-        // Ease the redirect zoom toward its target (one-frame lag like the follow-cam; consumed by
-        // buildProj next frame). zoomTarget is 1 outside a redirect, so non-redirect shots hold at 1.
-        cineZoom += (zoomTarget - cineZoom) * 0.2;
+        // The LANDING push-in outranks the redirect's easing tail (GS-landing-camera): a redirect is
+        // resolved by mid-flight and its zoom is on its way back out, so `min` composes the two without
+        // either having to know about the other — whichever wants the camera closer gets it, and the
+        // landing is always the last word on its own shot.
+        if (landingCam) {
+          zoomTarget = Math.min(zoomTarget, landingZoom);
+          zoomEase = F.landingZoomEase;
+        }
+        // Ease the cinematic zoom toward its target (one-frame lag like the follow-cam; consumed by
+        // buildProj next frame). zoomTarget is 1 outside a redirect or a landing, so the rest of a
+        // shot's flight holds at 1.
+        //
+        // …and then SETTLE, for the same reason the pan does (GS-shot-lag). The ease is exponential, so
+        // `cineZoom` converges on its target and never reaches it — and the follow-cam's cache key is an
+        // exact `cineZoom !== projZoom`, so a zoom that is still moving in the ninth decimal place
+        // rebuilds and re-paints the whole world (~100,000 canvas ops) every frame for the rest of the
+        // animation. Latent since the redirect cinematic shipped, where it cost one shot in a hundred;
+        // GS-landing-camera zooms on EVERY shot, which would have made it the common case.
+        cineZoom += (zoomTarget - cineZoom) * zoomEase;
+        if (Math.abs(zoomTarget - cineZoom) <= zoomTarget * CAMERA_SETTLE_ZOOM) cineZoom = zoomTarget;
         const [gx, gy] = proj.project(ground);
         // The drawn height. A bounce is exaggerated well past its modelled yards (GS-landing-real):
         // a real first bounce peaks ~2yd over a ~15yd skip, which at the shot camera's ~2px/yd is four
@@ -1400,6 +1456,15 @@ export function mountPlayView(
         }
       }
     } else if (puttIndex < putts.length) {
+      // THE LANDING ZOOM BELONGS TO THE SHOT THAT EARNED IT (GS-landing-camera). A shots-then-putts
+      // animation walks straight out of the last run-out into this branch, and the putt phase never
+      // touches `cineZoom` — so the green would be framed at the previous shot's chip-camera push-in,
+      // three times tighter than the putt was composed for. Hand the camera back before the first roll.
+      if (cineZoom !== 1) {
+        cineZoom = 1;
+        proj = buildProj();
+        projZoom = 1;
+      }
       // Putt phase: flat roll across the green, eased to a stop, into the cup.
       // GS-green-contour-2: a manual putt carries its true CURVED travel (`PuttLog.path` — the
       // break curve the aim screen drew, wobble sheared in), so the ball visibly curls with the

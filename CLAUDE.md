@@ -939,6 +939,34 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     honest 1-and-roll on all 40 green rows. **Render-only — no sim module imports `runout.ts`, zero
     carry moved, the harness has nothing to weigh.** Guarded by `tests/runout.test.ts`; eyes-on
     `scripts/landing-preview.mjs` (which now passes `ballYd`, so the sheet shows what SHIPS).
+  - **THE LANDING IS WATCHED FROM THE LANDING** (GS-landing-camera, `RunoutFeel.landingZoom` ·
+    `landingZoomFor`). Four passes read *"there's no ball bounce visible anywhere"* as a question about the
+    bounce MODEL and each found a real fault in it; the model was never the problem. `decisionReach` frames
+    the camera for the WHOLE shot (~1.6 px/yd on the composed phone), so a driver's 38-yard run-out was drawn
+    into **61 screen pixels** — and at `runoutTimeScale` 0.16 (≈1.3× REAL time, under a flight playing at 8×)
+    it crossed them in 3.1s, **a third of a pixel per frame**. Measured, ALL FORTY club/power/surface rows
+    came in under 1 px/frame: the ball was not travelling, it was being redrawn in the same place. Six bounces
+    cannot be shown in sixty-one pixels whatever the apex is. So the camera **pushes in** over the last 240ms
+    of the flight and holds for the run-out (riding `cineZoom`, the redirect cinematic's own lever — no second
+    camera), and the clock roughly doubles (`runoutTimeScale` 0.30, `runoutMaxMs` 2300): driver **61 → 179px**
+    and **0.33 → 4.90 px/frame**. It also mostly RESTORES the continuity the slow clock had to break —
+    apparent speed is yd/ms **times** px/yd, so the first hop now leaves at **0.90** of the ball's arrival
+    speed against 0.12; the velocity cliff at touchdown was largely a CAMERA cliff, which is why the clock
+    could never have fixed it alone. ⚠️ **`ballYd` must be asked at the LANDING camera** — it is how the plan
+    decides a hop is too small to be seen (GS-runout-seen), and asked at the flight camera the push-in arrives
+    to find the tail already thrown away; `landingZoomFor` is the ONE seam the push-in and the plan both read.
+    Three latent bugs it forced out: the zoom **never settled** (the follow-cam's key is an exact
+    `cineZoom !== projZoom` against an exponential ease ⇒ a full ~100k-op world repaint every frame for ever,
+    GS-shot-lag — `CAMERA_SETTLE_ZOOM` is `CAMERA_SETTLE_PX`'s twin); the zoom must be **handed back** per
+    shot and on entering the putt phase (a redirect returns to 1 inside its own flight, a landing zoom is the
+    last thing that happens to its shot); and `landingMinRadiusYd` stops a chip — already at the camera's own
+    30-yard floor — being pushed tighter than the putt screen. Render-only (no `src/sim/` module imports
+    `runout.ts`): zero carry, zero draws, nothing for the harness to weigh. NOT gated by reduced motion —
+    that would hide the landing from the players who asked for less motion — so it is a glide, not a snap.
+    ⚠️ **The eyes-on rig is how this survived four passes**: `landing-preview.mjs` drew every sheet at a
+    hand-set 4.6 px/yd while the game drew 1.6, i.e. it was honest about the model and silently wrong about
+    the picture. It takes the camera from the shipped constant now. Guarded by `tests/runout.test.ts`;
+    measured by `scripts/runout-frames.ts` (`GS_LANDING_ZOOM=1` reproduces the reported baseline).
   - **THE BALL STAYS ON THE SCREEN, AND A SHADOW UNDER THE BALL IS NO SHADOW** (GS-landing-real). The
     play view drew NOTHING once every shot and putt had played, so the ball blinked out and the player
     watched an empty fairway until the screen changed; it is now drawn at rest until unmount (cleared

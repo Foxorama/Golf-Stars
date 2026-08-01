@@ -158,11 +158,63 @@ export interface RunoutFeel {
    * touchdown, and pretending otherwise is what produced an invisible bounce — the honest thing is to
    * name it. Everything WITHIN the run-out stays chained (hop to hop to roll), which is the continuity
    * that actually shows.
+   *
+   * RE-SET BY GS-landing-camera, which found the correction had gone the other way. At 0.16 the run-out
+   * played at about 1.3x REAL time while the flight above it played at 8x — and it was drawn into sixty
+   * screen pixels, because the camera was framed for the whole shot. Measured across the bag, all forty
+   * club/power/surface rows crossed their run-out at under ONE PIXEL PER FRAME: the ball was not moving,
+   * it was being redrawn in almost the same place, for three seconds. The camera push-in fixes the
+   * picture's SIZE; this fixes its PACE. 0.30 lands a driver's landing at ~2 px/frame at the landing
+   * camera — a ball you can watch skip and settle, still 2.5x slower than the flight it arrived on.
    */
   runoutTimeScale: number;
   /** Clamp on the whole run-out's animation (ms). */
   runoutMinMs: number;
   runoutMaxMs: number;
+  /**
+   * THE LANDING IS WATCHED FROM THE LANDING (GS-landing-camera).
+   *
+   * A `viewRadius` multiplier — smaller is zoomed IN, exactly like the redirect cinematic's
+   * `REDIRECT_ZOOM` — that the play view's camera eases to as the ball comes down and holds for the
+   * whole run-out. It lives here, in the run-out's own feel block, because the run-out's camera is a
+   * property of the run-out: the number below and `ballYd` above are ONE decision, and separating them
+   * is how the plan ends up answering "can this hop be seen" about a camera the player is not looking
+   * through.
+   *
+   * The play camera frames the SHOT: `decisionReach` solves a radius that fits the ball's furthest
+   * resting place into the map's clear band, which on the composed phone is ~99 course yards of
+   * half-width and about **1.6 px per yard**. A driver's run-out is 38 of those yards, so the entire
+   * land → bounce → roll was drawn into **sixty-one screen pixels** — and at the old `runoutTimeScale`
+   * it spent three seconds crossing them, a THIRD OF A PIXEL PER FRAME. Measured across the bag
+   * (`scripts/runout-frames.ts`), all forty club/power/surface rows drew their run-out at under one
+   * pixel per frame.
+   *
+   * That is the play-test report — *"it's now not visible showing any bounces at all, regardless of
+   * club… it doesn't feel like you're hitting a golf ball at all"* — and no bounce model can answer it.
+   * The hops were planned, and drawn, and geometrically right; a two-yard skip is three pixels at that
+   * camera, and the ball takes half a second to cross it. The picture was too small, and then too slow.
+   *
+   * So the camera pushes in for the landing — which is what the shot is ABOUT, and what every
+   * broadcast does. It rides `cineZoom`, the redirect's existing lever, so there is no second camera
+   * and no new machinery. It also very nearly RESTORES the continuity `runoutTimeScale` had to break:
+   * apparent speed is yards-per-ms times pixels-per-yard, so pushing in 1/0.34 while playing at 0.30 of
+   * flight pace leaves the first hop travelling at ~0.9 of the speed the ball arrived at, against 0.12
+   * before. The velocity cliff at touchdown was mostly a CAMERA cliff all along.
+   */
+  landingZoom: number;
+  /** How tight the landing camera may ever get (course yards of view radius). `landingZoom` is a
+   *  MULTIPLIER, and the play camera's own radius has a 30-yard floor — so a chip already framed at 30
+   *  would be pushed to ten, less than half the putt screen's framing, for a ball that then runs two
+   *  yards. The push-in exists to make a landing readable, not to put the player's nose on the turf. */
+  landingMinRadiusYd: number;
+  /** How long before touchdown the push-in starts (ms). The camera should have ARRIVED as the ball
+   *  does — a zoom that begins on the bounce is a lurch on the one frame the player is watching. */
+  landingZoomLeadMs: number;
+  /** Per-frame ease toward the zoom target (the follow-cam's own rate is 0.2). Deliberately gentler:
+   *  this is a camera move, and it is NOT gated by reduced motion — gating it would hide the landing
+   *  from exactly the players who asked for less motion, which is the trade `accessibility.md` forbids
+   *  — so it has to be a glide rather than a snap. */
+  landingZoomEase: number;
   /** Backspin: forward skid on the bounce as a fraction of the eventual check-back distance + a cap. */
   backspinSkidFrac: number;
   backspinSkidMax: number;
@@ -197,9 +249,13 @@ export const DEFAULT_RUNOUT_FEEL: RunoutFeel = {
   creepMsPerYd: 420,
   creepMinMs: 380,
   rollEntryFloor: 0,
-  runoutTimeScale: 0.16,
+  runoutTimeScale: 0.30,
   runoutMinMs: 340,
-  runoutMaxMs: 3100,
+  runoutMaxMs: 2300,
+  landingZoom: 0.34,
+  landingMinRadiusYd: 20,
+  landingZoomLeadMs: 240,
+  landingZoomEase: 0.12,
   backspinSkidFrac: 0.55,
   backspinSkidMax: 7,
   backspinMsPerYd: 55,
@@ -378,6 +434,21 @@ export interface Landing {
  * combinations drew a peak bounce of 0.7–2.6px under a ball drawn at 3px — the ball never cleared
  * itself, which is exactly the reported "it lands and stops, or lands and does a flat roll". Pure.
  */
+/**
+ * The `viewRadius` multiplier the landing is actually watched at (GS-landing-camera).
+ *
+ * THE ONE ANSWER to "which camera is the run-out drawn at". The play view asks it twice — once to push
+ * the camera in, and once to tell `planRunout` how big the ball will be drawn (`Landing.ballYd`) — and
+ * the two must be the same number or the plan trims a train for a camera nobody is looking through.
+ *
+ * `undefined` radius means the play view is not in focus mode at all (the replay/demo path, where
+ * `holeProjector` fits the whole hole and `cineZoom` is inert), so the honest answer is 1.
+ */
+export function landingZoomFor(viewRadius: number | undefined, feel: RunoutFeel = DEFAULT_RUNOUT_FEEL): number {
+  if (viewRadius == null || !(viewRadius > 0)) return 1;
+  return clamp(Math.max(feel.landingZoom, feel.landingMinRadiusYd / viewRadius), feel.landingZoom, 1);
+}
+
 export function apexOverLenFor(descentDeg: number, feel: RunoutFeel = DEFAULT_RUNOUT_FEEL): number {
   const t = Math.tan((clamp(descentDeg, 5, 85) * Math.PI) / 180) / 4;
   return clamp(t, feel.apexOverLenMin, feel.apexOverLenMax);

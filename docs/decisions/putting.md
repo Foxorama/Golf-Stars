@@ -1974,3 +1974,143 @@ Windows at all.
   hopDrawBoost` at a hybrid's 47°), close to the 1:1.4 line `hopDrawBoost`'s own comment calls the
   point where a skip reads as a vertical bounce. Pre-existing and unchanged by this pass — the hops
   got longer at a constant ratio — but it is the reason `hopDrawBoost` must stay modest.
+
+---
+
+## GS-landing-camera â€” the landing is watched from the landing (2026-08-02)
+
+> *"Let's revisit the ball bouncing. It's now not visible showing any bounces at all. Regardless of
+> club there's no ball bounce visible anywhereâ€¦ basically, at the moment it doesn't feel like you're
+> hitting a golf ball at all."*
+
+Every previous pass on this report treated it as a question about the bounce MODEL, and every one of
+them found a real fault in it â€” the flat apex ratio (GS-runout-visible), the `cosÂ²` length term and
+the un-plannable tail (GS-runout-seen), the collapsing train (GS-runout-ladder), the 87ms hop
+(GS-landing-real round 2). Each shipped a measured improvement, and the report came back unchanged.
+
+It came back because the model was never the problem. It is the picture.
+
+### The measurement
+
+`scripts/runout-frames.ts` re-run with two corrections â€” the ball's radius taken from `ballRadiusPx`
+rather than a hard-coded 3px, and a new column for the run-out's DRAWN length and the ball's speed
+across it:
+
+| | driver, firm fairway, full swing |
+|---|---|
+| run-out distance | 38.1 course yards |
+| camera | ~1.6 px/yd (`decisionReach`, framed for the whole 290-yard shot) |
+| **drawn length** | **61 screen pixels** |
+| duration | 3,100 ms (`runoutMaxMs`, clamped) |
+| **ball's ground speed** | **0.33 px/frame** |
+
+**All forty club Ã— power Ã— surface rows drew their run-out at under one pixel per frame.** The ball
+was not travelling. It was being redrawn in almost the same place, for three seconds, inside a window
+sixty-one pixels wide. Six bounces cannot be shown in sixty-one pixels at a third of a pixel a frame,
+and no apex, restitution or decay constant can change that.
+
+Both halves of it were structural, and both had a documented reason for being where they were:
+
+- **The camera.** `decisionReach` (GS-decision-frame-carry) solves a view radius that fits the ball's
+  furthest resting place into the map's clear band â€” correct for the DECISION, and it is the same
+  radius the watch inherits so that releasing the shot does not jump the camera. It frames a
+  290-yard shot; the landing is 38 of those yards, i.e. 13% of the picture the player is looking at.
+- **The clock.** `runoutTimeScale` was set to 0.16 by GS-landing-real round 2, which found the bounce
+  chained to the flight's ~8Ã— time base and 87 milliseconds long. That correction was right and it
+  over-shot: 0.16 puts the run-out at about 1.3Ã— REAL time, under a flight playing at 8Ã—.
+
+Together: a small picture crossed slowly. Either alone is survivable; the two compound.
+
+### The fix
+
+**`landingZoom`** â€” a `viewRadius` multiplier the camera eases to over the last 240ms of the flight
+and holds for the whole run-out. It rides `cineZoom`, the caddy-redirect cinematic's existing lever
+(`REDIRECT_ZOOM` is the same kind of number), so there is no second camera and no new machinery:
+`buildProj` already rebuilds on a zoom change and the follow-cam already pans. The push-in starts
+BEFORE touchdown deliberately â€” a zoom that begins on the bounce is a lurch on the one frame the
+player is watching.
+
+**`runoutTimeScale` 0.16 â†’ 0.30** and **`runoutMaxMs` 3100 â†’ 2300**, so the same yards are crossed at
+a pace that reads.
+
+Measured, driver at the landing camera: **61px â†’ 179px**, **0.33 â†’ 4.90 px/frame off the first
+contact**, 3 planned hops â†’ **4**, and the first hop's drawn apex goes from 9.3px to **27.4px** over a
+ball drawn at 2.6.
+
+### The push-in mostly RESTORES the continuity the slow clock had to break
+
+`runoutTimeScale`'s own doc comment names the touchdown discontinuity and calls it the honest cost of
+a watchable bounce. It turns out most of that cost was the camera, not the clock. Apparent speed is
+yards-per-ms **times** pixels-per-yard, so:
+
+| | first hop's apparent speed, as a fraction of the ball's arrival speed |
+|---|---|
+| shipped (0.16 Ã— 1.0 camera) | **0.12** â€” a wall |
+| now (0.30 Ã— 1/0.34 camera) | **0.90** â€” a contact shedding speed, which is what a bounce is |
+
+The velocity cliff at touchdown was largely a CAMERA cliff. That is why the clock could not have been
+fixed on its own: doubling the pace at the old camera buys 0.24, and quadrupling it makes the hops too
+brief to watch again â€” which is exactly the trap round 2 fell into from the other side.
+
+### Three things this forced, all of them latent bugs
+
+1. **The plan must be told which camera it will be watched at.** `Landing.ballYd` (GS-runout-seen) is
+   how `planRunout` decides a hop is too small to be seen, and it was being handed `proj.scale` â€” the
+   FLIGHT camera. Left alone, the push-in would have arrived to find the tail of the train already
+   thrown away, trimming for a ball three times larger than the one being drawn. `landingZoomFor` is
+   the one seam both the push-in and `ballYd` read, resolved ONCE per animation.
+2. **The zoom never settled, and it has never settled.** The follow-cam's cache key is an exact
+   `cineZoom !== projZoom`, while the ease is exponential â€” so a zoom converging in the ninth decimal
+   place invalidates the projector and re-paints the whole world (~100,000 canvas ops, GS-shot-lag)
+   every frame for the rest of the animation. Latent since the redirect cinematic shipped, where it
+   cost one shot in a hundred; a landing zoom fires on EVERY shot, which would have made it the common
+   case. `CAMERA_SETTLE_ZOOM` is `CAMERA_SETTLE_PX`'s twin.
+3. **The zoom has to be handed back.** A redirect returns to 1 within its own flight; a landing zoom
+   is the last thing that happens to its shot. Left standing it holds through the NEXT shot's windup
+   (a branch that does not run the ease at all) and through a shots-then-putts animation's first roll,
+   framing the green three times tighter than the putt was composed for. Reset per shot, and again on
+   entering the putt phase.
+
+`landingMinRadiusYd` (20) keeps the push-in honest at the short end: `landingZoom` is a multiplier and
+the play camera's radius has a 30-yard floor of its own, so a chip would have been pushed to a ten-yard
+half-width â€” under half the putt screen's framing â€” for a ball that then runs two yards.
+
+### âš ï¸ The eyes-on rig was drawing the wrong picture, which is how this survived four passes
+
+`scripts/landing-preview.mjs` is the sheet every one of those passes was checked against, and it drew
+every row at a hand-set **4.6 px/yd** â€” the top of the shot-camera band â€” while the game drew a
+driver's run-out at **1.6**. The preview was honest about the MODEL and silently wrong about the
+PICTURE, which is the one thing an eyes-on rig exists to be right about. Every "the bounce reads now"
+verdict in this document was read off a camera the game does not use.
+
+It now takes the camera from the shipped constant. A camera is not a presentation choice for this
+feature; it is half of whether a bounce exists.
+
+### Contracts
+
+- **Render-only.** No `src/sim/` module imports `runout.ts` or `playView.ts`. Zero carry, zero rng
+  draws, zero strokes moved â€” the ball still stops exactly where `rollOut` put it, and the
+  death-spiral harness has nothing to weigh (contract 4). Determinism (1) and auto â‰¡ interactive (2)
+  are untouched.
+- **The graphic IS the physics (5)** is unaffected: this changes the camera and the clock, not the
+  path. The drawn run-out still walks the sim's own roll path to the sim's own rest point.
+- **Not gated by reduced motion**, deliberately. Gating the push-in would hide the landing from
+  exactly the players who asked for less motion â€” the trade `accessibility.md` forbids. It is a gentle
+  ease (`landingZoomEase` 0.12, under the follow-cam's own 0.2) rather than a snap.
+
+`npm run typecheck` + `npx vitest run` green: **220 files, 2,650 tests, 0 skipped**, plus `npm run
+build`. (`npm run check`'s trailing hub build cannot run on Windows â€” see the process doc.)
+
+Guarded by a new block in `tests/runout.test.ts`: the run-out is a picture big enough to hold a bounce;
+every club that skips leaves its first contact at more than 2.5 px/frame (wedges, which drop in at 61Â°
+with almost no forward speed to give, get their own 1.5 floor rather than a pass); the same plan asked
+at the FLIGHT camera keeps fewer hops, which is the fix stated as a comparison rather than a constant;
+the touchdown speed ratio sits between 0.5 and 1 (a contact must shed speed, never gain it); and
+`landingZoomFor` respects the short-shot floor and returns 1 for the whole-hole replay path.
+
+### Known, left alone
+
+- **The per-club bounce COUNTS are not yet to spec.** The play-test asks for driver 4â€“6, woods 3â€“5,
+  hybrids 2â€“4, long irons 1â€“3, short irons 1â€“2, wedges 0â€“1. The camera alone lands D 4 Â· 3W 4 Â· 4H 4 Â·
+  3i 2 Â· 7i 3 Â· 9i 3 Â· PW 2 â€” five of eight already in band, with the short clubs over. Those are a
+  tuning question against the NEW camera and are their own pass (GS-bounce-ladder).
