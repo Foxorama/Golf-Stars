@@ -120,6 +120,11 @@ export interface BallFeel {
   /** Below this radius the dimples are skipped (they'd be sub-pixel mud) and the band + mark carry
    *  the rotation on their own. */
   dimpleMinPx: number;
+  /** The cup's own size curve — the same shape as the ball's (floor + sqrt growth + cap) but its OWN
+   *  constants, because the two are read against different things. See `cupRadiusPx`. */
+  cupMinPx: number;
+  cupGrowth: number;
+  cupMaxPx: number;
 }
 
 export const DEFAULT_BALL_FEEL: BallFeel = {
@@ -131,6 +136,9 @@ export const DEFAULT_BALL_FEEL: BallFeel = {
   spinMaxStep: 0.55,
   flightSpinRate: 9,
   dimpleMinPx: 2.85,
+  cupMinPx: 1.58,
+  cupGrowth: 0.82,
+  cupMaxPx: 5,
 };
 
 /**
@@ -160,64 +168,61 @@ export function ballRadiusPx(pxPerYard: number, loft = 0, feel: BallFeel = DEFAU
 }
 
 /**
- * THE CUP IS DRAWN FROM THE RADIUS THAT ACTUALLY CATCHES THE BALL (GS-cup-scale).
+ * THE CUP IS DRAWN, AND IT IS DRAWN FROM THE SIM (GS-cup-scale, the original pass).
  *
  * The comment on `ballRadiusPx` above promises the ball never gets "near the size where it swamps
  * the cup it is rolling at". It was swamping it: there was no cup. The pin drew a `r: 2.2` base
  * SHADOW and a flagstick, at a fixed size that did not scale with the camera, while the ball at the
  * putt camera is drawn at up to 3.3 — so **the ball was bigger than the hole it dropped into**, and
- * a holed putt read as a ball parked on top of a dot. That is both halves of the report: "the hole
- * can be a little bigger" and "the ball often kind of misses the hole, but still sinks".
+ * a holed putt read as a ball parked on top of a dot.
  *
  * `HOLE_OUT_RADIUS` is the sim's own catch radius, and nothing in `src/render/` read it — a fact
- * described twice, which is contract 5's whole subject (the graphic IS the physics). It is read
- * here now, scaled in YARDS like every other ground measurement (GS-green-complex), and bounded
- * against the DRAWN ball rather than in raw px:
- *
- *  - **Floor** `ball × CUP_MIN_RATIO` — on the whole-hole map 1.2yd is under a pixel, and a cup you
- *    cannot see is a pin you cannot find. Never smaller than the ball, which was the bug.
- *  - **Cap** `ball × CUP_MAX_RATIO` — the ball itself is drawn well oversized (a real ball is a
- *    third of a pixel at the putt camera), so an honest 1.2yd cup at a tap-in zoom would be a
- *    crater with a marble beside it. Capping in proportion to the ball keeps ONE exaggeration
- *    rather than two disagreeing ones, and lands near real golf, where a ball is about 0.36 of the
- *    cup's radius.
- *
- * At the ordinary putt cameras (7.6–17 px/yd) the honest value wins and the drawn cup IS the catch
- * radius; only the extreme tap-in zoom reaches the cap.
+ * described twice, which is contract 5's whole subject (the graphic IS the physics). It is read here
+ * now, as a CEILING; how big the hole is actually drawn is `cupRadiusPx` below.
  */
-/** Real golf: a ball's radius is about 0.36 of the cup's, i.e. the cup is ~2.8x the ball. Drawn at
- *  3.2 it read as a crater sticker on the green; at the real ratio it reads as a hole. */
+/** Real golf: a ball's radius is about 0.36 of the cup's, i.e. the cup is ~2.8x the ball. A hard
+ *  ceiling only — since GS-cup-real the cup's own curve sits well under it at every camera. */
 export const CUP_MAX_RATIO = 2.8;
 
 /**
- * ⚠️ THERE IS NO FLOOR, AND THAT IS THE POINT (GS-cup-oversize).
+ * THE CUP IS A HOLE IN THE GROUND, NOT THE CATCH RADIUS DRAWN (GS-cup-real).
  *
- * There used to be one — `ball × 1.6`, so the cup could never be drawn smaller than the ball. It
- * reads as the safe direction and it is not: below ~4 px/yd the floor is what wins, so the drawn cup
- * grew to **3x the catch radius on the whole-hole map and 1.6x at a mid approach**. A circle wider
- * than the radius that catches means the ball's drawn centre can sit INSIDE the hole while the sim
- * correctly does not hole it — the ball rolls over the black circle and carries on, which is the
- * report ("it looks especially buggy when chipping") and is a straight violation of contract 5: the
- * graphic IS the physics.
+ * `HOLE_OUT_RADIUS` is **1.2 yards** — a generosity in the RULES, about twenty times a real hole.
+ * Drawing it is what made the crater: at the chip cameras the cup came out 13–16px across against a
+ * ball drawn at 5.4, so *"it's way too large… probably twice as large as it should be"*, and a ball
+ * running over that much black without dropping read as a bug rather than as golf.
  *
- * So the cup is bounded ABOVE only:
+ * It was pinned there for a reason, and the reason is now gone. The cup had to be as wide as the
+ * radius that catches because a ball could be **holed while drawn lying outside it** — the reverse
+ * lie, *"the ball often kind of misses the hole but still sinks"*. Every path now finishes IN the
+ * cup instead (`finishInCup` in `sim/round.ts`, the seam the putt resolvers and the chip-in already
+ * had), so the drawn hole no longer has to cover the sim's generosity: it only has to be a hole.
  *
- *  - by the catch radius itself — never draw a hole bigger than the one that catches, at any camera;
- *  - by `ball × CUP_MAX_RATIO` — the ball is drawn hugely oversized at low zoom (a real ball is a
- *    third of a pixel at the putt camera), so an honest 1.2yd cup at a tap-in would be a crater with
- *    a marble beside it. This is the cap that bites at every putt camera.
+ * So the cup gets its OWN size curve, the same shape as the ball's — a floor, sqrt growth, a cap —
+ * and deliberately NOT the ball's constants. The two are exaggerated by different amounts because
+ * they are read against different things: the ball is read against nothing (a white speck on turf at
+ * any size reads as a ball), while the cup is read against the GREEN and the flagstick beside it,
+ * which is why carrying the ball's ~11x exaggeration made it look like a bomb crater. Drawn width
+ * falls from the full 2.4yd at range to 0.29yd at a tap-in — you zoom in to see closer to the truth,
+ * exactly as the ball does.
  *
- * THE COST, STATED: at the whole-hole and long-approach cameras the cup is now SMALLER than the
- * drawn ball (0.6px against 2.25px at 0.5 px/yd) — the very thing the floor was added to prevent.
- * That is accepted deliberately. The two exaggerations cannot both be honoured: the ball has a hard
- * 2.25px floor of its own, so any cup floor above the catch radius re-creates the lie. From 300
- * yards you should not be able to see the hole — the FLAG is what marks the pin at that range, and
- * it is drawn. The case the floor was really protecting (a holed putt reading as a ball parked on a
- * dot) lives at the putt cameras, where the catch radius is 9–42px and nothing is at risk.
+ * TWO CEILINGS SURVIVE, and both are now slack at every camera — kept because they are the rules,
+ * not the arithmetic:
+ *
+ *  - the CATCH RADIUS itself: never draw a hole bigger than the one that catches, at any camera. It
+ *    still binds below ~2 px/yd, where it drives the cup to nothing (GS-cup-oversize) — from 300
+ *    yards you should not be able to see the hole; the FLAG is what marks the pin at that range.
+ *  - `ball × CUP_MAX_RATIO`: real golf's own proportion, so the cup can never become a crater
+ *    relative to the thing dropping into it.
+ *
+ * ⚠️ The cup must stay WIDER THAN THE BALL at the cameras you hole out at, or a ball on the lip
+ * hides the hole it is dropping into — that is the original GS-cup-scale bug, and it is what the
+ * floor and growth are set against (1.28x at the shortest putt camera, 1.5x at a tap-in).
  */
 export function cupRadiusPx(pxPerYard: number, feel: BallFeel = DEFAULT_BALL_FEEL): number {
   const ball = ballRadiusPx(pxPerYard, 0, feel);
-  return Math.min(HOLE_OUT_RADIUS * pxPerYard, ball * CUP_MAX_RATIO);
+  const grown = feel.cupMinPx + feel.cupGrowth * Math.sqrt(Math.max(0, pxPerYard - feel.ballGrowFrom));
+  return Math.min(HOLE_OUT_RADIUS * pxPerYard, Math.min(grown, feel.cupMaxPx), ball * CUP_MAX_RATIO);
 }
 
 /**

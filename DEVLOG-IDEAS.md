@@ -40,7 +40,9 @@ play-test verdict that killed the first version:
 - *"it looks buggy as heck, not like a real ball flight"* → GS-flight-shape, GS-roll-hairpin
 - *"a tennis ball… compared to the hole/flag it's a beachball"* → GS-ball-art, twice
 - *"everything is velcro'd to the wall — only your character is on the floor"* → GS-clubhouse-floor
-- *"the ball will roll over the black circle and not go in"* → GS-cup-oversize
+- *"the ball will roll over the black circle and not go in"* → GS-cup-oversize, and then
+  *"we over-corrected and made the hole too big and it looks weird now"* → GS-cup-real (the same
+  complaint from both directions, two sessions apart — the best single example of the loop there is)
 - *"it feels like cheating instead of chipping in"* → GS-landing-real
 
 The honest shape is that the AI wrote every line and was wrong about how it felt a lot of the time,

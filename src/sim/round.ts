@@ -320,6 +320,33 @@ export function chipInPath(hole: Hole, from: Vec, cup: Vec): { path: Vec[]; leng
 }
 
 /**
+ * A HOLED BALL FINISHES IN THE CUP — every path, one description (GS-cup-real).
+ *
+ * `manualPutt`/`onePutt` have returned the pin for a holed putt since GS-putt-holed-position, and the
+ * chip-in has trickled into it since GS-chipin-roll. The ORDINARY shot never got the rule: a shot
+ * resting inside `HOLE_OUT_RADIUS` was flagged holed and left lying wherever it stopped — up to 1.2yd
+ * (7–17 screen px at the chip/putt cameras) to one side of a hole it had supposedly just gone into.
+ *
+ * That is the same lie GS-putt-holed-position deleted, and it is the reason the DRAWN cup had to be
+ * inflated to the full catch radius: with the ball parked outside it, only a crater-sized hole could
+ * make "it went in" believable. Fix the finish and the cup is free to be a cup (see `cupRadiusPx`).
+ *
+ * Mutates the log in place and returns the cup, so the caller's `ballAfter` and the drawn ball agree
+ * by construction. Pure geometry after an outcome the sim has already decided — zero rng, so auto ≡
+ * interactive and every seeded stream is byte-for-byte.
+ */
+function finishInCup(hole: Hole, log: ShotLog): Vec {
+  const cup = pin(hole);
+  const trickle = chipInPath(hole, log.rest, cup);
+  log.rollPath = log.rollPath && log.rollPath.length > 1 ? [...log.rollPath, ...trickle.path.slice(1)] : trickle.path;
+  // POSITIVE and total: the journey ends forward, in the hole, so the recorded run is the whole arc
+  // travelled to get there. A wedge that checked back four yards and then trickled in covered both.
+  log.roll = Math.abs(log.roll ?? 0) + trickle.length;
+  log.rest = cup;
+  return cup;
+}
+
+/**
  * Roll the ball out from `touchdown` along `dir`, integrating each surface's "run" (`SURFACE_ROLL`)
  * step-by-step until the reference energy `K` (signed, from `rollPotential`) is spent — so the SAME
  * energy carries far across slick fairway/ice and dies quickly in thick rough, and a roll that
@@ -1453,6 +1480,9 @@ export function executeShot(
   } else if (dist(rest, pin(hole)) <= HOLE_OUT_RADIUS) {
     log.holed = true;
     holed = true;
+    // …and it goes IN, rather than being counted as holed while lying beside the hole (GS-cup-real).
+    ballAfter = finishInCup(hole, log);
+    lieAfter = 'green';
   } else if (
     // Wedge-caddy chip-in (GS-caddy, Dr Chipinski): a PW-or-shorter shot resting in the makeable
     // chip range gets a `chipIn` chance to drop. Gated behind `opts.chipIn` (caddy owned) AND the
@@ -1465,21 +1495,12 @@ export function executeShot(
     log.holed = true;
     log.chipIn = true;
     holed = true;
-    ballAfter = pin(hole);
-    lieAfter = 'green';
     // …and the ball actually GOES there (GS-chipin-roll). The outcome was already decided above; what
     // was missing is the travel, so the renderer had the ball stop short and the hole-out fire on bare
-    // ground. Extend the recorded run-out along a contour-broken trickle into the cup: `rest` IS the
-    // cup, `roll` grows by the arc it covers, and `rollPath` carries the curve the play view walks.
-    const cup = pin(hole);
-    const trickle = chipInPath(hole, rest, cup);
-    log.rollPath = log.rollPath && log.rollPath.length > 1 ? [...log.rollPath, ...trickle.path.slice(1)] : trickle.path;
-    // POSITIVE and total: the ball's journey now ends forward, in the cup, so the recorded run is the
-    // whole arc it travelled to get there. A wedge that checked back four yards and then trickled five
-    // into the hole covered nine yards of ground, and that is what the card and the drawn walk both
-    // want — a "−4yd check" on a ball that finished forward in the hole is neither.
-    log.roll = Math.abs(log.roll ?? 0) + trickle.length;
-    log.rest = cup;
+    // ground. `finishInCup` is that travel, and it is now SHARED with the proximity hole-out above —
+    // one description of what a holed ball does, or the two paths drift (GS-cup-real).
+    ballAfter = finishInCup(hole, log);
+    lieAfter = 'green';
   }
 
   return { log, ballAfter, lieAfter, restLie, penaltyStrokes, holed };

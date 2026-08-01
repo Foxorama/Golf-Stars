@@ -1034,24 +1034,33 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     emitters share ONE `surfaceProjector`/`DIMPLES`/`bandPoint`, so the pattern can't change at the
     moment the swing starts, and `ballSVG` emits **no ids** (they are document-global — see
     `holeIdPrefix`). Guarded by `tests/ball.test.ts`; eyes-on `scripts/ball-preview.mjs`.
-  - **THE DRAWN CUP IS NEVER BIGGER THAN THE RADIUS THAT CATCHES** (GS-cup-oversize, `cupRadiusPx`).
-    `cupRadiusPx` is bounded ABOVE by two things and floored by NOTHING: by `HOLE_OUT_RADIUS ×
-    pxPerYard` (the sim's own catch radius — contract 5, the graphic IS the physics) and by
-    `ball × CUP_MAX_RATIO` (the ball is drawn hugely oversized, so an honest 1.2yd cup at a tap-in
-    would be a crater with a marble beside it; this is the bound that bites at EVERY putt camera).
-    There used to be a `ball × 1.6` FLOOR and it reads as the safe direction — it is not: below ~4
-    px/yd the floor is what won, drawing the cup at **6.00× the catch radius on the whole-hole map,
-    2.50× at a long approach and 1.26× mid-approach**, so the ball's drawn centre could sit inside the
-    hole while the sim correctly did not hole it (*"the ball will roll over the black circle and not go
-    in"*). ⚠️ **The cost is deliberate and stated**: at wide cameras the cup is now SMALLER than the
-    drawn ball — the very thing the floor existed to prevent. The two exaggerations cannot both be
-    honoured (the ball has its own hard 2.25px floor), and from 300 yards you should not be able to see
-    the hole; the FLAG marks the pin at that range. The case the floor really protected — a holed putt
-    reading as a ball parked on a dot — lives at the putt cameras, where the catch radius is 9–42px.
-    ⚠️ The rule was WRITTEN in `tests/cup-and-swallow.test.ts` before it was true and asserted only over
-    `PUTT_CAMERAS`, i.e. exactly where it already held for free; it now runs over every camera, which is
-    what makes it a rule rather than a description. Putt-camera values are pinned so a later cup tweak
-    cannot quietly retune putting.
+  - **A HOLED BALL FINISHES IN THE CUP, AND THAT IS WHAT LETS THE CUP BE A CUP** (GS-cup-real,
+    `sim/round.ts finishInCup` · `render/ball.ts cupRadiusPx`). `HOLE_OUT_RADIUS` is **1.2 YARDS** — a
+    generosity in the RULES, ~20× a real hole — and the drawn cup was pinned to it, so at the chip
+    cameras the hole came out 13–16px across against a ball drawn at 5.4: *"way too large… probably
+    twice as large as it should be in green and green make view"*, and a ball running over that much
+    black without dropping read as a bug rather than as golf. It was pinned there for a reason and the
+    reason is now gone. The cup had to cover the catch radius because a ball could be **holed while
+    drawn lying outside it** — but the putt resolvers have snapped to the pin since
+    GS-putt-holed-position and the chip-in has trickled in since GS-chipin-roll; the ORDINARY shot
+    (`dist(rest,pin) ≤ HOLE_OUT_RADIUS`) was the one path that never got the rule, and it left the ball
+    up to 1.2yd (7–17 screen px) to one side of a hole it had supposedly gone into. `finishInCup` is
+    that one seam, shared by both branches — pure geometry after a decided outcome, **zero rng, zero
+    strokes moved**, so every seeded stream and the harness are byte-for-byte. **The drawn cup then
+    gets its OWN size curve** (floor + sqrt growth + cap, the ball's SHAPE with deliberately different
+    constants): the ball is read against nothing, the cup against the GREEN and the pin beside it, so
+    carrying the ball's ~11× exaggeration is exactly what made a crater. Drawn width falls 2.4yd → 0.29yd
+    as you zoom — closer to the truth the closer you look. Chip camera **6.84 → 3.20px**, green **8.21
+    → 4.07**, fairway 2.40 → 1.95. **Two ceilings survive and are now slack at every camera, kept
+    because they are the RULES, not the arithmetic**: never wider than the radius that CATCHES (it
+    still binds below ~1.35 px/yd, where it drives the cup to nothing — from 300 yards you should not
+    see the hole, the FLAG marks the pin) and never past `ball × CUP_MAX_RATIO`. ⚠️ It must stay WIDER
+    THAN THE BALL at the cameras you hole out at (1.28–1.5×), or a ball on the lip hides the hole —
+    the original GS-cup-scale bug. **The FLAGSTICK grows with it**: a real 7-foot pin in yards, FLOORED
+    at the flat 14 units it always was (every fairway camera byte-for-byte, and out there it is a
+    marker, not a stick) and capped at 30, because it had been standing shorter than the hole beside it
+    was wide. Guarded by `tests/cup-and-swallow.test.ts`; eyes-on `scripts/cup-preview.mjs` (which
+    renders at the DESIGN frame — a smaller cell mislabels every camera).
   - **THE FAIRWAY SYSTEM HAS ONE SILHOUETTE, AND EVERY PIECE OF IT IS OUTLINED** (GS-fairway-silhouette,
     `fairwayEdgeRuns`). A hole's fairway is nearly always SEVERAL polygons — corridor + green flare +
     a split lane / broken-island segments (**94%** of holes; **25%** carry a piece touching nothing else) —
