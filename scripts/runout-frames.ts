@@ -4,14 +4,27 @@
  * sheet cannot: at the camera scales the game actually uses, is the bounce VISIBLE, and does the ball
  * move smoothly from its last bounce to its final lie?
  *
- * Every number here comes from the shipped functions - `planRunout`, `sampleRunout`, the same
- * `flightScaleFor`/`rollFractionFor` the sim resolves a shot with, and the same
+ * Every number here comes from the shipped functions - `planRunout`, `sampleRunout`, `ballRadiusPx`,
+ * the same `flightScaleFor`/`rollFractionFor` the sim resolves a shot with, and the same
  * `height * scale * heightExaggeration * hopDrawBoost` the play view converts to pixels. Nothing is
  * re-derived, so a fix shows up here.
+ *
+ * THREE columns matter, and the first two were missing while the bounce was reported invisible
+ * (GS-landing-camera):
+ *   - `runPx`  the whole run-out's DRAWN length. A driver's 38 yards at the shot camera is sixty
+ *              screen pixels; six bounces cannot be shown in sixty pixels whatever the model says.
+ *   - `px/fr`  how fast the ball leaves its FIRST CONTACT, in pixels per frame. Not the mean over the
+ *              run-out — the closing roll decelerates to a dead stop by design, so a mean measures how
+ *              much roll a club has rather than whether the ball is moving. Under ~1 the ball is not
+ *              travelling, it is being redrawn in almost the same place, which is what "it lands and
+ *              just sits there" looks like.
+ *   - `seen`   hops whose drawn apex clears the DRAWN BALL (`ballRadiusPx`, not a hard-coded 3px)
+ *              for long enough to register.
  *
  *   npx tsx scripts/runout-frames.ts
  */
 import { planRunout, sampleRunout, DEFAULT_RUNOUT_FEEL, RUNOUT_BY_CLASS } from '../src/render/runout';
+import { ballRadiusPx } from '../src/render/ball';
 import { CLUBS } from '../src/sim/clubs';
 import { flightProfileOf, arcApex, ARC_FEEL, arcShapeOf, arrivalAngleDeg, flightScaleFor, rollFractionFor, flightClassOf } from '../src/sim/flight';
 import { sampleCurvedFlight, flightDurationMs, flightGroundAt } from '../src/render/trajectory';
@@ -19,15 +32,23 @@ import type { Vec } from '../src/sim/course/contract';
 
 // What the play view multiplies a modelled height by to get pixels (playView.ts DEFAULT_PLAY_FEEL).
 const HEIGHT_EXAGGERATION = 0.55;
+// The camera the run-out is WATCHED at — the shipped constant, never a copy of it. `GS_LANDING_ZOOM=1`
+// re-runs the sheet at the FLIGHT camera, which is what the run-out was drawn at before
+// GS-landing-camera — i.e. it reproduces the reported "no bounce anywhere" baseline.
+const LANDING_ZOOM = Number(process.env.GS_LANDING_ZOOM ?? DEFAULT_RUNOUT_FEEL.landingZoom);
 const HOP_DRAW_BOOST = DEFAULT_RUNOUT_FEEL.hopDrawBoost;
 const FRAME_MS = 1000 / 60;
 // The measured camera band (GS-ball-art): ~0.5-5.7 px/yd for shots. A drive watches from far out, an
-// approach/chip from close in, so each shot is judged at the scale it is actually seen at.
-const scaleFor = (carry: number): number => (carry > 200 ? 1.6 : carry > 120 ? 3.0 : 5.0);
-// A hop the player can SEE: it has to lift the ball clear of its own drawn radius (~3px) for more than
-// a frame or two. These are the thresholds the report flags against, not tuning knobs.
-const VISIBLE_PX = 3;
+// approach/chip from close in, so each shot is judged at the scale it is actually seen at. That is the
+// camera the FLIGHT is framed at; the run-out is watched at `scale / landingZoom` (GS-landing-camera).
+const shotCam = (carry: number): number => (carry > 200 ? 1.6 : carry > 120 ? 3.0 : 5.0);
+const landCam = (carry: number): number => shotCam(carry) / LANDING_ZOOM;
+// A hop the player can SEE has to lift the ball clear of its own drawn radius for more than a frame or
+// two. The radius is the one the play view draws (`ballRadiusPx`), never a constant — the ball's size
+// is a function of the camera, and so therefore is this question.
 const VISIBLE_FRAMES = 3;
+// Below this the ball is not travelling, it is being redrawn in nearly the same place.
+const MOVING_PX_PER_FRAME = 1;
 
 /** Arrival speed + descent angle off the DRAWN arc, exactly as playView.ts takes them. */
 function arrival(actualCarry: number, nominal: number, clubId: string) {
@@ -55,6 +76,9 @@ interface Row {
   hops: number;
   visibleHops: number;
   peakPx: number;
+  ballPx: number;
+  runPx: number;
+  hopPxPerFrame: number;
   hopShare: number;
   runoutMs: number;
   worstJumpPx: number;
@@ -69,10 +93,12 @@ function measure(clubId: string, power: number, firm: number): Row {
   const carry = c.carry * flightScaleFor(pr, c.carry) * power;
   const roll = carry * rollFractionFor(pr, c.carry);
   const a = arrival(carry, c.carry, clubId);
-  const scale = scaleFor(carry);
+  // The run-out is watched at the LANDING camera, so that is the scale every pixel column below uses.
+  const scale = landCam(carry);
+  const ballPx = ballRadiusPx(scale);
   // The play view tells the plan how big the ball is DRAWN, so a hop it could not show is never
   // planned (GS-runout-seen). Same conversion the pixel columns below use, run backwards.
-  const ballYd = VISIBLE_PX / (scale * HEIGHT_EXAGGERATION * HOP_DRAW_BOOST);
+  const ballYd = ballPx / (scale * HEIGHT_EXAGGERATION * HOP_DRAW_BOOST);
   const plan = planRunout(
     { dist: Math.abs(roll), firm, v0: a.v0, carry, descentDeg: a.descentDeg, clubId, vary: 0.5, checking: roll < -0.3, ballYd },
     DEFAULT_RUNOUT_FEEL,
@@ -91,6 +117,9 @@ function measure(clubId: string, power: number, firm: number): Row {
   for (let i = 1; i < frames.length; i++) {
     worstJumpPx = Math.max(worstJumpPx, Math.abs(frames[i]!.s - frames[i - 1]!.s));
   }
+  const runPx = Math.abs(plan.totalDist) * scale;
+  const firstHop = plan.hops[0];
+  const hopPxPerFrame = firstHop && firstHop.ms > 0 ? ((firstHop.dist * scale) / firstHop.ms) * FRAME_MS : 0;
   // A hop counts as SEEN if its drawn apex clears the ball and it holds that lift for a few frames.
   let visibleHops = 0;
   let peakPx = 0;
@@ -98,12 +127,12 @@ function measure(clubId: string, power: number, firm: number): Row {
     const apexPx = h.apex * scale * HEIGHT_EXAGGERATION * HOP_DRAW_BOOST;
     peakPx = Math.max(peakPx, apexPx);
     const framesUp = (h.ms / FRAME_MS) * 0.6; // the middle 60% of a sine arch is meaningfully lifted
-    if (apexPx >= VISIBLE_PX && framesUp >= VISIBLE_FRAMES) visibleHops++;
+    if (apexPx >= ballPx && framesUp >= VISIBLE_FRAMES) visibleHops++;
   }
   if (plan.check) {
     const apexPx = plan.check.skidApex * scale * HEIGHT_EXAGGERATION * HOP_DRAW_BOOST;
     peakPx = Math.max(peakPx, apexPx);
-    if (apexPx >= VISIBLE_PX && (plan.check.skidMs / FRAME_MS) * 0.6 >= VISIBLE_FRAMES) visibleHops++;
+    if (apexPx >= ballPx && (plan.check.skidMs / FRAME_MS) * 0.6 >= VISIBLE_FRAMES) visibleHops++;
   }
   const hopDist = plan.hops.reduce((s, h) => s + h.dist, 0);
   // playView drives the animation off `plan.totalMs` but `sampleRunout` maps t onto the RAW hop+roll
@@ -120,6 +149,9 @@ function measure(clubId: string, power: number, firm: number): Row {
     hops: plan.hops.length + (plan.check ? 1 : 0),
     visibleHops,
     peakPx,
+    ballPx,
+    runPx,
+    hopPxPerFrame,
     hopShare: plan.totalDist > 0.01 ? hopDist / plan.totalDist : 0,
     runoutMs: plan.totalMs,
     worstJumpPx,
@@ -127,27 +159,47 @@ function measure(clubId: string, power: number, firm: number): Row {
   };
 }
 
+/** What the play-test asked for, per club FAMILY: visible bounces, at full power on firm ground. */
+const WANT: Record<string, [number, number]> = {
+  driver: [4, 6],
+  wood: [3, 5],
+  hybrid: [2, 4],
+  ironLong: [1, 3],
+  ironShort: [1, 2],
+  wedge: [0, 1],
+  putter: [0, 2],
+};
+
 const CLUBS_UNDER_TEST = ['D', '3W', '4H', '3i', '7i', '9i', 'PW', 'SW'];
 const POWERS = [1, 0.85, 0.7, 0.55, 0.4];
 
 for (const firm of [0.85, 0.45]) {
   console.log(`\n=================  landing firmness ${firm} (${firm > 0.6 ? 'firm fairway' : 'soft green'})  =================`);
-  console.log('  club  pow   carry   roll  class       hops  seen  apexPx  hop%   msRunout  maxJumpPx  timeBase');
+  console.log('  club  pow   carry   roll  class       hops  seen  want   apexPx  ballPx   runPx  px/fr  hop%   msRunout  timeBase');
   const rows: Row[] = [];
   for (const club of CLUBS_UNDER_TEST) {
     for (const p of POWERS) rows.push(measure(club, p, firm));
   }
   for (const r of rows) {
-    const flag = r.visibleHops === 0 ? '  <== NO VISIBLE BOUNCE' : '';
+    const want = WANT[flightClassOf(r.club)]!;
+    const short = r.visibleHops < want[0] ? '  <== TOO FEW BOUNCES' : r.visibleHops > want[1] ? '  <== too many' : '';
+    const still = r.hopPxPerFrame < MOVING_PX_PER_FRAME ? '  <== NOT MOVING' : '';
     console.log(
       `  ${r.club.padEnd(4)} ${r.power.toFixed(2)} ${r.carry.toFixed(0).padStart(6)} ${r.roll.toFixed(1).padStart(6)}  ` +
         `${flightClassOf(r.club).padEnd(10)} ${String(r.hops).padStart(4)} ${String(r.visibleHops).padStart(5)} ` +
-        `${r.peakPx.toFixed(1).padStart(7)} ${(r.hopShare * 100).toFixed(0).padStart(4)}% ${r.runoutMs.toFixed(0).padStart(9)} ` +
-        `${r.worstJumpPx.toFixed(1).padStart(10)} ${r.timeBaseSkew.toFixed(2).padStart(9)}${flag}`,
+        `${(want[0] + '-' + want[1]).padStart(5)} ${r.peakPx.toFixed(1).padStart(8)} ${r.ballPx.toFixed(1).padStart(7)} ` +
+        `${r.runPx.toFixed(0).padStart(7)} ${r.hopPxPerFrame.toFixed(2).padStart(6)} ${(r.hopShare * 100).toFixed(0).padStart(4)}% ` +
+        `${r.runoutMs.toFixed(0).padStart(9)} ${r.timeBaseSkew.toFixed(2).padStart(9)}${short}${still}`,
     );
   }
-  const noBounce = rows.filter((r) => r.visibleHops === 0);
-  console.log(`\n  shots with NO visible bounce: ${noBounce.length}/${rows.length}` + (noBounce.length ? `  (${noBounce.map((r) => `${r.club}@${r.power}`).join(', ')})` : ''));
-  const skewed = rows.filter((r) => Math.abs(r.timeBaseSkew - 1) > 0.01);
-  console.log(`  shots whose animation clock differs from the sampler's: ${skewed.length}/${rows.length}`);
+  const full = rows.filter((r) => r.power === 1);
+  const off = full.filter((r) => {
+    const w = WANT[flightClassOf(r.club)]!;
+    return r.visibleHops < w[0] || r.visibleHops > w[1];
+  });
+  console.log(`\n  FULL-POWER rows outside the asked-for bounce band: ${off.length}/${full.length}` + (off.length ? `  (${off.map((r) => `${r.club}:${r.visibleHops}`).join(', ')})` : ''));
+  const crawling = rows.filter((r) => r.hopPxPerFrame < MOVING_PX_PER_FRAME);
+  console.log(`  run-outs drawn under ${MOVING_PX_PER_FRAME}px/frame (reads as stationary): ${crawling.length}/${rows.length}`);
+  const noBounce = rows.filter((r) => r.visibleHops === 0 && flightClassOf(r.club) !== 'wedge');
+  console.log(`  non-wedge shots with NO visible bounce: ${noBounce.length}/${rows.length}`);
 }

@@ -11,9 +11,10 @@
  * sim said the ball rests, however the time is parameterised.
  */
 import { describe, it, expect } from 'vitest';
-import { planRunout, sampleRunout, apexOverLenFor, hopBite, DEFAULT_RUNOUT_FEEL, RUNOUT_BY_CLASS, type Landing, type RunoutPlan } from '../src/render/runout';
+import { planRunout, sampleRunout, apexOverLenFor, hopBite, landingZoomFor, DEFAULT_RUNOUT_FEEL, RUNOUT_BY_CLASS, type Landing, type RunoutPlan } from '../src/render/runout';
 import { arcApex, ARC_FEEL, arcShapeOf, arrivalAngleDeg, descentAngleDeg, flightCarryScale } from '../src/sim/flight';
 import { sampleCurvedFlight, flightDurationMs, flightGroundAt } from '../src/render/trajectory';
+import { ballRadiusPx } from '../src/render/ball';
 import { flightGroundFrac, flightParamAt } from '../src/sim/flight';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -22,6 +23,8 @@ import { flightClassOf, flightProfileOf, FLIGHT_PROFILES, rollFractionFor, legac
 
 /** A firm fairway landing off a driver: ~180yd carry in ~600ms ⇒ 0.3 yd/ms. */
 const DRIVER_V = 0.3;
+/** One frame at 60fps — the unit "can the player see this" is actually measured in. */
+const FRAME_MS = 1000 / 60;
 
 describe('the run-out starts where the flight left off (no speed step)', () => {
   it('the run-out has its OWN time base, and that is deliberate', () => {
@@ -32,10 +35,15 @@ describe('the run-out starts where the flight left off (no speed step)', () => {
     // Measured in game under the old rule, a driver's six hops totalled 87ms and the first was 27ms —
     // under two frames — which is exactly the reported "there is no bounce, the ball drops, touches
     // ground and then rolls a little bit".
+    //
+    // The threshold below is stated in FRAMES, and it came DOWN with GS-landing-camera, which is the
+    // direction it should move: the correction had over-shot to ~1.3x real time, and the same hop is
+    // now drawn three times bigger, so it needs fewer frames to read. What must never change is that
+    // there ARE frames to read — the failure this guards is the 27ms hop, which is under two of them.
     const p = planRunout({ dist: 21, firm: 0.85, v0: DRIVER_V, carry: 250, descentDeg: 36, vary: 0.5, clubId: 'D' });
     const first = p.hops[0]!;
     expect(first.dist / first.ms).toBeLessThan(DRIVER_V); // slower than the flight, on purpose
-    expect(first.ms, `first hop ${first.ms.toFixed(0)}ms`).toBeGreaterThan(150); // long enough to WATCH
+    expect(first.ms / FRAME_MS, `first hop ${first.ms.toFixed(0)}ms`).toBeGreaterThan(6); // frames to WATCH
   });
 
   it('the bounce is a real share of the run-out, not a blip before a long roll', () => {
@@ -666,5 +674,125 @@ describe('the middle of the bag lands and BOUNCES (GS-runout-seen)', () => {
     const plan = land('D', runOf('D'), 0.85);
     expect(plan.hops.length).toBeGreaterThanOrEqual(4);
     for (const h of plan.hops) expect(h.dist).toBeGreaterThan(DEFAULT_RUNOUT_FEEL.hopMinYd);
+  });
+});
+
+/**
+ * GS-landing-camera — *"it's now not visible showing any bounces at all. Regardless of club there's no
+ * ball bounce visible anywhere… it doesn't feel like you're hitting a golf ball at all."*
+ *
+ * Every previous pass on this treated the report as a question about the bounce MODEL, and each one
+ * found a real fault in it (the flat apex ratio, the `cos²` length term, the collapsing tail, the
+ * un-plannable hops). This one is not about the model at all. Measured with `scripts/runout-frames.ts`,
+ * the shipped run-out was drawn:
+ *
+ *   - into **61 screen pixels** for a driver — 38 course yards at the ~1.6 px/yd the FLIGHT is framed at
+ *   - over **3,100 ms**, i.e. a THIRD OF A PIXEL PER FRAME
+ *   - and all 40 club/power/surface rows came in under one pixel per frame.
+ *
+ * A bounce cannot be seen in a picture that small crossed that slowly, whatever its apex is. So the
+ * camera pushes in for the landing and the run-out's clock roughly doubles. Both numbers live in
+ * `RunoutFeel` — the run-out owns its camera, because `landingZoom` and `ballYd` are one decision.
+ */
+describe('the landing is watched from the landing (GS-landing-camera)', () => {
+  const HEIGHT_EXAGGERATION = 0.55; // playView's, and the only conversion either side may use
+  const F = DEFAULT_RUNOUT_FEEL;
+  /** The camera the FLIGHT is framed at (GS-ball-art's measured band), and the one the RUN-OUT is
+   *  watched at — which is the flight's, pushed in. (The full push-in: every club here is framed well
+   *  outside `landingMinRadiusYd`, which is checked on its own below.) */
+  const flightCam = (carry: number): number => (carry > 200 ? 1.6 : carry > 120 ? 3.0 : 5.0);
+  const landingCam = (carry: number): number => flightCam(carry) / F.landingZoom;
+  /** What `playView` draws a modelled apex as, and its inverse — the `ballYd` the plan is handed. */
+  const drawnPx = (apexYd: number, px: number): number => apexYd * px * HEIGHT_EXAGGERATION * F.hopDrawBoost;
+  const ballYdAt = (px: number): number => ballRadiusPx(px) / (px * HEIGHT_EXAGGERATION * F.hopDrawBoost);
+  /**
+   * The run-out as the player sees it: how many pixels of ground, and how fast the ball crosses them
+   * OFF THE FIRST CONTACT.
+   *
+   * Deliberately not the mean over the whole run-out — the closing roll decelerates to a dead stop by
+   * design, so a mean says more about how much roll a club has than about whether the ball is moving.
+   * The first hop is the fastest thing in the run-out and the moment the player is looking at, so it is
+   * the honest peak: under the old camera and clock it came out at **0.98 px/frame** for a driver.
+   */
+  function drawn(id: string): { hopPxPerFrame: number; runPx: number; seen: number; ballPx: number } {
+    const ar = arrival(id);
+    const px = landingCam(ar.carry);
+    const plan = land(id, runOf(id), 0.85, { ballYd: ballYdAt(px) });
+    const ballPx = ballRadiusPx(px);
+    const first = plan.hops[0]!;
+    return {
+      runPx: plan.totalDist * px,
+      hopPxPerFrame: ((first.dist * px) / first.ms) * FRAME_MS,
+      ballPx,
+      seen: plan.hops.filter((h) => drawnPx(h.apex, px) >= ballPx && h.ms / FRAME_MS >= 5).length,
+    };
+  }
+
+  it('the run-out is a picture big enough to hold a bounce', () => {
+    // The report as a number. 61px is what a driver's whole landing used to get; a bounce train needs
+    // room to be a train. (This is a property of the CAMERA, so it is asserted per club at the camera
+    // that club is watched from — a wedge's twenty pixels of run-out is a plop and correctly small.)
+    for (const id of ['D', '3W', '4H', '3i']) {
+      expect(drawn(id).runPx, `${id} draws its whole run-out in ${drawn(id).runPx.toFixed(0)}px`).toBeGreaterThan(90);
+    }
+  });
+
+  it('the ball MOVES — every club that skips does it at more than 2.5px a frame', () => {
+    // The other half, and the one no bounce model could have answered: the ball was being redrawn in
+    // almost the same place for three seconds.
+    for (const id of ['D', '3W', '4H', '3i', '7i', '9i']) {
+      const d = drawn(id);
+      expect(d.hopPxPerFrame, `${id} skips at ${d.hopPxPerFrame.toFixed(2)} px/frame`).toBeGreaterThan(2.5);
+    }
+    // The WEDGES sit lower, and that is the physics rather than an exemption: a ball dropping in at 61°
+    // with a wedge's restitution has very little forward speed to give a first hop, which is why its
+    // skip is under `hopFirstMinShare`'s net in the first place. It still has to be a hop and not a
+    // stutter, so it gets a floor of its own rather than a pass.
+    for (const id of ['PW', 'SW']) {
+      const d = drawn(id);
+      expect(d.hopPxPerFrame, `${id} plops at ${d.hopPxPerFrame.toFixed(2)} px/frame`).toBeGreaterThan(1.5);
+    }
+  });
+
+  it('pushing the camera in is what BUYS the bounces — the same plan at the flight camera loses them', () => {
+    // Why the plan has to be told which camera it will be watched at (`Landing.ballYd`): the trim is a
+    // question about pixels, so asking it at the flight camera throws away the tail of the very train
+    // the push-in exists to show. This is the fix stated as a comparison, not as a constant.
+    for (const id of ['D', '3W', '4H']) {
+      const ar = arrival(id);
+      const near = land(id, runOf(id), 0.85, { ballYd: ballYdAt(landingCam(ar.carry)) });
+      const far = land(id, runOf(id), 0.85, { ballYd: ballYdAt(flightCam(ar.carry)) });
+      expect(near.hops.length, `${id}: ${far.hops.length} hops at the flight camera`).toBeGreaterThan(far.hops.length);
+    }
+  });
+
+  it('the landing camera never gets tighter than the green is wide', () => {
+    // `landingZoom` is a MULTIPLIER and the play camera's radius has a 30-yard floor of its own, so a
+    // chip would be pushed to a ten-yard half-width — under half the putt screen's framing — for a ball
+    // that then runs two yards.
+    expect(landingZoomFor(99) * 99).toBeCloseTo(99 * F.landingZoom, 6); // a drive gets the full push-in
+    expect(landingZoomFor(30) * 30).toBeCloseTo(F.landingMinRadiusYd, 6); // a chip stops at the floor
+    expect(landingZoomFor(15)).toBe(1); // already tighter than the floor ⇒ leave the camera alone
+  });
+
+  it('a view with no focus radius is not zoomed at all', () => {
+    // The replay/demo path fits the whole hole, where `cineZoom` multiplies nothing — so the honest
+    // answer is 1, and `ballYd` must be asked at the camera that path really draws.
+    expect(landingZoomFor(undefined)).toBe(1);
+    expect(landingZoomFor(0)).toBe(1);
+  });
+
+  it('the push-in very nearly closes the velocity cliff at touchdown that the slow clock opened', () => {
+    // Apparent speed is yards-per-ms TIMES pixels-per-yard, so the camera is half of it. At the flight
+    // camera the first hop left at ~12% of the speed the ball arrived at — a brake you can see, and the
+    // reason the landing read as the ball hitting a wall. `runoutTimeScale` alone could not fix that
+    // without making the hops too brief to watch; the camera is what pays for it.
+    const ar = arrival('D');
+    const plan = land('D', runOf('D'), 0.85, { ballYd: ballYdAt(landingCam(ar.carry)) });
+    const first = plan.hops[0]!;
+    const arrivePx = ar.v0 * flightCam(ar.carry); // px/ms as the flight ends
+    const hopPx = (first.dist / first.ms) * landingCam(ar.carry); // px/ms off the first contact
+    expect(hopPx / arrivePx).toBeGreaterThan(0.5);
+    expect(hopPx / arrivePx).toBeLessThan(1); // a contact SHEDS speed — it must not gain any
   });
 });
