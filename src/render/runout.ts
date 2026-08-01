@@ -115,11 +115,13 @@ export interface RunoutFeel {
    * frame — and it buys ~120ms of headroom under `runoutMaxMs`, whose compression is the other half
    * of that report.
    *
-   * ⚠️ The saving comes ENTIRELY out of the hops, and an earlier draft of this comment claimed
-   * otherwise — that the floor was "paid for twice", the second time by lengthening the roll. It is
-   * not: the roll enters at whichever is SLOWER of the chained speed and the last hop's drawn speed,
-   * and on a driver that is the chained speed either way, so the roll does not move. Measured, and
-   * pinned by a test, because the plausible version of this was wrong.
+   * ⚠️ It is paid for TWICE whenever the floor stretches the last hop below the chained speed: the
+   * roll enters at `min(chained, drawn)`, so `2·rollDist / vRoll` inherits the slower one. WHETHER it
+   * does depends on the train, and this comment has now been wrong in both directions — first
+   * asserting the double cost against a four-hop train where the chain bound, then denying it right up
+   * until `hopDrawBoost` bought a fifth hop and the drawn speed took over. The only thing that holds
+   * for every train is the monotonic one, and that is what the test pins: raising this floor can
+   * lengthen the hops and the roll, and can shorten neither.
    */
   hopMinMs: number;
   /** SAFETY NET for the first hop: at least this share of the run-out, up to `hopFloorMax` yards. A
@@ -164,6 +166,15 @@ export interface RunoutFeel {
    * 2.9px under a 3px ball). 5 → 5.4 puts every shot at 0.7 power and above back over the floor on
    * both firmnesses, and leaves the driver's drawn skip at 1:1.7 — still a skip, with room before the
    * 1:1.4 line. Measured by `scripts/runout-frames.ts`, not guessed.
+   *
+   * 5.4 → 6.5 BY GS-runout-clock, which takes it to that 1:1.4 line and stops there. The line was drawn
+   * against a ball that did not TRAVEL: the follow-cam pinned it, so a hop was a vertical bob and the
+   * height was all there was to read, and a tall bob does look like the ball is popping off the turf.
+   * With the camera holding still the hop is an ARC across the frame, which is a shape the eye reads as
+   * a skip well past the ratio a bob does. The measured driver goes from a 15px first lift to 19 and,
+   * more to the point, its fourth from 3.9 to 4.7 over a 2.6px ball — the tail is where a train stops
+   * reading. **It does not go past the line**: at 1:1.4 the drawn arc still leaves the turf shallower
+   * than it is long, and the ratio is what separates a skip from a pop-up whatever the camera is doing.
    */
   hopDrawBoost: number;
   /** How much a shot's deterministic variation may stretch a hop train (±). Without it every drive
@@ -314,7 +325,7 @@ export const DEFAULT_RUNOUT_FEEL: RunoutFeel = {
   minAirCarry: 12,
   rollMinShare: 0.3,
   holedEndSpeed: 0.45,
-  hopDrawBoost: 5.4,
+  hopDrawBoost: 6.5,
   varyLen: 0.22,
   varyApex: 0.3,
   creepPauseMs: 260,
@@ -326,7 +337,7 @@ export const DEFAULT_RUNOUT_FEEL: RunoutFeel = {
   runoutMaxMs: 3000,
   landingZoom: 0.34,
   landingMinRadiusYd: 20,
-  landingZoomLeadMs: 240,
+  landingZoomLeadMs: 300,
   landingZoomEase: 0.12,
   runoutLeashFrac: 0.3,
   backspinSkidFrac: 0.55,
@@ -390,8 +401,15 @@ export interface RunoutClassProfile {
  * check lives.
  */
 export const RUNOUT_BY_CLASS: Record<FlightClass, RunoutClassProfile> = {
-  driver: { restitution: 1.1, bounce: 0.88, len: 1.15, hops: 6 },
-  wood: { restitution: 1.06, bounce: 0.92, len: 1.08, hops: 5 },
+  // The driver's ceiling is 5, not its permitted 6, and the reason is the CLOCK rather than the golf
+  // (GS-runout-clock): a sixth skip adds ~100ms of hop and takes the ground for it out of the roll,
+  // which pushes a full-power landing past `runoutMaxMs` — and when that ceiling bites it compresses
+  // the hops, which is the whole defect this pass exists to remove. Five sits mid-band and clears it.
+  driver: { restitution: 1.1, bounce: 0.88, len: 1.15, hops: 5 },
+  // 4, not its permitted 5, for the same reason the hybrid sits at 3: the ladder has to STEP. Once
+  // GS-runout-clock raised `hopDrawBoost` the wood's fifth skip cleared the ball too, which put it
+  // level with the driver — in band for both, and reading as no ladder at all.
+  wood: { restitution: 1.06, bounce: 0.92, len: 1.08, hops: 4 },
   hybrid: { restitution: 0.98, bounce: 1.02, len: 0.95, hops: 3 },
   ironLong: { restitution: 1.03, bounce: 0.96, len: 1.05, hops: 3 },
   ironShort: { restitution: 0.9, bounce: 1.08, len: 0.93, hops: 2 },

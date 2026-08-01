@@ -993,7 +993,22 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     game does not use, `runout-frames.ts` reasons in the plan's own units and cannot see a camera cancelling
     the motion it measures — **neither rig could have found this and both reported success.** When a report
     survives a fix that measured green, stop improving the measurement of the MODEL and go measure the
-    PICTURE. Guarded by `tests/runout.test.ts`.
+    PICTURE. **AND THE CAMERA HAS TO ARRIVE BEFORE THE BALL DOES** (round 2): the dead-zone gate is
+    `landingCam`, NOT `rollPhase` — switched at touchdown the camera is still ~16px behind the ball it
+    chased all flight and spends the FIRST AND BIGGEST HOP catching up, panning forward faster than the
+    ball skips, so that hop was drawn moving 16px BACKWARDS. A bounce drawn the wrong way is worse than
+    one drawn still. It eases onto the pitch mark over `landingZoomLeadMs` (300) so the ball flies into a
+    frame that has already stopped. `hopDrawBoost` 5.4 → **6.5** takes the drawn height:length ratio TO
+    the 1:1.4 line its own comment names as the limit and stops there — the line was set against a PINNED
+    ball, where a hop was a vertical bob and a tall bob reads as a pop; an ARC across the frame reads as a
+    skip much further up the ratio. Driver cap 6 → **5** and wood 5 → **4** keep the ladder STEPPING once
+    the taller arc pushed more hops over the visibility floor (and keep the driver clear of the ceiling).
+    Measured: hops **4 → 5**, lifts **14/10/6/4 → 18/12/7.5/4.5/2.8px**, hop-phase travel **−16px → +61px**.
+    ⚠️ `hopMinMs`'s comment has now been wrong in BOTH directions ("paid for twice by the roll", then
+    "the roll does not move") — `vRoll` is `min(chained, drawn)` and which binds is a property of the
+    TRAIN, so the guard is the MONOTONIC rule (raising the floor can lengthen both, shorten neither).
+    A directional claim about a `min` is a claim about which side is smaller, i.e. the thing that moves
+    when any other constant does. Guarded by `tests/runout.test.ts`.
   - **HOW MANY TIMES A BALL SKIPS IS A PROPERTY OF THE CLUB** (GS-bounce-ladder,
     `RunoutClassProfile.hops` · `RunoutFeel.trainSustain`). The play-test's ladder — driver 4-6 ▸ wood 3-5 ▸
     hybrid 2-4 ▸ long iron 1-3 ▸ short iron 1-2 ▸ wedge 0-1 — had no home: `hopMax` was ONE number for the
