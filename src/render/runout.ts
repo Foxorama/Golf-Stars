@@ -68,8 +68,34 @@ export interface RunoutFeel {
    *  the pop, which is why a wedge bounces up and a driver skids along. Plus a ceiling in yards. */
   hopApexK: number;
   hopApexMax: number;
+  /**
+   * How much of the PHYSICAL decay rate a bounce train is drawn as keeping (GS-bounce-ladder).
+   *
+   * A hop's length falls by `kh²` per contact and this multiplies that rate — the same kind of number
+   * as `hopDrawBoost`, and there for the same reason. A real skip peaks a couple of feet, which is
+   * nothing at these cameras, so the HEIGHT has been exaggerated 5.4x since GS-landing-real; the
+   * train's LENGTH never got the same treatment, and an honestly-decaying train is two big skips and
+   * then it is over. That is what a drive looks like from a helicopter and it is not what a golf game
+   * should feel like — the play-test asks for four to six visible bounces off a driver.
+   *
+   * ⚠️ `kh²` is itself already an exaggeration and has been since GS-runout-ladder, which is worth
+   * naming because the module's own comment calls it the physics. A projectile ranges `2·vh·vv/g`, and
+   * between contacts `vh` decays by `kh` while `vv` decays by `kv` — so the honest rate is **`kh·kv`**,
+   * which for a driver on firm turf is 0.39 against `kh²`'s 0.59. This constant is the first one to say
+   * out loud that the train is drawn, not simulated.
+   *
+   * It is ONE number rather than a per-class table because `kh` already ladders by family (the class
+   * row's `restitution` runs 1.1 down to 0.7): measured, the per-class gains needed to hit the asked-for
+   * counts came out between 1.13 and 1.27, i.e. flat. And it MULTIPLIES the physical rate rather than
+   * replacing it, so the surface still kills the train — a drive plugging into rough decays at 0.25 and
+   * dies in two hops, exactly as it should.
+   */
+  trainSustain: number;
   /** Stop hopping once a hop is shorter than this (yards), or after this many hops. There is always
    *  at least ONE hop: every full shot arrives out of the air.
+   *
+   *  `hopMax` is the ABSOLUTE ceiling (and the live `_gsFeel` lever); how many skips a given club
+   *  takes is `RunoutClassProfile.hops`, and the loop runs to the smaller of the two.
    *
    *  `hopMinYd` is the FALLBACK floor, used only when the caller cannot say how big the ball is
    *  drawn (`Landing.ballYd`). A length in yards cannot answer "will this be seen" on its own — the
@@ -233,6 +259,7 @@ export const DEFAULT_RUNOUT_FEEL: RunoutFeel = {
   hopApexK: 0.05,
   hopApexMax: 6,
   hopMinYd: 0.35,
+  trainSustain: 1.1,
   hopMax: 6,
   hopMinMs: 130,
   hopFirstMinShare: 0.35,
@@ -278,6 +305,26 @@ export interface RunoutClassProfile {
   bounce: number;
   /** Scales the first hop's length outright — the club's own bite on the turf. */
   len: number;
+  /**
+   * The most times this family ever skips (GS-bounce-ladder).
+   *
+   * HOW MANY TIMES A BALL SKIPS IS A PROPERTY OF THE CLUB, and until now it was one number for the
+   * whole bag (`RunoutFeel.hopMax`, 6). So the only thing separating a driver from a 9-iron was where
+   * the geometric train happened to fall under the drawability floor — and that floor is a fact about
+   * the CAMERA, not about the club. GS-landing-camera moved it, which is precisely why the short irons
+   * suddenly started taking three skips: nothing about the golf changed, the ball just got drawn from
+   * closer in.
+   *
+   * The play-test's ladder, which is also the golf: driver 4–6 ▸ wood 3–5 ▸ hybrid 2–4 ▸ long iron 1–3
+   * ▸ short iron 1–2 ▸ wedge 0–1. These are the CEILINGS of that ladder; the bottom of each band falls
+   * out on its own at lower power and on softer ground, where the sim's own roll collapses. The hybrid
+   * sits at 3 rather than its permitted 4 so the ladder still steps — a hybrid skipping as often as a
+   * 3-wood reads as no ladder at all.
+   *
+   * Compile-forced by the `Record<FlightClass, …>`: splitting a flight class makes this a decision that
+   * has to be taken, not one that can be forgotten.
+   */
+  hops: number;
 }
 
 /**
@@ -297,13 +344,13 @@ export interface RunoutClassProfile {
  * check lives.
  */
 export const RUNOUT_BY_CLASS: Record<FlightClass, RunoutClassProfile> = {
-  driver: { restitution: 1.1, bounce: 0.88, len: 1.15 },
-  wood: { restitution: 1.06, bounce: 0.92, len: 1.08 },
-  hybrid: { restitution: 0.98, bounce: 1.02, len: 0.95 },
-  ironLong: { restitution: 1.03, bounce: 0.96, len: 1.05 },
-  ironShort: { restitution: 0.9, bounce: 1.08, len: 0.93 },
-  wedge: { restitution: 0.7, bounce: 1.2, len: 0.28 },
-  putter: { restitution: 0.6, bounce: 0.6, len: 0.3 },
+  driver: { restitution: 1.1, bounce: 0.88, len: 1.15, hops: 6 },
+  wood: { restitution: 1.06, bounce: 0.92, len: 1.08, hops: 5 },
+  hybrid: { restitution: 0.98, bounce: 1.02, len: 0.95, hops: 3 },
+  ironLong: { restitution: 1.03, bounce: 0.96, len: 1.05, hops: 3 },
+  ironShort: { restitution: 0.9, bounce: 1.08, len: 0.93, hops: 2 },
+  wedge: { restitution: 0.7, bounce: 1.2, len: 0.28, hops: 1 },
+  putter: { restitution: 0.6, bounce: 0.6, len: 0.3, hops: 1 },
 };
 
 /** One hop of the bounce phase: how far along the path it carries the ball, how long it takes, and
@@ -537,7 +584,14 @@ export function planRunout(landing: Landing, feel: RunoutFeel = DEFAULT_RUNOUT_F
   let used = 0;
   let khRun = kh;
   let kvRun = kv;
-  for (let i = 0; i < feel.hopMax; i++) {
+  // How much of a hop the NEXT one keeps (GS-bounce-ladder): the physical `kh²`, sustained. It is
+  // tracked alongside `khRun` rather than derived from it inside the loop so a mid-train hazard drags
+  // both by the same factor — a skip that finishes in a bunker loses its train there.
+  let decay = khRun * khRun * feel.trainSustain;
+  // How many times THIS CLUB skips, never a single number for the whole bag. `hopMax` stays the
+  // absolute ceiling (and the live `_gsFeel` lever).
+  const maxHops = Math.min(feel.hopMax, cls.hops);
+  for (let i = 0; i < maxHops; i++) {
     // The ground this hop lands ON decides what the ball keeps. A skip that finishes in a bunker or
     // deep rough loses the rest of its train there — the hazard acting on the bounce, not just on the
     // roll (which the sim already handles through `dist`).
@@ -546,6 +600,7 @@ export function planRunout(landing: Landing, feel: RunoutFeel = DEFAULT_RUNOUT_F
       const drag = clamp((here + 0.15) / (f + 0.15), 0.15, 1.15);
       khRun *= drag;
       kvRun *= drag;
+      decay *= drag;
     }
     const want = Math.min(hopLen, Math.max(0, airBudget - used));
     // The FIRST hop always happens for a ball out of the sky — it does not begin by rolling. After
@@ -561,8 +616,8 @@ export function planRunout(landing: Landing, feel: RunoutFeel = DEFAULT_RUNOUT_F
     if (i > 0 && landing.ballYd !== undefined && apex < landing.ballYd) break;
     hops.push({ dist: want, ms: Math.max(feel.hopMinMs, want / Math.max(0.01, v)), apex });
     used += want;
-    v *= khRun;
-    hopLen *= khRun * khRun; // constant horizontal speed within a hop ⇒ length decays as k²
+    v *= khRun; // the SPEED chain stays physical — only the drawn train is sustained
+    hopLen *= decay;
     // THE TRAIN STAYS SELF-SIMILAR AS IT DECAYS (GS-runout-ladder). Physically a hop's apex falls as
     // `kv²` — roughly 30% per bounce on firm turf — while its LENGTH falls as `kh²`, roughly 65%. Both
     // are right, and drawn together they mean the height collapses more than twice as fast as the
@@ -572,7 +627,7 @@ export function planRunout(landing: Landing, feel: RunoutFeel = DEFAULT_RUNOUT_F
     // skip is a smaller copy of the one before and the whole landing reads. `kv` still sets the
     // FIRST hop's height, so soft ground still plops and firm ground still skips: the surface's
     // character is untouched, only the tail survives to be seen.
-    hopApex *= khRun * khRun;
+    hopApex *= decay;
   }
 
   const rollDist = Math.max(0, D - used);

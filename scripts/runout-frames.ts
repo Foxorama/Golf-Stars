@@ -159,7 +159,14 @@ function measure(clubId: string, power: number, firm: number): Row {
   };
 }
 
-/** What the play-test asked for, per club FAMILY: visible bounces, at full power on firm ground. */
+/**
+ * What the play-test asked for, per club FAMILY: visible bounces (GS-bounce-ladder).
+ *
+ * ⚠️ The band is judged on the FIRM landing only. On a soft green a driver correctly comes down to two
+ * skips and a wood to two — the forward restitution falls from 0.77 to 0.55 and the sim's own roll
+ * collapses with it, which is the ground killing the bounce through the physics. A ball plugging into
+ * a soft green is not a bug to tune out; holding the ladder there would be the bug.
+ */
 const WANT: Record<string, [number, number]> = {
   driver: [4, 6],
   wood: [3, 5],
@@ -180,9 +187,10 @@ for (const firm of [0.85, 0.45]) {
   for (const club of CLUBS_UNDER_TEST) {
     for (const p of POWERS) rows.push(measure(club, p, firm));
   }
+  const judged = firm > 0.6; // the ladder is a FIRM-ground promise — see WANT
   for (const r of rows) {
     const want = WANT[flightClassOf(r.club)]!;
-    const short = r.visibleHops < want[0] ? '  <== TOO FEW BOUNCES' : r.visibleHops > want[1] ? '  <== too many' : '';
+    const short = !judged ? '' : r.visibleHops < want[0] ? '  <== TOO FEW BOUNCES' : r.visibleHops > want[1] ? '  <== too many' : '';
     const still = r.hopPxPerFrame < MOVING_PX_PER_FRAME ? '  <== NOT MOVING' : '';
     console.log(
       `  ${r.club.padEnd(4)} ${r.power.toFixed(2)} ${r.carry.toFixed(0).padStart(6)} ${r.roll.toFixed(1).padStart(6)}  ` +
@@ -192,12 +200,15 @@ for (const firm of [0.85, 0.45]) {
         `${r.runoutMs.toFixed(0).padStart(9)} ${r.timeBaseSkew.toFixed(2).padStart(9)}${short}${still}`,
     );
   }
-  const full = rows.filter((r) => r.power === 1);
-  const off = full.filter((r) => {
-    const w = WANT[flightClassOf(r.club)]!;
-    return r.visibleHops < w[0] || r.visibleHops > w[1];
-  });
-  console.log(`\n  FULL-POWER rows outside the asked-for bounce band: ${off.length}/${full.length}` + (off.length ? `  (${off.map((r) => `${r.club}:${r.visibleHops}`).join(', ')})` : ''));
+  if (judged) {
+    const off = rows.filter((r) => {
+      const w = WANT[flightClassOf(r.club)]!;
+      return r.visibleHops < w[0] || r.visibleHops > w[1];
+    });
+    console.log(`\n  rows outside the asked-for bounce band: ${off.length}/${rows.length}` + (off.length ? `  (${off.map((r) => `${r.club}@${r.power}:${r.visibleHops}`).join(', ')})` : ''));
+  } else {
+    console.log(`\n  (bounce band not judged on soft ground — the surface is meant to kill the train)`);
+  }
   const crawling = rows.filter((r) => r.hopPxPerFrame < MOVING_PX_PER_FRAME);
   console.log(`  run-outs drawn under ${MOVING_PX_PER_FRAME}px/frame (reads as stationary): ${crawling.length}/${rows.length}`);
   const noBounce = rows.filter((r) => r.visibleHops === 0 && flightClassOf(r.club) !== 'wedge');
