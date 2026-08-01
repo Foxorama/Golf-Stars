@@ -31,8 +31,35 @@
     • Privacy + install sections reworded
 
   NEW in this revision (neither was on the live page):
-    • "Built with" — because ITCH HAS NO "MADE WITH" FIELD to put it in.
+    • "Built with" — see the "Made with" note below.
     • "Licence" — the page said nothing about rights at all.
+
+  ---------------------------------------------------------------------------
+  SECOND PASS, SAME DAY
+  ---------------------------------------------------------------------------
+
+  • "How this game was made" now ends in an explicit WHO DID WHAT list instead
+    of the one-line "the AI did not generate the gameplay feel, game mode or
+    story ideas". Confirmed by the author, not inferred: he wrote NONE of the
+    code, specified the look and sound rather than choosing from what the AI
+    proposed, and originated the story, characters and plot while the AI wrote
+    most of the prose. The brief was "honest, impartial, practical — don't
+    oversell me in areas I didn't contribute to", which is why the first bullet
+    is the bluntest one and why the last bullet credits the AI's own decisions.
+    Do not add a line arguing this is more legitimate than using generated art;
+    state the facts and let readers take their own view. A detailed devlog on
+    the process is planned — the closing line promises it.
+
+  • The Licence section NO LONGER LINKS the GitHub repo. It still says the
+    repository is public, which is the point; the link put the pre-launch repo
+    name (`Golf-Stars`) in front of players, and GS-release-identity keeps that
+    spelling deliberately invisible to them.
+
+  ⚠️ "MADE WITH" IS A REAL ITCH FIELD, BUT IT IS A CLOSED LIST — engines like
+    Unity/Godot/GameMaker, not free text. TypeScript, Vite, Vitest and Capacitor
+    are not options in it, so it is left EMPTY on purpose: a near-miss entry
+    would file the game under an engine it does not use. That is exactly why the
+    "Built with" section exists in the Details box.
 
   ---------------------------------------------------------------------------
   METADATA, AS SET ON THE LIVE PAGE
@@ -171,7 +198,17 @@
 
 <p>The sound is the same. There isn't an audio file in the project either. <strong>Every note and every effect is synthesized in your browser as it plays.</strong></p>
 
-<p>The AI did write the code that draws and plays all of that, and a lot of the story text. The AI did not generate the gameplay feel, game mode or story ideas.</p>
+<p>Who did what:</p>
+
+<ul>
+<li><strong>The AI wrote all of the code.</strong> I wrote none of it — including the code that draws every visual and synthesizes every sound.</li>
+<li><strong>The AI wrote most of the prose</strong> — dialogue, item and card text, and most of the story writing itself.</li>
+<li><strong>The design is mine.</strong> The game modes, the golf feel, the worlds, the story, the characters and the plot. I specified how it should look and sound; the AI implemented that.</li>
+<li><strong>The judgement is mine.</strong> I play-tested it and sent it back, over and over. A lot of what is in the game is a second or fifth attempt, because the first one felt wrong.</li>
+<li><strong>Within all of that, the AI made countless decisions of its own.</strong> Nobody specifies a game at the level of every function and every line.</li>
+</ul>
+
+<p>A fuller account of how that worked in practice is coming as a devlog.</p>
 
 <!-- NEW 2026-08-01 — itch has no "Made with" field, so the tech goes here. -->
 <h2>Built with</h2>
@@ -212,7 +249,7 @@
 <!-- NEW 2026-08-01 — the page said nothing about rights. -->
 <h2>Licence</h2>
 
-<p>The Far Carry is <strong>© 2026 Vulpecula Games, all rights reserved</strong> — the code, the art, the audio, the text and the design. A copy from an official channel is yours to play, and you are welcome to read the source, quote it, critique it and learn from it: that is why <a href="https://github.com/Foxorama/Golf-Stars">the repository is public</a>. Being able to read it is not a licence to reuse it, though. If you want to use something, just ask — permission is usually given.</p>
+<p>The Far Carry is <strong>© 2026 Vulpecula Games, all rights reserved</strong> — the code, the art, the audio, the text and the design. A copy from an official channel is yours to play, and you are welcome to read the source, quote it, critique it and learn from it: that is why the repository is public. Being able to read it is not a licence to reuse it, though. If you want to use something, just ask — permission is usually given.</p>
 
 <p>The game bundles a small amount of open-source code (Vite and Capacitor, both MIT). Their notices are in <code>THIRD-PARTY-NOTICES.md</code> in the repository.</p>
 
