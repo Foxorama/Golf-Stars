@@ -2114,3 +2114,105 @@ the touchdown speed ratio sits between 0.5 and 1 (a contact must shed speed, nev
   hybrids 2â€“4, long irons 1â€“3, short irons 1â€“2, wedges 0â€“1. The camera alone lands D 4 Â· 3W 4 Â· 4H 4 Â·
   3i 2 Â· 7i 3 Â· 9i 3 Â· PW 2 â€” five of eight already in band, with the short clubs over. Those are a
   tuning question against the NEW camera and are their own pass (GS-bounce-ladder).
+
+---
+
+## GS-bounce-ladder â€” how many times a ball skips is a property of the club (2026-08-02)
+
+> *"Driver should bounce 4-6 times visibly. Woods 3-5. Hybrids 2-4. Long irons 1-3. Short irons 1-2.
+> Wedges 0-1."*
+
+GS-landing-camera made the landing visible. This makes it read as a BAG.
+
+### What was actually deciding the count
+
+`RunoutFeel.hopMax` was **one number for the whole bag** (6). The class row already carried how far a
+club bites (`len`), how much it keeps (`restitution`) and how high it pops (`bounce`) â€” but not how
+many times it skips. So the count fell out of wherever the geometric train happened to drop under the
+drawability floor (`Landing.ballYd`, GS-runout-seen)â€¦
+
+â€¦and that floor is a fact about the **camera**, not about the club. Short clubs are watched from closer
+in, so their floor is lower, so they keep more of their tail. GS-landing-camera moved every floor at
+once and the short irons promptly gained a third skip â€” nothing about the golf changed, the ball just
+got drawn from nearer. That is the tell that the number was being decided in the wrong place.
+
+### Two levers, both in the class row's own language
+
+**`RunoutClassProfile.hops`** â€” the most skips a family ever takes. Compile-forced by the
+`Record<FlightClass, â€¦>`, so splitting a flight class makes this a decision that has to be taken rather
+than one that can be forgotten. `hopMax` stays the absolute ceiling and the live `_gsFeel` lever; the
+loop runs to `min(feel.hopMax, cls.hops)`.
+
+| | driver | wood | hybrid | ironLong | ironShort | wedge |
+|---|---|---|---|---|---|---|
+| asked for | 4â€“6 | 3â€“5 | 2â€“4 | 1â€“3 | 1â€“2 | 0â€“1 |
+| `hops` | 6 | 5 | **3** | 3 | 2 | 1 |
+
+The hybrid sits at 3 rather than its permitted 4 so the ladder still **steps**. Counts inside the band
+are not enough on their own: a bag where a hybrid skips as often as a 3-wood is in band for both and
+reads as no ladder at all. What sells the club is the contrast, and there is a test for it.
+
+**`RunoutFeel.trainSustain` (1.1)** â€” the count alone could not get the driver past four. Its train
+decays at `khÂ²` â‰ˆ 0.55 per contact, so hop 5 came out 0.92 yards against a 0.97 threshold: it missed
+by five inches. The train had to decay more slowly, and the honest way to say that is that **the train
+is drawn, not simulated** â€” the same admission `hopDrawBoost` (5.4) has always made about a bounce's
+height, and for exactly the same reason. A real skip peaks a couple of feet, which is nothing at these
+cameras; a real train is two big skips and then it is over, which is what a drive looks like from a
+helicopter and not what a golf game should feel like.
+
+âš ï¸ **`khÂ²` was already an exaggeration and nobody had said so.** A projectile ranges `2Â·vhÂ·vv/g`, and
+between contacts `vh` decays by `kh` while `vv` decays by `kv` â€” so the honest length decay is
+**`khÂ·kv`**, which for a driver on firm turf is **0.39** against `khÂ²`'s **0.59**. The module's own
+comment has been calling `khÂ²` the physics since GS-runout-ladder. `trainSustain` is the first constant
+here to be explicit about it.
+
+It is **one** number rather than a per-class table because `kh` already ladders by family (the class
+row's `restitution` runs 1.1 â†’ 0.7): measured, the per-class gains needed to hit the asked-for counts
+came out between 1.13 and 1.27, i.e. flat. And it **multiplies** the physical rate rather than replacing
+it, which is what keeps the surface in charge â€” a drive plugging into rough decays at 0.25 and still
+dies in two hops. A flat authored decay would have had a ball landing in deep rough skipping five times.
+
+### Measured
+
+`npx tsx scripts/runout-frames.ts`, 40 club Ã— power rows per surface, at the landing camera:
+
+| club | before | **after** | band |
+|---|---|---|---|
+| D @1.0 | 4 | **5** | 4â€“6 |
+| D @0.7 | 5 | **6** | 4â€“6 |
+| 3W @1.0 | 4 | **4** | 3â€“5 |
+| 4H @1.0 | 4 | **3** | 2â€“4 |
+| 3i @1.0 | 2 | **2** | 1â€“3 |
+| 7i @1.0 | 3 | **2** | 1â€“2 |
+| 9i @1.0 | 3 | **2** | 1â€“2 |
+| PW @1.0 | 2 | **1** | 0â€“1 |
+| SW @1.0 | 1 | **1** | 0â€“1 |
+
+**0 of 40 firm-fairway rows outside the band, at every power**, against 6 before. The ladder steps
+5 â–¸ 4 â–¸ 3 â–¸ 2 â–¸ 2 â–¸ 1, and every drawn apex clears the drawn ball (the driver's fifth skip is 3.7px
+over a 2.6px ball).
+
+On a **soft green** the driver comes down to two and the wood to two, which is why the rig no longer
+judges the band there: the forward restitution falls from 0.77 to 0.55 and the sim's own roll collapses
+with it. A ball plugging into a soft green is supposed to stop. Holding the ladder there would be the
+bug.
+
+### Contracts
+
+- **Render-only.** No `src/sim/` module imports `runout.ts`. This re-cuts the roll `rollOut` already
+  computed between the hops and the closing roll â€” zero carry, zero rng draws, zero strokes moved, the
+  ball still stops exactly where the sim put it (asserted for the whole bag). Nothing for the
+  death-spiral harness to weigh (contract 4); contracts 1, 2 and 5 untouched.
+- The **speed** chain stays physical: `v *= khRun` is unchanged, so hopâ†’hopâ†’roll continuity and the
+  touchdown ratio are exactly as GS-landing-camera left them. Only the drawn train is sustained.
+- The mid-train hazard drag applies to the sustain too, so a skip that finishes in a bunker still loses
+  the rest of its train there.
+
+`npm run typecheck` + `npx vitest run` green: **220 files, 2,658 tests, 0 skipped**, plus `npm run
+build`. (`npm run check`'s trailing hub build cannot run on Windows â€” see the process doc.)
+
+Guarded by a new block in `tests/runout.test.ts`: the whole bag lands inside the asked-for band at every
+power on a firm fairway; the ladder STEPS (driver > wood > hybrid > short iron > wedge); a class row can
+never out-skip the global ceiling; the surface still kills the train; the sustain stays modest and can
+never let a contact keep more than it arrived with; and trimming to the class cap still conserves the
+ball's resting place.

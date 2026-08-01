@@ -758,11 +758,20 @@ describe('the landing is watched from the landing (GS-landing-camera)', () => {
     // Why the plan has to be told which camera it will be watched at (`Landing.ballYd`): the trim is a
     // question about pixels, so asking it at the flight camera throws away the tail of the very train
     // the push-in exists to show. This is the fix stated as a comparison, not as a constant.
-    for (const id of ['D', '3W', '4H']) {
+    const at = (id: string, px: number): number =>
+      land(id, runOf(id), 0.85, { ballYd: ballYdAt(px) }).hops.length;
+    for (const id of ['D', '3W']) {
       const ar = arrival(id);
-      const near = land(id, runOf(id), 0.85, { ballYd: ballYdAt(landingCam(ar.carry)) });
-      const far = land(id, runOf(id), 0.85, { ballYd: ballYdAt(flightCam(ar.carry)) });
-      expect(near.hops.length, `${id}: ${far.hops.length} hops at the flight camera`).toBeGreaterThan(far.hops.length);
+      const far = at(id, flightCam(ar.carry));
+      expect(at(id, landingCam(ar.carry)), `${id}: ${far} hops at the flight camera`).toBeGreaterThan(far);
+    }
+    // …and no club anywhere in the bag is WORSE off for it. Only the two longest gain outright: since
+    // GS-bounce-ladder a club's skip count is capped by its own class row, so from the hybrid down the
+    // ladder decides it and the camera cannot — which is the point of that change, not an exception to
+    // this one.
+    for (const id of ['D', '3W', '4H', '3i', '7i', '9i', 'PW', 'SW']) {
+      const ar = arrival(id);
+      expect(at(id, landingCam(ar.carry)), id).toBeGreaterThanOrEqual(at(id, flightCam(ar.carry)));
     }
   });
 
@@ -794,5 +803,109 @@ describe('the landing is watched from the landing (GS-landing-camera)', () => {
     const hopPx = (first.dist / first.ms) * landingCam(ar.carry); // px/ms off the first contact
     expect(hopPx / arrivePx).toBeGreaterThan(0.5);
     expect(hopPx / arrivePx).toBeLessThan(1); // a contact SHEDS speed — it must not gain any
+  });
+});
+
+/**
+ * GS-bounce-ladder â€” how many times a ball skips is a property of the CLUB.
+ *
+ * The play-test's spec, verbatim: *"Driver should bounce 4-6 times visibly. Woods should bounce 3-5
+ * times visibly. Hybrids should bounce 2-4 times visibly. Long Irons should bounce 1-3 times visibly.
+ * Short Irons should bounce 1-2 times visibly. Wedges should bounce 0-1 times visibly."*
+ *
+ * Before this, `hopMax` was ONE number for the whole bag, so what actually separated a driver from a
+ * 9-iron was where the geometric train fell under the drawability floor â€” a fact about the CAMERA, not
+ * about the club. GS-landing-camera moved that floor, and the short irons promptly gained a third skip
+ * without anything about the golf changing. The count belongs in the class row, beside the club's bite
+ * and its pop.
+ */
+describe('every club skips its own number of times (GS-bounce-ladder)', () => {
+  const HEIGHT_EXAGGERATION = 0.55;
+  const F = DEFAULT_RUNOUT_FEEL;
+  const flightCam = (carry: number): number => (carry > 200 ? 1.6 : carry > 120 ? 3.0 : 5.0);
+  const landingCam = (carry: number): number => flightCam(carry) / F.landingZoom;
+  const drawnPx = (apexYd: number, px: number): number => apexYd * px * HEIGHT_EXAGGERATION * F.hopDrawBoost;
+  const ballYdAt = (px: number): number => ballRadiusPx(px) / (px * HEIGHT_EXAGGERATION * F.hopDrawBoost);
+
+  /** The asked-for band, per FLIGHT CLASS. */
+  const BAND: Record<string, [number, number]> = {
+    driver: [4, 6],
+    wood: [3, 5],
+    hybrid: [2, 4],
+    ironLong: [1, 3],
+    ironShort: [1, 2],
+    wedge: [0, 1],
+  };
+  const BAG = ['D', '3W', '4H', '3i', '7i', '9i', 'PW', 'SW'];
+
+  /** Hops the PLAYER sees: drawn apex clears the drawn ball, held for long enough to register. */
+  function seen(id: string, power = 1): number {
+    const ar = arrival(id);
+    const carry = ar.carry * power;
+    const px = landingCam(carry);
+    const plan = land(id, runOf(id) * power, 0.85, { ballYd: ballYdAt(px), carry });
+    return plan.hops.filter((h) => drawnPx(h.apex, px) >= ballRadiusPx(px) && h.ms / FRAME_MS >= 5).length;
+  }
+
+  it('the whole bag lands inside the asked-for band, at every power, on a firm fairway', () => {
+    for (const id of BAG) {
+      const band = BAND[flightClassOf(id)]!;
+      for (const power of [1, 0.85, 0.7, 0.55, 0.4]) {
+        const n = seen(id, power);
+        expect(n, `${id} @${power} draws ${n} visible bounces, wanted ${band[0]}-${band[1]}`).toBeGreaterThanOrEqual(band[0]);
+        expect(n, `${id} @${power} draws ${n} visible bounces, wanted ${band[0]}-${band[1]}`).toBeLessThanOrEqual(band[1]);
+      }
+    }
+  });
+
+  it('the ladder STEPS â€” a driver out-skips a wood out-skips a hybrid out-skips an iron out-skips a wedge', () => {
+    // The counts being in band is not enough on its own: a bag where every club draws four is in band
+    // for three of the six families and reads as no ladder at all. What sells the club is the contrast.
+    expect(seen('D')).toBeGreaterThan(seen('3W'));
+    expect(seen('3W')).toBeGreaterThan(seen('4H'));
+    expect(seen('4H')).toBeGreaterThan(seen('7i'));
+    expect(seen('7i')).toBeGreaterThan(seen('PW'));
+  });
+
+  it('a class row can never out-skip the global ceiling', () => {
+    // `hopMax` stays the absolute cap and the live `_gsFeel` lever; the class row narrows it, never the
+    // other way round. A row above it would be a number that silently does nothing.
+    for (const cls of Object.values(RUNOUT_BY_CLASS)) expect(cls.hops).toBeLessThanOrEqual(DEFAULT_RUNOUT_FEEL.hopMax);
+  });
+
+  it('the SURFACE still kills the train â€” the ladder is a firm-ground promise, not a floor', () => {
+    // `trainSustain` MULTIPLIES the physical `khÂ²` rather than replacing it, which is the whole reason
+    // it can be one number: a drive plugging into soft ground still dies in two skips. Holding the
+    // ladder there would be the bug â€” a driver landing on a soft green is supposed to stop.
+    const ar = arrival('D');
+    const px = landingCam(ar.carry);
+    const firm = land('D', runOf('D'), 0.9, { ballYd: ballYdAt(px) });
+    const soft = land('D', runOf('D') * 0.5, 0.2, { ballYd: ballYdAt(px) });
+    expect(soft.hops.length).toBeLessThan(firm.hops.length);
+    expect(soft.hops.length).toBeGreaterThanOrEqual(1); // â€¦but a ball out of the sky always lands
+  });
+
+  it('the sustain is an exaggeration, and a modest one â€” the train is drawn, not simulated', () => {
+    // A projectile ranges 2Â·vhÂ·vv/g, and between contacts vh decays by kh while vv decays by kv â€” so the
+    // honest length decay is khÂ·kv, NOT the khÂ² the module has used since GS-runout-ladder. `khÂ²` was
+    // already an exaggeration of ~1.5x that nobody had named. The point of pinning this is that the
+    // constant must stay small: it multiplies a rate, so it compounds down the train.
+    expect(DEFAULT_RUNOUT_FEEL.trainSustain).toBeGreaterThan(1);
+    expect(DEFAULT_RUNOUT_FEEL.trainSustain).toBeLessThan(1.25);
+    // â€¦and it must never let a bounce keep MORE than it arrived with, at any surface or class.
+    for (const cls of Object.values(RUNOUT_BY_CLASS)) {
+      const khFirmest = Math.min(0.86, DEFAULT_RUNOUT_FEEL.restitutionFirm * cls.restitution);
+      expect(khFirmest * khFirmest * DEFAULT_RUNOUT_FEEL.trainSustain).toBeLessThan(1);
+    }
+  });
+
+  it('trimming the tail to the class cap still leaves the ball where the sim put it (contract 5)', () => {
+    for (const id of BAG) {
+      const dist = runOf(id);
+      const plan = land(id, dist, 0.85, { ballYd: ballYdAt(landingCam(arrival(id).carry)) });
+      expect(plan.hops.length, id).toBeLessThanOrEqual(RUNOUT_BY_CLASS[flightClassOf(id)]!.hops);
+      expect(sampleRunout(plan, 1).s, id).toBeCloseTo(dist, 6);
+      expect(plan.rollDist + plan.hops.reduce((a, h) => a + h.dist, 0), id).toBeCloseTo(dist, 6);
+    }
   });
 });

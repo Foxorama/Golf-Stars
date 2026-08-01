@@ -967,6 +967,28 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     hand-set 4.6 px/yd while the game drew 1.6, i.e. it was honest about the model and silently wrong about
     the picture. It takes the camera from the shipped constant now. Guarded by `tests/runout.test.ts`;
     measured by `scripts/runout-frames.ts` (`GS_LANDING_ZOOM=1` reproduces the reported baseline).
+  - **HOW MANY TIMES A BALL SKIPS IS A PROPERTY OF THE CLUB** (GS-bounce-ladder,
+    `RunoutClassProfile.hops` · `RunoutFeel.trainSustain`). The play-test's ladder — driver 4-6 ▸ wood 3-5 ▸
+    hybrid 2-4 ▸ long iron 1-3 ▸ short iron 1-2 ▸ wedge 0-1 — had no home: `hopMax` was ONE number for the
+    whole bag, so what actually decided the count was where the geometric train fell under the drawability
+    floor (`ballYd`), and **that floor is a fact about the CAMERA, not the club** — short clubs are watched
+    from closer in, so GS-landing-camera moved every floor at once and the short irons gained a third skip
+    with nothing about the golf having changed. `hops` is a ROW beside the club's bite and pop, compile-forced
+    by the `Record<FlightClass,…>`; `hopMax` stays the absolute ceiling + the live `_gsFeel` lever
+    (`min(hopMax, cls.hops)`). The hybrid sits at **3**, under its permitted 4, because **counts in band are
+    not enough — the ladder must STEP**: a hybrid skipping as often as a 3-wood is in band for both and reads
+    as no ladder at all. `trainSustain` 1.1 buys the driver its 5th skip (`kh²` ≈ 0.55 left hop 5 five inches
+    short of the threshold) and is the same admission `hopDrawBoost` makes about HEIGHT — **the train is
+    drawn, not simulated**. ⚠️ `kh²` was ALREADY an exaggeration nobody had named: a projectile ranges
+    `2·vh·vv/g`, so the honest length decay is **`kh·kv`** (0.39 for a firm driver, vs `kh²`'s 0.59). ONE
+    number, not a table, because `kh` already ladders by family (measured per-class gains 1.13–1.27, i.e.
+    flat) — and it **MULTIPLIES** the physical rate rather than replacing it, which is what keeps the SURFACE
+    in charge (a drive plugging into rough decays at 0.25 and still dies in two; a flat authored decay would
+    have it skipping five times). Measured: **0/40 firm rows outside the band at every power** (was 6),
+    ladder 5 ▸ 4 ▸ 3 ▸ 2 ▸ 2 ▸ 1. The band is a FIRM-ground promise — on a soft green a driver correctly
+    comes down to two, and holding the ladder there would be the bug. Render-only; the SPEED chain
+    (`v *= khRun`) is untouched, so the touchdown continuity is exactly as GS-landing-camera left it.
+    Guarded by `tests/runout.test.ts`; measured by `scripts/runout-frames.ts`.
   - **THE BALL STAYS ON THE SCREEN, AND A SHADOW UNDER THE BALL IS NO SHADOW** (GS-landing-real). The
     play view drew NOTHING once every shot and putt had played, so the ball blinked out and the player
     watched an empty fairway until the screen changed; it is now drawn at rest until unmount (cleared
