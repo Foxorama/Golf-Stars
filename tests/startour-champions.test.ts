@@ -189,7 +189,8 @@ describe('a champion reveals the World Tree; only the hammer opens Asgard', () =
   /** Mount the app-layer star map against a state, with the Yggdrasil sheet raised. */
   function chart(s: UiState): string {
     setState(s);
-    starTourView.storyMode = false;
+    // No mode to force: the chart's mode is `UiState.starTourFreeRoam` (GS-startour-chart-mode), and
+    // every state here comes through a real `openStarTour`, which is the door that arms free roam.
     starTourView.selectedId = null;
     starTourView.recordsOpen = false;
     starTourView.serpentResult = null;

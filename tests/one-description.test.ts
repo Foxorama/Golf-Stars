@@ -165,6 +165,23 @@ const REGISTER: OneDescription[] = [
       'tallies into a fresh hole and silently skipped that many shots (GS-anim-counter-stale).',
   },
   {
+    fact: 'Whether the star chart is the Story campaign navigator or free-roam Star Tour',
+    home: 'src/ui/starTourMode.ts',
+    answers: 'isStoryChart',
+    scan: 'src',
+    // The reducer's DOORS write the field (`starTourFreeRoam: true` / `: undefined` — an object
+    // literal, no member access), which is the decision being made and is correct. Reading it back
+    // off a VALUE is asking the question again, and the question has two parts: the flag AND whether
+    // a campaign is even loaded. Scoped to a lower-case receiver, so a prose reference to the field's
+    // home on the type (`UiState.starTourFreeRoam`) is not mistaken for a read of one.
+    pattern: /\b[a-z]\w*\.starTourFreeRoam/,
+    cost:
+      'The mode used to be an app-layer flag set on `openStoryMap` alone, while SIX reducer transitions land ' +
+      'on the chart — so a campaign that reached its chart through a world-clear recap\'s Pro Shop (no ' +
+      '`openStoryMap` anywhere on that route) flew as the records chase, and docking at its spaceport sent ' +
+      "the player to the title's cosmetic Clubhouse instead of their own (GS-startour-chart-mode).",
+  },
+  {
     fact: 'Whether a stored save blob can be read, and why not',
     home: 'src/save/schema.ts',
     answers: 'readSave',
@@ -235,6 +252,7 @@ describe('one decision, one home (GS-one-description)', () => {
       // The literal shape that was copy-pasted into 64 rigs — a hand-built Playwright cache path.
       findChromium: "const bin = join(base, d, 'chrome-linux', 'chrome');",
       holeIsNewToAnimator: 'if (state.play.holeIndex !== animHoleIndex) { animatedShots = 0; }',
+      isStoryChart: 'const worlds = state.starTourFreeRoam ? STATIC_COURSES : storyWorlds(state.story);',
       readSave: 'if (s.version !== SAVE_VERSION) return defaultSave();',
     };
     for (const row of REGISTER) {

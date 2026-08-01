@@ -283,6 +283,13 @@ export interface UiState {
   /** STAR TOUR (GS-star-tour): the course + weather the player has selected on the star map, carried
    *  from `pickStarTourCourse` through character select into `startRun`. Transient (not persisted). */
   starTourPick?: { courseId: string; effect?: string };
+  /** GS-startour-chart-mode: the star chart (`starTour`) is being flown as FREE-ROAM Star Tour — the
+   *  records chase, or a champion's reward — rather than as the Story Tour campaign navigator. Armed by
+   *  `openStarTour` (the one door into free roam) and disarmed by the doors into a campaign
+   *  (`openStory` / `storyContinueCampaign` / `openStoryMap`) and by `toTitle`; every other transition
+   *  onto the chart inherits it through `...state`, which is the whole point — read it ONLY through
+   *  `ui/starTourMode.ts`. Transient (never persisted). */
+  starTourFreeRoam?: boolean;
   /** STAR TOUR (GS-star-tour): the just-finished round's banked record — shown on the strokeResult recap
    *  with `strokeIsRecord` (did it set a NEW course best?). Transient. */
   lastStrokeRecord?: StrokePlayRecord;

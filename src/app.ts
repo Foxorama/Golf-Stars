@@ -102,7 +102,7 @@ import { MARKET_SECTION_IDS, marketView, tradeMarketScreen } from './app/marketS
 import { clubhouseHallScreen, clubhouseScreen, clubhouseView, type ClubSlot } from './app/clubhouseScreens';
 import { travelScreen, travelView } from './app/travelScreens';
 import { asgardMapScreen, asgardResultScreen, asgardLiveBoardHTML } from './app/asgardScreens';
-import { starTourScreen, starTourChampionScreen, starTourView, starTourWorlds, starTourShipSpeedMult, starTourShipHovers, starTourFuelHTML, STAR_TOUR_FUEL_CAP, starTourAmmoHTML, WEAPON_AMMO_CAP, yggdrasilArmed, tourShipId } from './app/starTourScreens';
+import { starTourScreen, starTourChampionScreen, starTourView, starTourWorlds, starTourShipSpeedMult, starTourShipHovers, starTourFuelHTML, STAR_TOUR_FUEL_CAP, starTourAmmoHTML, WEAPON_AMMO_CAP, yggdrasilArmed, tourShipId, inStoryTour } from './app/starTourScreens';
 import { tourWeaponFor, shotInnerSVG, type WeaponStyle } from './render/shipWeapons';
 import { strokeResultScreen, strokePlayProgressHTML } from './app/strokeResultScreens';
 import { storyHubScreen, storyResultScreen, storyGolferPickerHTML } from './app/storyScreens';
@@ -363,12 +363,12 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
     case 'storymap': {
       // GS-story-map: reach the galaxy star map in STORY mode the honest way — play the prologue to Chapter
       // 1, continue to the spaceport clubhouse, then open the chart (which reuses the Star Tour screen with
-      // the story context). Exercises world unlock-by-chapter + the map render. The app-layer `storyMode`
-      // flag is set by the dispatch handler on `openStoryMap`, so drive it through a real dispatch below.
+      // the story context). Exercises world unlock-by-chapter + the map render. Nothing to flag by hand:
+      // the chart's mode is `UiState.starTourFreeRoam` (GS-startour-chart-mode), so a state built by
+      // `reduce` carries it exactly as a played session would.
       const hub = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
       const result = reduce(reduce(hub, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' });
       const club = reduce(result, { type: 'storyRoundContinue' });
-      starTourView.storyMode = true; // dispatch normally sets this; the deep-link builds state directly
       return reduce(club, { type: 'openStoryMap' });
     }
     case 'storyqualpick': {
@@ -379,7 +379,6 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const hub0 = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
       const hub = hub0.story ? { ...hub0, story: { ...hub0.story, campaignSeed: 'q6' } } : hub0;
       const ch1 = reduce(reduce(reduce(hub, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' }), { type: 'storyRoundContinue' });
-      starTourView.storyMode = true; // dispatch normally sets this; the deep-link builds state directly
       const map = reduce(ch1, { type: 'openStoryMap' });
       starTourView.selectedId = 'verdant2-18';
       return map;
@@ -393,7 +392,6 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const hub1 = reduce(afterProl, { type: 'storyRoundContinue' });
       const world = reduce(pastLore(reduce(hub1, { type: 'storyPlayWorld', courseId: 'verdant-18' })), { type: 'play' });
       const hub2 = reduce(world, { type: 'storyRoundContinue' });
-      starTourView.storyMode = true; // dispatch normally sets this; the deep-link builds state directly
       const map = reduce(hub2, { type: 'openStoryMap' });
       return reduce(map, { type: 'openStoryShop', worldId: 'verdant-18' });
     }
@@ -555,7 +553,6 @@ function jumpToScreen(title: UiState, s: UiState, screen: string): UiState {
       const hub0 = reduce(reduce(title, { type: 'openStory' }), { type: 'selectCharacter', characterId: CHARACTERS[0]!.id });
       const afterProl = reduce(reduce(hub0, { type: 'storyPlayWorld', courseId: 'standrews-18' }), { type: 'play' });
       const hub1 = reduce(afterProl, { type: 'storyRoundContinue' });
-      starTourView.storyMode = true; // dispatch normally sets this; the deep-link builds state directly
       const map = reduce(hub1, { type: 'openStoryMap' });
       return reduce(map, { type: 'openShipInterior' });
     }
@@ -687,15 +684,14 @@ function dispatch(action: Action): void {
     // roster; reset the star map's whole view (selection, weather, ship at the spaceport) so a fresh
     // tour docks at home and re-centres on the port.
     // GS-story-map: Story Mode's "Set course" (openStoryMap) flies the SAME galaxy star map as the campaign
-    // navigator — reset the view identically, and flag `storyMode` so the chart plots the story's charted
-    // worlds, flies the campaign ship, and exits to the clubhouse (openStarTour clears the flag → the
-    // records chase). `leaveAsgard→starTour` is the records chase (no Story map returns via Asgard).
+    // navigator — reset the VIEW identically (camera, ship, weather, dossier). WHICH chart it is is no
+    // longer decided here: that is `UiState.starTourFreeRoam`, owned by the reducer, because six
+    // transitions land on the chart and only two of them pass through this block (GS-startour-chart-mode).
     if (
       action.type === 'openStarTour' ||
       action.type === 'openStoryMap' ||
       (action.type === 'leaveAsgard' && state.screen === 'starTour')
     ) {
-      starTourView.storyMode = action.type === 'openStoryMap';
       starTourView.selectedId = null;
       starTourView.effect = 'none';
       // GS-story-qualifier-partner-pick: partner picks are per-chart-session view state, like the weather —
@@ -2681,11 +2677,14 @@ function stepStarTour(): void {
       }
       if (v.dockingAtPort) {
         // Docked home at the spaceport (GS-star-tour-port) → the map's way out. In STORY mode that's the
-        // Story spaceport clubhouse (`exitStoryMap`), NOT the title cosmetic Clubhouse (the routing bug).
+        // campaign's OWN spaceport clubhouse (`exitStoryMap`), never the title's cosmetic Clubhouse hall.
+        // Asked through `inStoryTour()` — the ONE seam (GS-startour-chart-mode); this used to re-derive
+        // it from an app-layer flag plus `state.story`, and got the answer wrong on every route onto the
+        // chart that did not pass through `openStoryMap`.
         v.dockingAtPort = false;
         stAnim.raf = 0;
         sfx.click();
-        dispatch(v.storyMode && state.story ? { type: 'exitStoryMap' } : { type: 'openClubhouseHall' });
+        dispatch(inStoryTour() ? { type: 'exitStoryMap' } : { type: 'openClubhouseHall' });
         return;
       }
       if (v.flyingToYggdrasil) {
