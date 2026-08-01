@@ -1865,6 +1865,50 @@ movie ending where we list each character and what they're getting up to afterwa
     Guarded by `tests/story-credits.test.ts` + two deep-link smokes and a crawl/reachability test in
     `tests/build.test.ts`.
 
+## Phase P — which chart am I flying? (GS-startour-chart-mode)
+
+*The player's report: "when you go to the spaceport it takes you to the title screen's clubhouse instead of
+the Story Tour warden/coil clubhouse."*
+
+- **GS-startour-chart-mode** — ✅ *shipped* (`ui/starTourMode.ts` the pure pair · `ui/gameState.ts` the
+  field · `ui/game.ts` the four doors · `app/starTourScreens.ts` + `app.ts` the callers).
+  - **The chart is one screen serving two modes**, and which one it is decides the worlds plotted, the ship
+    flown, the HUD pod, and where the SPACEPORT drops you — `exitStoryMap` (your campaign's own spaceport
+    clubhouse) or `openClubhouseHall` (the title's cosmetic hall). The answer lived on
+    `starTourView.storyMode`, an app-layer flag assigned in exactly ONE place: app.ts's dispatch handler,
+    on `openStoryMap`.
+  - **But SIX reducer transitions land on `screen: 'starTour'`, and three of them never pass through
+    that handler.** `exitStoryShop`, `exitStoryShipyard` and `exitShipInterior` all return to the chart —
+    and since GS-story-venue-services the Pro Shop and the shipyard are reachable from the **world-clear
+    RECAP**, so `storyResult → openStoryShop → exitStoryShop` is `starTour` with no `openStoryMap`
+    anywhere along it. A campaign whose round started at the clubhouse (a quest, a tournament banner, a
+    round resumed at boot) and which then used the recap's own shop button arrived on its chart flagged as
+    the records chase. Docking flew the player to the title Clubhouse. `leaveAsgard` was worse: it set the
+    flag to *false* outright, so playing Asgard off a story chart's World Tree corrupted the mode on the
+    way back.
+  - **So the answer moved into `UiState` and rides the `...state` spread.** `starTourFreeRoam` is
+    transient (never persisted, no save bump) and only the DOORS declare it: `openStarTour` arms free roam,
+    and the three doors into a campaign (`openStory` / `storyContinueCampaign` / `openStoryMap`) plus
+    `toTitle` disarm it. Every other route onto the chart — character select, the champion picker, a
+    service exit, `leaveAsgard` — inherits it, which is the whole point: a transition nobody thought about
+    can no longer disagree with the chart it lands on.
+  - **The default is the campaign navigator, deliberately.** `isStoryChart` is `!!story && !freeRoam`, so a
+    route somebody forgets lands on the safe side of the reported bug rather than back inside it. It is
+    safe because `openStarTour` is the ONE door into free roam — character select, the champion picker and
+    a post-round "Star map" all flow from it — so free roam is never reached without arming.
+  - **`state.story` alone can never answer this**, which is why a flag exists at all: a Star Tour CHAMPION
+    is a completed campaign loaded into `state.story` (GS-story-startour-champions), so the free-roam
+    reward and the campaign navigator both hold one.
+  - **Four deep-links stopped lying.** `?screen=storymap|storyqualpick|storyshop|shipinterior` each carried
+    a hand-set `starTourView.storyMode = true` with a comment explaining that the flag is normally set by
+    dispatch — four copies of the same fact, and the clearest possible sign it was living in the wrong
+    place. They build state with `reduce`, so they now carry the mode exactly as a played session does.
+  - Guarded by `tests/startour-chart-mode.test.ts` (the real reducer walked down each broken route, plus
+    the free-roam control) and a **register row** in `tests/one-description.test.ts` banning any second
+    read of the field outside `ui/starTourMode.ts`. Verified end-to-end in a real browser: on the recap →
+    Pro Shop → chart route the HUD pod reads `‹ CLUBHOUSE Chapter 1/5` and docking lands on `🚀 Clubhouse`;
+    free roam still reads `✦ STAR TOUR` and docks at `🏠 The Clubhouse`.
+
 ## Open questions / deferred (revisit as chunks land)
 - **A genuinely-new gas-giant BIOME** (play on gas cloud-tops) — the player's optional "if we need to add
   more" ask. Deferred as its OWN focused session: a new `BiomeArchetype` fans out to ~16 compile-forced

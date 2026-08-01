@@ -1644,6 +1644,21 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     yggdrasil, shown only once Thor's Hammer is owned; Asgard is the only playable realm, others are
     data-flip placeholders). `intro`/`strokeResult` are strokeplay-branched; deep-linkable + guarded by
     `tests/startour-flow.test.ts`. Re-shoot `scripts/startour-preview.mjs`.
+    **WHICH CHART YOU ARE FLYING IS A FACT ABOUT `UiState`, NOT A FLAG ON THE VIEW** (GS-startour-chart-mode,
+    `ui/starTourMode.ts isStoryChart` · `UiState.starTourFreeRoam`). ONE screen serves the free-roam records
+    chase and the Story campaign navigator, and the answer decides the worlds, the ship, the HUD and where
+    the SPACEPORT drops you — your campaign's clubhouse (`exitStoryMap`) or the title's cosmetic hall
+    (`openClubhouseHall`). It used to be `starTourView.storyMode`, assigned in ONE place (on `openStoryMap`)
+    while **SIX reducer transitions land on the chart**: `exitStoryShop`/`exitStoryShipyard`/
+    `exitShipInterior` all return there, and since GS-story-venue-services the shop and shipyard open from
+    the world-clear RECAP — so `storyResult → shop → back` reached the chart with no `openStoryMap` on the
+    route, and a campaign docked at its own spaceport landed on the TITLE Clubhouse (`leaveAsgard` was
+    worse: it cleared the flag outright). Now only the DOORS declare it — `openStarTour` arms free roam,
+    `openStory`/`storyContinueCampaign`/`openStoryMap`/`toTitle` disarm it — and every other route inherits
+    it through `...state`. **The default is the campaign navigator**, so a forgotten route lands on the safe
+    side; safe because `openStarTour` is the only door into free roam. `state.story` can NEVER answer this
+    alone — a Star Tour champion is a loaded campaign too. Transient, no save bump. Four deep-links dropped
+    their hand-set copies of the flag. Guarded by `tests/startour-chart-mode.test.ts` + a register row.
   - **The finale battle has TWO bosses, one engine** (GS-story-battle-3 / GS-story-warden-ark,
     `render/storyBattle.ts`): the Warden fights **Jörmungandr**; the Herald fights the **Warden Ark**, the
     Order's capital ship holding the root (`render/wardenArk.ts`) — you cannot make the player shoot the

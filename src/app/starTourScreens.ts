@@ -36,6 +36,7 @@ import { shopItem } from '../sim/rpg/economy';
 import { formatToPar, toParColour } from '../sim/rpg/endless';
 import { shipForCharacter } from '../ui/gameCosmetics';
 import { currentRoster } from '../ui/game';
+import { isStoryChart, isChampionFreeRoam } from '../ui/starTourMode';
 import { championCampaigns } from '../sim/rpg/storyRoster';
 import type { StoryState } from '../sim/rpg/story';
 import { golferPreviewSVG } from '../render/apparelArt';
@@ -80,10 +81,6 @@ export interface StarTourRefuel {
 
 /** View state for the star map (mutated by app.ts; reset on entry). */
 export const starTourView = {
-  /** GS-story-map: the star map is being flown as the STORY campaign navigator (worlds gated by chapter,
-   *  story ship + credits, a clubhouse exit) rather than the free-roam records chase. Set by app.ts on
-   *  `openStoryMap`, cleared on `openStarTour`. */
-  storyMode: false,
   /** The world whose dossier is open, or null. */
   selectedId: null as string | null,
   /** The weather sky chosen for the round (a CourseEffectId). */
@@ -160,15 +157,17 @@ const RARITY_SPEED_MULT: Record<CosmeticRarity, number> = {
   mythic: 1.3,
 };
 
-/** GS-story-map: is the star map the STORY campaign navigator (vs the records chase)? */
+/** GS-story-map: is the star map the STORY campaign navigator (vs the records chase)? The answer lives
+ *  in `UiState` (GS-startour-chart-mode) — these are the ambient-state wrappers over the ONE pure pair,
+ *  so no surface re-derives "am I in a campaign?" from `state.story` plus a local flag. */
 export function inStoryTour(): boolean {
-  return !!starTourView.storyMode && !!state.story;
+  return isStoryChart(state);
 }
 /** GS-story-startour-champion: free-roam Star Tour played as the DEVELOPED champion (a completed campaign
  *  is playing its reward free-roam, NOT the campaign navigator). The champion + developed ship are fixed,
  *  so the chart flies the earned Story ship and drops the records-chase "change golfer" swap. */
 export function championFreeRoam(): boolean {
-  return !inStoryTour() && !!state.story?.completed;
+  return isChampionFreeRoam(state);
 }
 /** The active golfer id on the chart — the story protagonist in story mode, else the run's golfer. */
 function tourCharacterId(): string | undefined {

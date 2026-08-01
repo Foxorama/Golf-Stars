@@ -664,6 +664,10 @@ export function reduce(state: UiState, action: Action): UiState {
         // as Larry can never hijack the "Continue" of a Feather campaign left mid-chapter.
         ...(champion ? { story: champion } : {}),
         screen: champion || keepGolfer ? 'starTour' : 'character',
+        // GS-startour-chart-mode: THE door into free roam — every other route onto the chart (character
+        // select, the champion picker, a service exit, `leaveAsgard`) inherits this through `...state`,
+        // so the chart can never disagree with itself about which mode it is.
+        starTourFreeRoam: true,
         starTourPick: undefined,
         played: undefined,
         lastResult: undefined,
@@ -736,6 +740,9 @@ export function reduce(state: UiState, action: Action): UiState {
       return {
         ...state,
         screen: 'character',
+        // GS-startour-chart-mode: a door into a CAMPAIGN, so the chart is the campaign navigator again —
+        // a free-roam session left armed would send this campaign's spaceport to the title Clubhouse.
+        starTourFreeRoam: undefined,
         pendingStoryNew: true,
         storyInspectId: undefined,
         storyOverwriteId: undefined,
@@ -750,7 +757,9 @@ export function reduce(state: UiState, action: Action): UiState {
       if (state.screen !== 'character' && state.screen !== 'title' && state.screen !== 'story') return state;
       const saved = campaignFor(state.campaigns, action.characterId);
       if (!saved) return state;
-      const base = { ...state, pendingStoryNew: false, storyInspectId: undefined, storyOverwriteId: undefined };
+      // GS-startour-chart-mode: the OTHER door into a campaign — `resume` routes a parked story round
+      // straight here, bypassing `openStory`, so it has to disarm free roam itself.
+      const base = { ...state, starTourFreeRoam: undefined, pendingStoryNew: false, storyInspectId: undefined, storyOverwriteId: undefined };
       // GS-story-quality (finding A): The Choice is reached only via the transient tournament-result
       // screen (neither it nor `lastStoryTournament` is persisted), so quitting mid-dismiss after the
       // Chapter-3 win would silently railroad you onto the default Warden route AND skip the Chapter-4
@@ -941,7 +950,9 @@ export function reduce(state: UiState, action: Action): UiState {
       // context — app.ts's dispatch handler flags `starTourView.storyMode` so the chart plots the campaign's
       // charted worlds + flies the story ship.
       if ((state.screen !== 'story' && state.screen !== 'storyResult') || !state.story) return state;
-      return { ...state, screen: 'starTour', lastStoryRound: undefined };
+      // GS-startour-chart-mode: state the mode outright, even though the campaign doors already did —
+      // this is the action that NAMES the campaign navigator, and it is the one a reader looks for.
+      return { ...state, screen: 'starTour', starTourFreeRoam: undefined, lastStoryRound: undefined };
     }
 
     case 'exitStoryMap': {
@@ -2637,6 +2648,11 @@ export function reduce(state: UiState, action: Action): UiState {
         pendingStoryNew: false,
         storyInspectId: undefined,
         storyOverwriteId: undefined,
+        // …and the star chart's mode (GS-startour-chart-mode). `toTitle` is the ONE exit every screen's
+        // settings sheet lands on, so clearing it here is what stops a free-roam session claiming the
+        // NEXT campaign's chart — and the campaign navigator is the default, so this is also the safe
+        // side to leave it on.
+        starTourFreeRoam: undefined,
         // …and the per-mode picker's own confirm, for the same reason: carried onto the title it
         // would let the NEXT mode's first `selectCharacter` overwrite a slot without asking.
         slotOverwriteId: undefined,
