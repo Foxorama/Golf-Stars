@@ -939,6 +939,26 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     honest 1-and-roll on all 40 green rows. **Render-only — no sim module imports `runout.ts`, zero
     carry moved, the harness has nothing to weigh.** Guarded by `tests/runout.test.ts`; eyes-on
     `scripts/landing-preview.mjs` (which now passes `ballYd`, so the sheet shows what SHIPS).
+  - **⚠️ THE LANDING PUSH-IN IS RETIRED — `landingZoom` IS 1** (play-tested and rejected: *"the weird
+    zoom on ball flight ending is weird… it takes the focus completely away from where the ball is
+    ending"*). It reasoned correctly about SCALE and ignored the cost: a camera moving through the
+    landing is one the eye must re-acquire the ball against, at the moment it is reading a small fast
+    arc. Three passes measured the bounce getting bigger and none could see it getting harder to watch.
+    **The DEAD-ZONE hold stays** — that is not a zoom, it is the camera ceasing to chase the ball, and it
+    is the actual fix. At the flight camera the driver still draws **4 bounces, first lift 11.2px over a
+    2.3px ball** against the ~5.3px of the last state the play-test called good, and the ball now travels
+    the full 61px instead of being pinned. Cost: the part-power tail (`D @0.85` → 3), so the band is
+    asserted on a FULL swing, which is what it always described. `landingZoomFor` + the constant are kept
+    DORMANT (the rig measures through `GS_LANDING_ZOOM`, `_gsFeel` makes a gentler version a console
+    line); a test pins the shipped 1 so it cannot return by drift. **THE ROOT CAUSE, five passes back:
+    #612 fixed the arrival speed 0.0067 → 0.28 yd/ms (42×) — a real bug, and accidentally the entire
+    reason the bounce read well, since a hop's duration is `distance/speed` and every hop became 1/42 as
+    long.** Seven subsequent passes compensated in height, length, count and scale; the only one that
+    mattered was the dead-zone camera, because it was the only one addressing what the fix destroyed —
+    the ball's MOTION through the bounce, not its size. **When a fix upstream silently removes the thing
+    that was making a feature work, no amount of tuning the feature will find it.** Full story in
+    `docs/decisions/putting.md`. The bullet below is kept for the machinery it describes, which is still
+    live and still the seam both the camera and `ballYd` read.
   - **THE LANDING IS WATCHED FROM THE LANDING** (GS-landing-camera, `RunoutFeel.landingZoom` ·
     `landingZoomFor`). Four passes read *"there's no ball bounce visible anywhere"* as a question about the
     bounce MODEL and each found a real fault in it; the model was never the problem. `decisionReach` frames

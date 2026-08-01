@@ -335,7 +335,18 @@ export const DEFAULT_RUNOUT_FEEL: RunoutFeel = {
   runoutTimeScale: 0.30,
   runoutMinMs: 340,
   runoutMaxMs: 3000,
-  landingZoom: 0.34,
+  // 1 = NO PUSH-IN. Play-tested and rejected: *"the weird zoom on ball flight ending is weird, can we
+  // get rid of that? it doesn't start zooming till way too late in the flight and takes the focus
+  // completely away from where the ball is ending."* The push-in bought the bounce three times the
+  // pixels, and it cost more than it bought — a camera moving through the landing is a camera the eye
+  // has to re-acquire the ball against, at exactly the moment it is trying to read a small fast arc.
+  //
+  // It is kept at 1 rather than deleted because it is the one lever that trades camera movement for
+  // drawn scale, the whole rig measures through it (`GS_LANDING_ZOOM=…`), and it is live on `_gsFeel`
+  // — so a gentler version can be tried in one console line instead of a rewrite. The DEAD-ZONE hold
+  // it shares a gate with stays ON: that is not a zoom, it is the camera stopping chasing the ball, and
+  // it is what lets a skip travel across the frame at all.
+  landingZoom: 1,
   landingMinRadiusYd: 20,
   landingZoomLeadMs: 300,
   landingZoomEase: 0.12,
