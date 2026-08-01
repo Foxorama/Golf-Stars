@@ -81,6 +81,13 @@ weather, real astronomy). **The two projects are independent. Do not re-couple t
   End-of-session/one-off reports go in `reports/<topic>-YYYY-MM-DD.md`.
 - Keep a living `IDEAS.md` backlog (scan, rerank, merge, retire — not append-only). Stable IDs,
   never reused. Move shipped → Done (link PR), bad → Dropped (say why).
+- `DEVLOG-IDEAS.md` is the same living doc for devlog posts (`DL-*` ids, published → link). An entry
+  earns its place by having **material** — the specific thing that happened, and where the evidence
+  is — never a topic. Two standing rules it exists to enforce: **state facts, don't argue** (the AI
+  question attracts a defensive register, and an argument invites one back), and **check the claim
+  against the code before publishing it** — a wrong-but-better story once reached a chat summary, a
+  commit message, a PR body and a source comment on `main` before anyone re-read the file
+  (`DL-guard-caught-it`).
 
 ## Three lenses (read every change through these)
 This game lives or dies on three axes — put every change through all three before calling it done:

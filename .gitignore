@@ -28,3 +28,13 @@ vite.config.ts.timestamp-*.mjs
 
 # Scratch output from the preview/measurement scripts (screenshots, probe dumps).
 .tmp/
+
+# Claude Code local state. `.claude/skills/` IS tracked on purpose — a repo skill is shared work —
+# so these are named individually rather than ignoring `.claude/` wholesale.
+#   launch.json  — the preview-server config, and it holds an ABSOLUTE path to whichever node this
+#                  machine uses (node is not on PATH here). Committing it breaks the preview for
+#                  anyone else and puts a home directory in a public repo.
+#   worktrees/   — throwaway checkouts. This was only in `.git/info/exclude`, which is per-clone and
+#                  travels with nobody, so a fresh clone had nothing stopping it committing one.
+.claude/launch.json
+.claude/worktrees/
