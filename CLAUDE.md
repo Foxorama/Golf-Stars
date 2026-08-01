@@ -967,6 +967,33 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     hand-set 4.6 px/yd while the game drew 1.6, i.e. it was honest about the model and silently wrong about
     the picture. It takes the camera from the shipped constant now. Guarded by `tests/runout.test.ts`;
     measured by `scripts/runout-frames.ts` (`GS_LANDING_ZOOM=1` reproduces the reported baseline).
+  - **A BOUNCE THAT DOES NOT TRAVEL IS NOT A BOUNCE** (GS-runout-clock, `runoutCameraTarget` ·
+    `runoutLeashFrac`). Six passes read *"there's no ball bounce visible"* as a question about the bounce
+    MODEL and every one measured green; the yards were right the whole time. The instrument that settled it
+    hooks `drawBall`'s gradient + `drawBallShadow`'s ellipse in a real browser and records both per frame —
+    their difference is the LIFT, the one quantity the camera cannot confuse. It found two things no
+    plan-space rig can see. **The ball never moved forward**: the follow-cam eases at 0.2/frame, which the
+    ball outruns in flight and NOT AT ALL on the ground, so the whole run-out was drawn as *the world
+    scrolling behind a pinned ball* — total screen travel over the closing roll, **2.6 pixels** — leaving a
+    14px vertical bob in place. And **the hops were played at 100ms, not their planned 130**: `sampleRunout`
+    maps `t` over the RAW hop+roll total while the play view drives off `totalMs`, so a run-out tripping
+    `runoutMaxMs` plays uniformly faster and the compression lands on the hops, which sit on `hopMinMs` and
+    have no slack. (`runout-frames.ts` had been printing `timeBase 0.65` throughout, read as "a uniform
+    stretch (harmless)".) So the camera **LETS GO at touchdown** — a dead-zone camera holding the pitch mark
+    inside a leash of 0.3 frames and dragged along past it, so a monster run-out can never leave the frame —
+    and `runoutMaxMs` 2300 → **3000** (a safety net, never a pacing dial; a test pins that every family's
+    full-power shot fits under it) with `hopMinMs` 130 → **100**. Measured in game: roll travel **2.6 →
+    60px**, roll step **0.004 → 1.17 px/frame**, hops compressed **40/40 → 0/40**; the LIFTS are unchanged,
+    which is the point. ⚠️ **Trimming the ROLL to fit instead is the obvious fix and it is WRONG** — the
+    roll's duration is `2·rollDist/vLast`, pinned by the speed it inherits, so shortening it makes the ball
+    ACCELERATE out of its last bounce (caught by the hop→roll join guard within a minute). Uniform
+    compression is the only step-free way to shorten a run-out, so the fix had to be to stop needing one.
+    A still camera also lets the scene cache hold (GS-shot-lag), so this is the one part of a shot that can
+    run at full frame rate. **⚠️ THE LESSON, NOW THREE DEEP**: `landing-preview.mjs` drew at a camera the
+    game does not use, `runout-frames.ts` reasons in the plan's own units and cannot see a camera cancelling
+    the motion it measures — **neither rig could have found this and both reported success.** When a report
+    survives a fix that measured green, stop improving the measurement of the MODEL and go measure the
+    PICTURE. Guarded by `tests/runout.test.ts`.
   - **HOW MANY TIMES A BALL SKIPS IS A PROPERTY OF THE CLUB** (GS-bounce-ladder,
     `RunoutClassProfile.hops` · `RunoutFeel.trainSustain`). The play-test's ladder — driver 4-6 ▸ wood 3-5 ▸
     hybrid 2-4 ▸ long iron 1-3 ▸ short iron 1-2 ▸ wedge 0-1 — had no home: `hopMax` was ONE number for the

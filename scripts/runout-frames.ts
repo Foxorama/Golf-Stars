@@ -36,6 +36,10 @@ const HEIGHT_EXAGGERATION = 0.55;
 // re-runs the sheet at the FLIGHT camera, which is what the run-out was drawn at before
 // GS-landing-camera — i.e. it reproduces the reported "no bounce anywhere" baseline.
 const LANDING_ZOOM = Number(process.env.GS_LANDING_ZOOM ?? DEFAULT_RUNOUT_FEEL.landingZoom);
+// ⚠️ `timeBase` below is NOT cosmetic. It is `totalMs / raw`, i.e. how much the `runoutMaxMs` ceiling
+// compresses the run-out — and it compresses the HOPS, which are already sitting on `hopMinMs`. A row
+// under 1 is a row whose bounces are being played below the shortest duration that can be watched.
+// This was printing 0.65 for a driver while the bounce was being reported invisible (GS-runout-clock).
 const HOP_DRAW_BOOST = DEFAULT_RUNOUT_FEEL.hopDrawBoost;
 const FRAME_MS = 1000 / 60;
 // The measured camera band (GS-ball-art): ~0.5-5.7 px/yd for shots. A drive watches from far out, an
@@ -192,12 +196,13 @@ for (const firm of [0.85, 0.45]) {
     const want = WANT[flightClassOf(r.club)]!;
     const short = !judged ? '' : r.visibleHops < want[0] ? '  <== TOO FEW BOUNCES' : r.visibleHops > want[1] ? '  <== too many' : '';
     const still = r.hopPxPerFrame < MOVING_PX_PER_FRAME ? '  <== NOT MOVING' : '';
+    const squashed = r.timeBaseSkew < 0.99 ? '  <== HOPS COMPRESSED' : '';
     console.log(
       `  ${r.club.padEnd(4)} ${r.power.toFixed(2)} ${r.carry.toFixed(0).padStart(6)} ${r.roll.toFixed(1).padStart(6)}  ` +
         `${flightClassOf(r.club).padEnd(10)} ${String(r.hops).padStart(4)} ${String(r.visibleHops).padStart(5)} ` +
         `${(want[0] + '-' + want[1]).padStart(5)} ${r.peakPx.toFixed(1).padStart(8)} ${r.ballPx.toFixed(1).padStart(7)} ` +
         `${r.runPx.toFixed(0).padStart(7)} ${r.hopPxPerFrame.toFixed(2).padStart(6)} ${(r.hopShare * 100).toFixed(0).padStart(4)}% ` +
-        `${r.runoutMs.toFixed(0).padStart(9)} ${r.timeBaseSkew.toFixed(2).padStart(9)}${short}${still}`,
+        `${r.runoutMs.toFixed(0).padStart(9)} ${r.timeBaseSkew.toFixed(2).padStart(9)}${short}${still}${squashed}`,
     );
   }
   if (judged) {
@@ -209,6 +214,8 @@ for (const firm of [0.85, 0.45]) {
   } else {
     console.log(`\n  (bounce band not judged on soft ground — the surface is meant to kill the train)`);
   }
+  const squashedRows = rows.filter((r) => r.timeBaseSkew < 0.99);
+  console.log(`  run-outs whose HOPS are compressed by the runoutMaxMs ceiling: ${squashedRows.length}/${rows.length}`);
   const crawling = rows.filter((r) => r.hopPxPerFrame < MOVING_PX_PER_FRAME);
   console.log(`  run-outs drawn under ${MOVING_PX_PER_FRAME}px/frame (reads as stationary): ${crawling.length}/${rows.length}`);
   const noBounce = rows.filter((r) => r.visibleHops === 0 && flightClassOf(r.club) !== 'wedge');

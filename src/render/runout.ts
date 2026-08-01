@@ -103,9 +103,24 @@ export interface RunoutFeel {
    *  behind a drive. See `Landing.ballYd`. */
   hopMinYd: number;
   hopMax: number;
-  /** Floor on a single hop's DURATION (ms). A wedge's hop is under a yard, which at the run-out's own
-   *  time base is ~70ms — four frames, and you see nothing. The floor only bites on hops that are too
-   *  brief to watch, and on those the ball is going UP more than forward anyway. */
+  /**
+   * Floor on a single hop's DURATION (ms). A wedge's hop is under a yard, which at the run-out's own
+   * time base is ~70ms — four frames, and you see nothing. The floor only bites on hops that are too
+   * brief to watch, and on those the ball is going UP more than forward anyway.
+   *
+   * 130 → 100 by GS-runout-clock. Six frames of arc, and it reads: what made the late skips
+   * unwatchable was never their duration but the fact that the camera was tracking the ball, so they
+   * had no forward travel to read against (see `runoutLeashFrac`). Shortening them is what makes the
+   * TAIL of the train skip along instead of crawling — the fifth hop goes from 0.73 to 0.95 px per
+   * frame — and it buys ~120ms of headroom under `runoutMaxMs`, whose compression is the other half
+   * of that report.
+   *
+   * ⚠️ The saving comes ENTIRELY out of the hops, and an earlier draft of this comment claimed
+   * otherwise — that the floor was "paid for twice", the second time by lengthening the roll. It is
+   * not: the roll enters at whichever is SLOWER of the chained speed and the last hop's drawn speed,
+   * and on a driver that is the chained speed either way, so the roll does not move. Measured, and
+   * pinned by a test, because the plausible version of this was wrong.
+   */
   hopMinMs: number;
   /** SAFETY NET for the first hop: at least this share of the run-out, up to `hopFloorMax` yards. A
    *  wedge's modelled skip is a few inches — true, and unwatchable; the ball has to be SEEN to land.
@@ -194,7 +209,14 @@ export interface RunoutFeel {
    * camera — a ball you can watch skip and settle, still 2.5x slower than the flight it arrived on.
    */
   runoutTimeScale: number;
-  /** Clamp on the whole run-out's animation (ms). */
+  /**
+   * Clamp on the whole run-out's animation (ms).
+   *
+   * `runoutMaxMs` is a SAFETY NET for a monster run-out (an ice-world runner, a derelict carom), not a
+   * pacing dial — see the note where it is applied. When it bites it compresses the hops along with
+   * everything else, and the hops are the part with no slack; a test pins that a full-power driver on
+   * a firm fairway comes in under it.
+   */
   runoutMinMs: number;
   runoutMaxMs: number;
   /**
@@ -241,6 +263,29 @@ export interface RunoutFeel {
    *  from exactly the players who asked for less motion, which is the trade `accessibility.md` forbids
    *  — so it has to be a glide rather than a snap. */
   landingZoomEase: number;
+  /**
+   * THE CAMERA LETS GO OF THE BALL WHEN IT LANDS (GS-runout-clock) — how far, as a fraction of the
+   * frame's height, the ball may travel from its pitch mark before the camera starts moving again.
+   *
+   * A skip reads as a skip because the ball ARCS FORWARD. The follow-cam eases toward the ball at 0.2
+   * a frame, which the ball outruns easily in flight and not at all on the ground — so through the
+   * entire run-out it was pinned to the focus point and the forward travel was drawn as *the world
+   * scrolling behind a stationary ball*. Traced out of the real canvas, the ball's screen x over a
+   * driver's whole landing went 238 → 196 (all of it the camera's lag decaying) and then did not move
+   * again. What was left of a bounce was a fourteen-pixel vertical bob, in place, for a third of a
+   * second. That is the *"still no bouncing on screen"* report, and it is invisible to any model that
+   * reasons in course yards — the yards were right the whole time.
+   *
+   * So the landing camera, which is already framed FOR the landing, holds still and lets the ball skip
+   * across it. This is a dead-zone camera, and the leash is what keeps a monster run-out (an ice world
+   * runner, a derelict carom) from walking off the top of the frame: past it the camera is dragged
+   * along, so the ball can never leave. Zero is not an option and neither is 1 — hold everything and a
+   * long roll exits the frame; hold nothing and you are back to the pinned ball.
+   *
+   * It also pays for itself twice: a camera that is not moving lets the static-scene cache hold
+   * (GS-shot-lag), so the run-out is the one part of a shot that can run at full frame rate.
+   */
+  runoutLeashFrac: number;
   /** Backspin: forward skid on the bounce as a fraction of the eventual check-back distance + a cap. */
   backspinSkidFrac: number;
   backspinSkidMax: number;
@@ -261,7 +306,7 @@ export const DEFAULT_RUNOUT_FEEL: RunoutFeel = {
   hopMinYd: 0.35,
   trainSustain: 1.1,
   hopMax: 6,
-  hopMinMs: 130,
+  hopMinMs: 100,
   hopFirstMinShare: 0.35,
   hopFloorMax: 2.5,
   apexOverLenMin: 0.12,
@@ -278,11 +323,12 @@ export const DEFAULT_RUNOUT_FEEL: RunoutFeel = {
   rollEntryFloor: 0,
   runoutTimeScale: 0.30,
   runoutMinMs: 340,
-  runoutMaxMs: 2300,
+  runoutMaxMs: 3000,
   landingZoom: 0.34,
   landingMinRadiusYd: 20,
   landingZoomLeadMs: 240,
   landingZoomEase: 0.12,
+  runoutLeashFrac: 0.3,
   backspinSkidFrac: 0.55,
   backspinSkidMax: 7,
   backspinMsPerYd: 55,
@@ -496,6 +542,31 @@ export function landingZoomFor(viewRadius: number | undefined, feel: RunoutFeel 
   return clamp(Math.max(feel.landingZoom, feel.landingMinRadiusYd / viewRadius), feel.landingZoom, 1);
 }
 
+/**
+ * Where the camera should look while the ball runs out (GS-runout-clock) — a dead-zone camera.
+ *
+ * Given the pitch mark, where the ball is now, and how long the leash is IN YARDS, this returns the
+ * point to ease toward: the pitch mark itself while the ball is inside the leash (so the ball visibly
+ * skips ACROSS a still frame, which is the whole point), and a point dragged along behind it once the
+ * ball goes further than that (so a monster roll can never walk off the top).
+ *
+ * Pure, so the leash rule is testable without a browser — the play view supplies the leash in yards by
+ * converting `runoutLeashFrac` through its own projector, because "how far may the ball travel" is a
+ * question about the SCREEN and only the caller knows the scale.
+ */
+export function runoutCameraTarget(
+  pitch: readonly [number, number],
+  ball: readonly [number, number],
+  leashYd: number,
+): [number, number] {
+  const dx = ball[0] - pitch[0];
+  const dy = ball[1] - pitch[1];
+  const d = Math.hypot(dx, dy);
+  if (!(d > leashYd) || !(d > 1e-9)) return [pitch[0], pitch[1]];
+  const k = (d - leashYd) / d;
+  return [pitch[0] + dx * k, pitch[1] + dy * k];
+}
+
 export function apexOverLenFor(descentDeg: number, feel: RunoutFeel = DEFAULT_RUNOUT_FEEL): number {
   const t = Math.tan((clamp(descentDeg, 5, 85) * Math.PI) / 180) / 4;
   return clamp(t, feel.apexOverLenMin, feel.apexOverLenMax);
@@ -639,8 +710,21 @@ export function planRunout(landing: Landing, feel: RunoutFeel = DEFAULT_RUNOUT_F
   // A roll that ends in the CUP keeps some pace: distance = mean speed x time, so the same ground at
   // a higher mean takes less time and the ball is still travelling when it disappears.
   const rollEndFrac = landing.holed ? feel.holedEndSpeed : 0;
-  const rollMs = rollDist > 1e-6 ? (2 * rollDist) / Math.max(0.01, vRoll * (1 + rollEndFrac)) : 0;
+  let rollMs = rollDist > 1e-6 ? (2 * rollDist) / Math.max(0.01, vRoll * (1 + rollEndFrac)) : 0;
 
+  // THE CEILING COMPRESSES EVERY PHASE EQUALLY, AND IT MUST NOT BE ALLOWED TO BITE (GS-runout-clock).
+  //
+  // `sampleRunout` maps `t` onto this raw hop+roll total while the play view drives the animation off
+  // `totalMs`, so a clamped run-out plays uniformly faster than it was planned. Uniform is the ONLY
+  // safe way to shorten it — every phase's speed scales by the same factor, so no join gains a step —
+  // but it is not free: the hops are already sitting on `hopMinMs`, the shortest duration that can be
+  // watched, and the roll has seconds of slack. Measured in game, a driver's hops were being played at
+  // **100ms each instead of 130** while the roll kept 1.9 seconds of the clock.
+  //
+  // ⚠️ Trimming the ROLL alone instead is the obvious fix and it is WRONG: the roll's duration is
+  // `2·rollDist / vLast`, pinned by the speed it inherits, so shortening it makes the ball ACCELERATE
+  // out of its last bounce. `tests/runout.test.ts` catches that at the hop→roll join — which is why
+  // the ceiling is now set high enough not to bite on an ordinary shot rather than made cleverer.
   const raw = hops.reduce((a, h) => a + h.ms, 0) + rollMs;
   const totalMs = D < 0.3 && hops.length === 0 ? 0 : clamp(raw, feel.runoutMinMs, feel.runoutMaxMs);
   return { hops, rollDist, rollMs, totalMs, totalDist: D, rollEndFrac };

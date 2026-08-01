@@ -2216,3 +2216,118 @@ power on a firm fairway; the ladder STEPS (driver > wood > hybrid > short iron >
 never out-skip the global ceiling; the surface still kills the train; the sustain stays modest and can
 never let a contact keep more than it arrived with; and trimming to the class cap still conserves the
 ball's resting place.
+
+---
+
+## GS-runout-clock â€” a bounce that does not travel is not a bounce (2026-08-02)
+
+> *"How do we fix that, because whatever you fixed, wasn't it. There's now a fun zoom feature when the
+> ball is landing, but there's still no bouncing on screen."*
+
+GS-landing-camera and GS-bounce-ladder both measured what they claimed, both shipped, and both left the
+report standing â€” for the same reason the four passes before them did. **Every one of them reasoned in
+course yards.** The yards were right the whole time.
+
+### The measurement that should have been taken six passes ago
+
+Hook `drawBall`'s lit-sphere gradient and `drawBallShadow`'s ellipse in a real browser, run the game to
+a real tee shot, and record both every frame. The shadow is drawn at the ball's GROUND point, so their
+difference is the lift â€” the one quantity the camera cannot confuse. Shipped behaviour, driver:
+
+```
+3851ms  x=238.3  LIFT= 1.4px   â† touchdown
+3901ms  x=226.3  LIFT=14.4px   â† hop 1
+3951ms  x=217.9  LIFT= 1.2px
+4001ms  x=209.9  LIFT= 9.5px   â† hop 2
+4118ms  x=201.8  LIFT= 6.2px   â† hop 3
+4218ms  x=197.6  LIFT= 3.8px   â† hop 4
+4284ms  x=196.2  LIFT= 0.0px   â† â€¦and then MOTIONLESS for 1.9 seconds
+```
+
+The bounces were there, at the sizes the model promised. Two things were destroying them, and neither
+is visible to anything that reasons about the plan:
+
+**1. The ball never moved forward.** Look at the x column: 238 â†’ 196, every pixel of it the follow-cam's
+lag decaying, and then nothing at all. The camera eases toward the ball at 0.2 a frame â€” which the ball
+outruns easily in flight and not at all on the ground â€” so through the whole run-out it was pinned to
+the focus point and its forward travel was drawn as *the world scrolling behind a stationary ball*.
+**A skip reads as a skip because the ball arcs FORWARD.** What was left was a fourteen-pixel vertical
+bob, in place, for a third of a second. Total screen travel over the closing roll: **2.6 pixels.**
+
+**2. The hops were played at 100ms, not the 130 they were planned at.** `sampleRunout` maps `t` over
+the raw hop+roll total while the play view drives the animation off `totalMs`, so a run-out that trips
+`runoutMaxMs` plays uniformly faster than planned â€” and the compression lands on the hops, which sit on
+`hopMinMs` and have no slack, while the roll keeps seconds of it. **`scripts/runout-frames.ts` has
+printed `timeBase 0.65` for a driver throughout all of this**, and the previous pass read it as "a
+uniform stretch (harmless)" â€” in a document that also called it out as worth reporting. It was the
+second half of the bug, printed in the same table as the first half.
+
+### The fix
+
+**The camera lets go of the ball when it lands.** `runoutCameraTarget` is a dead-zone camera: the
+target is the pitch mark while the ball is inside a leash of `runoutLeashFrac` (0.3) of the frame, and
+is dragged along behind it past that, so a monster run-out (an ice-world runner, a derelict carom) can
+never walk off the top. The landing camera is already framed FOR the landing â€” it does not need to
+follow anything. In the AIR the camera still follows: the ball outruns any leash there and the flight
+has to stay in frame.
+
+**And the ceiling stops biting.** `runoutMaxMs` 2300 â†’ **3000**, plus `hopMinMs` 130 â†’ **100**, which
+buys ~120ms of headroom and makes the tail of the train skip along rather than crawl (the fifth hop
+goes from 0.73 to 0.95 px per frame). `runoutMaxMs` is a safety net for a monster run-out, not a pacing
+dial, and there is now a test pinning that a full-power shot in every club family comes in under it.
+
+âš ï¸ **Trimming the ROLL to fit instead is the obvious fix and it is wrong.** The roll's duration is
+`2Â·rollDist / vLast`, pinned by the speed it inherits from the last bounce, so shortening it makes the
+ball ACCELERATE out of that bounce. It was written, and `tests/runout.test.ts` failed it at the
+hopâ†’roll join within a minute â€” which is exactly what that guard is for. Uniform compression is the
+only step-free way to shorten a run-out, so the answer had to be to stop needing one.
+
+âš ï¸ **And one claim in the first draft of this was simply false.** The `hopMinMs` cut was justified as
+"a floor is paid for twice, the second time by the roll" â€” the roll enters at the last hop's drawn
+speed, so stretching a small late hop ought to halve that entry and double the roll. Measured, the roll
+does not move at all: it enters at whichever is SLOWER of the chained speed and the drawn one, and on a
+driver that is the chained speed either way. The saving comes entirely out of the hops. A test now pins
+the true version, because the plausible one was wrong and had already reached a code comment.
+
+### Measured, in the game
+
+Traced the same way, after:
+
+| | before | **after** |
+|---|---|---|
+| ball's screen travel, closing roll | 2.6px | **60px** |
+| ball's step during the roll | ~0.004 px/frame | **1.17 â†’ 0.75 px/frame** |
+| hop lifts | 14.4 / 9.5 / 6.2 / 3.8px | **14.3 / 9.6 / 6.1 / 3.8px** |
+| hops compressed by the ceiling (firm) | 40/40 | **0/40** |
+
+The lifts are unchanged, which is the point: they were never the problem. What changed is that the ball
+now crosses the screen underneath them.
+
+### Contracts
+
+- **Render-only.** No `src/sim/` module imports `runout.ts` or `playView.ts`. Zero carry, zero rng
+  draws, zero strokes moved; contracts 1, 2, 4 and 5 untouched. The drawn run-out still walks the sim's
+  own roll path to the sim's own rest point.
+- A camera that is NOT moving lets the static-scene cache hold (GS-shot-lag), so the run-out becomes
+  the one part of a shot that can run at full frame rate. The fix pays for itself.
+- `runoutCameraTarget` is pure and takes the leash in YARDS, because "how far may the ball travel"
+  is a question about the screen and only the play view knows the scale.
+
+`npm run typecheck` + `npx vitest run` green: **220 files, 2,664 tests, 0 skipped**, plus `npm run
+build`.
+
+Guarded by two new blocks in `tests/runout.test.ts`: the ceiling does not bite on an ordinary shot in
+any club family and every hop keeps `hopMinMs`; when it DOES bite it compresses uniformly and no join
+gains a step; the hop floor's saving comes out of the hops and not the roll; the camera holds still
+inside the leash, is dragged by exactly the leash outside it, and never drifts off the pitchâ†’ball line;
+and the leash is long enough that an ordinary landing never moves the camera at all â€” which is the
+assertion that keeps the bounce travelling.
+
+### âš ï¸ The lesson, which is now three deep
+
+`landing-preview.mjs` drew at a camera the game does not use (GS-landing-camera). `runout-frames.ts`
+reasons in the plan's own units, so it cannot see a camera cancelling the motion it measures. **Neither
+rig could have found this, and both reported success while the report stood.** The only instrument that
+settles "is there a bounce on screen" is one that reads the DRAWN ball out of the real canvas, and it
+took six passes to reach for it. When a report survives a fix that measured green, stop improving the
+measurement of the model and go and measure the picture.
