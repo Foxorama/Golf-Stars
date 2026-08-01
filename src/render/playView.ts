@@ -1314,14 +1314,23 @@ export function mountPlayView(
           height = rs.h;
         }
 
-        // Feed the follow-cam. ON THE GROUND IT IS A DEAD-ZONE CAMERA (GS-runout-clock): a skip reads
+        // Feed the follow-cam. AT THE LANDING IT IS A DEAD-ZONE CAMERA (GS-runout-clock): a skip reads
         // as a skip because the ball moves ACROSS the frame, and a camera that tracks it cancels
         // exactly that — the ball sits pinned at the focus point while the world scrolls behind it.
         // The landing camera is already framed for the landing, so it holds on the pitch mark and lets
         // the ball skip over it, dragged along only if the run-out is long enough to threaten the edge
-        // of the frame. In the AIR the camera still follows: the ball outruns any leash there, and the
-        // flight has to stay in frame.
-        lastGround = rollPhase
+        // of the frame. Elsewhere in the flight it still follows: the ball outruns any leash there, and
+        // the whole shot has to stay in frame.
+        //
+        // ⚠️ IT MUST ARRIVE BEFORE THE BALL DOES, which is why this gates on `landingCam` — the same
+        // `landingZoomLeadMs` lead as the push-in — and not on `rollPhase`. Switched at touchdown, the camera is
+        // still ~16 screen pixels behind the ball it has been chasing all flight, and it spends the
+        // FIRST AND BIGGEST HOP catching up: traced out of the canvas, the ball moved 232 → 216 px
+        // BACKWARDS across its own biggest skip, because the world was panning forward faster than the
+        // ball was travelling. A bounce drawn moving the wrong way is worse than one drawn still.
+        // Easing to the pitch mark over the last beat of the flight lands the ball in a frame that has
+        // already stopped, which is what every broadcast does with a landing.
+        lastGround = landingCam
           ? runoutCameraTarget(touchdown, ground, (frameH * F.runoutLeashFrac) / Math.max(1e-6, proj.scale))
           : ground;
         // The LANDING push-in outranks the redirect's easing tail (GS-landing-camera): a redirect is

@@ -2331,3 +2331,79 @@ rig could have found this, and both reported success while the report stood.** T
 settles "is there a bounce on screen" is one that reads the DRAWN ball out of the real canvas, and it
 took six passes to reach for it. When a report survives a fix that measured green, stop improving the
 measurement of the model and go and measure the picture.
+
+---
+
+## GS-runout-clock round 2 â€” the camera has to ARRIVE before the ball does (2026-08-02)
+
+> *"All I'm seeing is the weird zoom thing still at the end of a shot and no bounce."*
+
+Round 1 stopped the camera tracking the ball on the ground, and the trace confirmed the roll went from
+2.6 to 60 pixels of screen travel. It also left the FIRST and biggest hop drawn moving the wrong way,
+which the trace showed plainly and which was read past:
+
+```
+4008ms  x=231.9  LIFT= 8.2px
+4025ms  x=226.7  LIFT=12.9px
+4042ms  x=222.7  LIFT=14.3px   â† the biggest skip of the shotâ€¦
+4075ms  x=215.6  LIFT= 1.1px   â† â€¦drawn moving 16px BACKWARDS
+```
+
+The dead-zone camera held the pitch mark â€” but it only started holding at touchdown, and at touchdown
+it was still ~16 screen pixels behind the ball it had been chasing all flight. So it spent the first
+hop catching up, panning forward faster than the ball was skipping. **A bounce drawn moving the wrong
+way is worse than one drawn still.**
+
+The fix is one word: the dead-zone gate is `landingCam`, not `rollPhase` â€” the same
+`landingZoomLeadMs` lead the push-in already uses (240 â†’ **300ms**, which also gives the zoom's 0.12
+ease time to converge). The camera eases onto the pitch mark over the last beat of the flight, so the
+ball flies into a frame that has already stopped and then skips across it. Which is what a broadcast
+does with a landing, and why one looks the way it does.
+
+**And the arc got taller.** `hopDrawBoost` 5.4 â†’ **6.5**, taking the drawn height-to-length ratio to
+the 1:1.4 line that constant's own comment has always named as the limit â€” *to* it, not past it. That
+line was drawn against a ball the follow-cam pinned in place: a hop was then a vertical bob, its height
+was the only thing on screen, and a tall bob genuinely does read as the ball popping off the turf. An
+ARC across the frame reads as a skip much further up the ratio than a bob does. Past the line it would
+not, because the ball would be leaving the turf steeper than it travels â€” which is a pop whatever the
+camera is doing.
+
+Two class caps came down to keep the ladder stepping once the taller arc pushed more hops over the
+visibility floor: **driver 6 â†’ 5** (a sixth skip costs ~100ms of hop and takes the ground for it out of
+the roll, which pushed a full-power landing back through `runoutMaxMs` â€” and a bitten ceiling
+compresses the hops, which is the whole defect this pass exists to remove) and **wood 5 â†’ 4** (it drew
+level with the driver, which is in band for both and reads as no ladder at all).
+
+### Measured, in the game
+
+| driver, traced out of the canvas | shipped (round 1) | **now** |
+|---|---|---|
+| hops | 4 | **5** |
+| hop lifts | 14.3 / 9.6 / 6.1 / 3.8px | **18.2 / 11.8 / 7.5 / 4.5 / 2.8px** |
+| ball's travel through the hops | 16px BACKWARDS on hop 1 | **61px up-screen, forward throughout** |
+| hops compressed by the ceiling (firm) | 0/40 | **0/40** |
+| rows outside the asked-for band | 0/40 | **0/40** |
+
+Ladder still steps 5 â–¸ 4 â–¸ 3 â–¸ 2 â–¸ 2 â–¸ 1.
+
+### âš ï¸ The same assertion, now written wrongly in BOTH directions
+
+`hopMinMs`'s comment first claimed the floor was "paid for twice, the second time by the roll", was
+corrected to "the roll does not move at all", and both were false â€” the first against the four-hop
+train it was checked on (where the chained speed bound `vRoll`), the second the moment `hopDrawBoost`
+bought a fifth hop and the drawn speed took over. `vRoll` is `min(chained, drawn)`, and which one binds
+is a property of the train, not of the module.
+
+The test is a MONOTONIC rule now â€” raising the floor can lengthen the hops and the roll and can shorten
+neither â€” because that is the only statement true of every train. A directional claim about a `min` of
+two quantities is a claim about which one is smaller, and that is exactly the thing that moves when any
+other constant does.
+
+### Contracts
+
+Render-only; contracts 1, 2, 4 and 5 untouched, nothing for the death-spiral harness to weigh. The one
+guard that moved is the drawn-ratio ceiling in `tests/runout.test.ts` (0.55 â†’ the documented 1/1.4),
+and it moved as a decision with the reason recorded, to the line rather than through it.
+
+`npm run typecheck` + `npx vitest run` green: **220 files, 2,664 tests, 0 skipped**, plus `npm run
+build`.

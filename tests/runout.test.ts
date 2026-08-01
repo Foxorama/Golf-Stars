@@ -562,10 +562,20 @@ describe('the bounce is VISIBLE at the cameras the game uses (GS-runout-visible)
     expect(shortIron.hops.length).toBeGreaterThan(0);
     expect(drawnPx(shortIron), 'a 7-iron hop must clear the drawn ball').toBeGreaterThan(3);
     // A driver's skip must NOT become a pop-up in the process: its DRAWN height-to-length ratio is what
-    // reads as skipping-along vs bouncing-vertically, and it stays under half.
+    // reads as skipping-along rather than bouncing-vertically off the turf.
+    //
+    // The threshold MOVED with GS-runout-clock, from 0.55 to the 1:1.4 line `hopDrawBoost`'s own
+    // comment has always named as the limit — a deliberate decision, not a relaxation, and it goes TO
+    // the line rather than past it. What changed is what the ratio has to carry: it was set against a
+    // ball the follow-cam pinned in place, so a hop was a vertical bob and its height was the only
+    // thing on screen; a tall bob really does read as the ball popping off the turf. With the camera
+    // holding still the hop is an ARC across the frame, and an arc reads as a skip much further up the
+    // ratio than a bob does. Past the line it would not — the ball would be leaving the turf steeper
+    // than it travels, which is a pop whatever the camera is doing.
+    const POP_LINE = 1 / 1.4;
     const driver = planRunout({ dist: 23, firm: 0.85, v0: 0.3, carry: 272, descentDeg: 35, clubId: 'D', vary: 0.5 });
     const first = driver.hops[0]!;
-    expect((first.apex * 0.55 * DEFAULT_RUNOUT_FEEL.hopDrawBoost) / first.dist).toBeLessThan(0.55);
+    expect((first.apex * 0.55 * DEFAULT_RUNOUT_FEEL.hopDrawBoost) / first.dist).toBeLessThan(POP_LINE);
   });
 });
 
@@ -968,23 +978,33 @@ describe('the run-out is played at the speed it was planned (GS-runout-clock)', 
     }
   });
 
-  it('a shorter hop floor buys headroom under the ceiling, and buys it ONLY from the hops', () => {
-    // Why `hopMinMs` came down to 100 (six frames). It is a small, honest saving — the roll is
-    // untouched, because the roll enters at whichever is SLOWER of the chained speed and the drawn
-    // one, and on a driver that is the chained speed either way. Measured, not reasoned: an earlier
-    // draft of this claimed the floor was "paid for twice, the second time by the roll", and the
-    // numbers say the roll does not move at all.
+  it('the hop floor can only ever LENGTHEN the run-out, hops and roll alike', () => {
+    // Why `hopMinMs` came down to 100 (six frames), stated as the rule rather than as a direction.
+    //
+    // `vRoll` is `min(chained speed, last hop's DRAWN speed)`, so stretching a late hop below the
+    // chain drags the roll down with it — the floor is paid for once in the hops and again, sometimes,
+    // in `2·rollDist / vRoll`. SOMETIMES is the point, and it is why this is pinned as a monotonic
+    // rule and not as an effect size: which of the two speeds binds depends on the train, and this
+    // very assertion has now been written wrongly in BOTH directions. First as "paid for twice" (false
+    // at the four-hop train it was checked against, where the chain bound), then as "the roll does not
+    // move at all" (false the moment `hopDrawBoost` bought a fifth hop and the drawn speed took over).
+    // `min` of a decreasing quantity is monotone; nothing else here is.
     const at = (hopMinMs: number): RunoutPlan =>
       planRunout({ dist: 38, firm: 0.85, v0: 0.3, carry: 272, descentDeg: 36, clubId: 'D', vary: 0.5 }, { ...F, hopMinMs });
-    const slow = at(130);
-    const quick = at(100);
-    expect(quick.rollMs).toBeCloseTo(slow.rollMs, 6); // the roll is NOT where the saving comes from
     const hopMs = (p: RunoutPlan): number => p.hops.reduce((a, h) => a + h.ms, 0);
-    expect(hopMs(quick)).toBeLessThan(hopMs(slow));
-    // …compared on the RAW total, not `totalMs` — this fixture is the UNTRIMMED model (no `ballYd`),
-    // which plans a longer tail than the game draws and so is still up against the ceiling in both.
     const raw = (p: RunoutPlan): number => hopMs(p) + p.rollMs;
-    expect(raw(quick)).toBeLessThan(raw(slow));
+    let prev: RunoutPlan | null = null;
+    for (const floor of [60, 100, 130, 200]) {
+      const p = at(floor);
+      if (prev) {
+        expect(hopMs(p), `hops at floor ${floor}`).toBeGreaterThanOrEqual(hopMs(prev) - 1e-9);
+        expect(p.rollMs, `roll at floor ${floor}`).toBeGreaterThanOrEqual(prev.rollMs - 1e-9);
+        expect(raw(p), `total at floor ${floor}`).toBeGreaterThanOrEqual(raw(prev) - 1e-9);
+      }
+      prev = p;
+    }
+    // …and the shipped floor really does leave the shipped ceiling some room, which is the point of it.
+    expect(raw(at(F.hopMinMs))).toBeLessThan(raw(at(130)));
   });
 });
 
