@@ -48,7 +48,7 @@ import {
   type FlightFeel,
 } from './trajectory';
 import { arcShapeOf, arrivalAngleDeg, flightProfileOf } from '../sim/flight';
-import { planRunout, sampleRunout, landingZoomFor, DEFAULT_RUNOUT_FEEL, type RunoutFeel, type RunoutPlan } from './runout';
+import { planRunout, sampleRunout, landingZoomFor, runoutCameraTarget, DEFAULT_RUNOUT_FEEL, type RunoutFeel, type RunoutPlan } from './runout';
 import {
   advanceFlightSpin,
   advanceRollPhase,
@@ -344,6 +344,10 @@ export function mountPlayView(
   const F = feel();
   const width = opts.width ?? 360;
   const height = opts.height ?? 640;
+  /** The canvas height again, under a name the shot loop can still see — `height` is shadowed there by
+   *  the BALL's height off the ground, and the run-out's camera leash is measured in frames of screen
+   *  (GS-runout-clock). */
+  const frameH = height;
   const dpr = canvasRatio();
   // Resolved once at mount, not per frame — the setting cannot change mid-flight, and reading it in
   // the draw loop would put a localStorage-backed lookup on every frame.
@@ -1310,7 +1314,16 @@ export function mountPlayView(
           height = rs.h;
         }
 
-        lastGround = ground; // feed the follow-cam
+        // Feed the follow-cam. ON THE GROUND IT IS A DEAD-ZONE CAMERA (GS-runout-clock): a skip reads
+        // as a skip because the ball moves ACROSS the frame, and a camera that tracks it cancels
+        // exactly that — the ball sits pinned at the focus point while the world scrolls behind it.
+        // The landing camera is already framed for the landing, so it holds on the pitch mark and lets
+        // the ball skip over it, dragged along only if the run-out is long enough to threaten the edge
+        // of the frame. In the AIR the camera still follows: the ball outruns any leash there, and the
+        // flight has to stay in frame.
+        lastGround = rollPhase
+          ? runoutCameraTarget(touchdown, ground, (frameH * F.runoutLeashFrac) / Math.max(1e-6, proj.scale))
+          : ground;
         // The LANDING push-in outranks the redirect's easing tail (GS-landing-camera): a redirect is
         // resolved by mid-flight and its zoom is on its way back out, so `min` composes the two without
         // either having to know about the other — whichever wants the camera closer gets it, and the

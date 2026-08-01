@@ -11,7 +11,7 @@
  * sim said the ball rests, however the time is parameterised.
  */
 import { describe, it, expect } from 'vitest';
-import { planRunout, sampleRunout, apexOverLenFor, hopBite, landingZoomFor, DEFAULT_RUNOUT_FEEL, RUNOUT_BY_CLASS, type Landing, type RunoutPlan } from '../src/render/runout';
+import { planRunout, sampleRunout, apexOverLenFor, hopBite, landingZoomFor, runoutCameraTarget, DEFAULT_RUNOUT_FEEL, RUNOUT_BY_CLASS, type Landing, type RunoutPlan } from '../src/render/runout';
 import { arcApex, ARC_FEEL, arcShapeOf, arrivalAngleDeg, descentAngleDeg, flightCarryScale } from '../src/sim/flight';
 import { sampleCurvedFlight, flightDurationMs, flightGroundAt } from '../src/render/trajectory';
 import { ballRadiusPx } from '../src/render/ball';
@@ -907,5 +907,122 @@ describe('every club skips its own number of times (GS-bounce-ladder)', () => {
       expect(sampleRunout(plan, 1).s, id).toBeCloseTo(dist, 6);
       expect(plan.rollDist + plan.hops.reduce((a, h) => a + h.dist, 0), id).toBeCloseTo(dist, 6);
     }
+  });
+});
+
+/**
+ * GS-runout-clock â€” *"there's now a fun zoom feature when the ball is landing, but there's still no
+ * bouncing on screen."*
+ *
+ * GS-landing-camera and GS-bounce-ladder both measured what they claimed and both left the report
+ * standing, because both reasoned in COURSE YARDS. Traced out of the real canvas â€” hooking the ball's
+ * own draw call and its shadow's, frame by frame â€” the drawn landing was:
+ *
+ *   lift 14.4px, 9.5px, 6.2px, 3.8px over 433ms, and then nothing for 1.9 seconds
+ *   ball screen x: 238 â†’ 231 â†’ 226 â†’ 221 â†’ 217 â†’ 212 â†’ 209 â†’ â€¦ â†’ 196.2, and then MOTIONLESS
+ *
+ * Two faults, neither visible to a pure model:
+ *
+ *  1. **The hops were played at 100ms instead of 130.** `sampleRunout` maps `t` over the raw hop+roll
+ *     total while the play view drives off `totalMs`, so a clamped run-out plays uniformly faster â€”
+ *     and the compression lands on the hops, which sit on `hopMinMs` and have no slack, while the
+ *     roll keeps seconds of it. The rig has printed `timeBase 0.65` throughout and it was read as a
+ *     harmless uniform stretch.
+ *  2. **The ball never moved forward on screen.** The follow-cam tracks it, and on the ground it
+ *     tracks it perfectly, so the forward skip was drawn as the world scrolling behind a pinned ball.
+ *     A bounce that does not travel is not a bounce.
+ */
+describe('the run-out is played at the speed it was planned (GS-runout-clock)', () => {
+  const F = DEFAULT_RUNOUT_FEEL;
+
+  it('the ceiling does not bite on an ordinary shot â€” the hops keep the clock they were given', () => {
+    // The ceiling compresses EVERY phase, and the hops are the phase with no slack. This is the
+    // assertion that keeps it a safety net for monster run-outs rather than a pacing dial. Asked of
+    // the SHIPPED path (`ballYd` present), because the untrimmed model plans a longer tail and with it
+    // a longer roll — it is the run-out the PLAYER gets that has to fit.
+    const cam = (carry: number): number => (carry > 200 ? 1.6 : carry > 120 ? 3.0 : 5.0) / F.landingZoom;
+    for (const id of ['D', '3W', '4H', '3i', '7i', '9i', 'PW', 'SW']) {
+      const px = cam(arrival(id).carry);
+      const plan = land(id, runOf(id), 0.85, { ballYd: ballRadiusPx(px) / (px * 0.55 * F.hopDrawBoost) });
+      const raw = plan.hops.reduce((a, h) => a + h.ms, 0) + plan.rollMs;
+      expect(plan.totalMs, `${id} run-out planned at ${raw.toFixed(0)}ms`).toBeCloseTo(raw, 6);
+      for (const h of plan.hops) expect(h.ms).toBeGreaterThanOrEqual(F.hopMinMs - 1e-9);
+    }
+  });
+
+  it('and when it DOES bite it compresses uniformly â€” never the roll alone', () => {
+    // Trimming the roll to fit is the obvious fix and it makes the ball ACCELERATE out of its last
+    // bounce, because the roll's duration is `2Â·rollDist / vLast` and that speed is inherited. A
+    // monster run-out therefore plays fast all over rather than gaining a step in the middle.
+    const huge = planRunout({ dist: 400, firm: 1, v0: 0.35, carry: 272, descentDeg: 36, clubId: 'D', vary: 0.5 });
+    expect(huge.totalMs).toBeCloseTo(F.runoutMaxMs, 6);
+    const raw = huge.hops.reduce((a, h) => a + h.ms, 0) + huge.rollMs;
+    expect(raw).toBeGreaterThan(F.runoutMaxMs); // it really is being compressed
+    // Uniform compression cannot introduce a step: every phase's drawn speed scales by the same k.
+    const k = huge.totalMs / raw;
+    let prev = Infinity;
+    for (const h of huge.hops) {
+      const drawn = h.dist / (h.ms * k);
+      expect(drawn).toBeLessThanOrEqual(prev + 1e-9);
+      prev = drawn;
+    }
+  });
+
+  it('a shorter hop floor buys headroom under the ceiling, and buys it ONLY from the hops', () => {
+    // Why `hopMinMs` came down to 100 (six frames). It is a small, honest saving — the roll is
+    // untouched, because the roll enters at whichever is SLOWER of the chained speed and the drawn
+    // one, and on a driver that is the chained speed either way. Measured, not reasoned: an earlier
+    // draft of this claimed the floor was "paid for twice, the second time by the roll", and the
+    // numbers say the roll does not move at all.
+    const at = (hopMinMs: number): RunoutPlan =>
+      planRunout({ dist: 38, firm: 0.85, v0: 0.3, carry: 272, descentDeg: 36, clubId: 'D', vary: 0.5 }, { ...F, hopMinMs });
+    const slow = at(130);
+    const quick = at(100);
+    expect(quick.rollMs).toBeCloseTo(slow.rollMs, 6); // the roll is NOT where the saving comes from
+    const hopMs = (p: RunoutPlan): number => p.hops.reduce((a, h) => a + h.ms, 0);
+    expect(hopMs(quick)).toBeLessThan(hopMs(slow));
+    // …compared on the RAW total, not `totalMs` — this fixture is the UNTRIMMED model (no `ballYd`),
+    // which plans a longer tail than the game draws and so is still up against the ceiling in both.
+    const raw = (p: RunoutPlan): number => hopMs(p) + p.rollMs;
+    expect(raw(quick)).toBeLessThan(raw(slow));
+  });
+});
+
+/**
+ * The camera half of the same report. A skip reads as a skip because the ball travels ACROSS the
+ * frame; a camera locked to the ball cancels exactly that.
+ */
+describe('the camera lets go of the ball when it lands (GS-runout-clock)', () => {
+  const pitch: [number, number] = [100, 200];
+
+  it('holds still while the ball is inside the leash â€” this is what makes a skip travel', () => {
+    for (const d of [0, 1, 5, 19.9]) {
+      expect(runoutCameraTarget(pitch, [100, 200 + d], 20)).toEqual([100, 200]);
+    }
+  });
+
+  it('is dragged along past it, so a monster run-out can never leave the frame', () => {
+    const t = runoutCameraTarget(pitch, [100, 260], 20);
+    expect(t[1]).toBeCloseTo(240, 6); // 60 travelled, 20 of leash â‡’ camera 40 along
+    // â€¦and it lags by exactly the leash, whatever the direction or distance.
+    for (const [dx, dy] of [[30, 40], [-60, 80], [0, -300]] as const) {
+      const ball: [number, number] = [pitch[0] + dx, pitch[1] + dy];
+      const cam = runoutCameraTarget(pitch, ball, 20);
+      expect(Math.hypot(ball[0] - cam[0], ball[1] - cam[1])).toBeCloseTo(20, 6);
+      // it stays ON the pitchâ†’ball line, so the camera never drifts sideways off the shot
+      const cross = (ball[0] - pitch[0]) * (cam[1] - pitch[1]) - (ball[1] - pitch[1]) * (cam[0] - pitch[0]);
+      expect(Math.abs(cross)).toBeLessThan(1e-6);
+    }
+  });
+
+  it('the leash is long enough that an ordinary landing never moves the camera at all', () => {
+    // The whole point: at the landing camera a driver's run-out is ~179px and the leash is 30% of a
+    // 844px frame, so the ball skips right across a still picture. If this ever fails, the camera has
+    // started chasing the ball again and the bounce goes back to being a bob in place.
+    const FRAME_H = 844;
+    const leashPx = FRAME_H * DEFAULT_RUNOUT_FEEL.runoutLeashFrac;
+    const px = 1.6 / DEFAULT_RUNOUT_FEEL.landingZoom; // the driver's landing camera
+    const runPx = runOf('D') * px;
+    expect(runPx).toBeLessThan(leashPx);
   });
 });
