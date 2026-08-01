@@ -1,4 +1,5 @@
-// Rasterise the store-page banner + page sky for the itch.io project page.
+// Rasterise the store-page banner + page sky for the itch.io project page, and the 16:9 cover a
+// devlog post is published with.
 //
 // The banner REPLACES the page title on itch, so it has to carry the wordmark itself — and it is
 // scaled to the page's content column, so it is drawn oversized and shrunk rather than sized to a
@@ -25,6 +26,9 @@
 //                   the sky block below.
 //   embed-bg.png  → Embed BG (or Background, if you would rather have stars WITHOUT the colour —
 //                   it is the same sky with the washes left out). Colours: #11141b.
+//   devlog-cover.png → a DEVLOG's "Cover image" field (16:9, min width 500px). Not a project-page
+//                   asset: it is the thumbnail beside the post AND the social card the post
+//                   unfurls as. See the cover block below for why it carries a screenshot.
 //
 // Also writes four eyes-on previews that are never uploaded — banner-preview (the banner on its
 // real background), seam-preview / sky-seam-preview (each tile repeated 2x2 with the joins ruled),
@@ -32,7 +36,7 @@
 //
 // Pure dev tool — ships nothing, imports no game logic. Re-run after a wordmark or palette change.
 
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { launchChromium } from './chromium.mjs';
@@ -87,18 +91,16 @@ function mulberry32(a) {
 // what makes the nebulae possible at all (see the sky block), and two skies that merely agree
 // today would drift the next time either is retuned. One sky, drawn once.
 
-const bannerHTML = `<!doctype html><html><head><meta charset="utf-8"><style>
-  html,body { margin:0; padding:0; background:transparent; }
-  .wrap {
-    position:relative; width:${W}px; height:${H}px;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  }
-  /* .gs-hero-title, scaled from 34px to banner size — same colour, spacing and glow. */
+// THE WORDMARK IS ONE DESCRIPTION WITH TWO CALLERS (the store banner and the devlog cover), so it
+// is a function of its size rather than a block copied twice. Every glow radius scales WITH the
+// face — a cover set at 132px must not wear a 96px banner's halo, which is exactly what a copied
+// `text-shadow` gives you. At 96px the numbers come out 60/122/20, i.e. the banner is unchanged.
+const wordmarkCSS = (px) => `
+  /* .gs-hero-title, scaled from 34px — same colour, spacing and glow. */
   .title {
-    position:relative; margin:0; font-size:96px; font-weight:700;
+    position:relative; margin:0; font-size:${px}px; font-weight:700;
     letter-spacing:.045em; line-height:1.1; color:${INK};
-    text-shadow: 0 0 60px ${GLOW_GREEN}, 0 0 122px ${GLOW_GOLD};
+    text-shadow: 0 0 ${Math.round(px * 0.63)}px ${GLOW_GREEN}, 0 0 ${Math.round(px * 1.27)}px ${GLOW_GOLD};
   }
   /* A DRAWN flag, not the ⛳ glyph: the emoji rasterises as a colour bitmap (red pennant on a
      green mound) that is off-palette and far heavier than the type beside it. This one is the
@@ -106,10 +108,21 @@ const bannerHTML = `<!doctype html><html><head><meta charset="utf-8"><style>
      a bare width:auto does not resolve the viewBox aspect on an inline SVG here, and the flag
      rendered as a lone pennant with the pole clipped away. */
   .flag { height:.88em; width:.605em; margin-right:.22em; vertical-align:-.13em;
-          filter: drop-shadow(0 0 20px ${GLOW_GREEN}); }
+          filter: drop-shadow(0 0 ${Math.round(px * 0.21)}px ${GLOW_GREEN}); }`;
+
+const WORDMARK = `<h1 class="title"><svg class="flag" viewBox="0 0 44 64" xmlns="http://www.w3.org/2000/svg"><rect x="12" y="4" width="3.4" height="55" rx="1.7" fill="${INK}" opacity="0.85" /><path d="M15.4 7 L41 16 L15.4 26 Z" fill="#5fd45a" /><circle cx="28" cy="55" r="4" fill="#fff" opacity="0.92" /></svg>The Far Carry</h1>`;
+
+const bannerHTML = `<!doctype html><html><head><meta charset="utf-8"><style>
+  html,body { margin:0; padding:0; background:transparent; }
+  .wrap {
+    position:relative; width:${W}px; height:${H}px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+  ${wordmarkCSS(96)}
 </style></head><body>
   <div class="wrap">
-    <h1 class="title"><svg class="flag" viewBox="0 0 44 64" xmlns="http://www.w3.org/2000/svg"><rect x="12" y="4" width="3.4" height="55" rx="1.7" fill="${INK}" opacity="0.85" /><path d="M15.4 7 L41 16 L15.4 26 Z" fill="#5fd45a" /><circle cx="28" cy="55" r="4" fill="#fff" opacity="0.92" /></svg>The Far Carry</h1>
+    ${WORDMARK}
   </div>
 </body></html>`;
 
@@ -357,6 +370,77 @@ await shoot(
   ),
   W, H, 'banner-preview.png', false,
 );
+
+// ── The DEVLOG COVER (16:9) ──────────────────────────────────────────────────────────────────
+// itch's devlog "Cover image" is not only the thumbnail beside the post — it is the SOCIAL card,
+// so this is the image that represents the game in a Discord/Bluesky/Twitter unfurl. Two things
+// follow from that, and they are why the cover is not just the banner on a bigger canvas:
+//
+//   * IT IS SEEN SMALL. A social preview is a few hundred pixels wide, so the wordmark is set
+//     large and the tagline is cut to one line. The 178-char store tagline is unreadable here.
+//   * IT HAS TO SAY "GOLF". The banner deliberately carries only the wordmark, because on the
+//     store page the playable embed is directly beneath it. An unfurl has no embed, so the cover
+//     carries a real screenshot — the aim cone on a desert par 4, which is the one picture that
+//     shows both halves of the pitch (a golf hole, and the dispersion you are rolling against).
+//
+// 1920x1080 is the SAME size as the sky panorama, so the background lands 1:1 with no resampling
+// of a starfield that was built to be pixel-exact. itch asks for 16:9 and at least 500px wide.
+const COVER_W = SKY_W;
+const COVER_H = SKY_H;
+// Which picture rides the cover. `cover-cetus` / `cover-void` are rendered by cover-shot.mjs (the
+// two luminous worlds, which screenshots.mjs cannot reach — see that script's header); `aim` is the
+// real play screen with its HUD. Set COVER_SHOT to any basename in shots/.
+const SHOT = join(repoRoot, 'assets', 'itch', 'shots', `${process.env.COVER_SHOT ?? 'cover-cetus'}.png`);
+// Degrade to a wordmark-only cover rather than throwing: the shots are re-shot by a different
+// script (screenshots.mjs) and a missing one must not cost you the banner and the page sky too.
+const shotURI = existsSync(SHOT)
+  ? `data:image/png;base64,${readFileSync(SHOT).toString('base64')}`
+  : null;
+if (!shotURI) console.warn(`! ${SHOT} missing — devlog-cover falls back to wordmark only.`);
+
+const coverHTML = `<!doctype html><html><head><meta charset="utf-8"><style>
+  html,body { margin:0; padding:0; }
+  body { width:${COVER_W}px; height:${COVER_H}px; overflow:hidden; position:relative;
+         background:${PAGE_BG} url("${skyURI}") center/cover no-repeat;
+         font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+  /* The sky is seeded art, not a backdrop composed for this crop — so the type gets a vignette to
+     sit on rather than depending on where the nebulae happened to land. Weighted to the left,
+     where the words are, so the picture side keeps its colour. */
+  .vig { position:absolute; inset:0; background:
+     radial-gradient(122% 92% at 26% 50%, rgba(11,13,18,.88) 0%, rgba(11,13,18,.56) 44%, rgba(11,13,18,0) 78%); }
+  .row { position:absolute; inset:0; display:flex; align-items:center; gap:64px;
+         padding:0 88px; box-sizing:border-box; }
+  .left { flex:1 1 auto; min-width:0; }
+  ${wordmarkCSS(120)}
+  /* The wordmark is the one thing here that may never reflow: it is measured to fit the column
+     beside the screenshot, and a wrap would break it across two lines mid-name. */
+  .title { white-space:nowrap; }
+  .kicker { margin:0 0 30px; color:#5fd45a; font-size:25px; font-weight:700;
+            letter-spacing:.24em; text-transform:uppercase; }
+  /* Two lines, not three: the card is read at a few hundred pixels wide in an unfurl, and a
+     third line of 36px type is the first thing that stops being legible there. */
+  .tag { margin:34px 0 0; color:#c8ccd4; font-size:36px; line-height:1.44; max-width:19.5em; }
+  .shotwrap { position:relative; flex:0 0 auto; }
+  /* The shot is a dark image on a dark sky; without a glow behind it the frame is the only thing
+     separating them, and a frame alone reads as a sticker. */
+  .shotwrap::before { content:''; position:absolute; inset:-80px;
+     background:radial-gradient(50% 50% at 50% 50%, rgba(95,212,90,.30) 0%, rgba(95,212,90,0) 70%); }
+  .shot { position:relative; display:block; height:${COVER_H - 200}px; border-radius:26px;
+          border:2px solid rgba(236,255,233,.16); box-shadow:0 40px 90px rgba(0,0,0,.62); }
+</style></head><body>
+  <div class="vig"></div>
+  <div class="row">
+    <div class="left">
+      <p class="kicker">Out now · free in your browser</p>
+      ${WORDMARK}
+      <p class="tag">A travelling space golf RPG. Fly a galaxy of procedurally-generated courses.</p>
+    </div>
+    ${shotURI ? `<div class="shotwrap"><img class="shot" src="${shotURI}"/></div>` : ''}
+  </div>
+</body></html>`;
+
+// dpr 1: the output IS the upload size, and the sky underneath it is 1920x1080 of real pixels.
+await shoot(coverHTML, COVER_W, COVER_H, 'devlog-cover.png', false, 1);
 
 const EMBED_W = 600;
 const EMBED_H = 860;
