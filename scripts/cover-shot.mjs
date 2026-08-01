@@ -52,8 +52,12 @@ const server = await createServer({
 const { generateCourse } = await server.ssrLoadModule('/src/sim/course/generate.ts');
 const { renderHoleSVG } = await server.ssrLoadModule('/src/render/holeView.ts');
 // THE one way this repo finds AND launches Chromium (GS-browser-test-gate) — never a second copy.
-// It THROWS when there is no browser rather than exiting 0, which is the whole point: this rig used
-// to print "no chromium" and succeed, so a cover that never rendered looked like a cover that did.
+// This rig used to read `chromePath` and call `chromium.launch` itself: the right PLACE for where
+// the browser is, but its own answer for HOW one starts. It failed loudly (a message and exit 1),
+// so nothing here was ever silently wrong — the cost was drift, since the launch flags and the
+// not-found message were its own copy to fall out of step. That is the whole of the fault, and it
+// is worth stating precisely: the SOFT failure the guard warns about (print, then exit 0) belongs
+// to the other rigs it was written for, not to this one.
 const browser = await launchChromium({ args: ['--no-sandbox'] });
 
 for (const name of want) {
