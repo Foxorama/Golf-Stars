@@ -165,6 +165,13 @@ export interface SceneOpts {
  */
 const RARITY_VIEW_DEEPEN: Record<string, number> = { common: 1, rare: 1.3, epic: 1.6, legendary: 1.95 };
 
+/** A real flagstick is seven feet — 2.33 yards of ground, drawn in yards like the rest of the turf
+ *  (GS-green-complex). Floored at the size it has always been, so at range it stays the marker that
+ *  says "the pin is here", and capped so a tap-in camera doesn't run it off the top of the frame. */
+const FLAGSTICK_YD = 2.33;
+const FLAG_MIN_PX = 14;
+const FLAG_MAX_PX = 30;
+
 function worldLook(themeId: string | undefined, biome: string | undefined): { arch: BiomeArchetype; deepen: number } {
   const arch = archetypeFor(themeId, biome ?? '');
   const deepen = themeId ? RARITY_VIEW_DEEPEN[themeById(themeId)?.rarity ?? 'common'] ?? 1 : 1;
@@ -846,9 +853,9 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   const [gx, gy] = proj.project(hole.pin ?? hole.green);
   // THE CUP. This was a `r: 2.2` base shadow and nothing else — a fixed size that ignored the
   // camera, so at the putt view the drawn BALL (up to 3.3) was larger than the hole it dropped into
-  // and a holed putt read as a ball parked on a dot. `cupRadiusPx` derives it from the sim's own
-  // `HOLE_OUT_RADIUS` (contract 5: the graphic IS the physics), scaled in yards and bounded against
-  // the drawn ball. Rim first, then the dark mouth, so the hole reads as cut INTO the green.
+  // and a holed putt read as a ball parked on a dot. `cupRadiusPx` is the one place its size is
+  // decided (contract 5: the graphic IS the physics), bounded above by the sim's own
+  // `HOLE_OUT_RADIUS`. Rim first, then the dark mouth, so the hole reads as cut INTO the green.
   const cupR = cupRadiusPx(proj.scale);
   // Cut INTO the turf, not stamped on it: a soft seat shadow, a mouth in the green's own dark rather
   // than flat black, and a sliver of lit FAR wall (the near wall is what you'd be looking down past,
@@ -857,8 +864,23 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   prims.push({ t: 'circle', c: [gx, gy + cupR * 0.14], r: cupR * 1.1, fill: 'rgba(0,0,0,0.13)' });
   prims.push({ t: 'circle', c: [gx, gy], r: cupR, fill: '#16240f', stroke: 'rgba(0,0,0,0.35)', sw: 0.6 });
   prims.push({ t: 'circle', c: [gx, gy - cupR * 0.26], r: cupR * 0.58, fill: 'rgba(150,178,120,0.13)' });
-  prims.push({ t: 'line', a: [gx, gy], b: [gx, gy - 14], stroke: '#1a1a1a', sw: 1.4, round: true });
-  prims.push({ t: 'poly', pts: [[gx, gy - 14], [gx + 9, gy - 11], [gx, gy - 8]], fill: '#ff3b3b', stroke: '#7a1414', sw: 0.8 });
+  // THE FLAGSTICK IS A REAL SEVEN-FOOT PIN ONCE THE CAMERA IS CLOSE ENOUGH TO SEE ONE (GS-cup-real).
+  // It was a flat 14 units at every zoom, which is right at range — out there it is not a stick, it
+  // is the MARKER that says where the pin is, and the cup itself is under a pixel (see `cupRadiusPx`)
+  // — and wrong on the green, where it stood shorter than the hole beside it was wide. So: FLOORED at
+  // the old 14 (every fairway camera is byte-for-byte), then it grows in yards like every other piece
+  // of ground (GS-green-complex), capped before a tap-in turns it into a mast. The flag scales WITH
+  // the stick — one `k`, so the pin stays one object rather than a banner sliding down a pole.
+  const stick = Math.max(FLAG_MIN_PX, Math.min(FLAG_MAX_PX, FLAGSTICK_YD * proj.scale));
+  const k = stick / FLAG_MIN_PX;
+  prims.push({ t: 'line', a: [gx, gy], b: [gx, gy - stick], stroke: '#1a1a1a', sw: 1.4 * Math.min(k, 1.5), round: true });
+  prims.push({
+    t: 'poly',
+    pts: [[gx, gy - stick], [gx + 9 * k, gy - 11 * k], [gx, gy - 8 * k]],
+    fill: '#ff3b3b',
+    stroke: '#7a1414',
+    sw: 0.8,
+  });
 
   return prims;
 }

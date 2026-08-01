@@ -3,9 +3,12 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ballRadiusPx, cupRadiusPx, CUP_MAX_RATIO } from '../src/render/ball';
 import { HOLE_OUT_RADIUS, manualPutt, onePutt } from '../src/sim/putting';
-import { makeRng } from '../src/sim/rng';
+import { makeRng, Rng } from '../src/sim/rng';
 import { dist, type Vec } from '../src/sim/course/contract';
 import { PEN_INFO, type PenaltyKind } from '../src/sim/shot';
+import { generateCourse } from '../src/sim/course/generate';
+import { playHole, pinOf } from '../src/sim/round';
+import { buildScene } from '../src/render/style';
 
 /**
  * THE CUP IS THE CATCH RADIUS, AND A HAZARD THAT TAKES THE BALL TAKES IT (GS-cup-swallow).
@@ -52,6 +55,36 @@ describe('the drawn cup', () => {
     }
   });
 
+  it('IS A HOLE, NOT THE CATCH RADIUS DRAWN — the chip and green cameras roughly halve', () => {
+    // GS-cup-real. `HOLE_OUT_RADIUS` is 1.2 YARDS — a generosity in the rules, about twenty times a
+    // real hole — and drawing it made a crater: "way too large in chipping and chip watch view…
+    // probably twice as large as it should be in green and green make view". It was pinned to the
+    // catch radius only because a ball could be HOLED while drawn lying outside the cup; every path
+    // now finishes IN the cup (`finishInCup`), so the drawn hole is free to be a hole.
+    //
+    // Pinned as the shipped curve, and stated in YARDS as well, which is the number that says what
+    // the player is looking at: 2.4yd wide at range (the catch radius still binds out there — see
+    // GS-cup-oversize) down to 0.29yd at a tap-in. You zoom in to see closer to the truth.
+    const widthYd = (s: number): number => +((2 * cupRadiusPx(s)) / s).toFixed(2);
+    expect(PUTT_CAMERAS.map((s) => +cupRadiusPx(s).toFixed(2))).toEqual([3.55, 4.07, 4.79, 5]);
+    expect(PUTT_CAMERAS.map(widthYd)).toEqual([0.94, 0.74, 0.56, 0.29]);
+    // The two reported cameras, against what they used to draw.
+    expect(+cupRadiusPx(5.7).toFixed(2), 'the chip camera').toBe(3.2); // was 6.84
+    expect(+cupRadiusPx(11).toFixed(2), 'the green camera').toBe(4.07); // was 8.21
+    // …and the fairway, which was only "slightly" too large and correspondingly barely moves.
+    expect(+cupRadiusPx(2).toFixed(2), 'the fairway camera').toBe(1.95); // was 2.4
+  });
+
+  it('leaves the far cameras alone — out there the catch radius is still what binds', () => {
+    // Below ~2 px/yd the cup is under a couple of pixels and the CEILING is what decides it, exactly
+    // as GS-cup-oversize left it. From 300 yards you should not be able to see the hole; the flag is
+    // what marks the pin at that range.
+    // The crossover is ~1.35 px/yd; past it the cup's own curve is the smaller of the two and wins.
+    for (const s of [0.5, 1, 1.3]) {
+      expect(cupRadiusPx(s), `the catch radius no longer binds at ${s} px/yd`).toBeCloseTo(HOLE_OUT_RADIUS * s, 9);
+    }
+  });
+
   it('tracks the catch radius but is bounded by it, not equal to it — and that is a finding', () => {
     // MEASURED, and worth writing down: at every putt camera the honest 1.2yd catch radius is MORE
     // than the proportion cap, so the cap always bites. At 7.6 px/yd the two are within 2% (9.12
@@ -87,18 +120,39 @@ describe('the drawn cup', () => {
     }
   });
 
-  it('leaves the green exactly as it was — the fix is a shot-camera fix only', () => {
-    // The report was explicit that the cup reads right on the green and wrong at fairway/chip zooms.
-    // At every putt camera the proportion cap binds, so removing the floor cannot have moved them;
-    // these are the shipped values, pinned so a later tweak to the cup cannot quietly retune putting.
-    const onGreen = PUTT_CAMERAS.map((s) => +cupRadiusPx(s).toFixed(2));
-    expect(onGreen).toEqual([7.82, 8.21, 8.76, 9.24]);
-  });
-
   it('grows with the camera — a fixed-size cup is what this replaced', () => {
     const at = SHOT_CAMERAS.concat(PUTT_CAMERAS).map((s) => cupRadiusPx(s));
     for (let i = 1; i < at.length; i++) expect(at[i]!).toBeGreaterThanOrEqual(at[i - 1]!);
     expect(at[at.length - 1]!).toBeGreaterThan(at[0]! * 2);
+  });
+
+  it('THE FLAGSTICK IS A REAL PIN once the camera can see one — and unmoved at range', () => {
+    // The other half of the report: "the flag also needs to be a bit bigger as we made the hole
+    // bigger without making the flag bigger". It was a flat 14 units at every zoom, so on the green
+    // the stick stood shorter than the hole beside it was wide. Read out of the built prims rather
+    // than re-derived here, since the point is what the painter emits.
+    const stickAt = (scale: number): number => {
+      const hole = generateCourse(11, { holes: 1 }).holes[0]!;
+      // A stub projector is enough: the flagstick reads `proj.scale` and nothing else about the view.
+      const proj = {
+        scale,
+        project: (p: Vec): [number, number] => [p[0] * scale, p[1] * scale],
+      } as unknown as Parameters<typeof buildScene>[1];
+      const prims = buildScene(hole, proj, { width: 360, height: 640 });
+      const line = prims.filter((p) => p.t === 'line' && p.stroke === '#1a1a1a').pop() as { a: Vec; b: Vec };
+      return line.a[1] - line.b[1];
+    };
+    // Every fairway/approach camera is byte-for-byte the flag it has always been.
+    for (const s of [0.5, 1.2, 2.6, 5.7]) expect(stickAt(s), `flag moved at ${s} px/yd`).toBe(14);
+    // On the green it grows toward a real seven-foot pin, and stops before it becomes a mast.
+    expect(stickAt(7.6)).toBeCloseTo(17.71, 2);
+    expect(stickAt(11)).toBeCloseTo(25.63, 2);
+    expect(stickAt(17.1)).toBe(30);
+    expect(stickAt(35)).toBe(30);
+    // …and it is always taller than the hole is wide, which is what it failed at before.
+    for (const s of [...SHOT_CAMERAS, ...PUTT_CAMERAS]) {
+      expect(stickAt(s), `the cup out-measures the pin at ${s} px/yd`).toBeGreaterThan(2 * cupRadiusPx(s));
+    }
   });
 
   it('is read from the sim, never re-derived in a painter', () => {
@@ -170,5 +224,36 @@ describe('a hazard that swallows', () => {
       if (end) expect(dist(end, pin)).toBeCloseTo(0, 9);
     }
     expect(holedCount, 'the sweep never holed a putt — it is proving nothing').toBeGreaterThan(5);
+  });
+
+  it('A HOLED SHOT FINISHES IN THE CUP TOO — the path that never got the rule (GS-cup-real)', () => {
+    // The putt resolvers snapped to the pin (above) and the chip-in trickled into it, but an ORDINARY
+    // shot resting inside HOLE_OUT_RADIUS was flagged holed and left lying where it stopped — up to
+    // 1.2yd, which is 7–17 screen px at the cameras you watch it from. That is the same lie, and it
+    // is the one that forced the cup to be drawn crater-sized to cover it.
+    //
+    // Swept over real generated holes, so it holds for whatever a shot actually does.
+    let aces = 0;
+    for (let seed = 0; seed < 400 && aces < 12; seed++) {
+      const hole = generateCourse(seed, { holes: 1 }).holes[0]!;
+      const pin = pinOf(hole);
+      for (const s of playHole(hole, new Rng(`${seed}:play`)).shots) {
+        if (!s.holed) {
+          // The converse: an unholed shot must NOT be sitting in the cup.
+          expect(dist(s.rest, pin), 'an unholed shot rests in the hole').toBeGreaterThan(1e-9);
+          continue;
+        }
+        aces++;
+        expect(dist(s.rest, pin), `holed shot rests ${dist(s.rest, pin).toFixed(2)}yd from the cup`).toBeCloseTo(0, 9);
+        // The drawn walk has to arrive there as well, or the ball stops short and the hole-out fires
+        // on bare ground (the GS-chipin-roll lesson, which is why both branches share one seam).
+        const end = s.rollPath?.[s.rollPath.length - 1];
+        if (end) expect(dist(end, pin)).toBeCloseTo(0, 9);
+        // A ball that trickled in went FORWARD into the hole; a "−4yd check" on it is neither true
+        // nor drawable.
+        expect(s.roll).toBeGreaterThanOrEqual(0);
+      }
+    }
+    expect(aces, 'the sweep never holed a shot — it is proving nothing').toBeGreaterThan(3);
   });
 });
