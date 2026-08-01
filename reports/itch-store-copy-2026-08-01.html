@@ -1,0 +1,233 @@
+<!--
+  ============================================================================
+  itch.io store copy for THE FAR CARRY — current as of 2026-08-01.
+
+  Supersedes itch-store-copy-2026-07-30.html. This file MIRRORS THE LIVE PAGE
+  (https://vulpeculagames.itch.io/the-far-carry), which was edited in the itch
+  editor after the 07-30 file was written, plus the two new sections marked
+  NEW below. Read the live page before editing this file again — the editor is
+  the source of truth, this is the record.
+
+  Companion: itch-description-short-2026-07-29.html holds the 200-char tagline
+  for the "Short description or tagline" field. Everything else is here.
+
+  HOW TO USE: everything between the BEGIN/END markers is one contiguous block.
+  Paste it into the Details box via the <> source button.
+
+  ---------------------------------------------------------------------------
+  WHAT CHANGED IN THIS REVISION
+  ---------------------------------------------------------------------------
+
+  Synced from the live page (edited on itch since 07-30):
+    • Story Tour bullet no longer says "Five chapters, five" / "finale"
+    • Unending Universe — "How far can you get before the darkness closes"
+    • Star Tour — reworded, unlock moved to the front of the bullet
+    • Caddy section — the "run-defining pick / fires the one on your bag"
+      opener is gone; the Parrot now "can see the future"
+    • "Golf that feels like golf" ends "good gear is how you level up"
+    • "Play it your way" is now headed "Accessibility Features"
+    • "How this game was made" was added (from itch-disclosure-block-2026-07-31.md),
+      with a final paragraph that draws the line at feel/modes/story ideas
+    • Privacy + install sections reworded
+
+  NEW in this revision (neither was on the live page):
+    • "Built with" — because ITCH HAS NO "MADE WITH" FIELD to put it in.
+    • "Licence" — the page said nothing about rights at all.
+
+  ---------------------------------------------------------------------------
+  METADATA, AS SET ON THE LIVE PAGE
+  ---------------------------------------------------------------------------
+
+  Status: In development · Platforms: HTML5 · Genre: Sports, Role Playing
+  Tags: 2D, Golf, Physics, Procedural Generation, Roguelike, Singleplayer,
+        Space, Story Rich, Top-Down
+  Average session: A few minutes · Languages: English
+  Inputs: Keyboard, Mouse, Touchscreen, Smartphone, Playstation controller
+  AI disclosure: AI Assisted (Code, Text & Dialog)
+
+  ⚠️ CORRECTION TO THE 07-30 HEADER: it claimed "itch HAS NO ACCESSIBILITY
+  CHECKBOXES — that is a Steam feature". WRONG. itch has an Accessibility
+  multi-select with exactly eight options. Audited 2026-08-01 against what the
+  game actually ships; the verdict is SELECT NONE OF THEM, and un-tick
+  Subtitles if it is still set:
+
+    Subtitles ............ NO. There is no speech anywhere in the game — audio
+                           is assetless synthesized WebAudio, no voice acting,
+                           no timed narration. Nothing to caption.
+    High-contrast ........ NO. No contrast mode ships. The default palette
+                           clears WCAG AA/AAA on every text token, which is a
+                           good baseline, not a high-contrast option.
+    Interactive tutorial . NO. There is none. Instruction is in-context only.
+    One button ........... NO. Menus and pickers need directional navigation.
+    Blind friendly ....... NO. Screen-reader narration and keyboard play are
+                           real, but the putt pace meter is a purely visual
+                           sweep with NO audio cue (verified: puttMeter.ts
+                           fires no sfx), so putting cannot be timed blind.
+    Textless ............. NO. Text-heavy RPG.
+    Color-blind friendly . NO. No CVD mode, and colour-only channels are
+                           unaudited (rarity grades, fairway-vs-rough on the
+                           green worlds, the pace-coloured Stableford pod).
+    Configurable controls  NO. Left-handed mirroring, 3-way aim assist, UI
+                           scale and fast shots are real options, but nobody
+                           filtering this tag wants that — they want remapping,
+                           and keys are not rebindable.
+
+  So the accessibility metadata IS the "Accessibility Features" section below —
+  the tags cannot carry it. Keep that section, and keep it specific.
+
+  Cheapest tag to actually earn later: High-contrast. The palette is already a
+  closed set of `--gs-*` tokens on `:root`, and `.gs-readable` / `.gs-reduced`
+  are the existing precedent for a class-driven variant.
+
+  ⚠️ THE "DOWNLOAD & INSTALL INSTRUCTIONS" FIELD IS DEAD. itch only surfaces it
+  on a downloadable upload, and the only upload is the play-in-browser html5
+  channel. That is why install, saving and accessibility all live in the
+  Details box instead of being split across fields.
+
+  EMBED: viewport 820×760 (must clear 660, below which data-gs-fit flips to
+    `tight` and the HUD sheds detail), fullscreen on, mobile friendly on,
+    click-to-play on.
+
+  INSTALL, AS IT ACTUALLY BEHAVES (verified on Android Chrome, 2026-07-30):
+
+  • Chrome will not offer a real install until the service worker is registered
+    AND controlling the page. On a first visit to a new origin that race is lost
+    and Chrome silently degrades to "Add to Home screen" — a bookmark that opens
+    in the browser, not an app. One reload fixes it.
+
+  • A successful install is a WebAPK, i.e. a REAL app, so Android files it in the
+    app DRAWER, not the home screen. That is a launcher setting and a manifest
+    cannot ask for it. The degraded shortcut goes straight to the home screen, so
+    the broken outcome looks better in the one place a player is watching.
+
+  • DO NOT NAME A MENU ITEM IN PLAYER-FACING COPY. Across three attempts on one
+    device Chrome offered "Install app", "Add to Home screen" and "Install and
+    create shortcut" for the same action. The copy names the WORD to look for
+    (Install) and the one label that means the wrong thing (a bare "Create
+    shortcut"). `chrome://webapks` is the definitive check; "no address bar" is
+    the one a player can do.
+
+  • A PWA CANNOT BE INSTALLED FROM INSIDE THE ITCH EMBED — installation needs a
+    top-level context. Hence the outbound link to farcarry.vulpecula.games.
+-->
+
+
+<!-- ==================== BEGIN DETAILS BOX ==================== -->
+
+<p><strong>Space golf, it's a roguelike RPG in space, with golf.</strong></p>
+
+<p>Fly a galaxy of procedurally-generated golf courses, earn your bag, upgrade your ship, and find out what has been sleeping at the root of the World-Tree.</p>
+
+<h2>A whole galaxy of golf courses and competition</h2>
+
+<p>Fifteen worlds, each with its own physics and its own personality: links in the ice rings where the crosswind never rests, molten doglegs on the ember world, luminous spore-groves so tight you have to shape it, a star-ocean shelf with whales breaching under the cliffs. On the derelict ship you are shooting down metal corridors and caroming off bulkheads across gaps of open space.</p>
+
+<h2>Four ways to play</h2>
+
+<ul>
+<li><strong>🌠 Story Tour</strong> — the campaign. Galaxy Tournaments, each a different format: scramble, best-ball, singles matchplay, strokeplay, and a 2v2. Qualify on the road, pick your partners, and be careful when the Snake Cult comes calling.</li>
+<li><strong>🚀 The Voyage</strong> — three arcs, three bosses, one win. Survive the cut at every stop or the tour drops you.</li>
+<li><strong>🌌 Unending Universe</strong> — endless survival. Every hole has a number to beat. How far can you get before the darkness closes over you?</li>
+<li><strong>🗺 Star Tour</strong> — finish the Story Tour and then free-roam the whole star map. Land anywhere, play 18 holes and chase your course records.</li>
+</ul>
+
+<h2>Four characters to play as</h2>
+
+<ul>
+<li><strong>Feather Fade</strong> — a buttery, controlled fade on every shot. Predictable shape, tidy dispersion.</li>
+<li><strong>Huang-Woo Hook</strong> — a surgeon with the irons, but the big sticks fight a snap-hook left.</li>
+<li><strong>Longshot Larry</strong> — bombs it off the tee. Where it ends up is anyone's guess.</li>
+<li><strong>Backspin Bo</strong> — zips the short irons back on a string. Pin-seekers that bite and hold.</li>
+</ul>
+
+<h2>Hire a caddy. Regret it. Hire another.</h2>
+
+<p><strong>Suggestible Sam</strong> reads the green depth and calls the club. <strong>Dr Chipinski</strong> holes out from off the green when you least deserve it. The <strong>Mystic Mole</strong> finds the line on a putt nobody else can see. <strong>Sandy Sandsaver</strong> gets you home from the beach. The <strong>Prognostic Parrot</strong> can see the future and will help you pick the best line. They come from rival factions who each want you for something.</p>
+
+<h2>Earn fun cosmetics in game</h2>
+
+<p>Credits are for the Pro Shop this run. <strong>Star Shards</strong> are forever — spend them in the Trade Market on eighteen ships, from the station wagon you leave Earth in, to an alien mothership with fully sick spinning wheels, and over forty-plus cosmetics to outfit your team with. Ascension unlocks permanent bag tiers. A hole-in-one, in any mode, earns a ship nobody can buy.</p>
+
+<h2>Golf that feels like golf</h2>
+
+<p>Pull back to load the swing and watch the spray cone open with the power — the cone <em>is</em> the dispersion the game will roll against, drawn to scale, so what you see is what you're risking. Clubs launch, peak and come down at real angles: a driver runs out on firm turf, a wedge lands steep and checks. The ball skips, settles, and trickles down the fall line of a green you can read. Bad lies cost you, good gear is how you level up.</p>
+
+<h2>Accessibility Features</h2>
+
+<ul>
+<li><strong>Readable text</strong> — scale the whole interface, choose a legible typeface, add letter and word spacing.</li>
+<li><strong>Reduced motion</strong> — seeded from your system, and yours to override.</li>
+<li><strong>Full keyboard play</strong> — aim, modulate power and swing without a pointer, and every overlay is a proper dialog.</li>
+<li><strong>Screen-reader narration</strong> — the hole, the conditions and every shot outcome are spoken, not just drawn.</li>
+<li><strong>Left-handed mode</strong> — mirrors the controls and the whole cast, so a left-handed golfer plays a left-handed game. Golf video games almost never bother. This one does.</li>
+<li><strong>Aim assist on by default</strong> — the game picks a safe, sensible line and club; turn it off when you want the whole rope.</li>
+</ul>
+
+<h2>How this game was made</h2>
+
+<p>The AI disclosure on this page is ticked for <strong>Code</strong> and <strong>Text &amp; Dialog</strong>. That covers a lot of ground, so here is what it actually means.</p>
+
+<p>There are <strong>no AI-generated art assets</strong> in this game. There are no art assets at all. Every visual — the courses, the golfers, the ships, the item cards, even the icon and the banner at the top of this page — is drawn by code, as vectors and canvas drawing, while you play. Nothing came out of Midjourney or Stable Diffusion. There isn't an image file in the project to have generated.</p>
+
+<p>The sound is the same. There isn't an audio file in the project either. <strong>Every note and every effect is synthesized in your browser as it plays.</strong></p>
+
+<p>The AI did write the code that draws and plays all of that, and a lot of the story text. The AI did not generate the gameplay feel, game mode or story ideas.</p>
+
+<!-- NEW 2026-08-01 — itch has no "Made with" field, so the tech goes here. -->
+<h2>Built with</h2>
+
+<p>No game engine. The Far Carry is hand-written <strong>TypeScript</strong> running in your browser — the play view is Canvas2D, the hole maps are SVG, and every sound is Web Audio, synthesized as it plays. It is built with <strong>Vite</strong>, tested with <strong>Vitest</strong> and headless Chromium, and wrapped with <strong>Capacitor</strong> for Android.</p>
+
+<p>The whole game ships as a single inlined <code>index.html</code>. No engine runtime, no asset bundle, no font files, no audio files — which is why it loads the way it does.</p>
+
+<h2>No accounts. No tracking.</h2>
+
+<p>The Far Carry collects nothing and sends nothing. No sign-up, no analytics, no telemetry, no ads, no cookies. Your save lives on your own device, and you can export your save as a file to make sure it won't be lost if you clear your browser cache, uninstall or change devices.</p>
+
+<h2>It installs as a web app, and plays offline</h2>
+
+<p>There is nothing to download and nothing to update — but you can install it properly as an app on your home screen. Installed, it runs with no connection at all, and your progress will be saved with the app.</p>
+
+<p>Open <a href="https://farcarry.vulpecula.games/">farcarry.vulpecula.games</a> and:</p>
+
+<ul>
+<li><strong>Android</strong> — in Chrome, let the page finish loading, then open the ⋮ menu and pick whichever option says <strong>Install</strong>. Depending on your version that reads <em>Install app</em>, <em>Add to Home screen</em> or <em>Install and create shortcut</em> — they all give you the real app. One that only says <em>Create shortcut</em> is a bookmark, not an app.</li>
+<li><strong>iPhone / iPad</strong> — open it in <strong>Safari</strong>, then Share → <em>Add to Home Screen</em>. It has to be Safari; on iOS every other browser gives you a bookmark instead.</li>
+<li><strong>Desktop</strong> — Chrome and Edge show an install icon in the address bar.</li>
+<li><strong>Anything else</strong> — most browsers can do it, but they all name it differently. Look for <em>Install</em> or <em>Add to Home screen</em> in the main menu.</li>
+</ul>
+
+<p>Installed properly, the game opens with no address bar. If you can still see one you got a bookmark — remove it, reload the page once, and try again.</p>
+
+<h2>Your save, and how not to lose it</h2>
+
+<p>Progress saves automatically, on your own device. No account and nothing in the cloud — which also means there is nobody who can restore it for you. So:</p>
+
+<ul>
+<li><strong>Export a backup.</strong> Settings → Save data → Export writes one file holding every campaign, your current run and your settings. Import brings it back, on any device, in any browser.</li>
+<li><strong>Clearing your browser's site data erases it.</strong> Private and incognito windows, and browsers that block third-party storage, can stop the game saving at all — if that happens the title screen tells you, rather than letting you find out at the end of a campaign.</li>
+<li><strong>Each place you play keeps its own save.</strong> Playing here, playing at farcarry.vulpecula.games, and the installed app are three separate spaces. The export file is the bridge between them.</li>
+</ul>
+
+<!-- NEW 2026-08-01 — the page said nothing about rights. -->
+<h2>Licence</h2>
+
+<p>The Far Carry is <strong>© 2026 Vulpecula Games, all rights reserved</strong> — the code, the art, the audio, the text and the design. A copy from an official channel is yours to play, and you are welcome to read the source, quote it, critique it and learn from it: that is why <a href="https://github.com/Foxorama/Golf-Stars">the repository is public</a>. Being able to read it is not a licence to reuse it, though. If you want to use something, just ask — permission is usually given.</p>
+
+<p>The game bundles a small amount of open-source code (Vite and Capacitor, both MIT). Their notices are in <code>THIRD-PARTY-NOTICES.md</code> in the repository.</p>
+
+<!--
+  The closer is a LORE FRAGMENT and it was reading as a fourth bullet about
+  backups. itch strips inline styles and <style>, so a bordered <div> is not an
+  option — <blockquote> is the one block its own CSS styles distinctly. The split
+  into two paragraphs does as much work as the border: the imperative has to land
+  on its own line, not as the third sentence of a paragraph about cosmology.
+-->
+<hr>
+
+<blockquote>
+<p>Golf is the ritual geometry that keeps the lights on. Most beings never know it.</p>
+<p><strong>Go and play a world true.</strong></p>
+</blockquote>
+
+<!-- ==================== END DETAILS BOX ==================== -->
