@@ -195,6 +195,45 @@ here: several guards read prose as input — `privacy.test.ts` fails when a stor
 missing from `PRIVACY.md`'s table (and vice-versa), and the one-description register scans source
 for banned re-derivations. A docs-only change in this repo can be genuinely red.
 
+### And a release runs it too (GS-release-gate)
+
+Deleting the `main` run left the `v*` tag as **the last path to a real player's phone with no gate of
+its own**. `pages.yml` and `itch.yml` both fire on the tag and both went straight to build-and-ship.
+That was defensible while `main` also ran CI; once it didn't, the only thing behind a release was a
+PR check on a commit that is not necessarily the one being tagged — a tag is a commit **plus whatever
+the release branch did to `package.json` on its way past**.
+
+Both now gate on the suite: `uses: ./.github/workflows/tests.yml`, with `build`/`push` on
+`needs: test`. **Called, never copied.** A release workflow that pasted the seven steps would be free
+to drift from the one the PR gate runs, and nobody reads the release copy until a release is already
+going out. `tests.yml` gained `workflow_call` and an explicit `permissions: contents: read` — a
+called workflow inherits the *caller's* permissions, and `pages.yml` holds `pages: write` +
+`id-token: write`, so without that line the test job would run holding a Pages deployment token.
+
+⚠️ **A tag starts both callers at once, and the concurrency key has to know that.** Keyed on
+`${{ github.ref }}` alone, `pages.yml` and `itch.yml` calling the same reusable workflow on the same
+tag land in one group — and with `cancel-in-progress: true` the second caller **cancels the first
+one's suite**. A cancelled job is a failed dependency, so the deploy that needed it is skipped: the
+release half-ships, one destination live and the other silently absent. The key is
+`${{ github.workflow }}-${{ github.ref }}`, because in a called workflow `github.workflow` is the
+**caller's** name (`tests-pages-…` vs `tests-itch-…`). On a PR it is still one group per PR, so
+superseding a stale commit is unchanged. Caught by reading, before shipping — there is no way to
+test it short of pushing a tag.
+
+**The cost, named rather than discovered later:** two full suites per release tag. A real duplicate,
+accepted on the rare path (a handful a month, $0 on a public repo) in exchange for the two
+destinations continuing to fail independently — if butler is down, Pages still ships. It is not the
+~60-a-day duplicate GS-ci-once deleted and should not be read as reversing it. Spending it once means
+folding both into a single `release.yml` (test → build once → deploy Pages + push itch from the same
+artifact), which would also make itch.yml's "the SAME `npm run build` output that pages.yml serves"
+structurally true instead of a comment sitting over two independent builds. That is its own change
+and its own PR: this path reaches players' phones, it has already produced three documented
+incidents, and none of it can be verified without cutting a real tag.
+
+**Known gap, not closed here:** the tag-vs-`package.json` assertion lives only in `itch.yml`. A
+mismatched tag fails the itch push and still deploys Pages with the wrong `APP_VERSION`. Worth fixing
+when the two workflows merge, since the assertion then becomes one job both destinations gate on.
+
 **Why this was looked at at all.** The question was whether to make the repo private. Private repos
 have been free since 2019, but three things silently downgrade on the Free plan: GitHub Pages stops
 publishing from a private repo (Pro/Team/Enterprise only) — which is `farcarry.vulpecula.games`, the

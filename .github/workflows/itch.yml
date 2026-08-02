@@ -39,7 +39,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # A RELEASE RUNS THE SUITE BEFORE IT REACHES ANYONE (GS-release-gate) — see the note in pages.yml.
+  # Called, never copied. ⚠️ This is the SECOND caller on the same tag, which is why tests.yml keys
+  # its concurrency group on `github.workflow`: without it the two callers share a group and cancel
+  # each other, and a cancelled dependency skips the deploy.
+  test:
+    uses: ./.github/workflows/tests.yml
+
   push:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

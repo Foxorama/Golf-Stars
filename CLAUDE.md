@@ -1934,7 +1934,7 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
 ## Testing & the test/demo hub
 - `tests/` (vitest) imports the pure `src/sim/` modules and asserts on seeded runs. CI
   (`.github/workflows/tests.yml`) runs the suite **once per change, on the PULL REQUEST** — not on
-  branch pushes. **Keep new game logic in `src/sim/` (pure)** so it's reachable from tests.
+  branch pushes — and again on a `v*` release tag (GS-release-gate, below). **Keep new game logic in `src/sim/` (pure)** so it's reachable from tests.
   **ONE RUN, AT THE MOMENT THE DECISION IS MADE** (GS-ci-once): the old `push: ['**']` +
   `pull_request` pair sat in different concurrency groups, so every commit on a branch with an open
   PR ran the whole ~7-minute suite TWICE on identical code (2,333 runs in the repo's first 39 days).
@@ -1944,6 +1944,20 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
   what replaces it (admin-UI only, like the `github-pages` ref policy): with it on, the merge commit
   CI tested IS what lands. ⚠️ Never add a docs `paths-ignore` — `privacy.test.ts` and the
   one-description register read prose as input, so a docs-only change here can be genuinely red.
+  **AND A RELEASE RUNS IT TOO** (GS-release-gate): `pages.yml`/`itch.yml` fire on a `v*` tag and each
+  `uses: ./.github/workflows/tests.yml` before they ship — a tag is not `main` (it is a commit plus
+  whatever the release branch did to package.json), and Pages is the origin real players have
+  INSTALLED, so it was the last path to a phone with no gate of its own. **Called, never copied** —
+  `workflow_call` + `permissions: contents: read` so a caller can't lend the suite its `pages: write`
+  /`id-token` scopes. ⚠️ **A tag starts BOTH callers at once**, which is why the concurrency key is
+  `${{ github.workflow }}-${{ github.ref }}`: in a called workflow `github.workflow` is the CALLER's
+  name, so they split into `tests-pages-…`/`tests-itch-…`; on `github.ref` alone they share a group
+  and `cancel-in-progress` has the second CANCEL the first, whose deploy is then skipped — a release
+  that quietly half-ships. This does mean **two suites per tag**, a duplicate accepted deliberately
+  (a handful a month on the rare path, and it keeps the two destinations failing independently) —
+  not the ~60/day one GS-ci-once deleted. Folding both into one `release.yml` is the way to spend it
+  once; that is its own change (`GS-release-onebuild` in IDEAS), because the release path reaches
+  players and cannot be verified without cutting a real tag.
 - **Test & demo hub** (`test.html` / `src/test/`, full story in `docs/decisions/process-and-deploy.md`).
   Re-implements ZERO game logic — it pokes the built artifact (Demo iframe) + imports the pure sim
   (Sim Lab). **Most changes need no hub edit** — content rows + sim behaviour are absorbed
