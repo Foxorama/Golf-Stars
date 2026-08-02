@@ -1933,8 +1933,17 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
 
 ## Testing & the test/demo hub
 - `tests/` (vitest) imports the pure `src/sim/` modules and asserts on seeded runs. CI
-  (`.github/workflows/tests.yml`) runs the suite on every push/PR. **Keep new game logic in
-  `src/sim/` (pure)** so it's reachable from tests.
+  (`.github/workflows/tests.yml`) runs the suite **once per change, on the PULL REQUEST** — not on
+  branch pushes. **Keep new game logic in `src/sim/` (pure)** so it's reachable from tests.
+  **ONE RUN, AT THE MOMENT THE DECISION IS MADE** (GS-ci-once): the old `push: ['**']` +
+  `pull_request` pair sat in different concurrency groups, so every commit on a branch with an open
+  PR ran the whole ~7-minute suite TWICE on identical code (2,333 runs in the repo's first 39 days).
+  The PR run is the one kept because it tests the MERGE COMMIT — a branch push tests the branch in
+  isolation, which can be green while the merge into `main` is red. The post-merge `main` run is
+  deliberately gone, and branch protection's **Require branches to be up to date before merging** is
+  what replaces it (admin-UI only, like the `github-pages` ref policy): with it on, the merge commit
+  CI tested IS what lands. ⚠️ Never add a docs `paths-ignore` — `privacy.test.ts` and the
+  one-description register read prose as input, so a docs-only change here can be genuinely red.
 - **Test & demo hub** (`test.html` / `src/test/`, full story in `docs/decisions/process-and-deploy.md`).
   Re-implements ZERO game logic — it pokes the built artifact (Demo iframe) + imports the pure sim
   (Sim Lab). **Most changes need no hub edit** — content rows + sim behaviour are absorbed
@@ -2005,7 +2014,7 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
   `?screen=travel|shop|starmart|trademarket|clubhouse` deep-link (GS-screen-deeplink, `jumpToScreen` in
   `app.ts` — a test-only URL param like `?rainbow=`/`?asgard=`, driven from the hub's Demo rail; it
   mounts each screen off the REAL reducer transitions, so a render bug can't hide behind it). CI installs
-  Chromium + runs `npm test`, so these guards run on every push/PR. See
+  Chromium + runs `npm test`, so these guards run on every PR. See
   `reports/regression-postmortem-2026-07-11.md`.
 - **Default to shipping all the way.** When a change is complete and tests are green, take it to done:
   open the PR, enable auto-merge (`enable_pr_auto_merge` — GitHub lands it when the required `test`
@@ -2013,7 +2022,9 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
   user says not to, or CI is red/unresolved. If CI is already green with no pending required check,
   `merge_pull_request` directly.
 - Repo settings auto-merge depends on are admin-UI only: *Allow auto-merge*, *Auto-delete head
-  branches*, and a branch-protection rule on `main` **requiring the `test` check**. Set once by hand.
+  branches*, and a branch-protection rule on `main` **requiring the `test` check** plus **Require
+  branches to be up to date before merging** (the second one is load-bearing now that CI runs only on
+  the PR — it is what makes the merge commit CI tested the one that lands). Set once by hand.
 - **THE `github-pages` ENVIRONMENT ALLOWS EXACTLY ONE REF, THE TAG `v*` — AND THAT LIVES OUTSIDE THE
   REPO** (GS-staging). `pages.yml`'s trigger is only half the gate: the environment carries its own
   deployment-ref policy, and it held a single `main` **branch** rule from the days when `main` WAS
