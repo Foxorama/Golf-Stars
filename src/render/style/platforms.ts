@@ -245,7 +245,7 @@ export interface CliffLook {
   contact: string; // contact shadow tucked under the lip
   /** How deep the extrusion runs, as a fraction of the platform's SHORT span, floored/capped in px
    *  (GS-cetus-void-deep). A ROW, because the same painter carries four materials with four jobs: a
-   *  derelict hull SECTION is a torn slab of ship and wants real depth, a Rainbow Road buttress is a
+   *  derelict hull SECTION is a torn slab of ship and wants real depth, a Rainbow Course buttress is a
    *  pillar, and the void/cetus landmass wants a SKIRT — enough to say "this is floating in space"
    *  and no more. Omitted ⇒ the classic 0.6/44/190, so ship + rainbow are byte-for-byte. */
   skirt?: { k: number; min: number; max: number };
@@ -322,7 +322,7 @@ export const SHIP_CLIFF: CliffLook = {
   shadow: 'rgba(2,5,10,0.5)',
   contact: 'rgba(4,8,14,0.34)',
 };
-// Rainbow Road (GS-rainbow-road-2): the ribbon rests on a PRISMATIC crystal buttress — the support
+// Rainbow Course (GS-rainbow-road-2): the ribbon rests on a PRISMATIC crystal buttress — the support
 // pillars must read as the rainbow world's OWN structure, not a recoloured void asteroid. So the
 // strata descend through genuinely DIFFERENT jewel hues (lit rose-magenta → violet → periwinkle →
 // teal-blue → deep blue → indigo abyss), an opalescent gradient that refracts the road's spectrum,

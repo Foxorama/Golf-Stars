@@ -34,7 +34,7 @@ export function currentEffect(): string | undefined {
   return state.course?.meta?.effect;
 }
 
-/** Rainbow Ball (GS-rainbow): whether the live loadout has armed Rainbow Road. Baked into the render
+/** Rainbow Ball (GS-rainbow): whether the live loadout has armed Rainbow Course. Baked into the render
  *  options at the app boundary (like `lefty()`), so the renderer paints the rainbow ribbon + the sim's
  *  OOB-off-road rule (both keyed off the same loadout flag) stay in lock-step. */
 export function rainbowActive(): boolean {

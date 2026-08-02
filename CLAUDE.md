@@ -491,7 +491,7 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
   - **Bosses** play on a separate `:boss` rng and scale with Ascension via `bossEdgeForRun` (the ONE
     source). The three voyage bosses also ESCALATE by arc via `cutBonus`→`arcRank` (GS-boss-escalation);
     rank 0 / A0 / common bag / Arc-I is the classic boss byte-for-byte.
-  - **ASGARD interlude** (`docs/decisions/asgard.md`; GS-asgard) — an eagle-or-better on Rainbow Road opens
+  - **ASGARD interlude** (`docs/decisions/asgard.md`; GS-asgard) — an eagle-or-better on the Rainbow Course opens
     the Bifröst to a 9-hole stroke-play tournament vs three `contender` golfers, scaled by
     `warriorsEdge(depth,ascension,voyage)` and tuned per context (`asgardFieldEdge`; edge 0 = base = byte-
     identical). The real run is SUSPENDED (`asgardReturn`), the Asgard run is never persisted; win or lose

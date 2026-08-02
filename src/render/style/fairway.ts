@@ -30,7 +30,7 @@ const FIRST_CUT_STEPS = 6;
 /** The single fringe ring the non-grounded worlds (void/cetus) keep, in course yards. */
 const FRINGE_YD = 3;
 
-/** The Rainbow Road colour cycle (GS-rainbow) — a vivid 7-band rainbow the ribbon mows through. */
+/** The Rainbow Course colour cycle (GS-rainbow) — a vivid 7-band rainbow the ribbon mows through. */
 const RAINBOW_BANDS = ['#ff3b5c', '#ff9a3d', '#ffe23d', '#49e06b', '#3bd1ff', '#5a6bff', '#c46bff'];
 
 /**
