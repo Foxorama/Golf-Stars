@@ -48,7 +48,7 @@ import {
   type FlightFeel,
 } from './trajectory';
 import { arcShapeOf, arrivalAngleDeg, flightProfileOf } from '../sim/flight';
-import { planRunout, sampleRunout, landingZoomFor, runoutCameraTarget, DEFAULT_RUNOUT_FEEL, type RunoutFeel, type RunoutPlan } from './runout';
+import { planRunout, sampleRunout, landingZoomFor, runoutCameraTarget, landingHandoverTarget, DEFAULT_RUNOUT_FEEL, type RunoutFeel, type RunoutPlan } from './runout';
 import {
   advanceFlightSpin,
   advanceRollPhase,
@@ -1322,17 +1322,23 @@ export function mountPlayView(
         // of the frame. Elsewhere in the flight it still follows: the ball outruns any leash there, and
         // the whole shot has to stay in frame.
         //
-        // ⚠️ IT MUST ARRIVE BEFORE THE BALL DOES, which is why this gates on `landingCam` — the same
-        // `landingZoomLeadMs` lead as the push-in — and not on `rollPhase`. Switched at touchdown, the camera is
-        // still ~16 screen pixels behind the ball it has been chasing all flight, and it spends the
-        // FIRST AND BIGGEST HOP catching up: traced out of the canvas, the ball moved 232 → 216 px
-        // BACKWARDS across its own biggest skip, because the world was panning forward faster than the
-        // ball was travelling. A bounce drawn moving the wrong way is worse than one drawn still.
-        // Easing to the pitch mark over the last beat of the flight lands the ball in a frame that has
-        // already stopped, which is what every broadcast does with a landing.
-        lastGround = landingCam
-          ? runoutCameraTarget(touchdown, ground, (frameH * F.runoutLeashFrac) / Math.max(1e-6, proj.scale))
-          : ground;
+        // ⚠️ IT MUST ARRIVE BEFORE THE BALL DOES, which is why the hand-over starts `landingZoomLeadMs`
+        // before touchdown and not at `rollPhase`. Switched at touchdown, the camera is still ~16 screen
+        // pixels behind the ball it has been chasing all flight and spends the FIRST AND BIGGEST HOP
+        // catching up: traced out of the canvas, the ball moved 232 → 216px BACKWARDS across its own
+        // biggest skip, because the world was panning forward faster than the ball was travelling.
+        //
+        // ⚠️⚠️ AND THE HAND-OVER IS A BLEND, NOT A SWITCH — see `landingHandoverTarget`, which is where
+        // that decision and the measurements behind it live. Switched outright it flung the ball
+        // backwards at 25 px/frame, which is the reported "lands then quickfast jerkily teleports".
+        const leashYd = (frameH * F.runoutLeashFrac) / Math.max(1e-6, proj.scale);
+        if (rollPhase) {
+          lastGround = runoutCameraTarget(touchdown, ground, leashYd);
+        } else if (landingCam && F.landingZoomLeadMs > 0) {
+          lastGround = landingHandoverTarget(ground, touchdown, (elapsed - (flightDur - F.landingZoomLeadMs)) / F.landingZoomLeadMs);
+        } else {
+          lastGround = ground;
+        }
         // The LANDING push-in outranks the redirect's easing tail (GS-landing-camera): a redirect is
         // resolved by mid-flight and its zoom is on its way back out, so `min` composes the two without
         // either having to know about the other — whichever wants the camera closer gets it, and the
