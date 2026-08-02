@@ -32,11 +32,30 @@ name: tests
 on:
   pull_request:
   workflow_dispatch:
+  # Callable, so a RELEASE can gate on the suite without a second copy of it (GS-release-gate).
+  # `pages.yml` and `itch.yml` each call this before they ship. The suite is described HERE and
+  # nowhere else — a release workflow that pasted these steps would be free to drift from the one
+  # the PR gate runs, which is the only version anyone has ever looked at.
+  workflow_call:
+
+# Declared so a caller cannot lend this its own scopes. `pages.yml` holds `pages: write` +
+# `id-token: write` to deploy, and a called workflow inherits the caller's permissions — without
+# this line the test job would run holding a Pages deployment token it has no business holding.
+permissions:
+  contents: read
 
 # Supersede an in-flight run when a newer commit lands on the same PR, so a stale PASS from an older
 # commit can never satisfy auto-merge's required check over fresh code.
+#
+# ⚠️ `github.workflow` IS IN THE KEY BECAUSE A TAG STARTS TWO CALLERS AT ONCE. Both `pages.yml` and
+# `itch.yml` fire on `v*` and both call this, and in a called workflow `github.workflow` is the
+# CALLER's name — so they land in `tests-pages-…` and `tests-itch-…` rather than one shared group.
+# On `${{ github.ref }}` alone they would share it, and with `cancel-in-progress` the second caller
+# would CANCEL the first one's suite; a cancelled job is a failed dependency, so the deploy that
+# needed it would be skipped. A release would quietly half-ship. On a PR this is still one group per
+# PR (`tests-tests-refs/pull/N/merge`), so superseding a stale commit works exactly as before.
 concurrency:
-  group: tests-${{ github.ref }}
+  group: tests-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

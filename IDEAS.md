@@ -664,6 +664,22 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
   fresh, planned session.
 
 ## Later
+- **GS-release-onebuild — one tag, one suite, one artifact, two destinations.** GS-release-gate put the
+  test suite in front of both release workflows, and the honest cost is that a `v*` tag now runs it
+  TWICE: `pages.yml` and `itch.yml` both fire on the tag and each calls `tests.yml`. Accepted for now —
+  it is the rare path (a handful a month, $0 on a public repo) and it keeps the two destinations failing
+  independently, so a butler outage still lets Pages ship. The way to spend it once is a single
+  `release.yml`: test → build ONCE → deploy Pages + push itch in parallel from the same artifact. That
+  also fixes something subtler — itch.yml's header says *"the SAME `npm run build` output that pages.yml
+  serves — itch and the Pages build can never be different code"*, which today is a claim about the
+  build COMMAND sitting over two genuinely independent builds; merging makes it structurally true. And
+  it gives the tag-vs-`package.json` assertion (currently itch-only, so a mismatched tag still deploys
+  Pages with the wrong `APP_VERSION`) one home both destinations gate on. Why it is not done yet: this
+  is the path that reaches installed phones, it has already produced three documented incidents (the
+  `github-pages` ref-policy refusal, staging serving raw source, the butler-channel save-loss risk), and
+  **none of it can be verified without cutting a real tag** — so it wants its own PR, deliberately, on a
+  day when a real release is going out behind it. Keep `deploy-pages` and `push-itch` as separate jobs
+  both on `needs: build`, or the independence is what the merge quietly costs.
 - **GS-spin-bag-build — make the whole-bag backspin an intentional BUILD, not an accident.** GS-spin-bag
   gated `backspinBoost` to the clubs that actually spin (PW and below), because a wedge-slot item was
   quietly taking 43% of the driver's run and zeroing the 7-iron's — which is zero roll, which is zero

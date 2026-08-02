@@ -31,7 +31,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A RELEASE RUNS THE SUITE BEFORE IT REACHES ANYONE (GS-release-gate). `main` is tested at merge
+  # (GS-ci-once), but a tag is not `main`: it is a specific commit plus whatever the release branch
+  # did to package.json on its way past, and this deploys to the origin real players have INSTALLED.
+  # It was the last path to a player's phone with no gate of its own. Called, never copied — the
+  # suite is described in tests.yml alone.
+  test:
+    uses: ./.github/workflows/tests.yml
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
