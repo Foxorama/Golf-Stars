@@ -58,6 +58,29 @@ self.addEventListener('activate', function (e) {
   );
 });
 
+/*
+ * THE SHELL IS ALWAYS REVALIDATED, BECAUSE "NETWORK-FIRST" WAS NOT (GS-sw-stale).
+ *
+ * `fetch(req)` reads the browser's HTTP cache like any other fetch, and GitHub Pages serves this
+ * game's index.html with `Cache-Control: max-age=600` — a header Pages does not let you change. So
+ * for ten minutes after any load, "network-first" answers a navigation out of the HTTP cache without
+ * ever asking the server, and an installed app relaunched inside that window shows the PREVIOUS
+ * build. Reproduced with a persistent browser profile against the real worker: a deploy landed and
+ * the app still rendered BUILD-1 on every relaunch — **and it did so with the service worker removed
+ * entirely**, which is what proves the worker was never the culprit.
+ *
+ * `cache: 'no-cache'` forces a conditional request every time: the shell is revalidated against the
+ * server on every launch, so a deploy is picked up on the very next one. It is NOT `no-store` — that
+ * would bypass the cache in both directions and re-download the whole 2.4MB single-file bundle on
+ * every launch, on mobile data. `no-cache` sends `If-None-Match`, so an unchanged build costs a 304.
+ *
+ * Only the SHELL gets this. Icons and the manifest are content-addressed enough to ride the ordinary
+ * path, and paying a revalidation round-trip for each of them would slow every cold start.
+ */
+function isShell(req, url) {
+  return req.mode === 'navigate' || url.pathname === '/' || /(^|\/)index\.html$/.test(url.pathname);
+}
+
 self.addEventListener('fetch', function (e) {
   var req = e.request;
   if (req.method !== 'GET') return; // only cache idempotent reads
@@ -65,7 +88,7 @@ self.addEventListener('fetch', function (e) {
   if (url.origin !== self.location.origin) return; // don't touch cross-origin (CDN, etc.)
 
   e.respondWith(
-    fetch(req)
+    (isShell(req, url) ? fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' }) : fetch(req))
       .then(function (res) {
         // Refresh the cache in the background; return the live response immediately.
         if (res && res.ok) {

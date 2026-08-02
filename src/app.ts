@@ -4580,8 +4580,15 @@ function registerServiceWorker(): void {
     if (!('serviceWorker' in navigator)) return;
     if (location.protocol !== 'https:' && location.protocol !== 'http:') return;
     // Relative URL → the worker scopes to our own subpath, never a sibling app on the origin.
+    //
+    // `updateViaCache: 'none'` is load-bearing (GS-sw-stale). By default the browser fetches sw.js
+    // for its UPDATE CHECK through the ordinary HTTP cache, and GitHub Pages serves it with
+    // `max-age=600` — so for ten minutes after a launch the browser asks its own cache whether the
+    // worker changed, is told no, and never installs the new one. Reproduced against a persistent
+    // profile: a deploy whose sw.js genuinely differed still left the old worker in place and the old
+    // cache un-swept. 'none' makes the check go to the server, which is the only place that knows.
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').catch(() => {
+      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {
         /* offline support is a bonus; never surface or block on its failure */
       });
     });
