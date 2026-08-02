@@ -11,7 +11,7 @@
  * sim said the ball rests, however the time is parameterised.
  */
 import { describe, it, expect } from 'vitest';
-import { planRunout, sampleRunout, apexOverLenFor, hopBite, landingZoomFor, runoutCameraTarget, DEFAULT_RUNOUT_FEEL, RUNOUT_BY_CLASS, type Landing, type RunoutPlan } from '../src/render/runout';
+import { planRunout, sampleRunout, apexOverLenFor, hopBite, landingZoomFor, runoutCameraTarget, landingHandoverTarget, DEFAULT_RUNOUT_FEEL, RUNOUT_BY_CLASS, type Landing, type RunoutPlan } from '../src/render/runout';
 import { arcApex, ARC_FEEL, arcShapeOf, arrivalAngleDeg, descentAngleDeg, flightCarryScale } from '../src/sim/flight';
 import { sampleCurvedFlight, flightDurationMs, flightGroundAt } from '../src/render/trajectory';
 import { ballRadiusPx } from '../src/render/ball';
@@ -1050,6 +1050,66 @@ describe('the camera lets go of the ball when it lands (GS-runout-clock)', () =>
       const cross = (ball[0] - pitch[0]) * (cam[1] - pitch[1]) - (ball[1] - pitch[1]) * (cam[0] - pitch[0]);
       expect(Math.abs(cross)).toBeLessThan(1e-6);
     }
+  });
+
+  it('the hand-over to the pitch mark never JUMPS — the teleport was the camera, twice', () => {
+    // The regression this pins, measured off the real canvas: switching the follow target to the pitch
+    // mark outright moves it forward by everything the ball has left to fly, and the ball's drawn
+    // ground speed went 0.26 → 25.35 px/frame in ONE frame, decaying over ten. Reported as "driver
+    // lands then quickfast jerkily teleports to its stopping point".
+    //
+    // Simulate the lead: a ball closing on its pitch mark at a driver's arrival speed, and walk the
+    // target frame by frame. The SWITCH is what a `u`-step of 1 models, and it is asserted to be the
+    // catastrophe — a test that only checked the blend would pass on the old code too.
+    const PITCH: [number, number] = [0, 0];
+    const LEAD_FRAMES = 18; // ~300ms at 60fps
+    const REACH = 84; // yards the ball still has to fly when the lead opens (a driver)
+    const ballAt = (i: number): [number, number] => [0, -REACH * (1 - i / LEAD_FRAMES)];
+    const walk = (target: (i: number) => [number, number]): number => {
+      let worst = 0;
+      for (let i = 1; i <= LEAD_FRAMES; i++) {
+        const a = target(i - 1);
+        const b = target(i);
+        worst = Math.max(worst, Math.hypot(b[0] - a[0], b[1] - a[1]));
+      }
+      return worst;
+    };
+    // The OLD behaviour: the target is the pitch mark from the first frame of the lead.
+    const switched = walk((i) => (i === 0 ? ballAt(0) : PITCH));
+    expect(switched, 'the switch really does jump most of the shot in one frame').toBeGreaterThan(REACH * 0.9);
+    // The blend: the biggest single-frame move is a small multiple of the BALL's own pace, not a
+    // multiple of the shot. It cannot be bounded by the ball's pace exactly, and that is not a
+    // slack threshold — it is arithmetic. The target has to REACH the pitch mark before the ball does,
+    // or the exponentially-easing camera is still lagging at touchdown (which is the backwards-first-hop
+    // bug this lead exists to fix); a target that merely kept pace with the ball would BE the ball, and
+    // hand nothing over. So it leads, and what must be bounded is by how much. Measured: 1.68x.
+    const pace = REACH / LEAD_FRAMES;
+    const blended = walk((i) => landingHandoverTarget(ballAt(i), PITCH, i / LEAD_FRAMES));
+    expect(blended, `blend peaks at ${(blended / pace).toFixed(2)}x the ball's pace`).toBeLessThan(pace * 2);
+    expect(blended).toBeLessThan(switched / 8);
+    // …and it RAMPS: no frame is a step change on the one before it, which is what a jerk looks like.
+    let prev = 0;
+    for (let i = 1; i <= LEAD_FRAMES; i++) {
+      const a = landingHandoverTarget(ballAt(i - 1), PITCH, (i - 1) / LEAD_FRAMES);
+      const b = landingHandoverTarget(ballAt(i), PITCH, i / LEAD_FRAMES);
+      const step = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (i > 1) expect(step, `frame ${i} steps ${(step / prev).toFixed(2)}x the frame before`).toBeLessThan(prev * 2);
+      prev = Math.max(step, 1e-6);
+    }
+  });
+
+  it('the hand-over agrees with both neighbours it joins', () => {
+    // Continuity is the whole property: at u=0 nothing has changed yet (the target is still the ball),
+    // and at u=1 the ball has ARRIVED at the pitch mark, so the blend and the dead-zone that takes over
+    // from it return the same point. A corner at either join is a visible jerk.
+    const ball: [number, number] = [10, -84];
+    const pitch: [number, number] = [12, 0];
+    expect(landingHandoverTarget(ball, pitch, 0)).toEqual([10, -84]);
+    expect(landingHandoverTarget(pitch, pitch, 1)).toEqual([12, 0]);
+    expect(runoutCameraTarget(pitch, pitch, 20)).toEqual([12, 0]);
+    // …and it is clamped, so a caller that overshoots the window cannot drive it past the pitch mark.
+    expect(landingHandoverTarget(ball, pitch, 1.4)).toEqual([12, 0]);
+    expect(landingHandoverTarget(ball, pitch, -0.3)).toEqual([10, -84]);
   });
 
   it('the leash is long enough that an ordinary landing never moves the camera at all', () => {
