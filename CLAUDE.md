@@ -261,6 +261,30 @@ This game lives or dies on three axes — put every change through all three bef
   campaign. No `BACKUP_VERSION` bump (the roster's SHAPE is unchanged); a v8 campaign meeting a v7
   build is refused loudly by `campaignStoreTooNew`, which is precisely what GS-save-integrity is for.
   Guarded by `tests/story-flow.test.ts`.
+  **THERE ARE TWO EXITS: ONE PARKS THE ROUND AND ONE THROWS IT AWAY** (GS-leave-round,
+  `ui/resumable.ts abandonCost`/`abandonTarget` pure · `ui/back.ts abandonPrompt` the words). Between
+  them GS-save-slots and GS-story-round-resume made the game very good at never discarding anything,
+  which left **no way to discard anything**: a Story world round teed off by accident could only be
+  escaped by `storyRestartCampaign`, which destroys the whole campaign; a Star Tour round came back
+  every time you opened the mode; and "I am finished with this run" could not be said at all.
+  `abandonCost` is `resumeCost`'s twin and mirrors `runModeOf`'s discrimination in the SAME order
+  (`storyRound` first — a story round is played on the strokeplay format) — `world` (the campaign keeps
+  everything; only the round goes, and the world can be flown back to) · `round` (discarded, posts no
+  record) · `run` (ends here, pays out nothing) · **`null` for Asgard, where leaving already forfeits
+  and a second control would be the same button twice**. `abandonTarget` is the ONE predicate: it
+  renders the row, words the confirm and guards BOTH reducer cases, so a forged action can't reach a
+  write the UI would not have offered (and a Star Tour golfer with no course pinned has nothing to
+  discard — `slotTag`'s judgement). **THE VERB CHANGES WHEN THE THING CHANGES**: a Voyage stop is four
+  holes inside a run with no smaller unit to leave, so its control says *Give up this run* — calling it
+  "leave the round" would be a lie about what the button does. `AbandonCopy` hands out label + body
+  together so a renderer cannot take one without the other. Two writes are ALSO one description each:
+  the world case drops the round by clearing `play` and re-reading `campaignWithLiveRound` (never by
+  editing `liveRound`), and the run case marks the run `ended` and delegates to `toTitle` rather than
+  re-listing its resets. **Nothing is banked, and that is structural, not a flag** — `leaveRound` never
+  calls `runEndUpdates`, the only thing that posts a record or pays a shard; `EndReason` gains
+  `'abandoned'` and `cashOutShards`'s keeps-credits test is an ALLOWLIST, so a new reason lands on the
+  safe side by default. Guarded by `tests/leave-round.test.ts` + the browser half in
+  `tests/settings-sheet.test.ts`.
   **THIS BUILD NEVER OVERWRITES DATA IT COULD NOT FULLY READ** (GS-save-integrity, `save/integrity.ts` ·
   `save/schema.ts readSave` · `docs/decisions/save-integrity.md`). `migrate()` answered every blob it
   didn't understand with `defaultSave()` — its return type is `Save`, so "I can't read this" had nowhere

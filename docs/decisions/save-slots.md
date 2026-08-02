@@ -303,3 +303,108 @@ disk that state doesn't know about is a round the Continue button cannot see.
 No `BACKUP_VERSION` bump: the roster's shape is unchanged. A v8 campaign meeting a v7 build is refused
 loudly by `campaignStoreTooNew` rather than silently truncated, which is exactly the case
 GS-save-integrity shipped for that morning.
+
+---
+
+## Postscript: the other exit (GS-leave-round, 2026-08-02)
+
+### The hole this feature dug
+
+GS-save-slots gave every mode its own parked run, and GS-story-round-resume gave a campaign its own
+live round. Between them they made the game very good at never throwing anything away — and left no
+way to throw anything away.
+
+The report:
+
+> *"Because of the save changes there's no way to finish a round now without restarting a new game
+> mode. Which, y'know, not so bad for The Voyage and Unending Universe, but for Story Tour, once you
+> start a round, either on purpose or on accident, there's no way to back out."*
+
+That reading is exactly right, and the Voyage/Unending caveat is right for a reason worth writing
+down: those two have `bank` (GS-bank), a voluntary cash-out at the travel screen, so they always had
+*an* ending. The other two had none.
+
+- A **Story world round** teed off by accident put a `liveRound` on the campaign, and
+  `storyContinueCampaign` rebuilds it on every entry. The only control that could clear it was
+  `storyRestartCampaign` — which destroys the whole campaign. The escape hatch cost more than the
+  thing being escaped.
+- A **Star Tour round** you had lost interest in was parked in its slot and offered back for ever.
+- And there was no way at all to say *"I am finished with this run"* mid-stop.
+
+### Two exits, and they must say different things
+
+`resumeCost` answered "what does parking cost" and every exit surface read it, because parking was
+the only exit. So the shape of the fix is its twin:
+
+| `abandonCost` | when | what it does |
+| --- | --- | --- |
+| `'world'` | a Story world round | campaign keeps everything; only the round goes, and the world can be flown back to |
+| `'round'` | a Star Tour round | discarded, posts no record |
+| `'run'` | Voyage / Unending | ends here, pays out nothing |
+| `null` | Asgard | **no separate control** — leaving already forfeits (`resumeCost` says so) |
+
+The discrimination is `runModeOf`'s, in the same order and for the same reason: a story round is
+played on the strokeplay format, so `storyRound` has to be asked first or a campaign round is filed
+as a Star Tour one and offered the wrong sentence.
+
+`abandonTarget(state)` is the ONE predicate — it renders the settings row, words the confirm, and
+guards *both* reducer cases, so a forged action can never reach a destructive write the UI would not
+have offered. It also excludes a Star Tour golfer standing on the chart with no course pinned, which
+is the same judgement `slotTag` makes about whether a parked run is worth offering back.
+
+### The verb changes when the thing changes
+
+A Voyage stop is four holes inside a run with no smaller unit to leave. Calling its control "Leave
+the round" would be a lie about what the button does, so it says **Give up this run** — and the
+confirm and its button follow. `abandonPrompt` returns label, body, title and confirm label as one
+`AbandonCopy`, so a renderer cannot take the label without the matching promise.
+
+### Two writes, one description each
+
+- **`'world'`** clears `play` and re-reads `campaignWithLiveRound`, rather than editing `liveRound`
+  itself. That function is the one description of what a campaign parks and it reads the live state;
+  editing the field here would be the second description. The answer is folded back into
+  `state.campaigns` in the same action — writing one and not the other is GS-resume-slot-loss in the
+  campaign's half.
+- **`'run'`** marks the run `ended` and delegates to `toTitle`. `resumableState` already empties the
+  slot of a run that is not active — the same rule that retires a finished one — so this adds no new
+  path to a destructive write, and `toTitle` keeps owning every field that has to be cleared on the
+  way to the title rather than having them re-listed.
+- **`'round'`** clears the slot explicitly and rebuilds a fresh strokeplay run for the same golfer, so
+  the chart's flight and pick machinery has something clean to work on and nothing is left to
+  continue.
+
+### Nothing is banked, structurally
+
+`leaveRound` never calls `runEndUpdates`, which is the only thing that posts a record or pays a
+shard. `EndReason` gains `'abandoned'` so `status: 'ended'` is never reasonless — and note that
+`cashOutShards`'s keeps-credits test is an ALLOWLIST, so a new reason lands on the safe side by
+default. Two locks, one of which was already there.
+
+### Where it lives
+
+The settings sheet's footer, above Return to title — the safe exit stays nearest the thumb — as a
+full-width `.gs-setrow` rather than a More tile, because it has a whole sentence to say before it is
+tapped (GS-settings-more, which was done first to make the room). Back/Escape **cancels** the confirm
+like every other tier-0 layer, and that matters more here than for its twin: `cancelExit` merely
+keeps you in a round you were going to park, where a stray second press on this one would throw a
+round away for good.
+
+### No register row, deliberately
+
+`abandonPrompt` has two renderers and `abandonTarget` has three callers, so the admission rule is met
+— but neither candidate pattern survives the header's other rule. A literal scan for the copy would
+not catch the actual failure mode (somebody typing *different* words on a third surface), and banning
+the mode discrimination outside `resumable.ts` would flag the many legitimate reads of `storyRound`.
+The behavioural guard is that the row's sub-line and the confirm's body are the same field of one
+object, which `tests/leave-round.test.ts` asserts. A brittle row or a crying-wolf row is worse than
+no row; `resumePromise`, the older and more load-bearing twin, has none for the same reason.
+
+### Guard
+
+`tests/leave-round.test.ts` (pure, 15 cases): the cost per format including Asgard's `null`, the
+three nothing-to-give-up cases, the verb rule, back cancelling the confirm, and a walkthrough per
+mode — a Story round handing the campaign back whole with a parked Voyage untouched, a Star Tour
+round posting no record and emptying its slot, a Voyage run paying out nothing. The browser half is
+in `tests/settings-sheet.test.ts`: the row is absent on the title, present mid-run naming the *run*,
+raises a confirm without leaving anything, and "Keep playing" really keeps you playing.

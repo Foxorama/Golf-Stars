@@ -97,7 +97,11 @@ export { snapshotRun, resumeRun } from './runSerialise';
 export type { RunSnapshot, RoundProgress } from './runSerialise';
 
 export type RunStatus = 'active' | 'ended';
-export type EndReason = 'cut' | 'banked' | 'won' | 'stranded';
+/** How a run stopped. `'abandoned'` (GS-leave-round) is the player giving it up from the settings
+ *  sheet — and note that `cashOutShards`'s keeps-credits test is an ALLOWLIST, so a new reason lands
+ *  on the safe side by default: a run you walked away from cashes nothing out. It never reaches the
+ *  payout path at all (`leaveRound` does not call `runEndUpdates`); the allowlist is the second lock. */
+export type EndReason = 'cut' | 'banked' | 'won' | 'stranded' | 'abandoned';
 
 export interface StopResult {
   stopIndex: number;

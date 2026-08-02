@@ -28,7 +28,7 @@
  * `title` is the ONE screen where back exits the app. Nowhere else may close the game.
  */
 import type { Action, Screen, UiState } from './gameState';
-import { resumeCost } from './resumable';
+import { abandonTarget, resumeCost } from './resumable';
 
 /** What the caller should do about a back press. */
 export type BackIntent =
@@ -178,6 +178,10 @@ export function backIntent(state: UiState, ctx: BackContext = {}): BackIntent {
   // Tier 0, innermost first. The exit confirm is the newest layer, so back cancels it rather than
   // confirming — a second back press must never be able to leave the round.
   if (state.pendingExit) return { kind: 'dismiss', action: { type: 'cancelExit' } };
+  // GS-leave-round: the give-it-up confirm is the same layer and the same rule — back CANCELS it. This
+  // one matters more than its twin: `cancelExit` merely keeps you in a round you were going to park,
+  // where a stray second press here would throw away a round for good.
+  if (state.pendingLeave) return { kind: 'dismiss', action: { type: 'cancelLeaveRound' } };
   // The club picker is raised FROM the play screen and the settings sheet inerts it, so the two are
   // never both live; it is listed first because it is the innermost thing a play-screen back can mean.
   if (ctx.clubPickerOpen) return { kind: 'closeClubPicker' };
@@ -228,4 +232,56 @@ export function resumePromise(state: UiState): string {
 /** The copy for the leave-the-round confirm. */
 export function exitPrompt(state: UiState): { title: string; body: string; confirmLabel: string } {
   return { title: 'Leave this round?', body: resumePromise(state), confirmLabel: 'Leave round' };
+}
+
+/**
+ * WHAT GIVING IT UP COSTS, in one sentence and one verb — the `resumePromise` of the OTHER exit
+ * (GS-leave-round).
+ *
+ * It sits here, beside its twin, for the same reason: the settings row that offers it and the confirm
+ * card that takes the tap both read this, so a control can never promise something milder than the
+ * write. `null` when there is nothing to give up — the row is not rendered and the reducer refuses,
+ * both off the same `abandonTarget`.
+ *
+ * **The verb changes when the thing changes.** A Voyage stop is not a round, it is four holes inside a
+ * run with no smaller unit to leave, so calling its control "Leave the round" would be a lie about
+ * what the button does. Naming what you are actually giving up is the whole job of this function.
+ */
+export interface AbandonCopy {
+  /** The settings row's bold label. */
+  label: string;
+  /** The one sentence about what it costs — the row's sub-line AND the confirm's body. */
+  body: string;
+  /** The confirm card's heading. */
+  title: string;
+  /** The confirm's destructive button. */
+  confirmLabel: string;
+}
+
+export function abandonPrompt(state: UiState): AbandonCopy | null {
+  switch (abandonTarget(state)) {
+    case 'world':
+      return {
+        label: '🚪 Leave this round',
+        body: 'Your campaign keeps everything it has earned. Only this world’s round is discarded — you can fly back and play it again.',
+        title: 'Leave this round?',
+        confirmLabel: 'Leave the round',
+      };
+    case 'round':
+      return {
+        label: '🚪 Leave this round',
+        body: 'The round is discarded and posts no record. Your golfer, ships and Star Shards are untouched.',
+        title: 'Leave this round?',
+        confirmLabel: 'Leave the round',
+      };
+    case 'run':
+      return {
+        label: '🚪 Give up this run',
+        body: 'The run ends here and pays out nothing. Your Star Shards, unlocks and any run parked in another mode are untouched.',
+        title: 'Give up this run?',
+        confirmLabel: 'Give up the run',
+      };
+    default:
+      return null;
+  }
 }

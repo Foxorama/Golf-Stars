@@ -17,7 +17,7 @@ import type { UiState } from './gameState';
 import type { StoryLiveRound, StoryState } from '../sim/rpg/story';
 import { snapshotRun } from '../sim/rpg/run';
 import type { RoundProgress } from '../sim/rpg/run';
-import { ASGARD_FORMAT } from '../sim/rpg/formats';
+import { ASGARD_FORMAT, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
 import {
   clearSlot,
   runModeOf,
@@ -62,6 +62,55 @@ export function resumeCost(formatId: string | undefined, storyRound?: boolean): 
   if (storyRound) return 'hole';
   if (formatId === ASGARD_FORMAT) return 'forfeit';
   return 'hole';
+}
+
+/**
+ * WHAT GIVING IT UP COSTS — the other half of the leaving question (GS-leave-round).
+ *
+ * `resumeCost` answers "what does PARKING cost", and every exit in the game read it, because parking
+ * was the only exit there was. That is the hole this fills: with a slot per mode and a campaign
+ * carrying its own round, nothing was ever thrown away — so a Story world round teed off by accident
+ * could only be escaped by starting the whole campaign over, and there was no way to say "I am done
+ * with this run" at all.
+ *
+ *  - `'world'` — a Story world round. The campaign keeps everything; only the round goes, and the
+ *    world can be flown back to and played again.
+ *  - `'round'`  — a Star Tour round. Discarded, and it posts no record.
+ *  - `'run'`    — a Voyage or an Unending run. It ends here and pays out NOTHING (which is a property
+ *    of `leaveRound` never touching `runEndUpdates`, not of a flag).
+ *  - `null`     — there is no separate abandon here. Asgard is the only case: leaving already forfeits
+ *    the tournament (`resumeCost` says so), so a second control would be the same button twice.
+ *
+ * The discrimination is `runModeOf`'s, in the same order and for the same reasons — `storyRound` first
+ * because a story round is played on the strokeplay format, then Asgard's null. Voyage and Unending
+ * collapse to one answer because giving up means the same thing in both.
+ */
+export type AbandonCost = 'world' | 'round' | 'run';
+
+export function abandonCost(formatId: string | undefined, storyRound?: boolean): AbandonCost | null {
+  if (storyRound) return 'world';
+  if (formatId === ASGARD_FORMAT) return null;
+  if (formatId === STROKEPLAY_FORMAT) return 'round';
+  return 'run';
+}
+
+/**
+ * Is there anything here to give up, and what is it? — the ONE predicate every surface asks.
+ *
+ * The settings row is shown by it, `abandonPrompt` words itself from it, and the reducer refuses
+ * without it, so a forged action cannot reach a destructive write the UI would not have offered.
+ *
+ * A Star Tour run with no course pinned is deliberately excluded: that is a golfer standing on the
+ * star map with nothing played, the same judgement `slotTag` makes about whether a parked run is
+ * real. Offering to discard it would be offering to discard nothing.
+ */
+export function abandonTarget(state: UiState): AbandonCost | null {
+  const run = state.run;
+  if (run.status !== 'active' || !run.loadout.characterId) return null;
+  const cost = abandonCost(run.formatId, run.storyRound);
+  if (!cost) return null;
+  if (cost === 'round' && !run.staticCourseId) return null;
+  return cost;
 }
 
 /** Does this run continue on the hole it was left on? */
