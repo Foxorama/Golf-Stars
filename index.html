@@ -1976,6 +1976,13 @@
       .gs-seghint { font-size: 12px; opacity: .7; margin: 8px 2px 0; min-height: 15px; line-height: 1.4; }
       .gs-setfoot { margin-top: 16px; padding-top: 4px; border-top: 1px solid var(--gs-line); }
       .gs-setrow--nav { border-top: none; }
+      /* …but a SECOND exit row needs the divider back, or the two run together. */
+      .gs-setfoot .gs-setrow--nav + .gs-setrow--nav { border-top: 1px solid var(--gs-line-2); }
+      /* The give-it-up exit (GS-leave-round) stands above Return to title and must not read as its
+         twin — one parks the round, the other throws it away. A warm LABEL is the whole distinction:
+         the row itself stays quiet, because a loud destructive control invites the tap it exists to
+         make deliberate. (The confirm card behind it is where the weight belongs.) */
+      .gs-setrow--leave .gs-setlabel b { color: #ffc4b8; }
       /* An anchor used as a settings control needs the two things a <button> brings for free:
          no underline, and `box-sizing` on a flex row it does not otherwise inherit. */
       .gs-setrow--link { text-decoration: none; box-sizing: border-box; }

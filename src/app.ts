@@ -125,7 +125,7 @@ import { loreScreen } from './app/loreScreens';
 import { storyMidBeatScreen, storyQuestBeatScreen, storyQuestOfferScreen } from './app/storyMidroundScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
-import { exitConfirmOverlay, priceNoticeOverlay, saveView, scrambleChoiceOverlay, settingsOverlay, settingsSheetInner, shotPopupOverlay } from './app/overlays';
+import { exitConfirmOverlay, leaveConfirmOverlay, priceNoticeOverlay, saveView, scrambleChoiceOverlay, settingsOverlay, settingsSheetInner, shotPopupOverlay } from './app/overlays';
 import { applyOverlayFocus, captureFocusOrigin, focusPlayStroke, preservingFocus, wireRoleButtonKeys } from './app/focus';
 import { announce, shotSentence, situationSentence } from './app/announce';
 import {
@@ -2877,6 +2877,16 @@ function wireSettingsSheet(root: ParentNode): void {
       dispatch({ type: 'toTitle' });
     });
   });
+  // "Leave round" / "Give up this run" (GS-leave-round): close the sheet and raise the confirm. It
+  // never leaves anything itself — the reducer refuses `requestLeaveRound` on the same predicate the
+  // row is rendered by, so the destructive step is always a second, deliberate tap on its own card.
+  root.querySelectorAll<HTMLElement>('[data-settings-leave]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      settingsOpen = false;
+      dispatch({ type: 'requestLeaveRound' });
+    });
+  });
   wireSaveTransfer(root);
 }
 
@@ -3333,6 +3343,9 @@ function render(): void {
   // The leave-the-round confirm (GS-android-back) rides over every screen like the settings sheet;
   // only a back press inside a run can raise it.
   const exitConfirm = state.pendingExit ? exitConfirmOverlay() : '';
+  // …and its destructive twin (GS-leave-round), raised only from the settings sheet's leave row.
+  // `leaveConfirmOverlay` returns '' when there is nothing to give up, so a stale flag draws nothing.
+  const leaveConfirm = state.pendingLeave ? leaveConfirmOverlay() : '';
   // The club picker (GS-hud-bag) — raised by the play screen's bag. A DIRECT child of #app like every
   // other sheet, so it gets the dialog/focus/inert pass (and silences the arrow-key aim) for free.
   // Gated hard on "there is a shot to club up for": a stale flag can never show it anywhere else.
@@ -3352,7 +3365,7 @@ function render(): void {
   // Note what has focus BEFORE the DOM is torn down (GS-a11y-focus) — it is the last moment the
   // information exists, and closing an overlay needs it to hand focus back to whatever opened it.
   captureFocusOrigin();
-  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}${fit ? ' gs-main--fit' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${introTraits}${introField}${priceNotice}${exitConfirm}${clubPicker}`;
+  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}${fit ? ' gs-main--fit' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${introTraits}${introField}${priceNotice}${exitConfirm}${leaveConfirm}${clubPicker}`;
   app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
 
   // Star Tour star map (GS-star-tour): on first mount, centre the pannable chart on the worlds'

@@ -115,7 +115,7 @@ import {
   UNKNOWN_GOLFER,
   type SlotTag,
 } from '../sim/rpg/runSlots';
-import { campaignWithLiveRound, resumableState } from './resumable';
+import { abandonTarget, campaignWithLiveRound, resumableState } from './resumable';
 import {
   autoDecision,
   awaitingPutt,
@@ -2638,8 +2638,10 @@ export function reduce(state: UiState, action: Action): UiState {
         bossReward: undefined,
         manageCharacterId: undefined,
         // The back-button confirm (GS-android-back) is what usually dispatches this; clear it so the
-        // card can never survive onto the title screen.
+        // card can never survive onto the title screen. Same for its give-it-up twin (GS-leave-round),
+        // which reaches here for a Voyage/Unending run.
         pendingExit: undefined,
+        pendingLeave: undefined,
         // …and the same for the Story golfer/campaign picker's own state. `toTitle` is the ONE way off
         // that screen (its back button, hardware BACK, the settings sheet's escape hatch all land here),
         // and `pendingStoryNew` is what makes screen `character` render the clubhouse picker instead of
@@ -2670,6 +2672,105 @@ export function reduce(state: UiState, action: Action): UiState {
     case 'cancelExit': {
       if (!state.pendingExit) return state;
       return { ...state, pendingExit: undefined };
+    }
+
+    case 'requestLeaveRound': {
+      // GS-leave-round: raise the give-it-up confirm. Guarded by the SAME predicate the settings row is
+      // rendered by, so a forged action can never reach a destructive write the UI would not have
+      // offered — and refusing when there is nothing to give up keeps this from becoming a second,
+      // unguarded way to bin a run (the `slotRequestRestart` shape).
+      if (!abandonTarget(state)) return state;
+      return { ...state, pendingLeave: true };
+    }
+
+    case 'cancelLeaveRound': {
+      if (!state.pendingLeave) return state;
+      return { ...state, pendingLeave: undefined };
+    }
+
+    case 'leaveRound': {
+      // GS-leave-round: THE OTHER EXIT. `toTitle` parks; this one throws the round away and hands the
+      // player back to the place it was started from. Three answers, from the one function that decides
+      // what abandoning costs — never re-derived here, or the confirm could promise one thing and the
+      // write do another.
+      const cost = abandonTarget(state);
+      if (!cost) return state;
+      const base = { ...state, pendingLeave: undefined, pendingExit: undefined };
+
+      if (cost === 'world') {
+        // A Story world round belongs to its campaign, so leaving lands at the campaign's own hub — the
+        // screen `storyContinueCampaign` reaches when there is no live round, which is exactly the state
+        // we are putting the campaign back into. The round is dropped by CLEARING `play`, not by editing
+        // `liveRound`: `campaignWithLiveRound` is the one description of what the campaign parks, and it
+        // reads the live state. Editing the field here would be the second description.
+        const run = startRun(state.run.seed, undefined, state.metaUpgrades, undefined, 0, state.bagTier);
+        const next: UiState = {
+          ...base,
+          run,
+          course: currentCourse(run),
+          screen: 'story',
+          play: undefined,
+          holeRng: undefined,
+          stopPlayed: undefined,
+          played: undefined,
+          lastResult: undefined,
+          match: undefined,
+          scrambleChoice: undefined,
+          viewHole: 0,
+        };
+        // …and fold the campaign's now-round-less shape back into state, so the golfer picker (which
+        // reads `state.campaigns`, not the blob) cannot go on offering a round that is gone. Writing one
+        // and not the other is GS-resume-slot-loss in the campaign's half.
+        const story = campaignWithLiveRound(next);
+        return story ? { ...next, story, campaigns: upsertCampaign(next.campaigns, story) } : next;
+      }
+
+      // Star Tour and the two run modes both end up at a screen with no live round, and both must EMPTY
+      // the slot they were parked in — `resumableState` leads the save and only a confirmed start-over
+      // or a run ENDING may remove an entry (GS-save-slots), which is precisely what this is. Marking
+      // the run `ended` is what makes `resumableState` agree rather than re-park it on the way out.
+      const mode = runModeOf(state.run.formatId, state.run.storyRound);
+      const runSlots =
+        mode && mode !== 'story' ? clearSlot(state.runSlots, mode, state.run.loadout.characterId) : state.runSlots;
+      const given: UiState = {
+        ...base,
+        runSlots,
+        run: { ...state.run, status: 'ended', endedReason: 'abandoned' },
+      };
+      if (cost === 'round') {
+        // A Star Tour round hands you back to the chart you picked the course on — the mode, not the
+        // title. `resumableState` sees a run that is over and empties the slot, so the pointer is left
+        // alone and nothing is offered back. NOTHING is banked: this action never calls `runEndUpdates`,
+        // which is the only thing that posts a record or pays a shard.
+        const fresh = startRun(
+          state.run.seed,
+          STROKEPLAY_FORMAT,
+          state.metaUpgrades,
+          state.run.loadout.characterId,
+          state.run.ascension,
+          state.run.bagTier,
+          state.run.unlockedClubs,
+        );
+        return {
+          ...given,
+          run: fresh,
+          course: currentCourse(fresh),
+          screen: 'starTour',
+          starTourPick: undefined,
+          play: undefined,
+          holeRng: undefined,
+          stopPlayed: undefined,
+          played: undefined,
+          lastResult: undefined,
+          match: undefined,
+          scrambleChoice: undefined,
+          viewHole: 0,
+        };
+      }
+      // A Voyage or Unending run has no containing place to return to — the run IS the thing — so it
+      // ends and the title is where you land. `toTitle` owns every field that has to be cleared on the
+      // way there; re-listing them here is the two-descriptions bug this codebase keeps paying for.
+      return reduce(given, { type: 'toTitle' });
     }
 
     case 'restart': {

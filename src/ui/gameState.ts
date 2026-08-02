@@ -266,6 +266,12 @@ export interface UiState {
    *  See `ui/back.ts` — the confirm exists because leaving mid-stop replays that stop, not because
    *  anything is lost (`toTitle` keeps the run resumable). */
   pendingExit?: boolean;
+  /** A pending LEAVE-THE-ROUND-FOR-GOOD confirmation (GS-leave-round): the other exit, raised from the
+   *  settings sheet's footer. Where `pendingExit` parks the round and goes to the title, this one
+   *  DISCARDS it — a Story world round handed back to its campaign, a Star Tour round posting no
+   *  record, a Voyage/Unending run given up. Transient (never persisted); cleared on confirm/cancel
+   *  and by `toTitle`. What it costs, and what it is even called, comes from `abandonPrompt`. */
+  pendingLeave?: boolean;
   /** The suspended real run (GS-asgard): when an eagle-or-better on the Rainbow Course opens the Bifröst, the
    *  current run is snapshotted here while the Asgard tournament plays in `run`. Restored (perks edited)
    *  on the tournament's end. The Asgard run is never persisted, so a mid-tournament quit resumes THIS. */
@@ -667,6 +673,9 @@ export type Action =
   | { type: 'setCharacterBagTier'; tier: BagTier } // pick the managed golfer's Unending-Universe starting bag tier (GS-wardrobe-bagtier)
   | { type: 'requestExit' } // GS-android-back: raise the "leave this round?" confirm (back pressed in a run)
   | { type: 'cancelExit' } // GS-android-back: dismiss that confirm and stay in the round
+  | { type: 'requestLeaveRound' } // GS-leave-round: raise the GIVE-IT-UP confirm (settings sheet)
+  | { type: 'cancelLeaveRound' } // GS-leave-round: dismiss that confirm and stay in the round
+  | { type: 'leaveRound' } // GS-leave-round: abandon the round/run for good, per `abandonCost`
   | { type: 'backupExported' } // GS-backup-nudge: a backup actually landed — stamp the run counter
   | { type: 'toTitle' } // back to the title from anywhere (GS-settings-nav) — an underway run stays resumable
   | { type: 'restart'; seed?: number | string };

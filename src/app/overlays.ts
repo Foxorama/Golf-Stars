@@ -6,7 +6,7 @@
  */
 
 import { state } from './ctx';
-import { exitPrompt, resumePromise } from '../ui/back';
+import { abandonPrompt, exitPrompt, resumePromise } from '../ui/back';
 import { teamDuel, teamPartnerChar } from './duelHud';
 import { getCharacter } from '../sim/rpg/characters';
 import { storyPartnerName } from '../sim/rpg/storyPartners';
@@ -301,10 +301,24 @@ export function settingsSheetInner(): string {
   ).join('');
   const activeScale = SCALE_OPTS.find((o) => o.v === scale) ?? SCALE_OPTS[0]!;
   const midRun = state.run.status === 'active' && !!state.run.loadout.characterId;
+  // GS-leave-round: the OTHER exit, above the one that parks. Its label and its promise both come from
+  // `abandonPrompt`, because what you are giving up — a world's round, a Star Tour card, a whole run —
+  // decides what the control is even called; `null` ⇒ nothing to give up ⇒ no row, the same predicate
+  // the reducer refuses on. It sits FIRST because "save and quit" is the safe one and belongs nearest
+  // the thumb at the bottom, and it is rendered as a `.gs-setrow` rather than a More tile because it
+  // has a whole sentence to say before it is tapped (GS-settings-more).
+  const leave = abandonPrompt(state);
+  const leaveRow = leave
+    ? `<button class="gs-setrow gs-setrow--nav gs-setrow--leave" data-settings-leave="1">
+            <span class="gs-setlabel"><b>${leave.label}</b><span>${leave.body}</span></span>
+            <span style="font-size:16px;opacity:.6;" aria-hidden="true">→</span>
+          </button>`
+    : '';
   const homeFoot =
     state.screen === 'title'
       ? ''
       : `<div class="gs-setfoot">
+          ${leaveRow}
           <button class="gs-setrow gs-setrow--nav" data-settings-home="1">
             <!-- GS-save-slots: EVERY exit says what leaving costs, in the same words — this footer is a
                  second way out of a round that used to promise only a vague "continue it any time",
@@ -417,6 +431,42 @@ export function exitConfirmOverlay(): string {
             style="padding:11px 24px;">Keep playing</button>
           <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'toTitle' })}'
             style="padding:10px 24px;">${confirmLabel}</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+/**
+ * The GIVE-IT-UP confirm (GS-leave-round) — the destructive twin of `exitConfirmOverlay`, raised by
+ * the settings sheet's leave row.
+ *
+ * Same chrome, same shape, same "the safe choice is the fat one under a thumb" rule — and the same
+ * `null`-means-nothing-to-give-up predicate, so this can never render over a state the reducer would
+ * refuse. Every word comes from `abandonPrompt`, including the verb: what you are giving up decides
+ * whether this says "Leave the round" or "Give up the run".
+ *
+ * It mints no new chrome, deliberately: the two other destructive confirms in the game (the campaign
+ * start-over and the run-slot overwrite) are a plain `gs-btn--ghost` under a `gs-btn--primary` "keep
+ * it", and the weight is carried by the COPY. A bespoke danger tint for one button would be a global
+ * class with one caller. And there is no tap-to-dismiss backdrop, for the reason its twin already
+ * documents: `[data-action]` handlers bind per element with no `stopPropagation`, so a backdrop action
+ * would also fire on every click bubbling out of the card — here that would be a round thrown away on
+ * a mis-tap.
+ */
+export function leaveConfirmOverlay(): string {
+  const copy = abandonPrompt(state);
+  if (!copy) return '';
+  return `
+    <div class="gs-sheet-backdrop" style="align-items:center;">
+      <div class="gs-sheet gs-exit" style="max-width:360px;text-align:center;">
+        <div style="font-size:30px;margin:2px 0 6px;">🚪</div>
+        <b style="font-size:18px;">${copy.title}</b>
+        <p style="margin:10px 0 16px;line-height:1.5;color:var(--gs-dim);">${copy.body}</p>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button class="gs-btn gs-btn--primary" data-action='${JSON.stringify({ type: 'cancelLeaveRound' })}'
+            style="padding:11px 24px;">Keep playing</button>
+          <button class="gs-btn gs-btn--ghost" data-action='${JSON.stringify({ type: 'leaveRound' })}'
+            style="padding:10px 24px;">${copy.confirmLabel}</button>
         </div>
       </div>
     </div>`;

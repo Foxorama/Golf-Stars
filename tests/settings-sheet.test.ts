@@ -53,11 +53,11 @@ describe.runIf(chromePath)('the settings sheet (GS-settings-more)', () => {
     await browser?.close();
   });
 
-  async function openSheet() {
+  async function openSheet(query = '') {
     const page = await browser.newPage({ viewport: PHONE });
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
-    await page.goto(`file://${dist}?intro=0&seed=42`, { waitUntil: 'load' });
+    await page.goto(`file://${dist}?intro=0&seed=42${query}`, { waitUntil: 'load' });
     await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', {
       timeout: 15_000,
     });
@@ -142,4 +142,63 @@ describe.runIf(chromePath)('the settings sheet (GS-settings-more)', () => {
       await page.close();
     }
   }, 60_000);
+
+  /**
+   * The other half of GS-leave-round, end to end: the pure policy is guarded in `leave-round.test.ts`,
+   * and this is the part only a browser can see — that the row is actually reachable, that it raises a
+   * confirm rather than leaving anything, and that the safe answer really keeps you in the run.
+   *
+   * `?screen=travel` is the honest deep-link into a live Voyage (it builds the shop and leaves it, so
+   * the real reducer transitions run), which is why the row here says "run" and not "round".
+   */
+  describe('the leave-the-round exit (GS-leave-round)', () => {
+    it('is absent on the title, where there is nothing to give up', async () => {
+      const { page } = await openSheet();
+      try {
+        expect(await page.locator('[data-settings-leave]').count()).toBe(0);
+        // …and neither is Return to title, because the title IS the destination.
+        expect(await page.locator('[data-settings-home]').count()).toBe(0);
+      } finally {
+        await page.close();
+      }
+    }, 60_000);
+
+    it('offers both exits mid-run, and the destructive one takes a second deliberate tap', async () => {
+      const { page, errors } = await openSheet('&screen=travel');
+      try {
+        // Two exits, saying different things: one parks, one throws the round away.
+        const leave = page.locator('[data-settings-leave]');
+        expect(await leave.count()).toBe(1);
+        expect(await page.locator('[data-settings-home]').count()).toBe(1);
+        const label = (await leave.textContent()) ?? '';
+        expect(label, 'a Voyage stop is not a round — the control must name the RUN').toMatch(/give up this run/i);
+        expect(label).toMatch(/pays out nothing/i);
+
+        // Tapping it closes the sheet and raises the confirm. Nothing has been given up yet.
+        await leave.click();
+        await page.waitForSelector('.gs-exit', { timeout: 5_000 });
+        expect(await page.locator('.gs-settings').count()).toBe(0);
+        const stillInRun = await page.evaluate(() => !!document.querySelector('.gs-bhud, .gs-shot'));
+        expect(stillInRun, 'the run must still be underway behind the confirm').toBe(true);
+
+        // "Keep playing" is the fat primary, and it really does keep you playing.
+        await page.locator('.gs-exit .gs-btn--primary').click();
+        await page.waitForFunction(() => !document.querySelector('.gs-exit'), { timeout: 5_000 });
+        expect(await page.evaluate(() => !!document.querySelector('.gs-bhud, .gs-shot'))).toBe(true);
+
+        // Round two: through the confirm this time, and the run is gone.
+        await page.locator('[data-open-settings]').first().click();
+        await page.waitForSelector('.gs-settings', { timeout: 5_000 });
+        await page.locator('[data-settings-leave]').click();
+        await page.waitForSelector('.gs-exit', { timeout: 5_000 });
+        await page.locator('.gs-exit .gs-btn--ghost').click();
+        await page.waitForFunction(() => !!document.querySelector('.gs-navtile--game'), { timeout: 5_000 });
+        const slots = await page.evaluate(() => JSON.parse(localStorage.getItem('fc_save') || '{}').runSlots ?? {});
+        expect(Object.keys(slots), 'the run it gave up must not still be parked').toEqual([]);
+        expect(errors, `pageerror: ${errors[0] ?? ''}`).toEqual([]);
+      } finally {
+        await page.close();
+      }
+    }, 60_000);
+  });
 });
