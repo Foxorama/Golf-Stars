@@ -1,5 +1,6 @@
 /// <reference types="node" />
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
@@ -38,6 +39,28 @@ const HUB = process.env.VITE_HUB === '1';
 const outDir = fileURLToPath(new URL('./dist/', import.meta.url));
 const SW_VERSION_TOKEN = '%GS_VERSION%';
 
+/**
+ * WHICH BUILD IS THIS, not which release (GS-build-id).
+ *
+ * `APP_VERSION` comes from package.json, so every build between two releases carries the SAME string
+ * — 1.3.1 stood for fourteen merges and five deploys. The title screen has shown a build string since
+ * GS-release-identity precisely so a bug report can name one, and it could not distinguish today's
+ * build from this morning's. When a play-test says "my phone still isn't updated", that is the exact
+ * question nobody could answer: not the developer, not the player, not a support reply.
+ *
+ * The commit is the one identifier that always moves. CI hands it over in an env var; a local build
+ * asks git; anything else is honestly labelled `dev` rather than guessing.
+ */
+function buildId(): string {
+  const fromEnv = process.env.GITHUB_SHA ?? process.env.CF_PAGES_COMMIT_SHA ?? process.env.VERCEL_GIT_COMMIT_SHA;
+  if (fromEnv) return fromEnv.slice(0, 7);
+  try {
+    return execSync('git rev-parse --short=7 HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    return 'dev';
+  }
+}
+
 export default defineConfig({
   base,
   // Down-level modern syntax (??, ?., object spread, …) so the bundle PARSES on older
@@ -48,7 +71,7 @@ export default defineConfig({
     emptyOutDir: !HUB, // hub pass appends to dist/, never wipes the game build
     rollupOptions: { input: HUB ? 'test.html' : 'index.html' },
   },
-  define: { __APP_VERSION__: JSON.stringify(pkgVersion) },
+  define: { __APP_VERSION__: JSON.stringify(pkgVersion), __BUILD_ID__: JSON.stringify(buildId()) },
   plugins: [
     viteSingleFile(),
     {
