@@ -176,7 +176,12 @@ describe('the player is actually told', () => {
   });
 
   it('the settings sheet reports all three states, not just the failure', () => {
-    const fn = overlays.slice(overlays.indexOf('function storageStatusHTML()'), overlays.indexOf('/** The Save data section'));
+    // From the function's own declaration to the closing brace at column 0 — anchoring on whatever
+    // happens to be declared NEXT is how this broke when the Save data block became a sub-panel
+    // (GS-settings-more) and its doc comment was reworded.
+    const from = overlays.indexOf('function storageStatusHTML()');
+    const end = overlays.slice(from).search(/\r?\n\}\r?\n/);
+    const fn = overlays.slice(from, from + end);
     expect(fn).toMatch(/storageHealth\.writable/);
     expect(fn).toMatch(/storageHealth\.persisted/);
     // Writable-but-evictable is a real state and must not be printed as an unqualified success.

@@ -121,6 +121,10 @@ describe('a save this build cannot read (GS-save-integrity)', () => {
         // Import stays — it is the way out, and `applyBackup` clears the fault before writing.
         expect(await page.locator('[data-save-transfer="import"]').count()).toBe(1);
         expect(sheet).toMatch(/stored data/i);
+        // GS-settings-more: and all of that is INLINE. A read-only save is news the player has to act
+        // on, not a service they went looking for, so it is never folded behind the Save data tile —
+        // which is dropped entirely rather than sitting there leading somewhere the block already is.
+        expect(await page.locator('[data-setpanel="save"]').count()).toBe(0);
         expect(errors, `pageerror: ${errors[0] ?? ''}`).toEqual([]);
       } finally {
         await browser.close();
@@ -142,6 +146,11 @@ describe('a save this build cannot read (GS-save-integrity)', () => {
 
         await page.locator('[data-open-settings]').first().click();
         await page.waitForSelector('.gs-settings', { timeout: 4000 });
+        // A healthy save shows nothing at all in the sheet itself — the controls live one tap in,
+        // behind the Save data tile (GS-settings-more).
+        expect(await page.locator('[data-save-transfer="rescue"]').count()).toBe(0);
+        await page.locator('[data-setpanel="save"]').click();
+        await page.waitForSelector('[data-save-transfer="export"]', { timeout: 4000 });
         expect(await page.locator('[data-save-transfer="export"]').count()).toBe(1);
         expect(await page.locator('[data-save-transfer="rescue"]').count()).toBe(0);
         expect(errors, `pageerror: ${errors[0] ?? ''}`).toEqual([]);
