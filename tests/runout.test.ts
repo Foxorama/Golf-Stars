@@ -539,10 +539,17 @@ describe('the bounce is VISIBLE at the cameras the game uses (GS-runout-visible)
     // Launch at angle θ: length = v²·sin2θ/g, apex = v²·sin²θ/2g ⇒ apex/length = tan(θ)/4. Nothing to
     // tune. The old flat 0.3 was both too generous for a driver's shallow skip and — the bug — far too
     // stingy for a steep wedge, whose hop length is bounded by a deliberately tiny roll.
-    // Exact inside the unclamped band — tan(θ)/4 ∈ [0.12, 0.55] ⇒ θ ∈ ~[25.6°, 65.6°], which is every
-    // arrival angle the bag actually produces (driver ~35°, wedge ~62°).
-    for (const deg of [30, 35, 45, 56, 62]) {
+    // Exact inside the unclamped band. That band USED to be [0.12, 0.55] — every arrival angle in the
+    // bag — and GS-bounce-flat raised the floor to 0.30, which is `tan(50°)/4`: so the derivation is now
+    // only visible above a 7-iron's arrival, and everything shallower is held at the floor deliberately.
+    // The relation is what is pinned here; where it stops applying is `apexOverLenMin`'s business.
+    for (const deg of [52, 56, 62]) {
       expect(apexOverLenFor(deg), `${deg}deg`).toBeCloseTo(Math.tan((deg * Math.PI) / 180) / 4, 6);
+    }
+    // The floor is `tan(50.2°)/4`, so it takes over just under a 7-iron's arrival — which is exactly
+    // where the play-test drew its line between the clubs that bounce and the clubs that do not.
+    for (const deg of [30, 35, 45, 50]) {
+      expect(apexOverLenFor(deg), `${deg}deg is held at the readability floor`).toBe(DEFAULT_RUNOUT_FEEL.apexOverLenMin);
     }
     // A driver skips flat; a wedge pops. That ORDERING is the whole point of deriving it.
     expect(apexOverLenFor(35)).toBeLessThan(apexOverLenFor(62));
@@ -561,21 +568,31 @@ describe('the bounce is VISIBLE at the cameras the game uses (GS-runout-visible)
     const shortIron = planRunout({ dist: 3.5, firm: 0.85, v0: 0.25, carry: 141, descentDeg: 56, clubId: '7i', vary: 0.5 });
     expect(shortIron.hops.length).toBeGreaterThan(0);
     expect(drawnPx(shortIron), 'a 7-iron hop must clear the drawn ball').toBeGreaterThan(3);
-    // A driver's skip must NOT become a pop-up in the process: its DRAWN height-to-length ratio is what
-    // reads as skipping-along rather than bouncing-vertically off the turf.
+    // ⚠️ THIS GUARD USED TO POINT THE WRONG WAY, and a play-test is what turned it round
+    // (GS-bounce-flat). It asserted a driver's DRAWN height-to-length ratio stayed BELOW 0.55, then
+    // below the 1:1.4 line `hopDrawBoost`'s comment named as where a skip becomes a pop-up — on the
+    // reasoning that a tall hop reads as the ball bouncing vertically off the turf.
     //
-    // The threshold MOVED with GS-runout-clock, from 0.55 to the 1:1.4 line `hopDrawBoost`'s own
-    // comment has always named as the limit — a deliberate decision, not a relaxation, and it goes TO
-    // the line rather than past it. What changed is what the ratio has to carry: it was set against a
-    // ball the follow-cam pinned in place, so a hop was a vertical bob and its height was the only
-    // thing on screen; a tall bob really does read as the ball popping off the turf. With the camera
-    // holding still the hop is an ARC across the frame, and an arc reads as a skip much further up the
-    // ratio than a bob does. Past the line it would not — the ball would be leaving the turf steeper
-    // than it travels, which is a pop whatever the camera is doing.
-    const POP_LINE = 1 / 1.4;
-    const driver = planRunout({ dist: 23, firm: 0.85, v0: 0.3, carry: 272, descentDeg: 35, clubId: 'D', vary: 0.5 });
-    const first = driver.hops[0]!;
-    expect((first.apex * 0.55 * DEFAULT_RUNOUT_FEEL.hopDrawBoost) / first.dist).toBeLessThan(POP_LINE);
+    // The evidence says the opposite. Asked which clubs do not bounce, the play-test named
+    // D/3W/4H/3i and called 7i/9i/PW/SW fine — and the shipped ratios were D 0.70, 3W 0.72, 4H 0.96,
+    // 3i 0.96 against 7i 1.07, 9i 1.14, PW 1.19, SW 1.38. **The split is exactly 1.0**, and it is the
+    // wrong side of it that was unreadable. The sand wedge has been drawing 1.38 the whole time and is
+    // one of the clubs reported as looking RIGHT, so the pop-up line was never real; it was a guess
+    // that had hardened into a constant across three passes.
+    //
+    // So the band is now stated from the measurement: a hop must be at least as tall as it is long, or
+    // it is a smear, and not so tall it leaves the turf steeper than the steepest club in the bag
+    // already does.
+    // Asked of the REAL bag through the real flight — hand-picked descent angles would be testing a
+    // fixture rather than the clubs the play-test was looking at.
+    const READABLE = 1.0;
+    const POP = 1.45; // just above the sand wedge's 1.38, which the play-test names as reading right
+    for (const id of ['D', '3W', '4H', '3i', '7i', '9i', 'PW', 'SW']) {
+      const h = land(id, runOf(id), 0.85).hops[0]!;
+      const ratio = (h.apex * 0.55 * DEFAULT_RUNOUT_FEEL.hopDrawBoost) / h.dist;
+      expect(ratio, `${id} draws its first hop at ${ratio.toFixed(2)} tall:long`).toBeGreaterThanOrEqual(READABLE);
+      expect(ratio, `${id} draws its first hop at ${ratio.toFixed(2)} tall:long`).toBeLessThan(POP);
+    }
   });
 });
 
