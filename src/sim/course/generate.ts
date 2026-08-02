@@ -2336,7 +2336,7 @@ function chooseTemplate(
   // GS-variety-3: a hard hole need NOT bend (research §D4: "difficulty ≠ length + bend"). The old mix
   // crushed the workhorse SIMPLE shapes at high wildness — for a bendy world (void bend 0.45) it left
   // ~8% straight, ~0% plain dogleg, and ~92% cape/hairpin/double, so every deep stop (worst on the
-  // long, low-gravity worlds — void/cetus/Rainbow Road) read as one long severe-bend clone. The fix is
+  // long, low-gravity worlds — void/cetus/Rainbow Course) read as one long severe-bend clone. The fix is
   // SURGICAL: `straightP` now RISES with wildness (the deep stops gain straight holes — defended by
   // length, tighter width, the rough gradient and a tilted green — instead of losing them), while the
   // CALM stops keep GS-variety-2's rich early shape vocabulary (straight stays ~its old low share, so

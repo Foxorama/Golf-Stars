@@ -63,7 +63,7 @@ export const BIOME_RELIEF: Record<BiomeArchetype, ReliefLook> = {
 };
 
 /**
- * Rainbow Road's OWN relief (GS-biome-relief): a gentle prismatic sheen of lit rises + violet hollows
+ * Rainbow Course's OWN relief (GS-biome-relief): a gentle prismatic sheen of lit rises + violet hollows
  * drawn ON the road ribbon (the bands are opaque, so it rides over them) so the legendary track reads
  * as a rolling glowing road, not a flat decal. Kept subtle — the ribbon's prismatic bands carry the
  * colour; this only gives the surface form.
@@ -72,7 +72,7 @@ export const RAINBOW_RELIEF: ReliefLook = { hi: 'rgba(255,240,255,0.15)', lo: 'r
 
 /**
  * Lay directionally-lit relief mounds across each course-space polygon (the land hull, a lost-rough
- * world's platforms, or the Rainbow Road surfaces), clipped to it. A jittered COURSE-space grid picks
+ * world's platforms, or the Rainbow Course surfaces), clipped to it. A jittered COURSE-space grid picks
  * mound centres; each center that falls inside the poly draws a shaded hollow lobe offset DOWN-light
  * and a lit crest lobe offset UP-light, so it reads as a rise with volume. Sized in yards (via
  * `proj.scale`), varied off `posHash`. See the module header for the determinism/camera contract.

@@ -1,5 +1,5 @@
 /**
- * The Rainbow Road course transform (GS-rainbow-road-2) — a PURE, deterministic post-generation
+ * The Rainbow Course course transform (GS-rainbow-road-2) — a PURE, deterministic post-generation
  * reshaping of a stop's course, applied by `currentCourse` ONLY when the legendary Rainbow Ball is
  * armed (`loadout.rainbowRoad`). It never touches the generator or its rng, so a base run is
  * byte-for-byte unchanged; the whole transform is gated behind the ball being owned.
@@ -7,7 +7,7 @@
  * Two things happen, both keeping the "graphic IS the physics" contract intact (the SAME hole the
  * renderer draws is the one the sim scores):
  *
- *  1. **Widen the road.** Rainbow Road plays every OTHER surface as the OOB void, so a thin biome
+ *  1. **Widen the road.** Rainbow Course plays every OTHER surface as the OOB void, so a thin biome
  *     corridor is brutal — a good shot lands on the ribbon and rolls off into space. Grow the
  *     fairway/green/tee polygons outward (like Cetus/Void's generous island platforms), so the road
  *     is a fair, landable ribbon whose width matches the difficulty of flying it. Because we grow the
@@ -25,7 +25,7 @@
 
 import type { Course, Feature, Hole, Vec } from '../course/contract';
 
-/** How far (yards) to grow each road surface outward under Rainbow Road. */
+/** How far (yards) to grow each road surface outward under Rainbow Course. */
 const FAIRWAY_WIDEN = 10;
 const GREEN_WIDEN = 5;
 const TEE_WIDEN = 3;
@@ -88,7 +88,7 @@ function widenFor(kind: string): number {
   return 0;
 }
 
-/** Reshape ONE hole for Rainbow Road: grow the road surfaces, drop every hazard. Pure. */
+/** Reshape ONE hole for Rainbow Course: grow the road surfaces, drop every hazard. Pure. */
 function rainbowHole(hole: Hole): Hole {
   const features: Feature[] = hole.features.map((f) => {
     const m = widenFor(f.kind);
@@ -100,7 +100,7 @@ function rainbowHole(hole: Hole): Hole {
 }
 
 /**
- * Apply the Rainbow Road transform to a whole stop's course (widen the road, clear hazards on every
+ * Apply the Rainbow Course transform to a whole stop's course (widen the road, clear hazards on every
  * hole). Pure + deterministic; called by `currentCourse` only when the Rainbow Ball is armed.
  */
 export function applyRainbowRoad(course: Course): Course {

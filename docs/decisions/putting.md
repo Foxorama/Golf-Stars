@@ -677,7 +677,7 @@ contoured green: the wedge lands at ~61y and spins back toward the 49y flag, bas
     camera-proof, machine-checked), biome-derived washes (never neutral white/black), and
     fall-line arrows contrast-picked against the turf's luminance. The relief renders on EVERY
     biome — `contoured` gates on the ISOLINES (present on every sculpted green), NOT the fall-line
-    arrows (which vanish on a gentle low-`greenSlopeMax` green, the "no contour" bug). Rainbow Road
+    arrows (which vanish on a gentle low-`greenSlopeMax` green, the "no contour" bug). Rainbow Course
     is the one exception: it takes its own ribbon branch and draws no green contour (deliberate).
   - Harder stops tilt greens more (slope-magnitude floor rises with wildness, drawn from the SIDE
     slope rng — calm stops keep the old draw).

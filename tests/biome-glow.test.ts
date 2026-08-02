@@ -287,7 +287,7 @@ describe('the supporting art supports — it does not compete (GS-cetus-void-dee
     const { faces } = platformCliffs([wide], 1, () => 0.5, VOID_CLIFF);
     expect(faces[0]!.height).toBeLessThan(200 * 0.4);
     // ...and it is a ROW, so the other materials on the same painter are untouched: a derelict hull
-    // SECTION is a torn slab of ship and a Rainbow Road buttress is a pillar. Both keep the classic
+    // SECTION is a torn slab of ship and a Rainbow Course buttress is a pillar. Both keep the classic
     // depth, which is what stops a void art pass quietly restyling two other worlds.
     for (const look of [SHIP_CLIFF, RAINBOW_CLIFF]) {
       expect(platformCliffs([wide], 1, () => 0.5, look).faces[0]!.height).toBe(200 * 0.6);

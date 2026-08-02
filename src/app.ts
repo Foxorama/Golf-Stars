@@ -217,7 +217,7 @@ function boot(): void {
  * game never sets them, so they're dormant in production exactly like `?seed=`/`?intro=`. They let QA
  * reach the hard-to-earn Rainbow-Road → Asgard flow in one click, without grinding for the Rainbow Ball
  * or an eagle:
- *   • `?rainbow=1` — start a fresh run with the Rainbow Ball armed, so every hole is Rainbow Road (eagles
+ *   • `?rainbow=1` — start a fresh run with the Rainbow Ball armed, so every hole is the Rainbow Course (eagles
  *     come fast on the wide ribbon and the Bifröst trigger fires authentically when you make one).
  *   • `?asgard=1`  — jump STRAIGHT into the Bifröst interlude (the Himinbjörg map → cross → the nine-hole
  *     tournament → win/lose → return), from a real suspended run so "Return to your journey" works.

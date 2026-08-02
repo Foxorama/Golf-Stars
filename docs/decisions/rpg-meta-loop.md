@@ -523,7 +523,7 @@
   2. **THE LIE** — `executeShot` converts the REST lie to `scorch` when the ball settles on a mark
      (`LIE_INFO.scorch`: carry ×1.05 — it flies HOT off the baked crust — but dispersion ×1.45, wild;
      NEVER a penalty, gentler than trees/fescue). Conversion applies only to SCORCHABLE underlying lies
-     (a green/sand/penalty rest keeps its stricter read) and is SKIPPED under Rainbow Road (whose
+     (a green/sand/penalty rest keeps its stricter read) and is SKIPPED under Rainbow Course (whose
      off-road rule reads the unconverted rest lie — a scorched fairway is still the road). Gated behind
      `opts.meteorScorch` (default off ⇒ byte-for-byte; the ball's position/rng are identical armed or
      not — ONLY the lie label converts), threaded identically through the auto sim (`playerHoleOpts`,

@@ -408,7 +408,7 @@ export const ARCHETYPE_SPACE: Record<BiomeArchetype, SpaceLook> = {
 };
 
 /**
- * The Rainbow Road's OWN deep-space look (GS-rainbow-polish): a distinct cosmic backdrop so the
+ * The Rainbow Course's OWN deep-space look (GS-rainbow-polish): a distinct cosmic backdrop so the
  * legendary ball reads as its own bespoke world, not "whatever biome it landed on painted rainbow".
  * A rich indigo-violet void (deeper + more saturated than any archetype's, closer to the intro
  * cinematic's night sky) with a warm prismatic nebula wash and a bright multi-hue shore rim — the

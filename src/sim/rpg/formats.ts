@@ -231,7 +231,7 @@ export const FORMATS: Record<string, RunFormat> = {
 
 /**
  * The Asgard tournament format (GS-asgard): a one-off, nine-hole STROKE-PLAY side event on The Warrior's
- * Tee, reached only by earning an eagle-or-better on Rainbow Road (never selectable on the
+ * Tee, reached only by earning an eagle-or-better on the Rainbow Course (never selectable on the
  * title). Not winnable/holeGate — the reducer scores it as lowest-gross-of-four and returns the player
  * to their suspended run afterward, so `finishStop`'s ordinary Stableford path is a harmless no-op here.
  */

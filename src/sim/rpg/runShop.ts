@@ -224,7 +224,7 @@ export function shopOffer(run: Run, size = SHOP_OFFER_SIZE, salt = 0): ShopOffer
       (it.caddy !== 'service' || hasCaddy) &&
       (it.id !== 'driver-dan' || ownsDriver) &&
       // The Rainbow Ball, once SPENT on an Asgard tournament (GS-asgard), never returns to the rack
-      // this run — the run has left Rainbow Road behind for good.
+      // this run — the run has left Rainbow Course behind for good.
       (it.id !== 'rainbow-ball' || !run.rainbowConsumed) &&
       // Don't dangle a flat-stick putter you've already met (GS-clubs) — strict rarity upgrade only.
       putterItemOfferable(it, run.loadout),

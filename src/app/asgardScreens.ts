@@ -1,6 +1,6 @@
 /**
  * The Asgard interlude screens (GS-asgard): the Himinbjörg reveal map (crossed into by earning an
- * eagle-or-better on Rainbow Road) and the win/lose result of the nine-hole stroke-play tournament
+ * eagle-or-better on the Rainbow Course) and the win/lose result of the nine-hole stroke-play tournament
  * on The Warrior's Tee. Pure HTML-string builders — they read the live `state` from ctx and
  * dispatch through `data-action` wiring in app.ts, like every other screen module (GS-app-split).
  */
@@ -76,7 +76,7 @@ export function asgardLiveBoardHTML(playedSoFar: PlayedHole[], pars: readonly nu
 }
 
 /**
- * The Himinbjörg reveal (GS-asgard): shown the instant an eagle-or-better lands on Rainbow Road. The
+ * The Himinbjörg reveal (GS-asgard): shown the instant an eagle-or-better lands on the Rainbow Course. The
  * Bifröst opens; a card names The Warrior's Tee and the format; the CTA crosses into the tournament.
  */
 export function asgardMapScreen(): string {

@@ -128,7 +128,7 @@ export function derelictBreachesFor(hole: Hole): Vec[][] {
  * draws AND the play view's animated weather layer masks its twinkle starfield with, so the pinned
  * stars only ever twinkle over true deep space, never over playable turf (the graphic IS the
  * physics, animated edition). Normal hole → one rough hull to the OB frame; lost-rough ARMED
- * (`roughLie` biomeMod) → a platform per play feature; Rainbow Road → no land at all (`[]`).
+ * (`roughLie` biomeMod) → a platform per play feature; Rainbow Course → no land at all (`[]`).
  */
 export function landPolysCourseFor(hole: Hole, rainbow = false): Vec[][] {
   if (rainbow) return [];
