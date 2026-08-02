@@ -1959,6 +1959,22 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
   signature: the boot watchdog reports `…/src/main.ts` — a string a Vite *build* can never emit, so
   seeing it = raw source is being served. Keep the `index.html` boot watchdog (`tests/build.test.ts`
   guards the inlined-single-file output + the error-capture contract).
+- **⚠️ "NETWORK-FIRST" IS A CLAIM ABOUT THE WORKER, NOT ABOUT THE NETWORK** (GS-sw-stale). `fetch(req)`
+  inside a worker reads the browser's ordinary HTTP cache, and GitHub Pages serves index.html with
+  `Cache-Control: max-age=600` — **a header Pages gives you no way to set**. So for ten minutes after any
+  load the "always fetch fresh" handler answered navigations from the HTTP cache without asking the
+  server, and an installed app relaunched in that window rendered the PREVIOUS build. The worker's own
+  comment had promised otherwise since the file was written. **The shell is fetched `cache: 'no-cache'`**
+  (a conditional request every launch; NOT `no-store`, which re-downloads the whole 2.4MB bundle on mobile
+  data — `no-cache` costs a 304 when nothing changed) and the registration passes
+  **`updateViaCache: 'none'`** (by default the browser asks its own cache whether sw.js changed, so a
+  worker whose bytes genuinely differed still never installed). ⚠️ Diagnosed by REPRODUCING it — a
+  persistent chromium profile against a server sending Pages' real headers — and the control that settled
+  it was **removing the worker entirely and watching the staleness survive**. `VERSION` still moves per
+  RELEASE, not per build, deliberately: between releases the fetch handler re-caches the fresh shell on
+  every launch, so the version only governs sweeping old cache NAMES. Guarded by `tests/sw-update.test.ts`,
+  whose second case removes the revalidation and asserts the app goes stale again — `max-age` only bites
+  while the entry is fresh, so a test that merely waited would go green on the broken worker.
 - **PWA service worker is NETWORK-FIRST, never cache-first** (`public/sw.js`), subpath-scoped to
   `/golf-stars/` — offline play without resurrecting the stale-serve blank-page bug; a fresh deploy
   always wins online. Bump `VERSION` per deploy. The foreign-SW/cache cleanup in `index.html` is

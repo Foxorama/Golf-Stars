@@ -164,3 +164,87 @@ offline-utility service-worker framing. We deliberately left all of it behind. (
 a NETWORK-first, subpath-scoped SW for the installable PWA — see *PWA / installable app* above. That
 is the inverse of golf-finder's cache-first offline-utility SW, not a re-coupling of the two apps.)
 
+
+---
+
+## GS-sw-stale â€” "network-first" still read the HTTP cache (2026-08-02)
+
+> *"On my mobile phone, which is the app installed from farcarry.vulpecula.games, it's still not
+> updated and I've cleared cache on the app. Is this a versioning thing? â€¦ I don't have any way to
+> identify who would end up with a stale app."*
+
+### The diagnosis, and the theory it killed
+
+The obvious suspect was the worker's version. `sw.js` stamps `VERSION` from `package.json`, which had
+sat at **1.3.1 for fourteen merges** â€” so the served worker was byte-identical on every deploy, and a
+browser only installs a new worker when the script differs. No `install`, no `activate`, no cache
+sweep. That is real, and it is not the bug.
+
+The bug was found by reproducing it: a local server sending GitHub Pages' own headers, the real
+`public/sw.js`, and a PERSISTENT chromium profile so the worker, its CacheStorage and the HTTP cache
+all survive across "app launches" the way they do on a phone.
+
+```
+1. install (BUILD-1)          shows=BUILD-1  controlledBySW=true
+2. relaunch                   shows=BUILD-1
+--- deployed BUILD-2 ---
+3. relaunch after deploy      shows=BUILD-1     â† stale
+4. relaunch again             shows=BUILD-1
+--- and again with sw.js bytes CHANGED ---
+5. relaunch                   shows=BUILD-1     â† still stale
+```
+
+Then the decisive control: **run it with the service worker removed entirely.** Still stale. The
+worker was never the culprit.
+
+`fetch(req)` inside a worker reads the browser's ordinary HTTP cache like any other fetch, and GitHub
+Pages serves this game's single-file index.html with `Cache-Control: max-age=600` â€” **a header Pages
+gives you no way to set.** So for ten minutes after any load, "network-first" answers a navigation out
+of the HTTP cache without ever asking the server. The worker's policy was doing exactly what it said;
+the fetch underneath it was not.
+
+âš ï¸ Confirmed self-healing: with `max-age=2` and a four-second wait, both the worker and the no-worker
+control pick up the new build. So this explains a ten-minute stale window, **not a phone stale for
+hours** â€” that gap is still unexplained and the fix below is deliberately one that does not depend on
+knowing the answer.
+
+### The fix
+
+- **The shell is fetched with `cache: 'no-cache'`** â€” a conditional request on every launch, so a
+  deploy is picked up on the very next one. NOT `no-store`, which would bypass the cache in both
+  directions and re-download the whole 2.4MB bundle on mobile data every time; `no-cache` sends
+  `If-None-Match` and an unchanged build costs a 304. Only the SHELL, so icons and the manifest do not
+  each pay a round-trip on a cold start.
+- **`register('sw.js', { updateViaCache: 'none' })`** â€” by default the browser fetches sw.js for its
+  UPDATE CHECK through that same HTTP cache, so it asks its own cache whether the worker changed and
+  is told no. Step 5 above is that, measured: sw.js genuinely differed and the old worker stayed.
+
+Measured after, under the real `max-age=600` with no waiting: **relaunch after deploy shows BUILD-2.**
+
+### What was deliberately NOT changed
+
+`VERSION` still comes from `package.json`, i.e. it moves per RELEASE rather than per build. That is
+correct here rather than lazy: between releases the fetch handler re-`put`s the fresh shell into
+CacheStorage on every successful launch, so the offline copy stays current anyway, and the version
+only governs sweeping old cache NAMES. Stamping per build would reinstall the worker and re-precache
+2.4MB on every deploy for housekeeping nobody sees.
+
+### Guard
+
+`tests/sw-update.test.ts` drives a real persistent profile against a real server and asserts an
+installed app shows the new build after a deploy â€” and, in a second case, that **removing the
+revalidation puts it back to stale**. That second case is the point: `max-age` only bites while the
+entry is fresh, so a test that merely waited would report green on a worker that strands every player
+for ten minutes after each deploy.
+
+âš ï¸ It adds six browser launches to a suite that already runs 24 browser files in parallel, and it
+tipped `a11y-keyboard`'s timing-sensitive case over once under load. That case passes alone and the
+full suite passed clean on re-run, so it is noted rather than worked around â€” but if it recurs, the
+extra concurrency is where to look first.
+
+### The wider lesson
+
+**"Network-first" is a claim about the worker's policy, not about the network.** A cache the policy
+never mentions sat underneath it the whole time. The comment at the top of `public/sw.js` promised
+"online â†’ always fetch fresh", and it had been wrong since the file was written; nobody caught it
+because the only symptom is a ten-minute window that heals itself before you can investigate it.
