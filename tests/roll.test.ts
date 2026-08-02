@@ -219,6 +219,41 @@ describe('a spin build can only spin the clubs that spin (GS-spin-gate)', () => 
     }
   });
 
+  it('a spin item takes NOTHING off the clubs that do not spin (GS-spin-bag)', () => {
+    // GS-spin-gate stopped the long clubs going NEGATIVE and left them at a dead stop, which is still
+    // no roll — and no roll is no BOUNCE, because `planRunout` gets `dist: 0` and breaks before the
+    // first hop. Read off a real save: one Milled Tour Wedge (+0.06), a WEDGE-slot item whose own copy
+    // says "so approaches check up", took the driver's run fraction 0.140 → 0.080 and the 7-iron and
+    // 8-iron to zero. The play-test saw it as *"the save I was playing with shows no bounce"*, on the
+    // one campaign with story gear equipped.
+    //
+    // So the gate is on the APPLICATION now, not the sign: above the wedge threshold a spin build must
+    // leave the roll exactly as it found it, not merely non-negative.
+    // ⚠️ The two rounds DIVERGE once a wedge checks — the ball stops somewhere else, so the hole plays
+    // out differently and the shot lists stop corresponding. Only the prefix up to the first different
+    // club is comparable, which is fine: the tee shot is in it, and the tee shot is the driver whose
+    // run this bug was quietly halving.
+    let compared = 0;
+    for (const boost of [0.06, 0.26, 1.2]) {
+      for (let seed = 0; seed < 30; seed++) {
+        const hole = generateCourse(seed, { holes: 1 }).holes[0]!;
+        const plain = playHole(hole, new Rng(`${seed}:g`)).shots;
+        const spun = playHole(hole, new Rng(`${seed}:g`), { backspinBoost: boost }).shots;
+        for (let i = 0; i < Math.min(plain.length, spun.length); i++) {
+          if (plain[i]!.club.id !== spun[i]!.club.id) break; // the rounds have parted company
+          if (hasBackspin(plain[i]!.club.carry)) break; // …and a wedge is where they part
+          expect(
+            spun[i]!.roll,
+            `${plain[i]!.club.id} lost run to a boost of ${boost} (seed ${seed})`,
+          ).toBeCloseTo(plain[i]!.roll, 9);
+          compared++;
+        }
+      }
+    }
+    // A test that compared nothing would pass silently — the prefix must actually contain shots.
+    expect(compared, 'no long-club shots were compared at all').toBeGreaterThan(100);
+  });
+
   it('…and the wedges still check, so the build is worth buying', () => {
     let checked = false;
     for (let seed = 0; seed < 60 && !checked; seed++) {

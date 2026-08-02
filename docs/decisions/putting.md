@@ -2599,3 +2599,93 @@ run-out still walks the sim's own roll path to the sim's own rest point â€”
 ball is drawn between contacts, not where it goes.
 
 `npm run typecheck` + `npx vitest run` green: **220 files, 2,666 tests, 0 skipped**, plus `npm run build`.
+
+---
+
+## GS-spin-bag â€” a wedge item was taking the run off the driver (2026-08-02)
+
+> *"It turns out I am getting the updates â€” but the existing game, save file wasn't getting them or
+> there's a bugged interactionâ€¦ larry works fine in other game modes, bo works fine in a new game in
+> story mode, but the save I was playing with and continuing with shows no bounce."*
+
+Not a stale build, and not the renderer. One item.
+
+### The diagnosis
+
+The play-test attached their save. Reading it:
+
+- the campaign is `longshot-larry`, chapter 2, with story gear equipped
+- `equippedGear.wedge` is **`gear:wedge:milled`** â€” the Milled Tour Wedge, `backspinBoost: +0.06`
+- its own shipped copy: *"Tightens the wedge carry window, and rips a touch more backspin (+6%) so
+  approaches check up."*
+
+A **wedge**-slot item, described as affecting **wedge approaches**. But `rollPotential` subtracted
+`backspinBoost` from every club's run fraction. Computed against their actual bag:
+
+| club | run fraction | with that one item | |
+|---|---|---|---|
+| D | 0.140 | **0.080** | 43% of the driver's roll, gone |
+| 5W (`major:emerald`) | 0.105 | 0.045 | |
+| 3H | 0.075 | 0.015 | ~3yd of run |
+| 5i | 0.065 | 0.005 | ~0.8yd â€” nothing |
+| **7i / 8i** | 0.055 | **âˆ’0.005 â†’ 0** | **dead stop** |
+| 9i and below | | negative | checks back |
+
+**Zero roll is zero BOUNCE.** `planRunout` receives `dist: 0`, `airBudget` is 0, and the hop loop
+breaks before the first one. The ball lands and stops dead.
+
+Which explains every observation exactly: other modes carry no story gear, so they bounce; a NEW story
+campaign has nothing equipped, so it bounces; that one campaign had a wedge equipped, and lost the run
+across the whole bag.
+
+### Why GS-spin-gate did not catch it
+
+That pass had the right rule â€” *"a spin build can only spin the clubs that spin"* â€” and applied it to
+the **sign** of the result rather than to whether the delta applied at all:
+
+```js
+if (frac < 0 && !hasBackspin(nominalCarry)) frac = 0;   // stops the driver checking BACKWARDSâ€¦
+```
+
+â€¦and leaves it at a dead stop, which is exactly as bounce-less. It fixed the spectacular symptom (a
+250-yard drive sucking back eighteen yards) and left the quiet one, where a driver simply rolls less
+and nothing on screen says why.
+
+The boost is now withheld above the threshold entirely. The old clamp stays as a belt to those braces:
+gear can no longer drive a long club negative, but a future character mod could.
+
+### âš ï¸ Only the GEAR is gated, and that is deliberate
+
+The play-test asked for Backspin Bo to be gated the same way. **He already is, and better.** His
+`clubMods` returns nothing above the five-iron â€” the comment has always said *"above the 5-iron the big
+sticks are untouched"* â€” and every AI golfer's `rollFracDelta` is scaled by `(1 âˆ’ t)`, reaching zero at
+the driver. `rollFracDelta` is a per-club CURVE by construction; `backspinBoost` was a flat subtraction.
+
+Gating `rollFracDelta` here as well would have zeroed that curve across the mid irons for every golfer
+in the game â€” a balance change dressed as a bug fix, and a regression from a taper to a step. It was
+written, then read, then reverted before it shipped.
+
+### The fun accident is kept, as a flag
+
+`RoundOpts.spinsWholeBag` (default off) ungates it, and the same flag is threaded through
+`backspinRoll` so the drawn run-out helper line agrees with the sim (contract 5) rather than promising
+a driver a check it will not take. Nothing sets it yet â€” deliberately. The play-test remembered the
+ungated behaviour fondly on **cetus, void and rainbow**, the island worlds where run is a liability, and
+that is a real archetype which deserves to be chosen rather than stumbled into. `GS-spin-bag-build` in
+IDEAS carries the design questions, including that the death-spiral harness runs default loadouts and
+so will never see it.
+
+### Contracts
+
+- **Determinism (1):** the rng draw is consumed either way, and a base loadout has `backspinBoost: 0`,
+  so the delta is unchanged and every seeded stream is byte-for-byte. The whole suite passed unmoved â€”
+  **221 files, 2,669 tests** â€” which is also the death-spiral harness reporting no change.
+- **auto â‰¡ interactive (2):** the gate lives in `rollPotential`, which both drivers reach through the
+  same `resolveShot`; `backspinRoll` takes the same flag so the drawn line cannot disagree.
+- **The graphic IS the physics (5):** that is why the helper line was changed in the same breath.
+
+âš ï¸ A guard on this can only compare the PREFIX of two rounds up to the first wedge: a spin build
+genuinely changes where the ball stops, so the hole re-routes and the shot lists stop corresponding.
+The first attempt asserted the two shot lists were the same LENGTH and failed on a 2-vs-3 â€” which is
+the feature working, not the test finding a bug. The version that shipped also counts what it compared
+and fails if that is zero, because a prefix-walk that breaks immediately would otherwise pass silently.

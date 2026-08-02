@@ -664,6 +664,22 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
   fresh, planned session.
 
 ## Later
+- **GS-spin-bag-build — make the whole-bag backspin an intentional BUILD, not an accident.** GS-spin-bag
+  gated `backspinBoost` to the clubs that actually spin (PW and below), because a wedge-slot item was
+  quietly taking 43% of the driver's run and zeroing the 7-iron's — which is zero roll, which is zero
+  bounce. But the play-test remembered the ungated version fondly: *"there was a fun issue a while back
+  where if you got enough backspin then even the driver would backspin, and that would be interesting as a
+  game build to explore with Bo because it was great on worlds like cetus, void, rainbow"* — the island
+  worlds where run is a LIABILITY and a ball that stops dead is worth more than a ball that goes far.
+  That is a real archetype and it deserves to be chosen rather than stumbled into. The seam is already
+  there: `RoundOpts.spinsWholeBag` (and the same flag on `backspinRoll`, so the drawn helper line agrees
+  — contract 5) ungates it in one place, and nothing sets it yet. So this is a ROW: an item, a perk, or a
+  Bo ascension unlock that turns it on. Design questions worth settling first — (a) is it a Pro-Shop
+  MYTHIC (it wants to be rare and expensive, since it inverts the distance economy), or Bo-specific
+  (his identity, but then it is unavailable to the golfer who most wants to try it second)? (b) does the
+  aim overlay need to SAY the driver will check, since the run-out helper line already draws it? (c) the
+  death-spiral harness runs default loadouts, so it will not see this at all — a build that removes every
+  club's run needs its own balance pass on the island worlds before it ships, not the standard bar.
 - **GS-startour-topdown — should the STAR MAP fly the plan-view hull too?** GS-story-battle-topdown built a
   top-down twin for all 11 silhouettes, and the star map has arguably the same problem in a milder form: it
   is a CHART (a view from outside/above) with a side-elevation car driving across it, free to point in any
