@@ -7,9 +7,9 @@ calls about what counts as "wrong" are mine and are the first thing to argue wit
 Facts used: 812 commits since 2026-06-24. Ten pull requests merged on 2026-08-02, seven of them about
 the ball's bounce. Titles and numbers from `git log --first-parent`.
 
-Suggested title: **A day on one bounce**
-(alternatives: *Eight tries at a bouncing ball* · *What the loop actually looks like* · *The day I
-watched it get worse*)
+Title as published: **A day in the life of a ball that didn't bounce**
+(the drafted suggestion was *A day on one bounce*; the published one is better — it puts the ball,
+not the day, in the subject position, which is what the post is actually about.)
 
 ---
 
