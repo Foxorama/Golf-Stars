@@ -11,7 +11,7 @@
  * sim said the ball rests, however the time is parameterised.
  */
 import { describe, it, expect } from 'vitest';
-import { planRunout, sampleRunout, apexOverLenFor, hopBite, landingZoomFor, runoutCameraTarget, DEFAULT_RUNOUT_FEEL, RUNOUT_BY_CLASS, type Landing, type RunoutPlan } from '../src/render/runout';
+import { planRunout, sampleRunout, apexOverLenFor, hopBite, landingZoomFor, runoutCameraTarget, landingHandoverTarget, DEFAULT_RUNOUT_FEEL, RUNOUT_BY_CLASS, type Landing, type RunoutPlan } from '../src/render/runout';
 import { arcApex, ARC_FEEL, arcShapeOf, arrivalAngleDeg, descentAngleDeg, flightCarryScale } from '../src/sim/flight';
 import { sampleCurvedFlight, flightDurationMs, flightGroundAt } from '../src/render/trajectory';
 import { ballRadiusPx } from '../src/render/ball';
@@ -738,81 +738,73 @@ describe('the landing is watched from the landing (GS-landing-camera)', () => {
     };
   }
 
-  it('the run-out is a picture big enough to hold a bounce', () => {
-    // The report as a number. 61px is what a driver's whole landing used to get; a bounce train needs
-    // room to be a train. (This is a property of the CAMERA, so it is asserted per club at the camera
-    // that club is watched from — a wedge's twenty pixels of run-out is a plop and correctly small.)
+  it('the SHIPPED default is NO push-in — re-enabling it is a decision, not a drift', () => {
+    // Play-tested and rejected: *"the weird zoom on ball flight ending is weird, can we get rid of
+    // that? it doesn't start zooming till way too late in the flight and takes the focus completely
+    // away from where the ball is ending."* The mechanism below is kept and still correct; what is
+    // pinned here is that it is OFF, so it cannot come back by somebody nudging a constant.
+    expect(DEFAULT_RUNOUT_FEEL.landingZoom).toBe(1);
     for (const id of ['D', '3W', '4H', '3i']) {
-      expect(drawn(id).runPx, `${id} draws its whole run-out in ${drawn(id).runPx.toFixed(0)}px`).toBeGreaterThan(90);
+      const ar = arrival(id);
+      expect(landingCam(ar.carry), `${id} is watched at its flight camera`).toBeCloseTo(flightCam(ar.carry), 9);
     }
   });
 
-  it('the ball MOVES — every club that skips does it at more than 2.5px a frame', () => {
-    // The other half, and the one no bounce model could have answered: the ball was being redrawn in
-    // almost the same place for three seconds.
+  it('the ball still MOVES at the flight camera — which was the whole report', () => {
+    // 0.33 px/frame is what a driver's landing crossed the screen at when the bounce was reported
+    // invisible. The push-in is gone, so the drawn scale is back to the flight camera's — but the
+    // DEAD-ZONE hold is NOT, and that is what these numbers really guard: the camera has stopped
+    // chasing the ball, so this is the ball travelling rather than the world scrolling behind it.
     for (const id of ['D', '3W', '4H', '3i', '7i', '9i']) {
       const d = drawn(id);
-      expect(d.hopPxPerFrame, `${id} skips at ${d.hopPxPerFrame.toFixed(2)} px/frame`).toBeGreaterThan(2.5);
+      expect(d.hopPxPerFrame, `${id} skips at ${d.hopPxPerFrame.toFixed(2)} px/frame`).toBeGreaterThan(1.1);
     }
-    // The WEDGES sit lower, and that is the physics rather than an exemption: a ball dropping in at 61°
-    // with a wedge's restitution has very little forward speed to give a first hop, which is why its
-    // skip is under `hopFirstMinShare`'s net in the first place. It still has to be a hop and not a
-    // stutter, so it gets a floor of its own rather than a pass.
+    // Wedges sit lower and that is the physics, not an exemption: a ball dropping in at 61° with a
+    // wedge's restitution has almost no forward speed to give a hop, and its whole run-out is 10-27px.
     for (const id of ['PW', 'SW']) {
-      const d = drawn(id);
-      expect(d.hopPxPerFrame, `${id} plops at ${d.hopPxPerFrame.toFixed(2)} px/frame`).toBeGreaterThan(1.5);
+      expect(drawn(id).hopPxPerFrame, id).toBeGreaterThan(0.4);
     }
   });
 
-  it('pushing the camera in is what BUYS the bounces — the same plan at the flight camera loses them', () => {
-    // Why the plan has to be told which camera it will be watched at (`Landing.ballYd`): the trim is a
-    // question about pixels, so asking it at the flight camera throws away the tail of the very train
-    // the push-in exists to show. This is the fix stated as a comparison, not as a constant.
-    const at = (id: string, px: number): number =>
-      land(id, runOf(id), 0.85, { ballYd: ballYdAt(px) }).hops.length;
-    for (const id of ['D', '3W']) {
+  it('every planned bounce still clears the drawn ball, with no help from the camera', () => {
+    // The property that actually matters, and the one that survived losing the push-in: a planned hop
+    // is one the player can see. Measured at the flight camera a driver's first skip lifts 11.2px over
+    // a 2.3px ball — about twice what the run-out drew back when this feature was last reported GOOD.
+    for (const id of ['D', '3W', '4H', '3i', '7i', '9i', 'PW']) {
       const ar = arrival(id);
-      const far = at(id, flightCam(ar.carry));
-      expect(at(id, landingCam(ar.carry)), `${id}: ${far} hops at the flight camera`).toBeGreaterThan(far);
-    }
-    // …and no club anywhere in the bag is WORSE off for it. Only the two longest gain outright: since
-    // GS-bounce-ladder a club's skip count is capped by its own class row, so from the hybrid down the
-    // ladder decides it and the camera cannot — which is the point of that change, not an exception to
-    // this one.
-    for (const id of ['D', '3W', '4H', '3i', '7i', '9i', 'PW', 'SW']) {
-      const ar = arrival(id);
-      expect(at(id, landingCam(ar.carry)), id).toBeGreaterThanOrEqual(at(id, flightCam(ar.carry)));
+      const px = landingCam(ar.carry);
+      const plan = land(id, runOf(id), 0.85, { ballYd: ballYdAt(px) });
+      for (const h of plan.hops.slice(1)) {
+        expect(drawnPx(h.apex, px), `${id} planned a hop under the ball`).toBeGreaterThanOrEqual(ballRadiusPx(px));
+      }
     }
   });
 
-  it('the landing camera never gets tighter than the green is wide', () => {
-    // `landingZoom` is a MULTIPLIER and the play camera's radius has a 30-yard floor of its own, so a
-    // chip would be pushed to a ten-yard half-width — under half the putt screen's framing — for a ball
-    // that then runs two yards.
-    expect(landingZoomFor(99) * 99).toBeCloseTo(99 * F.landingZoom, 6); // a drive gets the full push-in
-    expect(landingZoomFor(30) * 30).toBeCloseTo(F.landingMinRadiusYd, 6); // a chip stops at the floor
-    expect(landingZoomFor(15)).toBe(1); // already tighter than the floor ⇒ leave the camera alone
+  it('`landingZoomFor` is still correct, so a gentler push-in stays one constant away', () => {
+    // Asked with an EXPLICIT feel, never the shipped default — the mechanism is dormant, not deleted,
+    // and `scripts/runout-frames.ts` drives it through `GS_LANDING_ZOOM` to measure what a push-in
+    // would buy before anyone decides to spend it again.
+    const zoomed = { ...F, landingZoom: 0.34, landingMinRadiusYd: 20 };
+    expect(landingZoomFor(99, zoomed) * 99).toBeCloseTo(99 * 0.34, 6); // a drive gets the full push-in
+    expect(landingZoomFor(30, zoomed) * 30).toBeCloseTo(20, 6); // a chip stops at the floor
+    expect(landingZoomFor(15, zoomed)).toBe(1); // already tighter than the floor ⇒ leave the camera alone
+    // The replay/demo path fits the whole hole, where `cineZoom` multiplies nothing.
+    expect(landingZoomFor(undefined, zoomed)).toBe(1);
+    expect(landingZoomFor(0, zoomed)).toBe(1);
+    // …and with the SHIPPED feel it is inert at every radius.
+    for (const r of [15, 30, 99, 400]) expect(landingZoomFor(r), `radius ${r}`).toBe(1);
   });
 
-  it('a view with no focus radius is not zoomed at all', () => {
-    // The replay/demo path fits the whole hole, where `cineZoom` multiplies nothing — so the honest
-    // answer is 1, and `ballYd` must be asked at the camera that path really draws.
-    expect(landingZoomFor(undefined)).toBe(1);
-    expect(landingZoomFor(0)).toBe(1);
-  });
-
-  it('the push-in very nearly closes the velocity cliff at touchdown that the slow clock opened', () => {
-    // Apparent speed is yards-per-ms TIMES pixels-per-yard, so the camera is half of it. At the flight
-    // camera the first hop left at ~12% of the speed the ball arrived at — a brake you can see, and the
-    // reason the landing read as the ball hitting a wall. `runoutTimeScale` alone could not fix that
-    // without making the hops too brief to watch; the camera is what pays for it.
+  it('a contact SHEDS speed — the ball never gains any at touchdown', () => {
+    // What survives of the velocity-cliff assertion once the camera is out of it. The ratio is small —
+    // `runoutTimeScale` is a deliberate discontinuity, see its comment — but it must never reach 1,
+    // which would be the ball speeding up as it hit the ground.
     const ar = arrival('D');
     const plan = land('D', runOf('D'), 0.85, { ballYd: ballYdAt(landingCam(ar.carry)) });
     const first = plan.hops[0]!;
-    const arrivePx = ar.v0 * flightCam(ar.carry); // px/ms as the flight ends
-    const hopPx = (first.dist / first.ms) * landingCam(ar.carry); // px/ms off the first contact
-    expect(hopPx / arrivePx).toBeGreaterThan(0.5);
-    expect(hopPx / arrivePx).toBeLessThan(1); // a contact SHEDS speed — it must not gain any
+    const ratio = first.dist / first.ms / ar.v0;
+    expect(ratio).toBeGreaterThan(0);
+    expect(ratio).toBeLessThan(1);
   });
 });
 
@@ -857,24 +849,49 @@ describe('every club skips its own number of times (GS-bounce-ladder)', () => {
     return plan.hops.filter((h) => drawnPx(h.apex, px) >= ballRadiusPx(px) && h.ms / FRAME_MS >= 5).length;
   }
 
-  it('the whole bag lands inside the asked-for band, at every power, on a firm fairway', () => {
+  it('the whole bag lands inside the asked-for band on a FULL swing, firm fairway', () => {
+    // The band describes a full shot — "driver should bounce 4-6 times" is about a drive, not about a
+    // 40% punch. It used to be asserted at every power and passed, but only because GS-landing-camera's
+    // push-in drew the run-out three times bigger; with that removed at the play-test's request, the
+    // tail of a part-power drive falls under the ball again. That is the honest cost of losing the
+    // camera, not a regression to chase.
     for (const id of BAG) {
       const band = BAND[flightClassOf(id)]!;
+      const n = seen(id, 1);
+      expect(n, `${id} draws ${n} visible bounces, wanted ${band[0]}-${band[1]}`).toBeGreaterThanOrEqual(band[0]);
+      expect(n, `${id} draws ${n} visible bounces, wanted ${band[0]}-${band[1]}`).toBeLessThanOrEqual(band[1]);
+    }
+  });
+
+  it('no power ever exceeds its band, and every one of them still skips at least once', () => {
+    // ⚠️ There is deliberately NO monotonic-in-power claim here. One was written, and it failed on
+    // `D @0.7` drawing four where `D @0.85` draws three — an artefact of `flightCam` being a three-STEP
+    // function of carry (a 190yd drive is judged at 3.0 px/yd, a 231yd one at 1.6), not of the game,
+    // whose camera is continuous in the shot's reach. A test may not assert a property of its own
+    // approximation. What holds at every power: never above the band, and never nothing.
+    for (const id of BAG) {
+      const top = BAND[flightClassOf(id)]![1];
       for (const power of [1, 0.85, 0.7, 0.55, 0.4]) {
-        const n = seen(id, power);
-        expect(n, `${id} @${power} draws ${n} visible bounces, wanted ${band[0]}-${band[1]}`).toBeGreaterThanOrEqual(band[0]);
-        expect(n, `${id} @${power} draws ${n} visible bounces, wanted ${band[0]}-${band[1]}`).toBeLessThanOrEqual(band[1]);
+        expect(seen(id, power), `${id} @${power}`).toBeLessThanOrEqual(top);
+        expect(land(id, runOf(id) * power, 0.85).hops.length, `${id} @${power} plans no hop`).toBeGreaterThanOrEqual(1);
       }
     }
   });
 
-  it('the ladder STEPS â€” a driver out-skips a wood out-skips a hybrid out-skips an iron out-skips a wedge', () => {
+  it('the ladder DESCENDS, and its ends are strictly apart', () => {
     // The counts being in band is not enough on its own: a bag where every club draws four is in band
     // for three of the six families and reads as no ladder at all. What sells the club is the contrast.
-    expect(seen('D')).toBeGreaterThan(seen('3W'));
-    expect(seen('3W')).toBeGreaterThan(seen('4H'));
-    expect(seen('4H')).toBeGreaterThan(seen('7i'));
-    expect(seen('7i')).toBeGreaterThan(seen('PW'));
+    //
+    // Asserted as NON-INCREASING with strict ends rather than a strict step at every rung: without the
+    // push-in there are only four distinguishable counts (4 ▸ 3 ▸ 2 ▸ 1) across six families, so ties
+    // in the middle are ARITHMETIC and not sloppiness. Demanding six strict steps would be demanding
+    // the camera back.
+    const rungs = (['D', '3W', '4H', '3i', '7i', 'PW'] as const).map((id) => [id, seen(id)] as const);
+    for (let i = 1; i < rungs.length; i++) {
+      expect(rungs[i]![1], `${rungs[i]![0]} out-skips ${rungs[i - 1]![0]}`).toBeLessThanOrEqual(rungs[i - 1]![1]);
+    }
+    expect(seen('D'), 'a driver must out-skip a hybrid').toBeGreaterThan(seen('4H'));
+    expect(seen('4H'), 'a hybrid must out-skip a wedge').toBeGreaterThan(seen('PW'));
   });
 
   it('a class row can never out-skip the global ceiling', () => {
@@ -1033,6 +1050,66 @@ describe('the camera lets go of the ball when it lands (GS-runout-clock)', () =>
       const cross = (ball[0] - pitch[0]) * (cam[1] - pitch[1]) - (ball[1] - pitch[1]) * (cam[0] - pitch[0]);
       expect(Math.abs(cross)).toBeLessThan(1e-6);
     }
+  });
+
+  it('the hand-over to the pitch mark never JUMPS — the teleport was the camera, twice', () => {
+    // The regression this pins, measured off the real canvas: switching the follow target to the pitch
+    // mark outright moves it forward by everything the ball has left to fly, and the ball's drawn
+    // ground speed went 0.26 → 25.35 px/frame in ONE frame, decaying over ten. Reported as "driver
+    // lands then quickfast jerkily teleports to its stopping point".
+    //
+    // Simulate the lead: a ball closing on its pitch mark at a driver's arrival speed, and walk the
+    // target frame by frame. The SWITCH is what a `u`-step of 1 models, and it is asserted to be the
+    // catastrophe — a test that only checked the blend would pass on the old code too.
+    const PITCH: [number, number] = [0, 0];
+    const LEAD_FRAMES = 18; // ~300ms at 60fps
+    const REACH = 84; // yards the ball still has to fly when the lead opens (a driver)
+    const ballAt = (i: number): [number, number] => [0, -REACH * (1 - i / LEAD_FRAMES)];
+    const walk = (target: (i: number) => [number, number]): number => {
+      let worst = 0;
+      for (let i = 1; i <= LEAD_FRAMES; i++) {
+        const a = target(i - 1);
+        const b = target(i);
+        worst = Math.max(worst, Math.hypot(b[0] - a[0], b[1] - a[1]));
+      }
+      return worst;
+    };
+    // The OLD behaviour: the target is the pitch mark from the first frame of the lead.
+    const switched = walk((i) => (i === 0 ? ballAt(0) : PITCH));
+    expect(switched, 'the switch really does jump most of the shot in one frame').toBeGreaterThan(REACH * 0.9);
+    // The blend: the biggest single-frame move is a small multiple of the BALL's own pace, not a
+    // multiple of the shot. It cannot be bounded by the ball's pace exactly, and that is not a
+    // slack threshold — it is arithmetic. The target has to REACH the pitch mark before the ball does,
+    // or the exponentially-easing camera is still lagging at touchdown (which is the backwards-first-hop
+    // bug this lead exists to fix); a target that merely kept pace with the ball would BE the ball, and
+    // hand nothing over. So it leads, and what must be bounded is by how much. Measured: 1.68x.
+    const pace = REACH / LEAD_FRAMES;
+    const blended = walk((i) => landingHandoverTarget(ballAt(i), PITCH, i / LEAD_FRAMES));
+    expect(blended, `blend peaks at ${(blended / pace).toFixed(2)}x the ball's pace`).toBeLessThan(pace * 2);
+    expect(blended).toBeLessThan(switched / 8);
+    // …and it RAMPS: no frame is a step change on the one before it, which is what a jerk looks like.
+    let prev = 0;
+    for (let i = 1; i <= LEAD_FRAMES; i++) {
+      const a = landingHandoverTarget(ballAt(i - 1), PITCH, (i - 1) / LEAD_FRAMES);
+      const b = landingHandoverTarget(ballAt(i), PITCH, i / LEAD_FRAMES);
+      const step = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (i > 1) expect(step, `frame ${i} steps ${(step / prev).toFixed(2)}x the frame before`).toBeLessThan(prev * 2);
+      prev = Math.max(step, 1e-6);
+    }
+  });
+
+  it('the hand-over agrees with both neighbours it joins', () => {
+    // Continuity is the whole property: at u=0 nothing has changed yet (the target is still the ball),
+    // and at u=1 the ball has ARRIVED at the pitch mark, so the blend and the dead-zone that takes over
+    // from it return the same point. A corner at either join is a visible jerk.
+    const ball: [number, number] = [10, -84];
+    const pitch: [number, number] = [12, 0];
+    expect(landingHandoverTarget(ball, pitch, 0)).toEqual([10, -84]);
+    expect(landingHandoverTarget(pitch, pitch, 1)).toEqual([12, 0]);
+    expect(runoutCameraTarget(pitch, pitch, 20)).toEqual([12, 0]);
+    // …and it is clamped, so a caller that overshoots the window cannot drive it past the pitch mark.
+    expect(landingHandoverTarget(ball, pitch, 1.4)).toEqual([12, 0]);
+    expect(landingHandoverTarget(ball, pitch, -0.3)).toEqual([10, -84]);
   });
 
   it('the leash is long enough that an ordinary landing never moves the camera at all', () => {

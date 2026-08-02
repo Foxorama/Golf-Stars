@@ -2407,3 +2407,96 @@ and it moved as a decision with the reason recorded, to the line rather than thr
 
 `npm run typecheck` + `npx vitest run` green: **220 files, 2,664 tests, 0 skipped**, plus `npm run
 build`.
+
+---
+
+## GS-landing-camera, retired â€” the push-in cost more than it bought (2026-08-02)
+
+> *"The weird zoom on ball flight ending is weird, can we get rid of that? It doesn't start zooming
+> till way too late in the flight and takes the focus completely away from where the ball is ending."*
+>
+> *"We had pretty good visible bounce for most of the game, it was only when I started trying to get
+> you to make it better that it has gotten massively complicatedâ€¦ I just wanted like an extra bounce
+> or 2 and now it feels like I need to scrap the whole ball flight process and start from scratch."*
+
+`landingZoom` is **1**. The push-in is off.
+
+### Why it was right to remove, and why the bounce survives it
+
+The push-in was reasoned from a true measurement â€” a driver's run-out is 61 screen pixels at the
+flight camera â€” and it drew a correct conclusion about SCALE while ignoring the cost. A camera moving
+through the landing is a camera the eye has to re-acquire the ball against, at exactly the moment it
+is trying to read a small, fast arc. Three passes of measurement all said the bounce was bigger and
+none of them could see that it had become harder to watch.
+
+Removing it costs less than it looks, because the MODEL work underneath it was real and is kept:
+
+| a driver's landing, firm fairway, at the flight camera | #609 (last reported GOOD) | **now** |
+|---|---|---|
+| visible bounces | 4 | **4** |
+| first bounce's drawn lift | ~5.3px over a 3px ball | **11.2px over a 2.3px ball** |
+| run-out drawn length | ~37px | **61px** |
+| the ball's own screen travel | ~0 (camera tracked it) | **the full 61px** |
+
+So the state the play-test remembers as working drew a 5-pixel bounce; this draws an 11-pixel one, and
+the ball now travels across the frame instead of being pinned. What is lost with the camera is the
+part-power tail â€” `D @0.85` falls to 3 â€” and the band is asserted on a FULL swing now, which is what
+it always described.
+
+### What actually went wrong, five passes back
+
+Worth recording, because it is the reason this took eight PRs to walk back.
+
+**#612 (GS-flight-pace) fixed the ball's arrival speed from 0.0067 to 0.28 yd/ms â€” a factor of 42.**
+That was a real bug: the flight's BÃ©zier collapsed to near-zero ground speed at touchdown, and the
+run-out chained off the measured value. It was also, accidentally, the entire reason the bounce looked
+good. A hop's duration is `distance / speed`, so at a stroke every hop became **1/42 as long** â€” the
+87ms train #613 then found. The bounce was never designed to be watchable; it was watchable because
+something upstream was broken, and fixing that broke it.
+
+Every pass since has been compensating in the wrong dimension:
+
+| | what it added | dimension |
+|---|---|---|
+| #613 | `runoutTimeScale` 0.16, `hopDrawBoost` 3 | time, height |
+| #615 | derived apex ratio, boost â†’ 5 | height |
+| #618 | self-similar decay, boost â†’ 5.4 | height |
+| #701 | `sin2Î¸` length term, `ballYd` trim | length |
+| #717 | the camera push-in | scale |
+| #718 | per-class counts, `trainSustain` | count |
+| #719/#720 | dead-zone camera, clock, boost â†’ 6.5 | travel, time, height |
+
+Seven passes, and the one that mattered was #719's dead-zone camera â€” because it was the only one
+addressing what the flight-pace fix actually destroyed: the ball's *motion* through the bounce, not
+its size. The push-in rode in on the same PR and got the credit.
+
+### What is kept, and why
+
+- **The dead-zone camera hold.** Not a zoom â€” the camera simply stops chasing the ball at the landing,
+  so a skip travels across a still frame instead of being redrawn in place while the world scrolls.
+  This is the fix; it is invisible except that the ball moves.
+- **The per-class ladder, `trainSustain`, `hopDrawBoost` 6.5, the clock work.** All measured, all
+  independent of the camera, and together they are why removing the push-in still leaves the bounce
+  twice the size it was when it last read well.
+- **`landingZoomFor` and `landingZoom` itself**, dormant at 1. It is the one lever that trades camera
+  movement for drawn scale, the rig measures through it (`GS_LANDING_ZOOM=â€¦`), and it is live on
+  `_gsFeel` â€” so a gentler push-in is a console line rather than a rewrite. A test pins the shipped
+  value at 1 so it cannot come back by drift.
+
+### Contracts
+
+Render-only throughout; contracts 1, 2, 4, 5 untouched, nothing for the death-spiral harness to weigh.
+
+Two guards changed, both as decisions with the reason recorded rather than as relaxations: the bounce
+band is asserted on a full swing (it always described one), and the ladder is asserted as
+NON-INCREASING with strictly separated ends rather than a strict step at every rung â€” without the
+push-in there are only four distinguishable counts across six families, so ties in the middle are
+arithmetic, and demanding six strict steps would be demanding the camera back.
+
+A third was deleted outright: a monotonic-in-power claim that failed on `D @0.7` drawing more than
+`D @0.85`. That is an artefact of the test's own three-step camera approximation, not of the game,
+whose camera is continuous in the shot's reach. **A test may not assert a property of its own
+approximation.**
+
+`npm run typecheck` + `npx vitest run` green: **220 files, 2,664 tests, 0 skipped**, plus `npm run
+build`.

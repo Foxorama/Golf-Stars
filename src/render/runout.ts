@@ -335,7 +335,18 @@ export const DEFAULT_RUNOUT_FEEL: RunoutFeel = {
   runoutTimeScale: 0.30,
   runoutMinMs: 340,
   runoutMaxMs: 3000,
-  landingZoom: 0.34,
+  // 1 = NO PUSH-IN. Play-tested and rejected: *"the weird zoom on ball flight ending is weird, can we
+  // get rid of that? it doesn't start zooming till way too late in the flight and takes the focus
+  // completely away from where the ball is ending."* The push-in bought the bounce three times the
+  // pixels, and it cost more than it bought — a camera moving through the landing is a camera the eye
+  // has to re-acquire the ball against, at exactly the moment it is trying to read a small fast arc.
+  //
+  // It is kept at 1 rather than deleted because it is the one lever that trades camera movement for
+  // drawn scale, the whole rig measures through it (`GS_LANDING_ZOOM=…`), and it is live on `_gsFeel`
+  // — so a gentler version can be tried in one console line instead of a rewrite. The DEAD-ZONE hold
+  // it shares a gate with stays ON: that is not a zoom, it is the camera stopping chasing the ball, and
+  // it is what lets a skip travel across the frame at all.
+  landingZoom: 1,
   landingMinRadiusYd: 20,
   landingZoomLeadMs: 300,
   landingZoomEase: 0.12,
@@ -583,6 +594,36 @@ export function runoutCameraTarget(
   if (!(d > leashYd) || !(d > 1e-9)) return [pitch[0], pitch[1]];
   const k = (d - leashYd) / d;
   return [pitch[0] + dx * k, pitch[1] + dy * k];
+}
+
+/**
+ * Where the follow-cam should look during the HAND-OVER — the beat of flight before touchdown in which
+ * the camera stops chasing the ball and settles onto the pitch mark (GS-runout-clock).
+ *
+ * `u` runs 0 → 1 across `landingZoomLeadMs`. It is a BLEND and never a switch, and that is the whole
+ * reason this function exists rather than an `if`:
+ *
+ * Assigning the pitch mark outright at u=0 moves the follow target forward by everything the ball has
+ * left to fly — **84 yards on a driver** — in a single frame. The camera then chases it at 0.2 a frame
+ * and flings the ball backwards across the screen: measured off the real canvas, the ball's ground
+ * speed went **0.26 px/frame → 25.35 px/frame in one frame**, decayed over ten, and was still running
+ * at 8px/frame as it touched down, into a run-out that crawls at 1.2. That is the reported *"lands then
+ * quickfast jerkily teleports to its stopping point"* — the original teleport bug's shape, reintroduced
+ * by the fix for the backwards first hop.
+ *
+ * The blend is continuous at BOTH ends by construction: at u=0 it returns the ball exactly (so nothing
+ * changes at the moment the lead opens), and at u=1 the ball IS the pitch mark, so the two agree when
+ * the dead-zone takes over. All it does in between is pull the camera gently ahead of the ball so that
+ * it has arrived by the time the ball has.
+ */
+export function landingHandoverTarget(
+  ball: readonly [number, number],
+  pitch: readonly [number, number],
+  u: number,
+): [number, number] {
+  const t = clamp(u, 0, 1);
+  const e = t * t * (3 - 2 * t); // smoothstep: zero slope at both ends, so neither join is a corner
+  return [ball[0] + (pitch[0] - ball[0]) * e, ball[1] + (pitch[1] - ball[1]) * e];
 }
 
 export function apexOverLenFor(descentDeg: number, feel: RunoutFeel = DEFAULT_RUNOUT_FEEL): number {
