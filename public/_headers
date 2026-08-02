@@ -1,0 +1,22 @@
+# Cache rules for hosts that honour them (Cloudflare). GitHub Pages ignores this file entirely, and
+# itch serves a zip, so shipping it everywhere is harmless — it only ever takes effect on staging.
+#
+# THE SHELL IS NEVER CACHED WITHOUT ASKING (GS-sw-stale). GitHub Pages serves index.html with
+# `Cache-Control: max-age=600` and gives you no way to change it, which is what stranded an installed
+# app on the previous build for ten minutes after every deploy. Cloudflare does let you set it, so the
+# staging origin says the honest thing: revalidate the shell every time.
+#
+# `no-cache` is NOT `no-store`. It permits the browser to keep the 2.4MB single-file bundle and send
+# `If-None-Match`, so an unchanged build costs a 304 rather than a full re-download on mobile data.
+#
+# ⚠️ These rules are correct on ANY host, which is deliberate: if production ever moves off GitHub
+# Pages this file makes it strictly fresher, never staler. Nothing here is staging-specific — keep it
+# that way, or this becomes a setting that silently changes meaning when the host does.
+/
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+/sw.js
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Cache-Control: no-cache
