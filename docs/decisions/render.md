@@ -553,7 +553,7 @@
   twinkles read as stars, not sparkle. Fix: `WeatherOpts.starMask?: () => Vec[][] | null` — screen
   polys the PINNED stars must stay out of, queried per frame. The mask's land source is the new
   exported `landPolysCourseFor(hole, rainbow)` in `style.ts` (hull to the OB frame / lost-rough
-  platforms / `[]` on Rainbow Road) — the SAME helper `buildScene` now draws from, so the drawn
+  platforms / `[]` on the Rainbow Course) — the SAME helper `buildScene` now draws from, so the drawn
   ground and the star mask can never disagree. `playView` feeds it through the LIVE projector (the
   follow-cam pans; the mask tracks). The aim/putt overlay (`app.ts mountWeatherOverlay`) can't
   project an exact mask (its local projector is wind-orientation only, not the SVG map's fit), so it
@@ -773,7 +773,7 @@
   are fine — a beach ball on the strand belongs). Props are ~4.8 yd (clamped 15–36 px) so they read
   both zoomed-out on the map AND in the follow-cam. Sized bigger + a few per hole (ocean 4–5, else
   3–4) so scanning the hole actually turns them up. Skipped on lost-rough holes (no rough to hide in)
-  and Rainbow Road; void/cetus have NO `EGGS` row by design (their bespoke deep already reads great).
+  and Rainbow Course; void/cetus have NO `EGGS` row by design (their bespoke deep already reads great).
   Determinism/camera holds trivially (dedicated stream, course-space rejection, fixed-count
   unconditional pushes) — no existing stream moves. Guards: `tests/biome-identity.test.ts` (props for
   the playful worlds + none for void/cetus, determinism, corridor/liquid rejection, a beach-prop
@@ -815,7 +815,7 @@
   `WATER.bank/contact`, `LAVA.bank/contact`.
 - **Greens** get a `castShadow` (`rgba(4,10,6,0.16)`) UNDER the fill on normal worlds (a putting
   surface sits slightly proud → a faint down-light drop shadow grounds it), skipped where a
-  shelf/void-glow already models the edge, and on Rainbow Road. The flush fairway was deliberately
+  shelf/void-glow already models the edge, and on the Rainbow Course. The flush fairway was deliberately
   LEFT alone — a cast shadow there would read as a floating sticker, the opposite of "mown in."
 - **The land tone-patch "spotlights" were tamed** (`buildScene` §4): 5 screen-space tonal discs
   spanning up to 29% of the viewport at heavy alpha read as lens-flare washes pasted over the hole —
@@ -842,7 +842,7 @@
     up-light side via `shiftPoly(offsetPoly(sp, 4), LIGHT_UL·4)` clipped to each segment, so the mown
     turf reads as gently crowned ground catching the shared GS-inset light, not a flat decal.
 - **Gated to the parkland worlds** (`groundedFw = arch !== 'void' && arch !== 'cetus'`, passed as the
-  optional `collar` param; Rainbow Road takes its own ribbon branch and never calls `styleFairways`).
+  optional `collar` param; Rainbow Course takes its own ribbon branch and never calls `styleFairways`).
   void/cetus edge their corridor with a glow rim / raised shelf, so a collar would fight it — they
   pass NO collar and `styleFairways` with `collar === undefined` is **byte-for-byte the pre-change
   output** (the whole suite, incl. the void/cetus determinism + camera-stability guards, stays green;
@@ -918,7 +918,7 @@ per-domain painters moved verbatim into `src/render/style/` modules:
 - `land.ts` — the land hull to the OB frame, the lost-rough `dilateUnion` platforms, the per-hole
   WeakMap caches of the union-merged hazard families, `landPolysCourseFor` (the weather layer's
   star-mask source).
-- `fairway.ts` — grouped `styleFairways` + per-world mow patterns, `styleTee`, the Rainbow Road
+- `fairway.ts` — grouped `styleFairways` + per-world mow patterns, `styleTee`, the Rainbow Course
   ribbon (grooved/shaded bands + crown sheen, GS-rainbow-polish).
 - `green.ts` — `styleGreen` + the whole green-slope art pipeline (`greenSlopeArt`, projected
   lobes, the cached topo isolines).
@@ -929,9 +929,9 @@ per-domain painters moved verbatim into `src/render/style/` modules:
   `easterEggs`.
 - `platforms.ts` — the cetus/void depth kit: `platformCliffs`, `raisedShelf`, `cetusOcean`
   (whales), `cetusRiverPath`/`cetusRiver` (the star-river + waterfall), and the `CETUS_CLIFF`/
-  `VOID_CLIFF`/`RAINBOW_CLIFF` looks (Rainbow Road extrudes its road onto a prismatic cliff too).
+  `VOID_CLIFF`/`RAINBOW_CLIFF` looks (Rainbow Course extrudes its road onto a prismatic cliff too).
 - `effects.ts` — tents/scorch/ground-patch showpieces, the wind streaks, the constellation
-  backdrop, and `rainbowSky` (the Rainbow Road aurora + coloured stars, GS-rainbow-polish).
+  backdrop, and `rainbowSky` (the Rainbow Course aurora + coloured stars, GS-rainbow-polish).
 
 **The load-bearing rule:** `buildScene` (still in style.ts) owns the SEEDED STREAMS and their draw
 order — main `rng`, celestial `crng`, and the dedicated ocean/river/cliff/cover/decor/egg streams
@@ -981,11 +981,11 @@ shots confirmed three tells, all in `styleFairways`:
    `MOW_BLEND` overrides (0.4/0.42) are untouched.
 
 **Guarantees:** all pure geometry, zero rng draws, fixed prim counts (camera-proof); every addition
-gates on `collar`, so void/cetus (no collar — glow rim / raised shelf) and Rainbow Road are
+gates on `collar`, so void/cetus (no collar — glow rim / raised shelf) and Rainbow Course are
 byte-for-byte identical. Full suite green (1009 tests); gallery re-shot across all ten worlds and
 play-zoom crops eyeballed on verdant + desert (smooth grade, no facets, no sheen line).
 
-## GS-rainbow-polish: the Rainbow Road becomes its own complete world (2026-07-07)
+## GS-rainbow-polish: the Rainbow Course becomes its own complete world (2026-07-07)
 
 The legendary Rainbow Ball (GS-rainbow) turns every hole into RAINBOW ROAD — a rainbow ribbon
 through the stars, off-road = OOB. Player feedback after shipping it, three parts:
@@ -1014,7 +1014,7 @@ through the stars, off-road = OOB. Player feedback after shipping it, three part
      prismatic shore rim) replaces "whatever biome recoloured", plus a `rainbowSky` painter — soft
      prismatic AURORA curtains bowing across the upper sky + coloured hero stars — drawn OVER the
      shared starfield off its OWN stream (the shared celestial `crng` stars/planet/comet stay
-     byte-identical) and camera-proof (fixed loop counts). So Rainbow Road reads distinct from
+     byte-identical) and camera-proof (fixed loop counts). So Rainbow Course reads distinct from
      Cetus's blue star-ocean and the Void's violet abyss.
 
 **Guarantees:** every addition gates on `rainbow`, so all ten archetypes are byte-for-byte
@@ -1064,7 +1064,7 @@ except the chip-cone one (preview-only, no sim rng). Full suite stayed green (10
   calm stop) had zero arrows and fell through to the flat legacy look. Every sculpted green has topo
   ISOLINES (the generator gives each green ≥1 lobe on its own side stream; `contourIsolines` floors at 3
   rings for any amplitude), so gate `contoured` on isolines instead — the relief now renders on every
-  biome; the chevrons still correctly stay OFF near-flat crests. (Rainbow Road still takes its own ribbon
+  biome; the chevrons still correctly stay OFF near-flat crests. (Rainbow Course still takes its own ribbon
   branch and draws no green contour — deliberate, its unique look.)
 - **Rough/hazard blobs fit every world.** `styleFescue` hardcoded an olive body + tufts with no archetype
   arg, so the SAME olive grass drew on frost snow / crystal scree / indigo void / ocean dune — and the
@@ -1104,7 +1104,7 @@ half of GS-rough-gradient (see `IDEAS.md GS-rough-gradient-rebalance`), gated by
   warm dune light + brown shadow (desert/ocean), snow-white crest + cool-blue hollow (frost), ember rise
   + charred hollow (inferno), luminous indigo rise + abyssal hollow (void), aqua clifftop swells (cetus),
   gilded meadow-rolls (asgard). Neutral white/black highlights are banned — they'd read as spotlights or
-  smudges, not terrain. Rainbow Road takes its own `RAINBOW_RELIEF`, drawn ON the ribbon (its bands are
+  smudges, not terrain. Rainbow Course takes its own `RAINBOW_RELIEF`, drawn ON the ribbon (its bands are
   opaque) as a gentle prismatic sheen so the track rolls without muddying the spectrum.
 - **Determinism + camera (why it's cheap to trust).** The pass is PURE geometry — it draws ZERO rng, so
   it perturbs NO existing seeded stream (contract 1) and every prior seeded/byte test stays identical; it
@@ -1312,7 +1312,7 @@ object, and drive it off the shared wall clock — or it will render differently
     neutral. PURE geometry (ZERO rng — `posHash` variety only) → perturbs no seeded stream (contract
     1) and the mound count is a function of the COURSE-space land bbox, never the projection
     (camera-proof). Clipped to the land/lost-platforms and drawn UNDER the mown turf (undulation lives
-    in the rough); Rainbow Road rides its own `RAINBOW_RELIEF` sheen ON the ribbon. Rides `art.texture`
+    in the rough); Rainbow Course rides its own `RAINBOW_RELIEF` sheen ON the ribbon. Rides `art.texture`
     (no new `_gs*` hook). Re-shoot the gallery after touching it.
   - Platforms + hazard families merge through `render/merge.ts`: platforms are
     `dilateUnion(…, 14)` (never a mitred `offsetPoly` outset — it folds at concave bends);
@@ -1965,7 +1965,7 @@ deleted — GS-green-complex's lesson stands: a blend that dissolves the green i
 so the surface keeps its base fill, its inward edge ease, its own mow grain and a visible outline.
 
 The derelict is excluded outright: it has no grass, and seats its green in a machined deck bay
-(GS-ship-deck-blend). Rainbow Road rides its own continuous ribbon, as before.
+(GS-ship-deck-blend). Rainbow Course rides its own continuous ribbon, as before.
 
 **Verification:** full suite green, `npx tsc --noEmit` clean, gallery re-shot, plus
 `scripts/greenblend-preview.mjs` (approach) and `scripts/green-zoom.mjs` (putt) before/after. New rig
@@ -2194,7 +2194,7 @@ ran to roughly two-fifths of the drawn island — as much of the frame as the fa
 Both fixed. The strata now start a clear step **under** the fairway and fall away to near-black, and
 the depth is a `CliffLook.skirt` **row** at 0.32 (capped 96px). The row matters: `platformCliffs` is
 shared by four materials with four jobs — a derelict hull SECTION is a torn slab of ship and a
-Rainbow Road buttress is a pillar, and both want the classic depth. Omitting the field keeps the old
+Rainbow Course buttress is a pillar, and both want the classic depth. Omitting the field keeps the old
 constants, so those two worlds are byte-for-byte and a void art pass cannot quietly restyle them.
 
 Note the rule is pinned to the **fairway**, not to the darkest ground: Cetus is a sea cliff whose

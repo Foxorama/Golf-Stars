@@ -22,6 +22,7 @@ import { renderHoleSVG } from '../render/holeView';
 import { shotCardHTML } from '../render/cards';
 import { pinOf } from '../sim/round';
 import { dist } from '../sim/course/contract';
+import { GUIDE_URL } from '../brand';
 import { getSettings, clampUiScale, type Settings } from '../settings';
 import { backupNudge, describeBackup, type Backup } from '../save/backup';
 import { storageHealth } from '../save/durability';
@@ -162,6 +163,33 @@ const SCALE_OPTS: readonly { v: number; label: string; desc: string }[] = [
 ];
 
 /**
+ * The guide row — the ONLY outbound link in the game.
+ *
+ * There is no in-game tutorial by design (see `GUIDE_URL` in `brand.ts`), so this is deliberately
+ * the quietest possible surface: one row, in the sheet, below everything a player actually came
+ * here to change. It is never offered, never prompted, and never appears on a first run — a
+ * player who wants to golf is not asked about a tutorial, and a player looking for help opens
+ * the ⚙ that rides every screen.
+ *
+ * It is an ANCHOR, not a button with a handler: `target="_blank"` + `rel="noopener"` is the whole
+ * mechanism, so it needs no reducer action, no dispatch, and nothing in `backIntent`. The
+ * destination is stated in the visible sub-label rather than only in a `target` attribute nobody
+ * can see — a link that leaves the app should say so before it is tapped.
+ *
+ * ⚠️ In the Android shell (Capacitor, GS-android) this hands off to the system browser. That is
+ * the wanted behaviour — the alternative is a link that opens INSIDE the game's own webview, with
+ * no address bar and no way back to the game except the hardware button.
+ */
+function helpSection(): string {
+  return `
+        <div class="gs-setsec">❔ Help</div>
+        <a class="gs-setrow gs-setrow--link" href="${GUIDE_URL}" target="_blank" rel="noopener noreferrer">
+          <span class="gs-setlabel"><b>📖 How to play</b><span>The guide — the swing, the bag, scoring and the modes. Opens in your browser.</span></span>
+          <span style="font-size:15px;opacity:.6;" aria-hidden="true">↗</span>
+        </a>`;
+}
+
+/**
  * The settings sheet's INNER content (everything inside `.gs-settings`), split out so an in-sheet
  * toggle / aim change can re-render it SURGICALLY (`refreshSettings` in app.ts) without re-mounting the
  * `.gs-sheet` element. Re-mounting replays the sheet's slide-up animation, which read as a flicker on
@@ -230,6 +258,8 @@ export function settingsSheetInner(): string {
         <div class="gs-setnote">How every shot is pre-aimed. Change it mid-round with the ◎ button too.</div>
         <div class="gs-segctl" role="radiogroup" aria-label="Default aim mode">${aimBtns}</div>
         <div class="gs-seghint">${activeAim.desc}</div>
+
+        ${helpSection()}
 
         ${saveDataSection()}
 

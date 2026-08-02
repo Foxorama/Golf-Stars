@@ -1976,6 +1976,10 @@
       .gs-seghint { font-size: 12px; opacity: .7; margin: 8px 2px 0; min-height: 15px; line-height: 1.4; }
       .gs-setfoot { margin-top: 16px; padding-top: 4px; border-top: 1px solid var(--gs-line); }
       .gs-setrow--nav { border-top: none; }
+      /* The guide link (GUIDE_URL) reuses the settings ROW, but it is an <a>, not a <button> —
+         so it needs the two things an anchor brings and a button does not: an underline to
+         suppress, and `box-sizing` on a flex row it does not otherwise inherit. */
+      .gs-setrow--link { text-decoration: none; box-sizing: border-box; }
       .gs-setdone { text-align: center; margin-top: 14px; }
 
       /* ── Save export / import (GS-save-transfer) ───────────────────────────────────────

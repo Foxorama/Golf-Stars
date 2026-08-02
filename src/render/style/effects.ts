@@ -305,11 +305,11 @@ export function constellationBackdrop(themeId: string, W: number, H: number): Pr
   return prims;
 }
 
-/** The Rainbow Road sky's aurora hues (GS-rainbow-polish) — a prismatic sweep, warm→cool. */
+/** The Rainbow Course sky's aurora hues (GS-rainbow-polish) — a prismatic sweep, warm→cool. */
 const RAINBOW_SKY_HUES = ['#ff4d7d', '#ff9a3d', '#ffe23d', '#49e06b', '#3bd1ff', '#7d6bff', '#c46bff'];
 
 /**
- * The Rainbow Road's bespoke starfield flourish (GS-rainbow-polish): drawn OVER the shared deep-space
+ * The Rainbow Course's bespoke starfield flourish (GS-rainbow-polish): drawn OVER the shared deep-space
  * base + starfield so the legendary ball reads as its own cosmic world, distinct from Cetus's blue
  * star-ocean and the Void's violet abyss. A stack of soft prismatic AURORA ribbons bowing across the
  * upper sky (the intro cinematic's screen-blended nebula, rainbow-hued) plus a scatter of coloured

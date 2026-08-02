@@ -54,7 +54,7 @@ look assembly). Cosmetic-only → zero sim/rng impact, so no contract is touched
 ## 3. The interlude (phase 3)
 
 ### Access — the trigger
-An **eagle-or-better on Rainbow Road** opens the Bifröst. `asgardPortalOpens(run, played)` fires when the
+An **eagle-or-better on the Rainbow Course** opens the Bifröst. `asgardPortalOpens(run, played)` fires when the
 Rainbow Ball is armed AND a holed hole scored ≥2 under par (a hole-in-one, albatross, or eagle — there
 are no par-2s, so an ace is always ≤ −2). It is **reducer-only and gated on the ball**, so it adds no rng
 draws and the feature-off path is byte-for-byte unchanged (the same discipline caddy-reputation uses —
@@ -149,12 +149,12 @@ real run, play a self-contained side-run, and come back. The chosen shape:
   interactive nine-hole playthrough, and the win/lose return with all rewards + the shop block).
 
 ## Testing the flow (test hub only)
-The interlude is hard to reach by hand (earn the Rainbow Ball, then eagle on Rainbow Road), so the
+The interlude is hard to reach by hand (earn the Rainbow Ball, then eagle on the Rainbow Course), so the
 **test/demo hub** carries two TEST-ONLY URL params (dormant in the live game, exactly like `?seed=`/
 `?intro=`; the hub's "Asgard" row drives them, and `tests/test-hub.test.ts` guards the parity):
 - **`?asgard=1`** — jump straight into the Bifröst: the Himinbjörg map → cross → the nine-hole
   tournament → win/lose → return (from a real suspended run, so the return works).
-- **`?rainbow=1`** — start a run with the Rainbow Ball armed, so every hole is Rainbow Road and you can
+- **`?rainbow=1`** — start a run with the Rainbow Ball armed, so every hole is the Rainbow Course and you can
   score an eagle to fire the trigger authentically.
 Both read in `app.ts applyDebugParams()` (reusing the real reducer to build an honest run) and are set
 by the hub with `intro:'0'` so they land past the boot cinematic in one click.

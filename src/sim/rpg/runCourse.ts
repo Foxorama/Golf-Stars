@@ -3,7 +3,7 @@
  *
  * Turns a `Run` at its current stop into the `Course` awaiting the player: the deterministic stop
  * seed + retry guard, the star-travel theme resolution (`currentTheme`/`routeTheme`), and the
- * `currentCourse` pipeline (split-biome stitching, tent arming, effect physics, Rainbow Road). Pure &
+ * `currentCourse` pipeline (split-biome stitching, tent arming, effect physics, Rainbow Course). Pure &
  * deterministic; the only run dependency is the `Run` TYPE (erased at compile, so no runtime import
  * cycle). run.ts re-exports every public symbol here, so existing importers are unchanged. Behaviour
  * is byte-for-byte identical to when this lived inside run.ts — a pure move (same rng streams, same
@@ -155,7 +155,7 @@ export function currentCourse(run: Run): Course {
   // resume), so no new run/save state. Stop 0 / no event ⇒ boost 0, effect 'none' (byte-for-byte old).
   const wildnessBoost = routeDifficulty(run.pendingEvent);
   const effect = routeEffect(run.pendingEvent);
-  // Rainbow Road (GS-rainbow-road-2): when the legendary Rainbow Ball is armed the whole run plays as
+  // Rainbow Course (GS-rainbow-road-2): when the legendary Rainbow Ball is armed the whole run plays as
   // RAINBOW ROAD, so reshape every generated stop into a fair, wide ribbon with no hazards (see
   // `applyRainbowRoad`). Applied LAST — a pure, rng-free post-generation transform on the finished,
   // already-validated course, gated on the loadout flag — so a base run is byte-for-byte unchanged and

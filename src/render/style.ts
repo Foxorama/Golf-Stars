@@ -179,7 +179,7 @@ function worldLook(themeId: string | undefined, biome: string | undefined): { ar
 }
 export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[] {
   const { width: W, height: H, biome, themeId } = opts;
-  // Rainbow Road (GS-rainbow): the play surfaces become a glowing rainbow ribbon and everything off
+  // Rainbow Course (GS-rainbow): the play surfaces become a glowing rainbow ribbon and everything off
   // it is the bare starry void (out of bounds). The deep-space base + starfield (painted first) stay,
   // so the ribbon floats through the stars; the land hull, rough texture and non-sand hazards are
   // dropped below. All rng draws are KEPT (only the prim pushes change), so the art stream is stable.
@@ -248,7 +248,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   const landPlatformsCourse: Vec[][] =
     arch === 'derelict' && !rainbow && lostHole ? jagShipPlatforms(hole, rawPlatformsCourse) : rawPlatformsCourse;
   const landPlatforms = landPlatformsCourse.map((p) => projPoly(p, proj));
-  // Rainbow Road gets its OWN bespoke deep-space look (GS-rainbow-polish) — a distinct indigo-violet
+  // Rainbow Course gets its OWN bespoke deep-space look (GS-rainbow-polish) — a distinct indigo-violet
   // cosmos with a prismatic shore rim — so the legendary ball reads as its own world, not the
   // underlying biome recoloured. Every other world keeps its archetype space, byte-for-byte.
   const space = rainbow ? RAINBOW_SPACE : spaceLookFor(arch, deepen);
@@ -338,7 +338,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     }
   } // end space-vs-earth backdrop branch
 
-  // --- 2a. Rainbow Road's bespoke aurora sky (GS-rainbow-polish) --------------
+  // --- 2a. Rainbow Course's bespoke aurora sky (GS-rainbow-polish) --------------
   // Prismatic aurora curtains + coloured hero stars OVER the shared starfield, so the legendary ball
   // reads as its own cosmic world — a distinct starfield from Cetus's blue deep and the Void's violet
   // abyss. Drawn off a DEDICATED stream so the shared celestial `crng` (stars/planet/comet) stays
@@ -354,7 +354,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   if (arch === 'cetus' && !rainbow) prims.push(...cetusOcean(landPlatformsCourse, cb, proj, W, H, art.accents, oceanRng));
 
   // --- 3. The floating landmass: an atmospheric rim feathering into the void ---
-  // Rainbow Road: NO landmass at all (rim glow + fill) — the rainbow ribbon floats over open space, so
+  // Rainbow Course: NO landmass at all (rim glow + fill) — the rainbow ribbon floats over open space, so
   // the starfield reads everywhere off the road (off-road IS out of bounds). An island-green par 3
   // draws a separate platform per play feature (tee + green island) so the deep shows between them.
   if (!rainbow) {
@@ -467,7 +467,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // NO star-salt on the land (GS-rough-frame): the in-bounds ground is playable rough and must
   // read as turf, not as the starfield it once wore — the stars live beyond the OB frame, where
   // the ball actually IS lost. (The old crng star loop here was the "rough became starfields" bug.)
-  // Rainbow Road drops the rough/tufts/flowers (off-road is empty space); a lost-rough hole also
+  // Rainbow Course drops the rough/tufts/flowers (off-road is empty space); a lost-rough hole also
   // drops them (its platforms are tiny and turf-covered, the rest is the open deep). The rng was
   // still consumed above, so the art stream is byte-stable whether or not the detail is painted.
   if (!rainbow && !lostHole) prims.push({ t: 'clip', clip: islandPts, children: land });
@@ -546,7 +546,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   const waterPolys: Vec[][] = merged.water.map((p) => projPoly(roughenHazardCached(p, 'water'), proj));
   const lavaPolys: Vec[][] = merged.lava.map((p) => projPoly(roughenHazardCached(p, 'lava'), proj));
   const sandPolys: Vec[][] = merged.sand.map((p) => projPoly(p, proj));
-  // Rainbow Road: extrude EVERY play surface (fairway/green/tee) into a prismatic layered CLIFF
+  // Rainbow Course: extrude EVERY play surface (fairway/green/tee) into a prismatic layered CLIFF
   // (GS-rainbow-polish) — the same side-on depth treatment Cetus/Void get — so the road reads as a
   // raised glowing track floating in space, not a flat decal. Drawn FIRST (behind every ribbon: the
   // ribbon caps each plateau), off the dedicated `cliffRng` (unused on the rainbow path otherwise) so
@@ -558,7 +558,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     prims.push(...platformCliffs(roadSps, deepen, cliffRng, RAINBOW_CLIFF).prims);
   }
   if (glow) for (const sp of fairwaySps) prims.push(...glowBloom(sp, glow, proj.scale));
-  // Rainbow Road: ONE continuous band grid (the main corridor's bbox) shared by the fairway, GREEN and
+  // Rainbow Course: ONE continuous band grid (the main corridor's bbox) shared by the fairway, GREEN and
   // TEE ribbons — so the rainbow bands run seamlessly tee→fairway→green as a single track instead of
   // three separately-phased blobs with mismatched stripe scales at each seam (the "fairway/green don't
   // mesh" read). Computed once here; the feature loop below reuses it for the green + tee.
@@ -673,7 +673,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     if (glow && f.kind === 'green') prims.push(...glowSurfaceEdge(sp, glow, proj.scale));
   }
 
-  // --- 5b2. Rainbow Road surface relief (GS-biome-relief) ---------------------
+  // --- 5b2. Rainbow Course surface relief (GS-biome-relief) ---------------------
   // A gentle prismatic sheen of lit rises + violet hollows drawn ON the road ribbon (its bands are
   // opaque, so the relief rides over them) so the legendary track reads as a rolling, glowing road
   // rather than a flat decal. Clipped to the road surfaces; pure geometry (zero rng), so the rainbow
@@ -722,7 +722,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
     // void holes render as purple zones" bug). Breach is derelict-only, so dropping it here is safe.
     else if (!WATER_KINDS.has(f.kind) && !LAVA_KINDS.has(f.kind) && f.kind !== 'bunker' && f.kind !== 'waste' && f.kind !== 'sand' && f.kind !== 'pot' && f.kind !== 'breach') scatterHaz.push(f);
   }
-  // Rainbow Road: SAND is on the road (in-play, see `ROAD_LIES`) so bunkers/craters still draw; every
+  // Rainbow Course: SAND is on the road (in-play, see `ROAD_LIES`) so bunkers/craters still draw; every
   // OTHER hazard (rough fescue, ravines, exotic scatter, water/lava, trees) is OFF the road → the bare
   // void, so it's dropped (it reads as the OOB space it now is, matching the sim's lie rule).
   if (!rainbow) {
@@ -762,7 +762,7 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // The meteor-shower route's signature: charred craters burned into the turf, drawn from the SAME
   // `meteorScorch(hole)` the sim's lie conversion reads — a crater you see is exactly the lie the sim
   // plays (the graphic IS the physics). Pure (posHash variation only — zero rng draws, so the seeded
-  // scene streams are untouched); off under Rainbow Road (whose road rule ignores scorch).
+  // scene streams are untouched); off under Rainbow Course (whose road rule ignores scorch).
   if (opts.meteorScorch && !rainbow) prims.push(...styleScorch(meteorScorchFor(hole), proj));
   // Effect ground patches (GS-journey-fx-2): same contract as the craters — drawn from the SAME
   // `effectPatches(hole, kind)` the sim's lie conversion reads, posHash variation only (zero rng).
@@ -772,14 +772,14 @@ export function buildScene(hole: Hole, proj: Projector, opts: SceneOpts): Prim[]
   // The trade-market route's signature: a ring of bright, collidable tents around the green. Drawn in
   // COURSE space (projected) so they sit on the ground and track the follow-cam — the fix for the old
   // screen-space caravan that floated in mid-air over the controls / the flight. Pure (no rng); off the
-  // road under Rainbow Road (they'd be in the OOB void).
+  // road under Rainbow Course (they'd be in the OOB void).
   // Tents live on ONE stamped hole of the stop (GS-tent-interactions) — draw only when this hole carries them.
   if (opts.tradeTents && !rainbow && hole.tents) prims.push(...styleTents(tradeTentsFor(hole), proj));
 
   // --- 6d. Ship-corridor walls (GS-ship-walls) --------------------------------
   // The derelict world's collidable metal corridor walls, drawn from the SAME `hole.walls` the sim
   // bounces off (the graphic IS the physics). Course space (projected), over the deck, under the
-  // flag/motes. Pure geometry; off under Rainbow Road.
+  // flag/motes. Pure geometry; off under Rainbow Course.
   if (!rainbow && hole.walls) prims.push(...styleShipWalls(hole.walls, proj, lostHole));
 
   // --- 7. Sparkle motes (a little life over the whole hole) -------------------

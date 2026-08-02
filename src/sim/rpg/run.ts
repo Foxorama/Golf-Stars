@@ -1038,7 +1038,7 @@ export function bank(run: Run): Run {
 
 /**
  * Build the ASGARD tournament run (GS-asgard) — a self-contained nine-hole stroke-play side event on the
- * Golden Realm, spun off from the player's CURRENT run when they earn an eagle-or-better on Rainbow Road.
+ * Golden Realm, spun off from the player's CURRENT run when they earn an eagle-or-better on the Rainbow Course.
  * It keeps their built-up bag (perks) MINUS the Rainbow Ball, so it plays Asgard's real geometry rather
  * than the rainbow ribbon; the theme is forced to Asgard (`pendingTheme` object, never `themeById`), so
  * `currentCourse` generates the `asgard-realm` biome. It is never travelled/shopped and never persisted

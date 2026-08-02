@@ -1715,7 +1715,7 @@ export function reduce(state: UiState, action: Action): UiState {
       // the gameover/victory screen; a survived non-final stop goes to the result screen.
       const ended = run.status !== 'active';
       const endless = endlessProgressUpdates(state, run);
-      // An eagle-or-better on Rainbow Road diverts to the Himinbjörg map instead (GS-asgard).
+      // An eagle-or-better on the Rainbow Course diverts to the Himinbjörg map instead (GS-asgard).
       return withAsgardPortal({
         ...state,
         run,
@@ -2094,7 +2094,7 @@ export function reduce(state: UiState, action: Action): UiState {
       const { run, result } = finishStop(state.run, state.course, stopPlayed, { prevBestHoles: state.endlessBestHoles });
       const ended = run.status !== 'active';
       const endless = endlessProgressUpdates(state, run);
-      // An eagle-or-better on Rainbow Road diverts to the Himinbjörg map instead (GS-asgard).
+      // An eagle-or-better on the Rainbow Course diverts to the Himinbjörg map instead (GS-asgard).
       return withAsgardPortal({
         ...state,
         run,

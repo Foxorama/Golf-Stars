@@ -266,7 +266,7 @@ export interface UiState {
    *  See `ui/back.ts` — the confirm exists because leaving mid-stop replays that stop, not because
    *  anything is lost (`toTitle` keeps the run resumable). */
   pendingExit?: boolean;
-  /** The suspended real run (GS-asgard): when an eagle-or-better on Rainbow Road opens the Bifröst, the
+  /** The suspended real run (GS-asgard): when an eagle-or-better on the Rainbow Course opens the Bifröst, the
    *  current run is snapshotted here while the Asgard tournament plays in `run`. Restored (perks edited)
    *  on the tournament's end. The Asgard run is never persisted, so a mid-tournament quit resumes THIS. */
   asgardReturn?: RunSnapshot;

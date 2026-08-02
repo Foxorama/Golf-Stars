@@ -1,4 +1,4 @@
-// Quick visual check for Rainbow Road (GS-rainbow-polish + GS-rainbow-road-2): render a few holes as
+// Quick visual check for Rainbow Course (GS-rainbow-polish + GS-rainbow-road-2): render a few holes as
 // the static SVG map WITH rainbow road armed, applying the in-game `applyRainbowRoad` transform (wide
 // road + no hazards) so the aurora sky, prismatic cliff pillars, aligned band grid and widened ribbon
 // can be eyeballed exactly as the run shows them. Dev tool only — imports the real TS render layer.

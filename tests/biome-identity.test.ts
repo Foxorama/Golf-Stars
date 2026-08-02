@@ -263,7 +263,7 @@ describe('rough vs the starfield (GS-rough-frame)', () => {
     const armed = generateCourse(6, { biome: 'void-garden', holes: 1, wildness: 1 }).holes[0]!; // re-pinned (GS-variety-3)
     expect(landPolysCourseFor(wooded).length).toBe(1); // normal world: one rough hull to the OB frame
     expect(landPolysCourseFor(armed).length).toBeGreaterThanOrEqual(2); // armed lost-rough: per-feature platforms
-    expect(landPolysCourseFor(armed, true).length).toBe(0); // Rainbow Road: no land — stars everywhere
+    expect(landPolysCourseFor(armed, true).length).toBe(0); // Rainbow Course: no land — stars everywhere
   });
 
   it("the void's deep carries negative-energy rifts on an armed hole", () => {

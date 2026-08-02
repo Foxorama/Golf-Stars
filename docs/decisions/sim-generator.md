@@ -896,7 +896,7 @@ per-hole later"). `GENERATOR_VERSION` bumped 9 → 10 (stream reordered — no b
   sandbelt blowout instead of a flat-cut road slab. Pure math on the SAME rng draws (count unchanged).
 
 ## GS-variety-3 — a hard hole need not be a long bendy clone (variety at mid-to-high difficulty)
-Player report: "at higher difficulties, especially Rainbow Road, Void and Cetus, all the holes turn
+Player report: "at higher difficulties, especially Rainbow Course, Void and Cetus, all the holes turn
 into exceptionally long bendy holes that basically all look exactly the same." Directive: research
 what makes golf holes hard AND interesting, then apply it to mid-to-high difficulty for a real range
 of par 3/4/5 holes — "ignore balance and death spiral for this; we can tune balance/AI later, but we
@@ -910,7 +910,7 @@ holes as change-of-pace; give the interesting holes genuine two-route optionalit
 Root cause (measured): at high wildness `chooseTemplate`'s shape mix **crushed the workhorse simple
 shapes**. For a bendy world (void `doglegBias 0.45`) at wildness 1 the old formula gave ~8% straight,
 **~0% plain dogleg**, and ~92% cape/hairpin/double — so every deep stop was a severe bend, and on the
-long low-gravity worlds (void 1.4×, cetus 1.12×, Rainbow Road inherits its base biome) that read as
+long low-gravity worlds (void 1.4×, cetus 1.12×, Rainbow Course inherits its base biome) that read as
 "exceptionally long bendy holes, all the same." Three coupled fixes, all in `generate.ts`:
 
 - **`straightP` RISES with wildness** (`Math.min(0.30, Math.max(0.08, 0.06 + wildness·0.20 −
@@ -952,7 +952,7 @@ void `unending:<theme>:<dist>:<v>` raw-throw configs) and two `tests/biome-ident
 NO death-spiral fence needed relaxing — reducing the severe-bend share is difficulty-NEUTRAL-to-easier,
 so every bar (ember/frost <1.0, characters/biomes relaxed bars, void "bites") held; full suite green
 (1052). NO new `_gs*`/URL hook (content-as-data + sim behaviour), so the test-hub guard needs nothing.
-Verified with a rendered high-wildness sheet (void/cetus par-4/5 + Rainbow Road): straight par-4/5 now
+Verified with a rendered high-wildness sheet (void/cetus par-4/5 + Rainbow Course): straight par-4/5 now
 appear beside doglegs/hairpins/S-curves, and the island holes range from 2-pad island-greens to 4-pad
 stepping-stone runways. TODO(GS-variety-3-followup): the bigger levers from the research are still on
 the table — named TEMPLATE holes (Redan/Cape/Biarritz/Short) as set-pieces, an anti-repeat scheduler
@@ -1847,7 +1847,7 @@ RENDER junction blend is a separate render-only pass (GS-green-blend). Re-shoot
     stops; difficulty rides bend severity + hazard density, not which shapes exist. And a hard hole
     need NOT bend (GS-variety-3): `straightP` RISES with wildness (deep stops GAIN straight holes,
     defended by length/width/rough/green tilt) so a wild stop stops reading as all-severe-bends — the
-    worst-hit worlds were the long low-gravity ones (void/cetus/Rainbow Road). DRIVABLE par-4s persist
+    worst-hit worlds were the long low-gravity ones (void/cetus/Rainbow Course). DRIVABLE par-4s persist
     at every wildness (a heroic change-of-pace, no longer halved deep in). Lost-rough par 4/5 draw an
     island STORY (`runway`/`island-green`/`cape`/`stepping-stones`/`staggered`) so the pad chain varies
     in count + position, not one even chain; every gap is floored to `ISLAND_GAP_MIN_YD` (past the
