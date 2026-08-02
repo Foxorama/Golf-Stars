@@ -51,6 +51,24 @@ export const GAME_TITLE_UPPER = 'THE FAR CARRY';
 export const APP_VERSION: string =
   typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0-dev';
 
+/**
+ * The player-facing guide — the ONE outbound link in the whole game.
+ *
+ * There is no in-game tutorial and that is a decision, not an omission: the game is written to
+ * explain itself where the player is standing, and a first-run walkthrough is exactly what a
+ * player who wants to golf has to dismiss. The guide is for the player who wants to know what a
+ * number means, which is a question they ask later and somewhere else.
+ *
+ * **It is the SHORT path on purpose.** `/guide` is a permanent redirect to the guide's real
+ * address, so this string — which ships inside builds that can never be edited again — stays
+ * valid if the site is ever reorganised. Never write the deep link here.
+ *
+ * ⚠️ It is a link, not a request: nothing is fetched, so the "collects nothing, sends nothing"
+ * guarantee is untouched (`tests/privacy.test.ts` bans `fetch`/beacons/cookies, not anchors).
+ * Whoever renders it owes it `target="_blank"` + `rel="noopener"`.
+ */
+export const GUIDE_URL = 'https://vulpecula.games/guide';
+
 /** Injected by Vite from the commit being built (see `buildId()` in `vite.config.ts`). */
 declare const __BUILD_ID__: string;
 
