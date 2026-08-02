@@ -48,6 +48,31 @@ play-test verdict that killed the first version:
 The honest shape is that the AI wrote every line and was wrong about how it felt a lot of the time,
 and the loop is what closed that gap. Resist making it a defence.
 
+
+### DL-bounce-day — a day on one bounce, and what each of us actually did
+
+**Published as `reports/devlog-bounce-day-2026-08-02.md` (draft, awaiting a read-through).** The
+material is a single day: ten PRs merged 2026-08-02, seven of them on the ball's bounce, two of which
+made the game worse. Written by Claude in the author's voice rather than the author's words tidied,
+which is the opposite of the launch post and the thing to check hardest before it ships.
+
+Why it earns its place: it is the `DL-how-it-was-made` loop in miniature and with receipts, and it is
+the honest version rather than the flattering one. The specific material —
+
+- every "fixed" report measured the MODEL and none measured the PICTURE; `landing-preview.mjs` had
+  been drawing at 4.6 px/yd while the game drew a driver at 1.6, so weeks of eyes-on verdicts were
+  read off a camera the game does not use
+- the play-test's own four-club split (driver/wood/hybrid/long iron bad, short iron/wedge fine)
+  landed at **exactly** the 1.0 drawn height:length ratio, a number nobody knew existed
+- a test asserting the bounce stay BELOW that ratio — written on an unvalidated guess — had been
+  blocking the fix for three attempts, while a sand wedge shipped at 1.38 and was one of the clubs
+  called correct
+- and the actual reason the author's own save never bounced was a wedge item whose copy said it
+  affected approaches, silently subtracting its backspin from every club in the bag
+
+Pairs with `DL-guard-caught-it`: both are about a green light that wasn't, and this one adds the case
+where the guard itself was the wrong colour.
+
 ### DL-guard-caught-it — the guard caught a second description, and then the AI oversold it
 
 Two parts, and **the second is the better story.**
