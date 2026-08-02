@@ -210,7 +210,7 @@
          A bare `:focus-visible` is specificity (0,1,0) — lower than every `.gs-thing:focus-visible`
          rule below it — so this is a FLOOR, not an override: components keep their bespoke rings and
          everything else stops being invisible to a keyboard. It covers the set that had no ring at
-         all (.gs-setchip, .gs-seg, .gs-mapbtn, .gs-roundbtn, .gs-setrow, .gs-clickcard, .gs-traits-bar,
+         all (.gs-setchip, .gs-seg, .gs-setact, .gs-mapbtn, .gs-roundbtn, .gs-setrow, .gs-clickcard, .gs-traits-bar,
          .si-card …) and, more usefully, every control written from here on. */
       :focus-visible { outline: 2px solid var(--gs-info); outline-offset: 2px; }
 
@@ -1976,11 +1976,36 @@
       .gs-seghint { font-size: 12px; opacity: .7; margin: 8px 2px 0; min-height: 15px; line-height: 1.4; }
       .gs-setfoot { margin-top: 16px; padding-top: 4px; border-top: 1px solid var(--gs-line); }
       .gs-setrow--nav { border-top: none; }
-      /* The guide link (GUIDE_URL) reuses the settings ROW, but it is an <a>, not a <button> —
-         so it needs the two things an anchor brings and a button does not: an underline to
-         suppress, and `box-sizing` on a flex row it does not otherwise inherit. */
+      /* An anchor used as a settings control needs the two things a <button> brings for free:
+         no underline, and `box-sizing` on a flex row it does not otherwise inherit. */
       .gs-setrow--link { text-decoration: none; box-sizing: border-box; }
       .gs-setdone { text-align: center; margin-top: 14px; }
+      /* ── The More section's ACTION TILES (GS-settings-more) ─────────────────────────────
+         Places you go / things you do, two per row: the guide link and the Save data panel,
+         where the sheet used to stack a section heading, a paragraph, a storage line, three
+         buttons and a nudge under the controls the player actually came to change. Same
+         `auto-fit` + `minmax(min(…))` grid as `.gs-chipgrid`, and for the same reason — it
+         drops to one column on its own at a large UI scale, which no media query could decide
+         (GS-a11y-scale-wrap). Anything that has to state a CONSEQUENCE stays a full-width
+         `.gs-setrow` in the footer below; a tile's sub-line is a hint, not a promise. */
+      .gs-actgrid {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(min(158px, 100%), 1fr));
+        gap: 8px; margin-top: 9px;
+      }
+      .gs-setact {
+        display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+        padding: 11px 12px; border-radius: var(--gs-r); cursor: pointer; color: var(--gs-ink);
+        background: #1b2130; border: 1px solid var(--gs-line);
+        text-decoration: none; box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        transition: background .14s ease, border-color .14s ease;
+      }
+      .gs-setact:active { background: #ffffff0d; }
+      .gs-setact-i { font-size: 19px; line-height: 1; flex: 0 0 auto; }
+      .gs-setact-t { flex: 1 1 auto; min-width: 0; }
+      .gs-setact-t b { display: block; font-size: 13.5px; font-weight: 800; overflow-wrap: anywhere; }
+      .gs-setact-t span { display: block; font-size: 11.5px; opacity: .6; margin-top: 1px; line-height: 1.35; overflow-wrap: anywhere; }
+      .gs-setact-x { flex: 0 0 auto; font-size: 13px; opacity: .55; }
 
       /* ── Save export / import (GS-save-transfer) ───────────────────────────────────────
          Lives inside the settings sheet, so it borrows `.gs-setsec`/`.gs-setnote`/`.gs-btn`

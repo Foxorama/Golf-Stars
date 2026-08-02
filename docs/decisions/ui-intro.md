@@ -906,6 +906,90 @@ run that raced past the frame can't pass silently. Verified red on the unfixed b
 
 ---
 
+## GS-settings-more: the sheet's tail becomes two tiles and a page (2026-08-02)
+
+### The report
+
+> *"The saving options, help link and return to title now take up a lot of space and don't look
+> great in the settings, and if we add in 'leave round' it's going to make it even messier."*
+
+### What was there
+
+The sheet's bottom half had accreted, one feature at a time, and each addition was individually
+reasonable:
+
+| block | what it was |
+| --- | --- |
+| `❔ Help` | a section heading over ONE link row (GS-guide-link) |
+| `💾 Save data` | a heading, a paragraph, a storage-status line, a backup nudge and four buttons |
+| `🏠 Return to title` | a bordered footer row (GS-settings-nav) |
+
+Measured on the composed-for phone (390×844) at the ship scale, the sheet was **1059px of content in
+an 831px box**. Two screens of settings — and everything on the second screen was a feature used once
+a month, sitting under the volume toggle somebody opened the sheet to flip.
+
+### The rule
+
+**A tile is a place you GO; a row is a promise about a CONSEQUENCE.**
+
+- **Tiles** (`.gs-setact` in a two-up `.gs-actgrid`) get an icon, a bold label and a short hint —
+  *How to play* and *Save data*. The grid is the same `repeat(auto-fit, minmax(min(158px, 100%), 1fr))`
+  the preference chips use, so it drops to one column on its own at a large UI scale, which no media
+  query could decide (GS-a11y-scale-wrap).
+- **Rows** (`.gs-setrow` in the `.gs-setfoot`) stay full-width, because each has a whole sentence to
+  say that the player must be able to read before tapping: *Return to title* reads `resumePromise`,
+  and — since GS-leave-round, which this pass exists to make room for — *Leave round* reads
+  `abandonPromise`. Squeezing either into a tile's hint line would be squeezing out the one part of
+  the control that matters.
+
+### Save data is a PAGE
+
+The most important thing in the sheet is also the least often used: `localStorage` is the only copy
+of a save (GS-save-transfer), so export/import should get real estate when a player goes looking for
+it and none of the sheet's height when they are turning the music off. So it is the second page of
+the same sheet — `saveView.open`, its own `.gs-sheet-head` with a back arrow in front of the ✕, and
+a *‹ Back to settings* button at its foot.
+
+Three rules fell out:
+
+- **The sheet always opens on its first page.** `saveView.open` is cleared when the cog is tapped,
+  beside the existing reset of a half-finished import confirmation — the same reason, one visit's
+  state must never greet the next.
+- **Escape closes the panel before the sheet.** `backIntent` answers `closeSettings` (it cannot see
+  `saveView`, which is app-layer module state like `settingsOpen` itself), and `handleBack`'s
+  `closeSettings` arm closes the panel first if it is open. That is `backIntent`'s own
+  innermost-layer-first rule applied one level further in, not a second policy.
+- **A read-only save is NEVER behind a tap.** Under a `saveIntegrity.fault` (GS-save-integrity) the
+  whole block renders inline in the main sheet under an ordinary `.gs-setsec`, and the Save data tile
+  is dropped entirely rather than left pointing at a place the content already is. A fault is news
+  the player has to act on, not a service they went looking for. The **backup nudge** follows the
+  same logic in miniature: it renders in the More section of the main sheet as well as in the panel,
+  from ONE `backupNudgeHTML`, because a warning nobody opens the panel to see is not a warning.
+
+`saveDataBody()` therefore emits everything EXCEPT its heading — the two callers head it differently,
+and a function that emitted its own would have forced one of them to strip it back out.
+
+### Numbers
+
+Sheet content height, before → after:
+
+| viewport | before | after |
+| --- | --- | --- |
+| 390×844, ship scale | 1059px | **829px** (fits the 831px box — no scroll at all) |
+| 390×844, largest text + readable font | 1470px | **1132px** |
+| 320×568, ship scale | 1241px | **1046px** |
+| 820×760 (the itch embed) | 1013px | **799px** |
+
+### Guard
+
+`tests/settings-sheet.test.ts`, in a real browser against the built artifact: the two tiles exist and
+no `[data-save-transfer]` does, the panel round-trips by its footer button, Escape closes the panel
+then the sheet, and the whole sheet stays under a **950px** budget on the phone (a fence with ~15%
+slack for CI font metrics — it fails the moment the old shape is stacked back in). The fault case is
+guarded next door in `save-integrity-browser.test.ts`, which now also asserts the tile is absent.
+
+---
+
 ## Migrated from CLAUDE.md — System-index bullets (2026-07-23 refactor)
 
 > These are the verbatim terse System-index bullets moved out of `CLAUDE.md` when it was

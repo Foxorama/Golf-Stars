@@ -56,9 +56,12 @@ describe('save transfer in a browser (GS-save-transfer)', () => {
           localStorage.setItem('fc_save', JSON.stringify({ version: 1, shards: 1, bestStableford: 2 }));
         });
 
-        // Open settings from the cog that rides every screen.
+        // Open settings from the cog that rides every screen, then its Save data panel
+        // (GS-settings-more — the section is a second page of the sheet, not a block in it).
         await page.locator('[data-open-settings]').first().click();
         await page.waitForSelector('.gs-settings', { timeout: 4000 });
+        await page.locator('[data-setpanel="save"]').click();
+        await page.waitForSelector('[data-save-transfer="export"]', { timeout: 4000 });
 
         // The section is present, with both actions and the (hidden) picker.
         expect(await page.locator('[data-save-transfer="export"]').count()).toBe(1);
@@ -117,6 +120,9 @@ describe('save transfer in a browser (GS-save-transfer)', () => {
         });
         await page.locator('[data-open-settings]').first().click();
         await page.waitForSelector('.gs-settings', { timeout: 4000 });
+        await page.locator('[data-setpanel="save"]').click();
+        // The picker is `hidden` by design, so wait for it to be ATTACHED, not visible.
+        await page.waitForSelector('#gs-save-file', { state: 'attached', timeout: 4000 });
 
         await page.setInputFiles('#gs-save-file', {
           name: 'holiday-photo.json',

@@ -2849,6 +2849,25 @@ function wireSettingsSheet(root: ParentNode): void {
       refreshSettings();
     });
   });
+  // The Save data SUB-PANEL (GS-settings-more): the sheet's second page. Surgical, like every other
+  // in-sheet change — a full render would replay the slide-up as a flicker (GS-settings-flicker) —
+  // and closing it drops any half-finished import confirmation, so backing out and coming in again
+  // never greets the player with the last visit's state.
+  root.querySelectorAll<HTMLElement>('[data-setpanel]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = el.dataset.setpanel === 'save';
+      saveView.open = open;
+      if (!open) {
+        saveView.stage = 'idle';
+        saveView.pending = null;
+        saveView.message = '';
+      }
+      sfx.click();
+      haptic(HAPTICS.tap);
+      refreshSettings();
+    });
+  });
   // "Return to title" (GS-settings-nav): close the sheet, then the reducer parks an underway run as a
   // resumable snapshot and lands on the title — the same offer a page reload makes.
   root.querySelectorAll<HTMLElement>('[data-settings-home]').forEach((el) => {
@@ -3915,10 +3934,12 @@ function render(): void {
       e.stopPropagation();
       settingsOpen = true;
       // Open clean: a half-finished import confirmation or a stale result line from the last time
-      // the sheet was open must never greet the next one (GS-save-transfer).
+      // the sheet was open must never greet the next one (GS-save-transfer) — and the sheet always
+      // opens on its FIRST page, never on the Save data panel somebody left open (GS-settings-more).
       saveView.stage = 'idle';
       saveView.pending = null;
       saveView.message = '';
+      saveView.open = false;
       render();
     });
   });
@@ -4508,6 +4529,18 @@ function handleBack(): boolean {
   const intent = backIntent(state, { settingsOpen, clubPickerOpen, starMapSheetOpen });
   switch (intent.kind) {
     case 'closeSettings':
+      // The Save data panel is a page INSIDE the sheet (GS-settings-more), so back closes it first —
+      // the same innermost-layer-first rule `backIntent` walks, applied one level further in. It lives
+      // here rather than in `backIntent` because `saveView` is app-layer module state, exactly like
+      // `settingsOpen` itself.
+      if (saveView.open) {
+        saveView.open = false;
+        saveView.stage = 'idle';
+        saveView.pending = null;
+        saveView.message = '';
+        refreshSettings();
+        return true;
+      }
       settingsOpen = false;
       render();
       return true;

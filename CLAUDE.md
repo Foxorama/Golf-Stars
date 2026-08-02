@@ -1747,6 +1747,26 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     re-wires (`refreshSettings`, GS-settings-flicker); the settings sheet inner is split from its backdrop;
     the pull-to-power drag redraws only the overlay. A full `render()` re-mounts frames and replays slide-up
     animations as a flicker.
+  - **IN THE SETTINGS SHEET A TILE IS A PLACE YOU GO; A ROW IS A PROMISE ABOUT A CONSEQUENCE**
+    (GS-settings-more, `app/overlays.ts actTile`). The sheet's tail had accreted one feature at a time —
+    a `❔ Help` heading over ONE link row, the whole Save data block (heading · paragraph · storage line ·
+    nudge · four buttons), then the Return-to-title footer — until it measured **1059px of content in an
+    831px box** on the composed-for phone: two screens of settings, the second one entirely features used
+    once a month, stacked under the volume toggle somebody opened the sheet to flip. Now the guide and
+    Save data are TILES in a two-up `.gs-actgrid` (same `auto-fit`/`minmax(min(…))` as the chips, so a
+    large UI scale drops it to one column on its own), and anything with a whole sentence to say before it
+    is tapped stays a full-width `.gs-setrow` in the footer — which is what keeps `resumePromise` and
+    `abandonPromise` readable. **Save data is a second PAGE of the same sheet** (`saveView.open`), because
+    it is the most important thing here and the least often used: real estate when you go looking, none of
+    the height when you don't. Three rules — the sheet always opens on page ONE (cleared beside the
+    stale-import reset); **Escape closes the panel before the sheet** (`backIntent` answers
+    `closeSettings` and cannot see `saveView`, so `handleBack` applies its own innermost-first rule one
+    level further in); and **a read-only save is NEVER behind a tap** — a `saveIntegrity.fault` renders
+    inline and the tile is DROPPED, since a fault is news to act on, not a service you went looking for.
+    Hence `saveDataBody()` emits everything except its heading: two callers head it differently. 829px on
+    the phone (it now fits with no scroll at all), 1132 at the largest text. Guarded by
+    `tests/settings-sheet.test.ts` (a 950px budget + the panel round-trip) and the fault half by
+    `tests/save-integrity-browser.test.ts`.
   - **WHICH ROSTER CARD YOU GET IS A QUESTION ABOUT THE CARD, NOT ABOUT THE PAGE** (GS-select-card-room).
     The golfer card has two dressings — COMPACT (portrait · stats · one clamped ✓/▲ hint) and FULL (blurb ·
     pros/cons · the "Tap · …" footer) — and the switch was `max-width: 999px` alone, which is a question

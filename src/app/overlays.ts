@@ -40,12 +40,23 @@ import { faultExplanation, faultHeadline, faultRescue, saveIntegrity } from '../
  *                say yes before anything is overwritten. This step is the safety: import replaces
  *                everything, so it must never happen on a single tap of a file picker.
  *  - `note`    — a transient result line (exported / copied / imported / refused), `message` set.
+ *
+ * `open` is the SUB-PANEL flag (GS-settings-more): the whole Save data block is a second page of the
+ * same sheet, reached from its tile in the More section, so the sheet's bottom half is two tiles
+ * instead of four buttons, a paragraph and a status line.
  */
-export const saveView: { stage: 'idle' | 'confirm' | 'note'; pending: Backup | null; message: string; bad: boolean } = {
+export const saveView: {
+  stage: 'idle' | 'confirm' | 'note';
+  pending: Backup | null;
+  message: string;
+  bad: boolean;
+  open: boolean;
+} = {
   stage: 'idle',
   pending: null,
   message: '',
   bad: false,
+  open: false,
 };
 
 /**
@@ -68,15 +79,27 @@ function storageStatusHTML(): string {
   return `<div class="gs-setnote">✓ Saving normally — though a browser can still clear site data to reclaim space, or after a long time away. Installing the game usually earns it protected storage; an exported file always survives.</div>`;
 }
 
-/** The Save data section of the settings sheet. `localStorage` is the only copy of a save AND it is
- *  per-origin, so the website and the Android shell cannot see each other's progress — moving
- *  between them, or off a device before an uninstall, is what this is for. */
-function saveDataSection(): string {
+/** How overdue a backup is, in RUNS (GS-backup-nudge), or '' when there is nothing worth saying.
+ *  ONE builder, rendered in TWO places — the More section of the main sheet (where a player who never
+ *  opens the Save data panel still sees it) and inside the panel itself. */
+function backupNudgeHTML(): string {
+  const nudge = backupNudge({ clubhouseVisit: state.clubhouseVisit, lastExportRun: state.lastExportRun });
+  if (!nudge) return '';
+  return `<div class="gs-savenote${nudge.urgent ? ' gs-savenote--bad' : ''}">${nudge.urgent ? '⚠ ' : ''}${nudge.text}</div>`;
+}
+
+/** The Save data BODY — everything under the section heading. `localStorage` is the only copy of a
+ *  save AND it is per-origin, so the website and the Android shell cannot see each other's progress —
+ *  moving between them, or off a device before an uninstall, is what this is for.
+ *
+ *  The heading is the CALLER's, because there are two of them and they head it differently: the
+ *  sub-panel puts it in the sheet head beside a back arrow, and the read-only FAULT case renders it
+ *  inline in the main sheet under an ordinary `.gs-setsec` (a fault is never hidden behind a tap). */
+function saveDataBody(): string {
   if (saveView.stage === 'confirm' && saveView.pending) {
     const b = saveView.pending;
     const when = b.exportedAt ? new Date(b.exportedAt).toLocaleString() : 'unknown date';
     return `
-        <div class="gs-setsec">💾 Save data</div>
         <div class="gs-savebox">
           <div class="gs-savebox-h">Replace your save with this file?</div>
           <div class="gs-setnote" style="margin:0 0 6px;">Saved ${when}</div>
@@ -98,7 +121,6 @@ function saveDataSection(): string {
   const fault = saveIntegrity.fault;
   if (fault) {
     return `
-        <div class="gs-setsec">💾 Save data</div>
         <div class="gs-savenote gs-savenote--bad">⚠ ${faultHeadline(fault)} ${faultExplanation(fault)}</div>
         <div class="gs-setnote">${faultRescue(fault)}</div>
         <div class="gs-saverow">
@@ -110,14 +132,10 @@ function saveDataSection(): string {
         ${note}
         <input type="file" id="gs-save-file" accept="application/json,.json" hidden>`;
   }
-  // GS-backup-nudge: how overdue a backup is, in RUNS. `null` = nothing worth saying (a save with no
-  // finished run behind it, or one exported this run) — a warning that fires every time is wallpaper.
-  const nudge = backupNudge({ clubhouseVisit: state.clubhouseVisit, lastExportRun: state.lastExportRun });
   return `
-        <div class="gs-setsec">💾 Save data</div>
         <div class="gs-setnote">Your progress lives only on this device, and the website and the app store it separately. Export to move a save between them — or to keep a backup.</div>
         ${storageStatusHTML()}
-        ${nudge ? `<div class="gs-savenote${nudge.urgent ? ' gs-savenote--bad' : ''}">${nudge.urgent ? '⚠ ' : ''}${nudge.text}</div>` : ''}
+        ${backupNudgeHTML()}
         <div class="gs-saverow">
           <button class="gs-btn gs-btn--ghost" data-save-transfer="export">⬇ Export save</button>
           <button class="gs-btn gs-btn--ghost" data-save-transfer="import">⬆ Import save</button>
@@ -163,30 +181,81 @@ const SCALE_OPTS: readonly { v: number; label: string; desc: string }[] = [
 ];
 
 /**
- * The guide row — the ONLY outbound link in the game.
+ * A tile in the More section (GS-settings-more) — icon, bold label, one short line. Two per row on a
+ * phone, one when they no longer fit, off the same `auto-fit`/`minmax(min(…))` grid the preference
+ * chips use so a large UI scale drops to a column on its own (GS-a11y-scale-wrap).
+ *
+ * A tile is for a place you GO or a thing you DO, and its sub-line is a hint, not a promise. Anything
+ * that has to state a consequence in a whole sentence stays a full-width `.gs-setrow` below — which
+ * is exactly the split that keeps "Return to title" and "Leave round" readable.
+ */
+function actTile(
+  attrs: string,
+  icon: string,
+  label: string,
+  sub: string,
+  tag = 'button',
+  trail = '',
+): string {
+  return `<${tag} class="gs-setact" ${attrs}>
+          <span class="gs-setact-i" aria-hidden="true">${icon}</span>
+          <span class="gs-setact-t"><b>${label}</b><span>${sub}</span></span>
+          ${trail ? `<span class="gs-setact-x" aria-hidden="true">${trail}</span>` : ''}
+        </${tag}>`;
+}
+
+/**
+ * The guide tile — the ONLY outbound link in the game.
  *
  * There is no in-game tutorial by design (see `GUIDE_URL` in `brand.ts`), so this is deliberately
- * the quietest possible surface: one row, in the sheet, below everything a player actually came
+ * the quietest possible surface: one tile, in the sheet, below everything a player actually came
  * here to change. It is never offered, never prompted, and never appears on a first run — a
  * player who wants to golf is not asked about a tutorial, and a player looking for help opens
  * the ⚙ that rides every screen.
  *
  * It is an ANCHOR, not a button with a handler: `target="_blank"` + `rel="noopener"` is the whole
- * mechanism, so it needs no reducer action, no dispatch, and nothing in `backIntent`. The
- * destination is stated in the visible sub-label rather than only in a `target` attribute nobody
- * can see — a link that leaves the app should say so before it is tapped.
+ * mechanism, so it needs no reducer action, no dispatch, and nothing in `backIntent`. That it leaves
+ * the app is said in the visible sub-line and the ↗, not only in a `target` attribute nobody can see.
  *
  * ⚠️ In the Android shell (Capacitor, GS-android) this hands off to the system browser. That is
  * the wanted behaviour — the alternative is a link that opens INSIDE the game's own webview, with
  * no address bar and no way back to the game except the hardware button.
  */
-function helpSection(): string {
+function helpTile(): string {
+  return actTile(
+    `href="${GUIDE_URL}" target="_blank" rel="noopener noreferrer"`,
+    '📖',
+    'How to play',
+    'In your browser',
+    'a',
+    '↗',
+  );
+}
+
+/**
+ * The SAVE DATA sub-panel (GS-settings-more) — the second page of the same sheet.
+ *
+ * Export/import is the most important thing in the sheet and the least often used: `localStorage` is
+ * the only copy of a save, so it earns real estate when a player goes looking for it and earns none
+ * of the sheet's height when they are turning the music off. As a panel it gets both — and the sheet's
+ * bottom half stops being a paragraph, a status line, three buttons and a nudge stacked under the
+ * controls somebody actually opened the sheet to change.
+ *
+ * The head is the sheet's own `.gs-sheet-head` with a back arrow in front of the ✕, so the panel is
+ * a page rather than a modal-over-a-modal: `backIntent` still resolves to `closeSettings`, and the
+ * app-layer handler closes the PANEL first if it is open (the same innermost-layer-first rule).
+ */
+function savePanelInner(): string {
   return `
-        <div class="gs-setsec">❔ Help</div>
-        <a class="gs-setrow gs-setrow--link" href="${GUIDE_URL}" target="_blank" rel="noopener noreferrer">
-          <span class="gs-setlabel"><b>📖 How to play</b><span>The guide — the swing, the bag, scoring and the modes. Opens in your browser.</span></span>
-          <span style="font-size:15px;opacity:.6;" aria-hidden="true">↗</span>
-        </a>`;
+        <div class="gs-sheet-head">
+          <button class="gs-mapbtn" data-setpanel="close" title="Back" aria-label="Back to settings">‹</button>
+          <b style="font-size:17px;">💾 Save data</b>
+          <button class="gs-mapbtn" data-settings="close" title="Close">✕</button>
+        </div>
+        ${saveDataBody()}
+        <div class="gs-setdone">
+          <button class="gs-btn gs-btn--ghost" data-setpanel="close" style="padding:11px 30px;">‹ Back to settings</button>
+        </div>`;
 }
 
 /**
@@ -199,8 +268,14 @@ function helpSection(): string {
  * resumable snapshot, never destroyed. Every interactive element carries a `data-*` hook whose app.ts
  * handler stops propagation, so a tap (or a near-miss) can never bubble to the backdrop and tear the
  * sheet down (the old native `<select>` mis-tap → accidental exit).
+ *
+ * GS-settings-more: the bottom half is a MORE section of tiles (guide · save data) over a footer of
+ * full-width exit rows, and Save data is a sub-panel of the same sheet rather than a block stacked
+ * under everything. See `savePanelInner` for why, and `actTile` for which of the two shapes a new
+ * entry belongs in.
  */
 export function settingsSheetInner(): string {
+  if (saveView.open) return savePanelInner();
   const s = getSettings();
   const chip = (key: keyof Settings, icon: string, label: string, desc: string): string => {
     const on = s[key];
@@ -238,6 +313,13 @@ export function settingsSheetInner(): string {
             <span style="font-size:16px;opacity:.6;" aria-hidden="true">→</span>
           </button>
         </div>`;
+  // GS-save-integrity: a READ-ONLY save is the one thing here that is never folded behind a tap. It is
+  // not a service the player went looking for, it is news they have to act on — so the whole block is
+  // rendered inline and the tile that would have hidden it is dropped.
+  const fault = !!saveIntegrity.fault;
+  const saveBlock = fault
+    ? `<div class="gs-setsec">💾 Save data</div>${saveDataBody()}`
+    : backupNudgeHTML();
   return `
         <div class="gs-sheet-head"><b style="font-size:17px;">⚙ Settings</b>
           <button class="gs-mapbtn" data-settings="close" title="Close">✕</button></div>
@@ -259,9 +341,12 @@ export function settingsSheetInner(): string {
         <div class="gs-segctl" role="radiogroup" aria-label="Default aim mode">${aimBtns}</div>
         <div class="gs-seghint">${activeAim.desc}</div>
 
-        ${helpSection()}
-
-        ${saveDataSection()}
+        <div class="gs-setsec">⋯ More</div>
+        <div class="gs-actgrid">
+          ${helpTile()}
+          ${fault ? '' : actTile('data-setpanel="save"', '💾', 'Save data', 'Export &amp; import', 'button', '›')}
+        </div>
+        ${saveBlock}
 
         ${homeFoot}
         <div class="gs-setdone">
