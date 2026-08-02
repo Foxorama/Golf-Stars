@@ -35,28 +35,56 @@
   disclosure, and every section from "A whole galaxy…" onward.
 
   ---------------------------------------------------------------------------
-  ⚠️ FOUR COPY PROBLEMS ON THE LIVE PAGE (checked against the source, not by eye)
+  COPY PROBLEMS FOUND — ALL FIXED ON THE LIVE PAGE, RE-READ 2026-08-02
   ---------------------------------------------------------------------------
 
-  Recorded here verbatim so the record is honest. Fix them in the itch editor,
-  then re-read the page into a new dated file.
+  The block above is the page AS IT NOW STANDS, after these were corrected in
+  the editor. Kept as a record of what was wrong and how it was checked, because
+  the same four are the ones a future rewrite will reintroduce.
 
-    1. "Jormungdar" → the game spells it **Jörmungandr**, in the battle intro
-       plate, the boss bar and the credits (`render/battleIntro.ts`,
+    1. "Jormungdar" → **Jörmungandr** ✔ fixed. That is the spelling on the
+       battle intro plate, the boss bar and the credits (`render/battleIntro.ts`,
        `sim/rpg/storyCredits.ts`). A player who meets the name on the store page
        and then in the game should meet the same name.
-    2. "Or chose to save or end the galaxy" → **choose**.
-    3. "Story Mode" → the player-facing name is **Story Tour**, and the bullet
-       three paragraphs below already says Story Tour. "Story Mode" appears
-       ZERO times in the shipped bundle — it survives only in source comments,
-       so the page is the only place a player would ever see it.
-    4. "Rainbow Course" → the game calls it **Rainbow Road** (40 uses; "Rainbow
-       Course" appears nowhere). Also "Ragnarok" is spelled **Ragnarök**
-       everywhere in the game.
+    2. "Or chose to save or end the galaxy" → **choose** ✔ fixed.
+    3. "Story Mode" → **Story Tour** ✔ fixed. "Story Mode" appears ZERO times in
+       the shipped bundle — it survives only in source comments, so the store
+       page was the only place a player could ever have seen it.
+    4. "Ragnarok" → **Ragnarök** ✔ fixed (17 uses with the umlaut in the game).
 
-  Two smaller ones, style rather than fact: "The RPG mode -pick your partners"
-  and "The roguelike -three arcs" use an unspaced hyphen where every other dash
-  on the page is a spaced em dash.
+  Still there, style rather than fact: "The RPG mode -pick your partners" and
+  "The roguelike -three arcs" use an unspaced hyphen where every other dash on
+  the page is a spaced em dash.
+
+  ---------------------------------------------------------------------------
+  ⚠️ "RAINBOW COURSE" IS DELIBERATE. DO NOT "CORRECT" IT TO RAINBOW ROAD.
+  ---------------------------------------------------------------------------
+
+  An earlier revision of this file listed "Rainbow Course → Rainbow Road" as a
+  fix. **That advice was wrong and is withdrawn.** The author is steering clear
+  of "Rainbow Road" because of its strong association with another publisher's
+  course, and the recommendation had no basis to override that — the reasoning
+  behind it ("40 uses in the game") did not survive checking:
+
+    • "Rainbow Road" appears **ZERO times in the built bundle.** All 40 hits are
+      in SOURCE COMMENTS and doc prose. No player has ever seen the phrase.
+    • The player-facing string is the **Rainbow Ball** — a 360-credit shop item
+      (`rainbow-ball`) that arms the effect. That is the name to use if the
+      thing needs naming on a store page at all.
+    • `rainbowRoad` is an internal loadout FIELD and `rainbow-ball` an item ID.
+      Both are invisible to players, and GS-release-identity is explicit that
+      identifiers do not have to follow a display name.
+
+  So there was never anything to align the store page TO, and the game itself
+  needs no change. ⚠️ The repository is PUBLIC, so those 40 comments are
+  publicly readable — if belt-and-braces is wanted, renaming them is a
+  comment-only sweep: no shipped string, no persisted key, no save bump, no
+  test fixture. It has not been done, because it is internal naming rather than
+  use as a product identifier. That is a judgement call for the author, not a
+  cleanup to do quietly.
+
+  (Nobody here is a lawyer and this file is not legal advice — it records where
+  the string does and does not appear, which is the checkable part.)
 
   ---------------------------------------------------------------------------
   NOTE FOR THE NEXT EDIT
@@ -234,7 +262,7 @@
 
 <p>Choose your character and play golf amongst the stars.</p>
 
-<p>Can you find the Warrior's Tee at the end of the Rainbow Course? Compete and win in The Voyage. Play forever in the Unending Universe as the holes get harder and harder. Or chose to save or end the galaxy in Story Mode by putting Jormungdar back to sleep or allowing the serpent to wake up and devour the galaxy.</p>
+<p>Can you find the Warrior's Tee at the end of the Rainbow Course? Compete and win in The Voyage. Play forever in the Unending Universe as the holes get harder and harder. Or choose to save or end the galaxy in Story Tour by putting Jörmungandr back to sleep or allowing the serpent to wake up and devour the galaxy.</p>
 
 <h2>A whole galaxy of golf courses and competition</h2>
 
@@ -243,7 +271,7 @@
 <h2>Four ways to play</h2>
 
 <ul>
-<li><strong>🌠 Story Tour</strong> — The RPG mode -pick your partners, beat your rivals and choose to save or end the galaxy from Ragnarok.</li>
+<li><strong>🌠 Story Tour</strong> — The RPG mode -pick your partners, beat your rivals and choose to save or end the galaxy from Ragnarök.</li>
 <li><strong>🚀 The Voyage</strong> — The roguelike -three arcs, three bosses, one win. Survive the cut at every stop or the tour drops you.</li>
 <li><strong>🌌 Unending Universe</strong> — endless survival. Every set of holes gets more difficult to complete. How far can you get before the darkness closes over you?</li>
 <li><strong>🗺 Star Tour</strong> — finish the Story Tour and then free-roam the whole star map. Land anywhere, play 18 holes and chase your course records.</li>
