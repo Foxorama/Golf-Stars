@@ -1,13 +1,40 @@
 name: tests
 
-on:
-  push:
-    branches: ['**']
-  pull_request:
+# ONE RUN PER CHANGE, AT THE MOMENT THE DECISION IS MADE — THE PULL REQUEST.
+#
+# This used to be `push: ['**']` AND `pull_request`. Those land in different concurrency groups
+# (`refs/heads/<branch>` vs `refs/pull/<n>/merge`), so every commit on a branch with an open PR ran
+# the whole ~7-minute suite TWICE, side by side, on identical code. Measured over the repo's first
+# 39 days: 2,333 runs of this workflow, ~60 a day, roughly half of them a duplicate of the run
+# beside them.
+#
+# THE PULL-REQUEST RUN IS THE ONE WORTH KEEPING, and not merely because it is the required check
+# auto-merge gates on. It tests the MERGE COMMIT — the PR head already merged into `main` — whereas
+# a branch push tests the branch in isolation, which can be green while the merge is red. Strictly
+# more information for the same seven minutes, at the only moment the answer changes what happens.
+#
+# ⚠️ THE POST-MERGE RUN ON `main` IS DELIBERATELY GONE, AND AN ADMIN-UI SETTING IS WHAT REPLACES IT:
+# branch protection's *Require branches to be up to date before merging*. With it ON, the merge
+# commit CI tested is what lands on `main`, so a run on `main` afterwards could only re-confirm a
+# green it already had. With it OFF, a PR opened against an older `main` can merge on a pass that was
+# never true of the result — the stale-pass hole the concurrency block below closes for commits,
+# reopened one level up. It is not in git (like Pages' *Source: GitHub Actions* and the
+# `github-pages` environment's ref policy — see CLAUDE.md); check it there before trusting this file.
+#
+# Pushing a branch with no PR open runs nothing, which is the intent — an unopened branch has no
+# decision pending. `workflow_dispatch` is the escape hatch for checking one early.
+#
+# ⚠️ DO NOT ADD A `paths-ignore` FOR DOCS. Several guards here read prose as input: `privacy.test.ts`
+# fails when a storage key in `src/` is missing from PRIVACY.md's table (and vice-versa), and the
+# one-description register scans source for banned re-derivations. A docs-only change in this repo
+# can be genuinely red, so skipping CI on one would let it through.
 
-# Supersede an in-flight run when a newer commit lands on the same ref, so a stale PASS from
-# an older commit can never satisfy auto-merge's required check over fresh code. Don't cancel
-# on `main` (group is per-ref) — only redundant feature-branch/PR runs are cancelled.
+on:
+  pull_request:
+  workflow_dispatch:
+
+# Supersede an in-flight run when a newer commit lands on the same PR, so a stale PASS from an older
+# commit can never satisfy auto-merge's required check over fresh code.
 concurrency:
   group: tests-${{ github.ref }}
   cancel-in-progress: true

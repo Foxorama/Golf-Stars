@@ -6,8 +6,9 @@
 
 ## Testing (regression guard)
 - `tests/` (vitest) imports the pure `src/sim/` modules directly and asserts on seeded runs.
-- CI: `.github/workflows/tests.yml` runs the suite on every push/PR. Keep new game logic inside
-  `src/sim/` (pure) so it's reachable from tests.
+- CI: `.github/workflows/tests.yml` runs the suite **once per change, on the pull request**. Keep new
+  game logic inside `src/sim/` (pure) so it's reachable from tests. (See *One CI run, on the pull
+  request* below for why the branch-push and post-merge runs went.)
 
 ## The one Chromium lookup (GS-browser-test-gate → GS-preview-chromium)
 
@@ -153,10 +154,55 @@ guard that flags 22 correct files is one everybody learns to edit.
 - **Repo settings auto-merge depends on are admin-UI only (no API tool in this env):** Settings →
   General → Pull Requests → *Allow auto-merge* and *Automatically delete head branches*, plus a
   branch-protection rule on `main` that **requires the `test` status check** (without a required
-  check, enabling auto-merge merges immediately — no CI gate). Set these once by hand; they're not
-  in the repo. The `tests.yml` workflow is the check the rule should require.
+  check, enabling auto-merge merges immediately — no CI gate) and **Require branches to be up to date
+  before merging**. Set these once by hand; they're not in the repo. The `tests.yml` workflow is the
+  check the rule should require. The up-to-date rule became load-bearing when CI stopped running on
+  `main` — see below.
 - Use the GitHub MCP tools in the web environment; finish changes by shipping (PR → merge → cleanup).
 - Commit messages explain the *why*; end with the Co-Authored-By: Claude trailer.
+
+## One CI run, on the pull request (GS-ci-once)
+
+`tests.yml` fired on `push: ['**']` **and** `pull_request`. Both are real events on the same code,
+and their concurrency groups differ — `refs/heads/<branch>` for the push, `refs/pull/<n>/merge` for
+the PR — so the cancellation rule could never collapse them. Every commit on a branch with an open
+PR ran the whole ~7-minute suite **twice, side by side**. It is plain in the run history:
+`leave-round` push 7.3 min and `leave-round` pull_request 7.3 min, back to back, same commit.
+Measured over the repo's first 39 days: **2,333 runs of this workflow, ~60 a day**, roughly half of
+them a duplicate.
+
+On a public repo that costs no money — standard runners are free and unlimited — which is exactly
+why it survived so long. It costs **wall-clock**: every push waits on two runs competing for the
+same runner pool.
+
+**The pull-request run is the one kept**, and the reason is not just that it is the required check
+auto-merge gates on. It tests the **merge commit** — the PR head already merged into `main` —
+whereas a branch push tests the branch in isolation, which can be green while the merge is red.
+Strictly more information for the same seven minutes, at the only moment the answer changes what
+happens next. A branch with no PR open now runs nothing, deliberately: an unopened branch has no
+decision pending, and `workflow_dispatch` is there to check one early.
+
+⚠️ **The post-merge run on `main` is gone, and an admin-UI setting is what replaces it.** Branch
+protection's *Require branches to be up to date before merging* is what makes the merge commit CI
+tested byte-for-byte the one that lands; with it on, a run on `main` afterwards could only
+re-confirm a green it already had. With it **off**, a PR opened against an older `main` can merge on
+a pass that was never true of the result — the same stale-pass hole `concurrency` closes for
+commits, reopened one level up. Like Pages' *Source: GitHub Actions* and the `github-pages`
+environment's ref policy, it lives outside the repo and nothing in git enforces it.
+
+⚠️ **Never add a docs `paths-ignore` to buy more.** It is the obvious next saving and it is wrong
+here: several guards read prose as input — `privacy.test.ts` fails when a storage key in `src/` is
+missing from `PRIVACY.md`'s table (and vice-versa), and the one-description register scans source
+for banned re-derivations. A docs-only change in this repo can be genuinely red.
+
+**Why this was looked at at all.** The question was whether to make the repo private. Private repos
+have been free since 2019, but three things silently downgrade on the Free plan: GitHub Pages stops
+publishing from a private repo (Pro/Team/Enterprise only) — which is `farcarry.vulpecula.games`, the
+origin real players have installed; Actions minutes stop being free (2,000/month, then $0.006/min —
+this workflow alone runs ~12,600 minutes a month, about **$64**, and Pro's 3,000 minutes barely dent
+it); and protected branches and rulesets are public-only on Free, which is the required `test` check
+auto-merge depends on. The repo stays **public** — it is all-rights-reserved already, and the licence
+is the protection, not the visibility. The duplicate run was found while measuring the minutes.
 
 ## Do NOT carry from golf-finder
 GPS/geolocation, OSM/Overpass, weather APIs, real astronomy/star catalogs, the day course-finder,
