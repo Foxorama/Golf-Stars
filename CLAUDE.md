@@ -1953,6 +1953,23 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
 - Repo settings auto-merge depends on are admin-UI only: *Allow auto-merge*, *Auto-delete head
   branches*, and a branch-protection rule on `main` **requiring the `test` check**. Set once by hand.
 - Commit messages explain the *why*; end with the `Co-Authored-By: Claude` trailer.
+- **A RELEASE IS A TAG; `main` IS STAGING** (GS-staging, `docs/decisions/process-and-deploy.md`).
+  `pages.yml` used to fire on every push to `main` — and `farcarry.vulpecula.games` is the origin real
+  players have **installed as a PWA**, so every merge went straight onto their phones. One day shipped
+  four passes at the ball's bounce that way, two of them net-worse, each live within minutes and with no
+  way to try it first. Now: **prod = GitHub Pages on a `v*` tag** (the convention `itch.yml` already
+  used, tag asserted against package.json — one tag, both destinations, one version), **staging =
+  Cloudflare Pages at `next.farcarry.vulpecula.games` on every push to `main`**, and **a preview URL per
+  BRANCH** (`<branch>.next-far-carry.pages.dev`), which is the row that actually answers "let me try it
+  before it's merged". ⚠️ **Staging must be a separate ORIGIN, never a path** — a PWA binds to its
+  origin and `localStorage` is per-origin, so `/next/` would have staging and production sharing `fc_*`
+  save blobs, and a staging build with a bumped schema would write one production refuses to read
+  (GS-save-integrity going read-only, on a real player). Production therefore CANNOT move either: every
+  installed app is pinned to that origin. ⚠️ Cloudflare's default button is the WORKERS flow (wants
+  `npx wrangler deploy` + a repo config); this uses the PAGES flow (build command + output dir). ⚠️ The
+  first staging deploy went **green while serving the repo root** — output dir unset, so `/src/main.ts`
+  returned 200 and the game was raw dev source: the same blank-page failure Pages was set up to avoid,
+  caught by its own documented signature. A green deployment is not a working one.
 - **Deploy = GitHub Pages, Source MUST be "GitHub Actions"** (not "Deploy from a branch"). `pages.yml`
   builds the Vite app and serves `dist/` (a single inlined `index.html`). If Source is a branch,
   Pages serves the RAW source whose dev entry `/src/main.ts` 404s → permanent blank page. Symptom

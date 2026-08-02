@@ -248,3 +248,69 @@ extra concurrency is where to look first.
 never mentions sat underneath it the whole time. The comment at the top of `public/sw.js` promised
 "online â†’ always fetch fresh", and it had been wrong since the file was written; nobody caught it
 because the only symptom is a ten-minute window that heals itself before you can investigate it.
+
+---
+
+## GS-staging â€” three environments, and a release is a tag (2026-08-02)
+
+> *"I also need an environment where I can test out this stuff before pushing it to itch or to the
+> installed appsâ€¦ all the back and forth we've been through today."*
+
+### What went wrong that this exists to stop
+
+`pages.yml` fired on every push to `main`, and `farcarry.vulpecula.games` is the origin real players
+have **installed as a PWA**. So every merge went straight onto their phones. In one day that shipped
+four passes at the ball's bounce, two of them net-worse, each live within minutes of merging and with
+no way to try it first. The play-test loop was running in production.
+
+### The constraint that decides the shape
+
+**Production cannot move, and staging cannot be a path.**
+
+A PWA binds to its ORIGIN. Everyone who installed the game is pinned to
+`farcarry.vulpecula.games`, and their saves live in that origin's `localStorage`. Moving production
+elsewhere means every player uninstalling, reinstalling, and hand-carrying a save export across.
+
+And a path on the same origin (`/next/`) does not work either, for the reason that is easy to miss:
+`localStorage` is per-ORIGIN, not per-path. Staging and production would share the same `fc_*` blobs,
+and a staging build with a bumped save schema would write something production refuses to read â€”
+`GS-save-integrity` would drop that player into read-only mode, correctly, and it would be a real
+player.
+
+So staging is a separate subdomain on a separate host, and production stays exactly where it is.
+
+### The layout
+
+| | host | trigger | audience |
+|---|---|---|---|
+| production | GitHub Pages, `farcarry.vulpecula.games` | **version tag** | installed PWAs, everyone |
+| staging | Cloudflare Pages, `next.farcarry.vulpecula.games` | every push to `main` | us |
+| preview | Cloudflare Pages, `<branch>.next-far-carry.pages.dev` | every branch | us, before merge |
+| itch | butler | **the same version tag** | itch players |
+
+The preview row is the one that answers the original complaint: a pull request now has a URL you can
+open on a phone BEFORE it is merged, which is the only thing that would have caught a feel regression
+in time.
+
+`itch.yml` already worked this way (`tags: ['v*']`, with the tag asserted against `package.json`), so
+this is Pages catching up to a convention the repo already had rather than a new one.
+
+### Notes worth keeping
+
+- **Cloudflare's setup is the WORKERS flow now**, not Pages, if you start from the default button â€”
+  it asks for `npx wrangler deploy` and wants a config in the repo. The Pages flow (build command +
+  output directory) is what this uses. A `wrangler.jsonc` was written for the Workers path and then
+  deleted, because nothing on the Pages path reads it and a config file nothing reads is a trap for
+  whoever finds it next.
+- **The first staging deploy went green while serving the repo root**, because the build output
+  directory was unset â€” so `/src/main.ts` returned 200 and the game was the raw dev source. That is
+  the same permanent-blank-page failure the Pages setup was designed around, arriving via a different
+  host, and its documented signature (`/src/main.ts` in the served HTML, a string a Vite build can
+  never emit) caught it in one request. **A green deployment is not a working one.**
+- **Staging is proxied and production is not**, so Cloudflare injects ~1.2KB of bot-detection script
+  into staging that production never sees. Harmless so far, and worth remembering the two are not
+  byte-identical.
+- `public/_headers` sets `Cache-Control: no-cache` on the shell. GitHub Pages ignores the file
+  entirely and itch serves a zip, so it takes effect only on staging today â€” where it means a
+  play-test can never be looking at a stale build. The rules are written to be correct on ANY host so
+  that if production ever moves, it gets fresher and never staler.
