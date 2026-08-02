@@ -295,6 +295,38 @@ in time.
 `itch.yml` already worked this way (`tags: ['v*']`, with the tag asserted against `package.json`), so
 this is Pages catching up to a convention the repo already had rather than a new one.
 
+### The gate is in TWO places, and only one of them is in git
+
+`pages.yml`'s `on: push: tags: ['v*']` says what may *start* a deploy. The **`github-pages`
+environment** says what may *finish* one, and it carries its own deployment-ref policy in repo
+settings — nothing in the repository describes it, nothing in CI checks it.
+
+It held a single **branch** rule for `main`, from the days when `main` was production. So the very
+first tagged release built green and then the deploy step was refused:
+
+> Tag "v1.4.0" is not allowed to deploy to github-pages due to environment protection rules.
+
+Which reads like a credentials or permissions fault and is neither: it is the workflow and the
+environment disagreeing about what a release *is*. Worth knowing the shape of, because the build job
+succeeding makes it look like the deploy is the broken part.
+
+The policy is now **exactly one row — the tag `v*`**. The `main` branch rule was DELETED rather than
+left alongside, and that is the part worth stating: while it existed, a `workflow_dispatch` on `main`
+could publish staging code to every installed PWA. Leaving it would have meant the protection this
+whole change exists for held only as long as nobody used the manual trigger.
+
+To read or restore it (there is no other copy):
+
+```
+gh api repos/OWNER/REPO/environments/github-pages/deployment-branch-policies
+gh api -X POST repos/OWNER/REPO/environments/github-pages/deployment-branch-policies \
+  -f name='v*' -f type='tag'
+```
+
+⚠️ This joins *Allow auto-merge*, *Auto-delete head branches* and the `main` branch protection on the
+short list of settings the workflow depends on and cannot assert. A recreated repo, or an environment
+recreated by Pages, comes back without it.
+
 ### Notes worth keeping
 
 - **Cloudflare's setup is the WORKERS flow now**, not Pages, if you start from the default button â€”
