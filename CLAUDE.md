@@ -1970,6 +1970,17 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
   `merge_pull_request` directly.
 - Repo settings auto-merge depends on are admin-UI only: *Allow auto-merge*, *Auto-delete head
   branches*, and a branch-protection rule on `main` **requiring the `test` check**. Set once by hand.
+- **THE `github-pages` ENVIRONMENT ALLOWS EXACTLY ONE REF, THE TAG `v*` — AND THAT LIVES OUTSIDE THE
+  REPO** (GS-staging). `pages.yml`'s trigger is only half the gate: the environment carries its own
+  deployment-ref policy, and it held a single `main` **branch** rule from the days when `main` WAS
+  production. So the first tagged release built green and the deploy step was refused — *"Tag
+  "v1.4.0" is not allowed to deploy to github-pages due to environment protection rules"* — which
+  reads like a permissions bug and is actually the workflow and the environment disagreeing about
+  what a release is. The `main` rule is now **deleted, not kept alongside**: while it existed a
+  `workflow_dispatch` on `main` could publish STAGING code to every installed PWA, which is the exact
+  thing GS-staging was built to make impossible. Nothing in git enforces this — check it before
+  blaming a workflow, and re-add it if the repo or the environment is ever recreated:
+  `gh api repos/OWNER/REPO/environments/github-pages/deployment-branch-policies`.
 - Commit messages explain the *why*; end with the `Co-Authored-By: Claude` trailer.
 - **A RELEASE IS A TAG; `main` IS STAGING** (GS-staging, `docs/decisions/process-and-deploy.md`).
   `pages.yml` used to fire on every push to `main` — and `farcarry.vulpecula.games` is the origin real
