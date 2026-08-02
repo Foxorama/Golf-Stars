@@ -41,6 +41,11 @@ const LANDING_ZOOM = Number(process.env.GS_LANDING_ZOOM ?? DEFAULT_RUNOUT_FEEL.l
 // under 1 is a row whose bounces are being played below the shortest duration that can be watched.
 // This was printing 0.65 for a driver while the bounce was being reported invisible (GS-runout-clock).
 const HOP_DRAW_BOOST = DEFAULT_RUNOUT_FEEL.hopDrawBoost;
+// ⚠️ THE COLUMN THAT EXPLAINS "club X does not bounce" (GS-bounce-flat): a hop's DRAWN height divided
+// by its DRAWN length. Under 1.0 the hop is flatter than it is long and reads as a smear; over 1.0 it
+// reads as a bounce. A play-test named D/3W/4H/3i as not bouncing and 7i/9i/PW/SW as fine, and the
+// shipped ratios split at exactly 1.0 across that line. It is a property of the DESCENT ANGLE, so a
+// uniform `hopDrawBoost` under-serves precisely the clubs that land flattest.
 const FRAME_MS = 1000 / 60;
 // The measured camera band (GS-ball-art): ~0.5-5.7 px/yd for shots. A drive watches from far out, an
 // approach/chip from close in, so each shot is judged at the scale it is actually seen at. That is the
@@ -80,6 +85,7 @@ interface Row {
   hops: number;
   visibleHops: number;
   peakPx: number;
+  drawnRatio: number;
   ballPx: number;
   runPx: number;
   hopPxPerFrame: number;
@@ -153,6 +159,7 @@ function measure(clubId: string, power: number, firm: number): Row {
     hops: plan.hops.length + (plan.check ? 1 : 0),
     visibleHops,
     peakPx,
+    drawnRatio: plan.hops[0] ? (plan.hops[0].apex * HEIGHT_EXAGGERATION * HOP_DRAW_BOOST) / plan.hops[0].dist : 0,
     ballPx,
     runPx,
     hopPxPerFrame,
@@ -186,7 +193,7 @@ const POWERS = [1, 0.85, 0.7, 0.55, 0.4];
 
 for (const firm of [0.85, 0.45]) {
   console.log(`\n=================  landing firmness ${firm} (${firm > 0.6 ? 'firm fairway' : 'soft green'})  =================`);
-  console.log('  club  pow   carry   roll  class       hops  seen  want   apexPx  ballPx   runPx  px/fr  hop%   msRunout  timeBase');
+  console.log('  club  pow   carry   roll  class       hops  seen  want   apexPx  ratio  ballPx   runPx  px/fr  hop%   msRunout  timeBase');
   const rows: Row[] = [];
   for (const club of CLUBS_UNDER_TEST) {
     for (const p of POWERS) rows.push(measure(club, p, firm));
@@ -200,7 +207,7 @@ for (const firm of [0.85, 0.45]) {
     console.log(
       `  ${r.club.padEnd(4)} ${r.power.toFixed(2)} ${r.carry.toFixed(0).padStart(6)} ${r.roll.toFixed(1).padStart(6)}  ` +
         `${flightClassOf(r.club).padEnd(10)} ${String(r.hops).padStart(4)} ${String(r.visibleHops).padStart(5)} ` +
-        `${(want[0] + '-' + want[1]).padStart(5)} ${r.peakPx.toFixed(1).padStart(8)} ${r.ballPx.toFixed(1).padStart(7)} ` +
+        `${(want[0] + '-' + want[1]).padStart(5)} ${r.peakPx.toFixed(1).padStart(8)} ${r.drawnRatio.toFixed(2).padStart(6)} ${r.ballPx.toFixed(1).padStart(7)} ` +
         `${r.runPx.toFixed(0).padStart(7)} ${r.hopPxPerFrame.toFixed(2).padStart(6)} ${(r.hopShare * 100).toFixed(0).padStart(4)}% ` +
         `${r.runoutMs.toFixed(0).padStart(9)} ${r.timeBaseSkew.toFixed(2).padStart(9)}${short}${still}${squashed}`,
     );

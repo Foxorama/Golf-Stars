@@ -2500,3 +2500,102 @@ approximation.**
 
 `npm run typecheck` + `npx vitest run` green: **220 files, 2,664 tests, 0 skipped**, plus `npm run
 build`.
+
+---
+
+## GS-bounce-flat â€” a hop flatter than it is long is not a bounce (2026-08-02)
+
+> *"There's no bounce on drivers/woods/hybrids/long irons. Short irons and wedges and the green seem
+> ok, but the longer clubs landing on the greens still need to be bouncing depending on green
+> firmness."*
+
+The play-test named four clubs. The split is exact, it is one number, and the number was in the code
+the whole time.
+
+### The measurement
+
+`apexOverLen Â· heightExaggeration Â· hopDrawBoost` is a hop's DRAWN height divided by its DRAWN length.
+At the shipped constants:
+
+| club | descent | drawn tall:long | reported |
+|---|---|---|---|
+| D | 38Â° | **0.70** | no bounce |
+| 3W | 39Â° | **0.72** | no bounce |
+| 4H | 47Â° | **0.96** | no bounce |
+| 3i | 47Â° | **0.96** | no bounce |
+| 7i | 50Â° | 1.07 | fine |
+| 9i | 52Â° | 1.14 | fine |
+| PW | 53Â° | 1.19 | fine |
+| SW | 57Â° | 1.38 | fine |
+
+**Every club under 1.0 is on the play-test's list, and every club over it is not.** A hop drawn flatter
+than it is long is a smear the eye reads as a wobble; one drawn taller than it is long reads as a
+bounce. The line is at 1.0 and the report found it to the club.
+
+It is a property of the DESCENT ANGLE â€” `apexOverLenFor` is `tan(Î¸)/4`, so a driver arriving at 38Â°
+skids and a sand wedge dropping in at 57Â° pops â€” which means a uniform `hopDrawBoost` under-serves
+precisely the clubs that land flattest. No amount of raising it fixes the ordering; it lifts everything
+and puts the wedge into a genuine pop-up before it rescues the driver.
+
+### The fix
+
+`apexOverLenMin` **0.12 â†’ 0.30**. It already existed as the floor on that ratio, and it was set nowhere
+near where a hop becomes readable â€” 0.12 is a drawn 0.43, less than half the threshold. 0.30 puts the
+flattest club in the bag at the 7-iron's own **1.07**, which is the ratio the play-test says already
+reads correctly. Every steeper club keeps its own bigger ratio, so the wedge still pops harder than the
+driver skips: the character survives, the unreadability does not.
+
+âš ï¸ **The floor has to act on the APEX, not only on `apexOverLenFor`'s clamp.** For the shallowest clubs
+the modelled apex (`hopApexK Â· carry Â· sinÂ²Î¸ Â· kv`) undershoots the ratio cap and binds first â€” measured,
+raising the clamp alone brought every club to 1.07 and left the DRIVER, the loudest complaint, at 0.96.
+`hopApexMax` still caps it, so a floor can never make a pop-up.
+
+Measured, full power on a firm fairway â€” the ladder holds and the driver picks up a fifth skip because
+the taller apex now clears the visibility trim:
+
+| | D | 3W | 4H | 3i | 7i | 9i | PW | SW |
+|---|---|---|---|---|---|---|---|---|
+| bounces | **5** | 4 | 3 | 2 | 2 | 2 | 1 | 1 |
+| first apex px | **17.3** | 15.0 | 16.4 | 17.3 | 11.3 | 17.0 | 10.9 | 4.7 |
+| drawn tall:long | **1.07** | 1.07 | 1.07 | 1.07 | 1.07 | 1.16 | 1.17 | 1.37 |
+
+0/40 rows outside the asked-for band; 0/40 hops compressed by the ceiling on firm ground.
+
+**On greens** the same floor applies, which is the other half of the ask: a long club landing on a soft
+green now draws a readable hop too, while firmness still governs how MANY hops there are and how far
+each one carries (a driver gets 5 on a firm fairway and 2 on a soft green). Height is a readability
+constant; the physics lives in the count and the length.
+
+### âš ï¸ The guard was pointing the wrong way, and had been for three passes
+
+`tests/runout.test.ts` asserted a driver's drawn ratio stayed **below** 0.55, then below the 1:1.4 line
+`hopDrawBoost`'s comment names as where a skip becomes a pop-up â€” on the reasoning that a tall hop reads
+as the ball bouncing vertically off the turf.
+
+The evidence says the opposite, and it was available all along: **the sand wedge has been drawing 1.38
+since GS-runout-visible and is one of the clubs the play-test calls right.** The pop-up line was a guess
+that hardened into a constant, and a guard was built to defend it, and the guard then defended the bug
+through three subsequent passes â€” every one of which was free to raise the boost and none of which
+could, because the test would have gone red.
+
+The band is stated from the measurement now: at least as tall as it is long, and no taller than the
+steepest club in the bag already draws. Asked of the REAL bag through the real flight, because
+hand-picked descent angles test a fixture rather than the clubs the play-test was looking at.
+
+### How it was found
+
+The play-test supplied an mp4. There is no ffmpeg on the machine, so it was decoded with **system
+Chrome** â€” load the file as a `file://` document so the media is same-origin (a `setContent` page is
+`about:blank` and `--allow-file-access-from-files` will not help it), seek frame by frame, draw to a
+canvas and emit a contact sheet. That located the shot; the diagnosis came from the arithmetic above.
+
+`scripts/runout-frames.ts` gained the `ratio` column, because it is the number that explains this whole
+class of report and it was the one thing the rig never printed.
+
+### Contracts
+
+Render-only; contracts 1, 2, 4, 5 untouched, nothing for the death-spiral harness to weigh. The drawn
+run-out still walks the sim's own roll path to the sim's own rest point â€” this changes how high the
+ball is drawn between contacts, not where it goes.
+
+`npm run typecheck` + `npx vitest run` green: **220 files, 2,666 tests, 0 skipped**, plus `npm run build`.

@@ -987,6 +987,27 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     hand-set 4.6 px/yd while the game drew 1.6, i.e. it was honest about the model and silently wrong about
     the picture. It takes the camera from the shipped constant now. Guarded by `tests/runout.test.ts`;
     measured by `scripts/runout-frames.ts` (`GS_LANDING_ZOOM=1` reproduces the reported baseline).
+  - **A HOP FLATTER THAN IT IS LONG IS NOT A BOUNCE** (GS-bounce-flat, `apexOverLenMin`). A play-test named
+    the clubs that don't bounce — *"drivers/woods/hybrids/long irons; short irons and wedges seem ok"* — and
+    the split is EXACT. `apexOverLen · heightExaggeration · hopDrawBoost` is the hop's DRAWN height÷length,
+    and it read **D 0.70 · 3W 0.72 · 4H 0.96 · 3i 0.96** against **7i 1.07 · 9i 1.14 · PW 1.19 · SW 1.38**:
+    every club under 1.0 was on the list and every club over it was not. Flatter than it is long reads as a
+    smear; taller reads as a bounce. It is a property of the DESCENT ANGLE (`tan θ/4` — a driver arrives at
+    38° and skids, a wedge at 57° and pops), so a uniform `hopDrawBoost` under-serves precisely the clubs
+    that land flattest and raising it puts the wedge into a real pop-up before it rescues the driver.
+    `apexOverLenMin` 0.12 → **0.30** = the 7-iron's own 1.07, i.e. the ratio the play-test says already
+    reads right; steeper clubs keep their bigger ratio, so the character survives. ⚠️ **The floor must act
+    on the APEX, not only on `apexOverLenFor`'s clamp** — for shallow clubs the modelled apex
+    (`hopApexK·carry·sin²θ·kv`) undershoots the cap and binds first, so clamping alone brought every club to
+    1.07 and left the DRIVER at 0.96. Result: D **5** bounces at 17.3px, ladder 5▸4▸3▸2▸2▸1 held, 0/40
+    outside band. Height is a READABILITY constant; firmness still governs the COUNT and the LENGTH (driver
+    5 on a firm fairway, 2 on a soft green), which is what makes greens bounce "depending on firmness".
+    ⚠️⚠️ **THE GUARD WAS POINTING THE WRONG WAY AND HAD BEEN FOR THREE PASSES** — it asserted the driver's
+    ratio stayed BELOW 0.55, then below a 1:1.4 "pop-up line" that was a guess hardened into a constant. The
+    refutation was in the data all along: **the SW has drawn 1.38 since GS-runout-visible and is one of the
+    clubs called RIGHT.** Any pass could have raised the boost; none could, because the test would have gone
+    red. A guard built on an unvalidated threshold defends the bug. The band is measured now (≥1.0, <1.45)
+    and asked of the REAL bag, never hand-picked angles. `runout-frames.ts` prints the `ratio` column.
   - **A BOUNCE THAT DOES NOT TRAVEL IS NOT A BOUNCE** (GS-runout-clock, `runoutCameraTarget` ·
     `runoutLeashFrac`). Six passes read *"there's no ball bounce visible"* as a question about the bounce
     MODEL and every one measured green; the yards were right the whole time. The instrument that settled it

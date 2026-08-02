@@ -129,10 +129,34 @@ export interface RunoutFeel {
    *  The cap keeps it a net and not a second model: a club whose own bounce is bigger keeps it. */
   hopFirstMinShare: number;
   hopFloorMax: number;
-  /** Bounds on a hop's apex as a fraction of its own length, BEFORE `hopDrawBoost`. The ratio itself
-   *  is not tuned — it comes from the descent angle (`apexOverLenFor`). These are the safety rails:
-   *  below the floor a hop is a scuff, above the ceiling the ball reads as bouncing vertically off the
-   *  turf instead of skipping along it. */
+  /**
+   * Bounds on a hop's apex as a fraction of its own length, BEFORE `hopDrawBoost`. The ratio itself is
+   * not tuned — it comes from the descent angle (`apexOverLenFor`). These are the safety rails: below
+   * the floor a hop is a scuff, above the ceiling the ball reads as bouncing vertically off the turf
+   * instead of skipping along it.
+   *
+   * **THE FLOOR IS A READABILITY RULE, NOT A PHYSICAL ONE, AND IT WAS SET NOWHERE NEAR WHERE A HOP
+   * BECOMES READABLE** (GS-bounce-flat). A play-test named the clubs that do not bounce — *"no bounce
+   * on drivers/woods/hybrids/long irons; short irons and wedges and the green seem ok"* — and the split
+   * is exact. `apexOverLen · heightExaggeration · hopDrawBoost` is the hop's DRAWN height-to-length
+   * ratio, and at the shipped constants it comes out:
+   *
+   * | D 0.70 · 3W 0.72 · 4H 0.96 · 3i 0.96 | 7i 1.07 · 9i 1.14 · PW 1.19 · SW 1.38 |
+   * |---|---|
+   * | reported as not bouncing | reported as fine |
+   *
+   * **Every club below 1.0 is on the play-test's list and every club above it is not.** A hop drawn
+   * flatter than it is long is a smear the eye reads as a wobble; one drawn taller than it is long
+   * reads as a bounce. That is the whole of it, and it is a property of the DESCENT ANGLE — a driver
+   * arrives at 38° and skids, a sand wedge drops in at 57° and pops — so a uniform `hopDrawBoost`
+   * under-serves precisely the clubs that land flattest.
+   *
+   * 0.12 → **0.30**, which puts the flattest club in the bag at the 7-iron's own 1.07 — the ratio the
+   * play-test says already reads correctly. It is a FLOOR, so every steeper club keeps its own bigger
+   * ratio and the wedge still pops harder than the driver skips: the character survives, the
+   * unreadability does not. It stays well under `apexOverLenMax` and under the 1:1.4 line
+   * `hopDrawBoost` names as where a skip becomes a pop-up.
+   */
   apexOverLenMin: number;
   apexOverLenMax: number;
   /** Below this carry the ball did not really arrive from the SKY — a putter tap, a dribbled chip —
@@ -320,7 +344,7 @@ export const DEFAULT_RUNOUT_FEEL: RunoutFeel = {
   hopMinMs: 100,
   hopFirstMinShare: 0.35,
   hopFloorMax: 2.5,
-  apexOverLenMin: 0.12,
+  apexOverLenMin: 0.3,
   apexOverLenMax: 0.55,
   minAirCarry: 12,
   rollMinShare: 0.3,
@@ -738,7 +762,13 @@ export function planRunout(landing: Landing, feel: RunoutFeel = DEFAULT_RUNOUT_F
     if (want <= (i === 0 && fromTheAir ? 1e-4 : feel.hopMinYd)) break;
     // …and a hop is never taller than it is long by much, or the ball reads as bouncing vertically
     // off the turf instead of skipping along it.
-    const apex = Math.max(0.05, Math.min(hopApex, want * apexOverLen));
+    // …and never FLATTER than `apexOverLenMin` of its own length (GS-bounce-flat). That floor has to
+    // act on the APEX and not merely on `apexOverLenFor`'s clamp, because for the shallowest clubs the
+    // modelled apex (`hopApexK · carry · sin²θ · kv`) undershoots the ratio cap and binds first —
+    // measured, raising the clamp alone brought every club to 1.07 and left the DRIVER, the loudest
+    // complaint, at 0.96. `hopApexMax` still caps it, so a floor can never make a pop-up.
+    const readable = Math.min(want * feel.apexOverLenMin, feel.hopApexMax);
+    const apex = Math.max(0.05, readable, Math.min(hopApex, want * apexOverLen));
     // A HOP THAT CANNOT BE DRAWN IS NOT PLANNED (GS-runout-seen). Its ground goes to the closing
     // roll, where it is at least seen as motion, rather than to a `hopMinMs` segment of the ball
     // scuffing along under its own radius. The first hop is exempt for the same reason it is above:
