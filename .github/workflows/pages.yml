@@ -2,9 +2,23 @@ name: pages
 
 # Build the Vite app and deploy to GitHub Pages. Enable Pages (Settings → Pages →
 # Source: GitHub Actions) for this to publish. Safe to leave dormant on a private repo.
+#
+# TAGS ONLY — THIS IS THE ORIGIN REAL PLAYERS HAVE INSTALLED (GS-staging).
+#
+# It used to fire on every push to `main`, which meant every merge went straight to the PWA people
+# have on their phones. A day of play-test churn shipped that way: four passes at the ball's bounce,
+# two of them net-worse, each one live within minutes and with no way to try it first. `main` is now
+# a staging branch — Cloudflare Pages builds it to `next.farcarry.vulpecula.games`, and every pull
+# request gets its own preview URL — and a RELEASE is a version tag, exactly as itch.yml already
+# worked. One tag, both destinations, one version number.
+#
+# ⚠️ Staging must be a different ORIGIN, never a path here: a PWA binds to its origin and
+# `localStorage` is per-origin, so a `/next/` path would have staging and production sharing the same
+# `fc_*` save blobs — and a staging build with a bumped schema would write something production
+# refuses to read (GS-save-integrity, correctly, by going read-only on a real player).
 on:
   push:
-    branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
