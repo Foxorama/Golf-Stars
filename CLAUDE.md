@@ -719,6 +719,24 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     (`greenSlopeAt`, the field that breaks a putt), so it curls instead of tracking like a magnet — and
     sets `rest` = cup with `roll` = the WHOLE arc, positive (the journey ends forward, in the hole, so a
     chip-in is walked forward and never as a check). Zero rng: geometry after the decided outcome.
+  - **AND THE GATE IS ON THE APPLICATION, NOT THE SIGN** (GS-spin-bag). GS-spin-gate stopped over-spun long
+    clubs going NEGATIVE and left them at a **dead stop** — which is still no roll, and **no roll is no
+    BOUNCE**: `planRunout` gets `dist: 0`, the air budget is 0, and the train breaks before the first hop.
+    Read off a real save, ONE Milled Tour Wedge (+0.06 — a WEDGE-slot item whose own copy says *"so
+    approaches check up"*) took the driver's run fraction **0.140 → 0.080**, the 3-hybrid to 0.015, and the
+    7-iron and 8-iron to **zero**. That is the play-test's *"the save I was playing with shows no bounce"*,
+    on the one campaign with story gear equipped — the same golfer bounced fine in every other mode.
+    `backspinBoost` is now withheld from clubs above `hasBackspin` entirely, so a wedge item can never
+    touch a driver. ⚠️ **Only the GEAR is gated, and that is not a half-measure**: a character's
+    `rollFracDelta` is ALREADY per-club — Bo's `clubMods` returns nothing above the five-iron, and every AI
+    golfer's is scaled by `(1 − t)` to zero at the driver — so gating it here too would flatten a smooth
+    taper across the mid irons for every golfer, a balance change dressed as a bug fix. The old ungated
+    behaviour was FUN on cetus/void/rainbow (run is a liability on island worlds), so it survives as
+    `RoundOpts.spinsWholeBag`, off, wired through `backspinRoll` too so the drawn helper line agrees
+    (contract 5) — a build to be CHOSEN, one row away (`GS-spin-bag-build` in IDEAS). Default loadouts have
+    `backspinBoost: 0`, so the whole suite and the death-spiral harness are byte-for-byte. Guarded by
+    `tests/roll.test.ts` — and note that guard may only compare the PREFIX before a wedge, because a spin
+    build genuinely re-routes the hole from there.
   - **A SPIN BUILD CAN ONLY SPIN THE CLUBS THAT SPIN** (GS-spin-gate). `rollPotential` subtracted
     `backspinBoost` from EVERY club's roll fraction and never asked `hasBackspin` — the predicate that
     exists for precisely this. Two stacked spin items (0.26 + 0.2 vs a driver's 0.25 run) sent it negative

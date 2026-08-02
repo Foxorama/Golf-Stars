@@ -257,16 +257,41 @@ export function hasBackspin(nominalCarry: number): boolean {
  * `rollFracDelta` + a little variance. This is surface-FREE; the surface is applied along the path by
  * `rollOut`. Consumes EXACTLY one rng draw (same as the old `rollYards`), so a 0-delta shot keeps the
  * same rng budget and auto≡interactive holds. */
-function rollPotential(profile: FlightProfile, nominalCarry: number, carry: number, rng: Rng, rollFracDelta = 0): number {
-  let frac = rollFractionFor(profile, nominalCarry) + rollFracDelta;
-  // A spin build can take the RUN off any club in the bag; it can only spin BACK the clubs that spin
-  // back (GS-spin-gate). `hasBackspin` has always been the predicate for "clubs whose roll a spin
-  // build can turn into a real BACKSPIN check" — PW and below — and this is the code that never asked
-  // it. Stacking two spin items (0.26 + 0.2) against a driver's 0.25 run fraction sent it NEGATIVE, so
-  // a driver checked back to the −18yd MAX_CHECK: a 250-yard drive that lands and sucks 18 yards
-  // backwards across a contoured green. Above the wedge threshold the spin now bottoms out at a dead
-  // stop, which is the honest trade — you bought spin, you gave up your run.
-  if (frac < 0 && !hasBackspin(nominalCarry)) frac = 0;
+function rollPotential(
+  profile: FlightProfile,
+  nominalCarry: number,
+  carry: number,
+  rng: Rng,
+  rollFracDelta = 0,
+  backspinBoost = 0,
+  spinsWholeBag = false,
+): number {
+  // SPIN REACHES ONLY THE CLUBS THAT SPIN (GS-spin-bag). `hasBackspin` — PW and below — has been the
+  // predicate for "clubs whose roll a spin build can turn into a real check" since GS-spin-gate, and
+  // that pass applied it to the SIGN of the result and not to whether the delta applied at all. So a
+  // spin item still came off every club in the bag, silently:
+  //
+  //   one Milled Tour Wedge (+0.06), read off a real save — a WEDGE-slot item whose own copy says
+  //   "so approaches check up" — took the driver's run fraction 0.140 → 0.080 (43% of its roll gone),
+  //   the 3-hybrid to 0.015, and the 7-iron and 8-iron to a DEAD STOP.
+  //
+  // Zero roll is zero hops: `planRunout` gets `dist: 0`, the air budget is 0, and the train breaks
+  // before the first one. That is the play-test's *"the save I was playing with shows no bounce"*,
+  // on a campaign whose only spin item was a wedge — while the same golfer bounced fine in every
+  // other mode, because no story gear was equipped there.
+  //
+  // ⚠️ ONLY THE GEAR IS GATED, and that is not a half-measure — a character's `rollFracDelta` is
+  // ALREADY per-club by construction, and better than a hard cutoff would be. Backspin Bo's own
+  // `clubMods` returns nothing above the five-iron ("above the 5-iron the big sticks are untouched")
+  // and every AI golfer's is scaled by `(1 - t)`, which reaches zero at the driver. Gating it here as
+  // well would zero a smooth taper across the mid irons for every golfer in the game — a balance
+  // change dressed as a bug fix, and a regression from a per-club curve to a step.
+  const spins = hasBackspin(nominalCarry) || spinsWholeBag;
+  let frac = rollFractionFor(profile, nominalCarry) + rollFracDelta - (spins ? backspinBoost : 0);
+  // The GS-spin-gate floor stays as the belt to this pass's braces: with the boost withheld a long
+  // club can no longer be driven negative by GEAR, but a future character mod could, and a driver that
+  // sucks back eighteen yards is never the intent.
+  if (frac < 0 && !spins) frac = 0;
   // The rng draw is consumed either way, so the stream is identical whether or not the clamp bites.
   const raw = carry * frac * rng.range(0.85, 1.15);
   return Math.max(-MAX_CHECK, Math.min(ROLL_ENERGY_CAP, raw));
@@ -724,6 +749,22 @@ export interface PlayHoleOptions {
   /** Reduced weather impact (GS-proshop-2, Wind-Cheater balls), 0..1. Undefined/0 = full wind. */
   windResist?: number;
   /** Increased backspin (GS-proshop-2, Fresh-Groove wedges), 0..1: more check / less run. Undefined/0 = base. */
+  /**
+   * SPIN THE WHOLE BAG (GS-spin-bag) — let a spin build's check reach clubs that do not naturally
+   * spin, up to and including the driver.
+   *
+   * Off by default, which is the FIX: `backspinBoost` and a character's `rollFracDelta` are otherwise
+   * applied only to PW and below (`hasBackspin`), so a wedge item can no longer quietly take the run
+   * off a driver. On, it is the BUILD the play-test remembered fondly — *"if you got enough backspin
+   * then even the driver would backspin, and that would be interesting to explore with Bo because it
+   * was great on worlds like cetus, void, rainbow"* — the island worlds where run is a liability and
+   * a ball that stops dead is worth more than a ball that goes far.
+   *
+   * Nothing grants it yet. It is a flag rather than a rewrite so that turning the old accident into a
+   * deliberate build is a ROW (an item or a perk that sets it), not another pass through this
+   * function. See `GS-spin-bag-build` in IDEAS.md.
+   */
+  spinsWholeBag?: boolean;
   backspinBoost?: number;
   /** Hazard-skip balls (GS-proshop-2): penalty kinds the ball skims across with no stroke. Absent = base. */
   hazardImmune?: readonly string[];
@@ -923,6 +964,7 @@ export function playHole(hole: Hole, rng: Rng, opts: PlayHoleOptions = {}): Play
       lefty: opts.lefty,
       windResist: opts.windResist,
       backspinBoost: opts.backspinBoost,
+      spinsWholeBag: opts.spinsWholeBag,
       hazardImmune: opts.hazardImmune,
       rainbowRoad: opts.rainbowRoad,
       tradeTents: opts.tradeTents,
@@ -1051,6 +1093,22 @@ export interface ExecOpts {
   windResist?: number;
   /** Increased backspin (GS-proshop-2): 0..1 subtracted from the roll fraction (more check, less run).
    *  Folded into the SAME roll-energy rng draw. Undefined/0 = byte-for-byte unchanged. */
+  /**
+   * SPIN THE WHOLE BAG (GS-spin-bag) — let a spin build's check reach clubs that do not naturally
+   * spin, up to and including the driver.
+   *
+   * Off by default, which is the FIX: `backspinBoost` and a character's `rollFracDelta` are otherwise
+   * applied only to PW and below (`hasBackspin`), so a wedge item can no longer quietly take the run
+   * off a driver. On, it is the BUILD the play-test remembered fondly — *"if you got enough backspin
+   * then even the driver would backspin, and that would be interesting to explore with Bo because it
+   * was great on worlds like cetus, void, rainbow"* — the island worlds where run is a liability and
+   * a ball that stops dead is worth more than a ball that goes far.
+   *
+   * Nothing grants it yet. It is a flag rather than a rewrite so that turning the old accident into a
+   * deliberate build is a ROW (an item or a perk that sets it), not another pass through this
+   * function. See `GS-spin-bag-build` in IDEAS.md.
+   */
+  spinsWholeBag?: boolean;
   backspinBoost?: number;
   /** Hazard-skip balls (GS-proshop-2): penalty kinds the ball skims across with no stroke (water/lava/
    *  void). Absent/empty = ordinary penalties (byte-for-byte). Pure geometry, no rng. */
@@ -1334,7 +1392,15 @@ export function executeShot(
   if (!tdPen || (immune && immune.has(tdPen))) {
     // Increased backspin (GS-proshop-2): subtract from the roll fraction (more check, less run) — same
     // single rng draw, so backspinBoost 0/undefined is byte-for-byte the old energy.
-    const energy = rollPotential(flight, nominalCarry, result.carry, rng, mods.rollFracDelta - (opts.backspinBoost ?? 0));
+    const energy = rollPotential(
+      flight,
+      nominalCarry,
+      result.carry,
+      rng,
+      mods.rollFracDelta,
+      opts.backspinBoost ?? 0,
+      opts.spinsWholeBag ?? false,
+    );
     // Tent ricochet (GS-tents): the run-out goes along the REFLECTED direction with a lively floor of
     // energy (a real bounce, not a dead drop). Otherwise the roll runs along the flight direction. The
     // rng draw above is unchanged either way, so the stream is stable. tents are passed so a roll that
@@ -1701,6 +1767,9 @@ export function backspinRoll(
     rollFracDelta?: number;
     /** Spin gear (Fresh-Groove wedges etc.): subtracted from the roll fraction — more check. */
     backspinBoost?: number;
+    /** GS-spin-bag: let the spin reach clubs that do not naturally spin. MUST be passed the same value
+     *  the sim gets, or the drawn line promises a check the ball will not take (contract 5). */
+    spinsWholeBag?: boolean;
     /** Hazard-skip balls: penalty kinds the ball skims across instead of resting in. */
     immune?: ReadonlySet<string>;
     tents?: readonly TradeTent[];
@@ -1715,7 +1784,10 @@ export function backspinRoll(
   // The MEAN roll energy: rollPotential's `carry · frac` at the rng.range(0.85,1.15) midpoint 1.0 — the
   // family carry/roll SPLIT (GS-carry-rollout-split) off the club's flight profile, so the drawn line IS
   // the physics the sim releases.
-  const frac = rollFractionFor(spray.flight, nominal) + (opts.rollFracDelta ?? 0) - (opts.backspinBoost ?? 0);
+  // …and the SAME spin gate the sim applies (GS-spin-bag), or the drawn line offers a driver a check
+  // the ball will not take. This is contract 5: the helper line is the physics, not a second opinion.
+  const spins = hasBackspin(nominal) || (opts.spinsWholeBag ?? false);
+  const frac = rollFractionFor(spray.flight, nominal) + (opts.rollFracDelta ?? 0) - (spins ? (opts.backspinBoost ?? 0) : 0);
   const K = Math.max(-MAX_CHECK, Math.min(ROLL_ENERGY_CAP, carry * frac));
   if (Math.abs(K) < SPIN_LINE_MIN) return null;
   const tdLie = lieAt(hole, landing);

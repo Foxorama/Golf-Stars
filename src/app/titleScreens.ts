@@ -7,7 +7,7 @@
 import { state } from './ctx';
 import { storageHealth } from '../save/durability';
 import { faultExplanation, faultHeadline, faultRescue, saveIntegrity } from '../save/integrity';
-import { GAME_TITLE, APP_VERSION } from '../brand';
+import { GAME_TITLE, APP_VERSION, BUILD_ID } from '../brand';
 import { FORMATS, ASGARD_FORMAT, STROKEPLAY_FORMAT, getFormat } from '../sim/rpg/formats';
 import type { RunSnapshot } from '../sim/rpg/run';
 import { shipForCharacter } from '../ui/gameCosmetics';
@@ -155,8 +155,12 @@ export function titleScreen(): string {
       <p class="gs-hero-tag">Voyage the galaxy · Make the cut · Travel deeper</p>
       <!-- The shipped build, quiet but always reachable (GS-release-identity). A player
            reporting a bug needs a build string they can read WITHOUT digging through
-           settings, and the title screen is the one place every session passes through. -->
-      <p class="gs-hero-build">v${APP_VERSION}</p>
+           settings, and the title screen is the one place every session passes through.
+           The COMMIT is here too (GS-build-id): the version alone answers "which release"
+           and stood at 1.3.1 across fourteen merges, so it could not answer the question a
+           play-test actually asked — "is this the build you just deployed, or the one from
+           this morning?" Two devices showing different ids settles that in one glance. -->
+      <p class="gs-hero-build">v${APP_VERSION} · ${BUILD_ID}</p>
       <div class="gs-hero-chips">
         <span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:12px;">✦ <b>${state.shards}</b> Star Shards</span>
         ${state.lifetimeAces > 0 ? `<span class="gs-chip" style="border-color:#3a3320;color:var(--gs-gold);font-size:12px;" title="lifetime holes-in-one">⛳ <b>${state.lifetimeAces}</b> Ace${state.lifetimeAces === 1 ? '' : 's'}</span>` : ''}

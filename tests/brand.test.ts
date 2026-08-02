@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
-import { GAME_TITLE, GAME_TITLE_UPPER, APP_VERSION } from '../src/brand';
+import { GAME_TITLE, GAME_TITLE_UPPER, APP_VERSION, BUILD_ID } from '../src/brand';
 import { BACKUP_KIND, LEGACY_BACKUP_KIND, buildBackup, parseBackup } from '../src/save/backup';
 import { SAVE_KEY } from '../src/save/storage';
 import { STORY_KEY } from '../src/save/storyStore';
@@ -121,6 +122,26 @@ describe('the product name is single-sourced', () => {
     expect(GAME_TITLE_UPPER).toBe(GAME_TITLE.toUpperCase());
     // Either a real semver from package.json, or the honest dev marker — never a silent blank.
     expect(APP_VERSION).toMatch(/^\d+\.\d+\.\d+(-\w+)?$/);
+  });
+
+  it('the BUILT bundle carries the commit, not just the release (GS-build-id)', () => {
+    // The gap this closes, in the play-test's own words: *"my phone still hasn't updated, but my
+    // wife's has"* — with no way for anyone to establish which build either device was running,
+    // because `APP_VERSION` stood at 1.3.1 across fourteen merges. A version answers "which
+    // release"; only the commit answers "is this the build you just deployed".
+    //
+    // ⚠️ `define` is on the SHARED vite config, so vitest substitutes it too — `BUILD_ID` is the real
+    // commit here, not the dev marker. (The neighbouring version test's comment claims the opposite
+    // for `__APP_VERSION__`; that comment is stale, and its assertion happens to pass either way.)
+    // So the shape is what is pinned: a seven-char commit, or the honest fallback, never a blank.
+    expect(BUILD_ID).toMatch(/^([0-9a-f]{7}|dev)$/);
+    const built = resolve(__dirname, '../dist/index.html');
+    if (!existsSync(built)) return; // dist is built by globalSetup; skip if a run has none
+    const html = readFileSync(built, 'utf8');
+    const sha = execSync('git rev-parse --short=7 HEAD', { encoding: 'utf8' }).trim();
+    expect(html, `the built bundle must carry the commit it was built from (${sha})`).toContain(`"${sha}"`);
+    // …and it must be visibly rendered beside the version, not merely present in the bundle.
+    expect(src('src/app/titleScreens.ts')).toContain('${BUILD_ID}');
   });
 
   it('the shipped version tracks package.json', () => {
