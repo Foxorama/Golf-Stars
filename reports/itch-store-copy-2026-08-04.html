@@ -1,0 +1,315 @@
+<!--
+  ============================================================================
+  itch.io store copy for THE FAR CARRY — 2026-08-04.
+
+  SUPERSEDES itch-store-copy-2026-08-02.html for everything above the
+  "Accessibility Features" heading. Everything from that heading DOWN is
+  carried over unchanged and is still the 08-02 text — it was not the problem
+  and it has not been touched.
+
+  ---------------------------------------------------------------------------
+  WHY THIS REVISION EXISTS
+  ---------------------------------------------------------------------------
+
+  The page named the modes, the worlds and the premise and then stopped. It
+  never said what a player DOES. Read cold, it did not answer:
+
+    • how a mode is STRUCTURED — what a stop is, what a chapter is, what
+      actually ends a run
+    • that there is a PRO SHOP at all, or that gear changes the picture
+    • what a caddy does beyond a one-line joke about hiring one
+    • that DIFFICULTY is a ladder you climb (Ascension, fifteen rungs, and
+      the bag tiers behind its gates)
+    • that a large slice of the best content is EARNED and cannot be bought
+
+  Five of the six flashy sections are rewritten and three are new (the Pro
+  Shop, the caddies as their own section, and the secrets). The practical
+  half of the page — accessibility, how it was made, built with, privacy,
+  install, saves, licence, the closing verse — is unchanged.
+
+  The same rewrite went to the website's game page
+  (vulpeculagames-site, far-carry/index.html, PR #2, merged 2026-08-04). The
+  two are deliberately NOT identical: the site has room for nine caddies and
+  eight secrets, this page carries the best of each and links out. When one
+  is edited, decide whether the other needs it — they are not generated from
+  a shared source and cannot be.
+
+  ---------------------------------------------------------------------------
+  ⚠️ "RAINBOW ROAD" — A CORRECTION TO THE 08-02 HEADER
+  ---------------------------------------------------------------------------
+
+  The 08-02 file states: "Rainbow Road appears ZERO times in the built
+  bundle. All 40 hits are in SOURCE COMMENTS and doc prose. No player has
+  ever seen the phrase."
+
+  THAT IS NO LONGER TRUE, and it may never have been. Checked 2026-08-04
+  against `dist/index.html`: the phrase ships EXACTLY ONCE, lowercase, in the
+  Rainbow Ball's own shop card —
+
+      src/sim/rpg/shopItems.ts:831
+      desc: 'Race the rainbow road at your own peril! Warning: unbalanced
+             course. Travel here only if you are worthy…'
+
+  So a player who buys the item does see it. Every other hit is still a
+  comment. Nothing has been changed in the game: per the 08-02 header this is
+  the author's call, not a cleanup to do quietly. It is flagged because the
+  avoidance is deliberate and the record said the opposite.
+
+  THE COPY BELOW QUOTES THAT CARD WITH THE FIRST CLAUSE DROPPED — "Warning:
+  unbalanced course. Travel here only if you are worthy…" is a true direct
+  quote and carries the tease without the phrase. Do not "restore" the full
+  quote.
+
+  If the string is ever reworded, the fix is one `desc` in `shopItems.ts`. No
+  save bump, no persisted key, no test fixture — the item ID `rainbow-ball`
+  and the loadout field `rainbowRoad` are internal and stay as they are
+  (GS-release-identity: identifiers do not have to follow a display name).
+
+  ---------------------------------------------------------------------------
+  EVERY CLAIM IN HERE WAS CHECKED AGAINST THE SOURCE
+  ---------------------------------------------------------------------------
+
+  Written to DL-guard-caught-it's rule: check the claim against the code
+  before publishing it. What was read, and where:
+
+    56 shop entries, 9 named caddies ....... src/sim/rpg/shopItems.ts
+    item effects + exact desc strings ...... src/sim/rpg/shopItems.ts
+    the allowance ladder +4 … −4 ........... ENDLESS_SET_STEPS, endless.ts
+                                             (nine bands, each TWO sets long;
+                                             the last repeats forever)
+    market hides unearned rows ............. shipRevealedInMarket, ships.ts
+    ace ship on ANY ace, not the first ..... aceShipUnlock, ships.ts
+    1,000 wins / "Beaten into Submission" .. SERPENT_TROPHY_WINS,
+                                             serpentTrophy.ts
+    Ascension max 15, gates A2/A6/A11 ...... runLoadout.ts, bag.ts
+    a win adds a club, permanently ......... club-unlock.ts
+    18 ships, 44 apparel ................... ships.ts, apparel.ts
+    5 chapters, qualify at 2 of 4 .......... story.ts, storyTournaments.ts
+    the five qualifier formats ............. storyQualifierFormats.ts
+    betrayer = the partner tally ........... betrayerId, storyBetrayal.ts
+    8 starting fuel ........................ formats.ts
+
+  ⚠️ TWO NUMBERS THAT LOOK WRONG AND ARE NOT:
+
+  1. "Fifty-odd" shop items. `SHOP_ITEMS` has 56 entries, but 9 of those are
+     the caddies, so ~47 are gear. "Fifty-odd" is honest for the table and
+     safe either way. Do not "correct" it to 56 and sell the caddies twice.
+
+  2. The Unending allowance. The title tile in `formats.ts` still says "every
+     hole has a score to beat", which is STALE — `run.ts` imports
+     `passesEndlessSet` and judges a FOUR-HOLE SET. The copy says sets. If
+     anyone syncs this page to that tile, they will reintroduce the error the
+     08-02 revision already fixed once.
+
+  ---------------------------------------------------------------------------
+  METADATA — UNCHANGED, not re-read this session
+  ---------------------------------------------------------------------------
+
+  Status Released · HTML5 · Genre Sports, Role Playing
+  Tags: 2D, Golf, Physics, Procedural Generation, Roguelike, Singleplayer,
+        Space, Story Rich, Top-Down
+  Short description / tagline (UNCHANGED — still the best line on the page):
+        "Play golf amongst the stars to save the galaxy (or end it)."
+  Average session: A few minutes · Languages: English
+  Inputs: Keyboard, Mouse, Touchscreen, Smartphone, Playstation controller
+  AI disclosure: AI Assisted (Code, Text & Dialog)
+  Accessibility multi-select: NONE ticked — the 08-02 audit stands, and the
+        reasoning for each of the eight is in that file. Do not re-litigate it
+        from this one.
+  "Made with": deliberately EMPTY (closed list, no TypeScript/Vite option).
+
+  EMBED: viewport 820×760, fullscreen on, mobile friendly on, click-to-play
+  on. 760 must clear 660 or `data-gs-fit` flips to `tight` and the HUD sheds
+  detail.
+
+  HOW TO USE: everything between the BEGIN/END markers is one contiguous
+  block. Paste it into the Details box via the <> source button. itch strips
+  inline styles and <style>, so this uses nothing but h2/p/ul/li/strong/em/
+  a/hr/blockquote.
+-->
+
+
+<!-- ==================== BEGIN DETAILS BOX ==================== -->
+
+<p><strong>It's a golf game in space with RPG and roguelike game modes.</strong></p>
+
+<p>Pick a golfer, load the ship, and play a galaxy that gets stranger the further out you go. You start in a station wagon with a beginner's bag and a cut to survive. What you do about that is up to you. Hire a caddy. Buy something reckless. Fly further than the fuel really allows.</p>
+
+<p>Can you find the Warrior's Tee at the end of the Rainbow Course? Compete and win in The Voyage. Play forever in the Unending Universe as the holes get harder and harder. Or choose to save or end the galaxy in Story Tour, by putting Jörmungandr back to sleep or letting the serpent wake up and devour it.</p>
+
+<h2>Golf that feels like golf</h2>
+
+<p>Pull back to load the swing and watch the spray cone open with the power. That cone <em>is</em> the dispersion the game will roll your shot against, drawn to scale on the map, so if it touches the water then the water is genuinely in play. Nothing is hidden behind a number you never see.</p>
+
+<p>Clubs launch, peak and come down at real angles. A driver arrives shallow and runs out on firm turf. A wedge lands steep and checks. The ball skips, settles, and trickles down the fall line of a green you can read — and the break line stops dead where your golfer stops being sure of it.</p>
+
+<p>Stroke play, Stableford, matchplay, scramble and best-ball all turn up somewhere, and the campaign makes you play all of them.</p>
+
+<h2>Four ways to play</h2>
+
+<ul>
+<li><strong>🌠 Story Tour</strong> — the RPG. Five chapters, and each one charts four worlds you only have to qualify at two of, so you pick your road and leave two unplayed. A qualifying event is nine holes and its format is drawn before you fly: stroke, Stableford, or a pairs event played scramble, best-ball or matchplay. Clear two and the chapter's major opens with a rival already on the tee. <strong>Pick your playing partners carefully — one of your friends is going to turn on you, and which one is decided entirely by who you kept picking.</strong></li>
+<li><strong>🚀 The Voyage</strong> — the roguelike, and the only mode you can win. Nine stops in three arcs. Every ordinary stop is four holes against a field and you have to make the cut; miss it and the tour drops you. Each arc ends with a boss, and the last one is the whole thing. You leave Earth with exactly enough fuel to finish by short hops, so every long jump is one you have to find the money for.</li>
+<li><strong>🌌 Unending Universe</strong> — endless survival, judged four holes at a time rather than hole by hole, so one disaster can be clawed back by the other three. The allowance tightens every other set: it opens at four over and walks down through level to four <em>under</em>, and then it stops easing and just keeps asking. It always ends. The only question is where you were when it did.</li>
+<li><strong>🗺 Star Tour</strong> — finish a campaign and the whole chart opens. Fly it yourself, with no route and nobody to beat. Land anywhere, play that world's designed eighteen, and chase a record per course.</li>
+</ul>
+
+<h2>A whole galaxy of golf courses</h2>
+
+<p>Fifteen worlds, each with its own physics and its own personality. Gravity changes the carry, heavy air drops the ball short, and the course is generated the moment you land on it — so nobody has ever played the hole you are standing on.</p>
+
+<p>Links in the ice rings where the crosswind never rests. Molten doglegs on the ember world. Storms on a gas giant that will carry your drive or throw it into the next county. Cliff shelves over a star-ocean with whales breaching below. On the void world there is no rough at all, only the abyss. On the derelict there is no ground except the deck you are standing on, and the bulkheads are in play.</p>
+
+<h2>Four golfers, and they are not skins</h2>
+
+<ul>
+<li><strong>Feather Fade</strong> — a buttery, controlled fade on every shot. Tightest dispersion in the game, and her left miss is all but gone.</li>
+<li><strong>Huang-Woo Hook</strong> — a surgeon with the irons and a liability with the big sticks, which fight a snap-hook left. Two different golfers depending on what you pull out.</li>
+<li><strong>Longshot Larry</strong> — bombs it off the tee and where it ends up is anyone's guess. Will not carry a hybrid. Not can't. Won't.</li>
+<li><strong>Backspin Bo</strong> — the only golfer who spins it back. Pin-seekers that land, bite and hold, paid for with distance off the tee.</li>
+</ul>
+
+<p>Tap a portrait on the select screen for their story — where they are from, their best win, their lowest moment. The lowest moments are the good ones.</p>
+
+<h2>Nine caddies, and you can only have one</h2>
+
+<p>Whoever is on the bag rewrites a piece of how the game plays for as long as they are there.</p>
+
+<ul>
+<li><strong>Space Ducks</strong> — laser-toting ducks who zap <em>every</em> ball missing left back onto the short grass.</li>
+<li><strong>Convict Sheep</strong> — the right-hand mirror, with boomerangs. Between the two of them you can buy your way out of one entire side of the golf course.</li>
+<li><strong>The Prognostic Parrot</strong> — sees the shot before you play it. When he does, you play it twice and keep the better ball.</li>
+<li><strong>Dr Chipinski</strong> — holes out from off the green when you least deserve it. Calls "You rang?" as you strike it, then makes good on it.</li>
+<li><strong>The Mystic Mole</strong> — lives under the greens and has read every break there is. He aims the putt on a perfect line. You judge the pace.</li>
+<li><strong>Driver Dan</strong> — play your driver from <em>any</em> lie, at full power. Rough, sand, trees, doesn't matter. It is a terrible idea and it works.</li>
+<li><strong>Suggestible Sam</strong>, <strong>Sandy the Sand-Saver</strong> and <strong>Penelope Putter</strong> round it out — the club call, the bad-lie rescue, and handing the whole green to somebody else.</li>
+</ul>
+
+<p><strong>Hiring a new one fires the one you have got</strong>, the perk walks out with them, and they will not work for you again this run. They come from rival factions, and the factions notice. In the campaign they are not for hire at all — they are your friends, and you pick them up one at a time at the worlds they belong to. Which is what makes the betrayal hurt.</p>
+
+<h2>Fifty-odd ways to spend money you can't keep</h2>
+
+<p>Every stop has a Pro Shop and credits do not survive the run, so there is no sense saving them. And because the spray cone is the real dispersion, gear changes the picture in front of you rather than a number you never see. Buy the <strong>Shank Guard</strong> and the red wedge on the right of your cone is gone. Not reduced. Gone. There is a grip that does the same to the duck-hook.</p>
+
+<ul>
+<li><strong>The Power Glove</strong> — its own description begins "It's so bad." Crank the pull past the top of the meter to 140% and hit the biggest bomb in the galaxy.</li>
+<li><strong>Floater Balls</strong> — buoyant, so they skip clean over water and water stops costing you a stroke. There is a heat-shielded pair for lava and an anti-grav pair that drifts across the void.</li>
+<li><strong>Grooved Driver Face</strong> — your driver can no longer be hit short. Not "shouldn't be". Can't. Commit to it or put it away.</li>
+<li><strong>Spin Trajectory Computer</strong> — draws the entire run-out before you swing. Every yard of check, every foot of curl, all the way to where the ball actually stops.</li>
+<li><strong>Full Send</strong> — a curse, and it says so. Both miss zones open up and you take 60% more money out of every stop.</li>
+</ul>
+
+<p>And then there is the <strong>Rainbow Ball</strong>, whose card just says <em>"Warning: unbalanced course. Travel here only if you are worthy…"</em> Buy it and the hole becomes a glowing ribbon through the stars with every hazard deleted and open space either side. Something is waiting at the end of it for anyone who plays it well enough.</p>
+
+<h2>What you keep, and how much harder it gets</h2>
+
+<p>Credits are for the Pro Shop, this run only. <strong>Star Shards</strong> are forever — spend them in the Trade Market on eighteen ships, from the station wagon you leave Earth in up to an alien mothership with fully sick spinning wheels, and on forty-odd cosmetics to outfit the whole team with. Buying is global and wearing is per golfer, so all four of yours can look completely different.</p>
+
+<p><strong>Ascension</strong> is the difficulty ladder and it runs to fifteen. Every level adds a stroke to every cut you have to make and takes money out of every purse. Clear the gates and you unlock permanent bag tiers for every future run: the Planet set, then Phoenix Flames, then Solar Storm, which is the apex bag and blazes gold across the galaxy.</p>
+
+<p>And every voyage you win permanently hands that golfer a club they did not own before. Not for the run. Forever. So each of the four is slowly building a bag of their own.</p>
+
+<h2>Some of it is not for sale</h2>
+
+<p>The Trade Market hides what you have not earned yet. There are rows in that rack you cannot see, and it will never tell you they are there. Here is a few of them. Not how.</p>
+
+<ul>
+<li><strong>☄ The Comet Rider</strong> — a dimpled golf-ball comet blazing across the void. There is exactly one way to earn it and it takes exactly one shot.</li>
+<li><strong>🔨 Thor's Hammer</strong> — Mjölnir, reforged as a driver, rune-etched and crackling with caught lightning. Won on the storms of Asgard, which is not on the map.</li>
+<li><strong>🔥 The Firebird</strong> — a jet-black muscle-car cruiser with a golden phoenix blazing across the hood. Somebody on your bag has to recognise the wreck.</li>
+<li><strong>♾ The Infinity Ace</strong> — a phoenix-winged star-yacht wreathed in living aurora. Its own card says: there is no better ride, there cannot be.</li>
+<li><strong>🌳 Yggdrasil</strong> — the World Tree is not on your star chart. Something you might be carrying is what puts it in the sky.</li>
+<li><strong>🐉 The World Serpent</strong> — Jörmungandr broken to the bridle. The achievement is called <em>Beaten into Submission</em>, and you have to beat it a thousand times. That is not a typo.</li>
+</ul>
+
+<p>Finish the campaign and the road you took hangs a set of gear on you for good — the Warden's Vigil, or the Coil Shroud. One campaign only ever earns one of them.</p>
+
+<h2>And once, at the end, it stops being about golf</h2>
+
+<p>Halfway through the campaign you are asked to choose, and it cannot be undone. Hold the line and keep the World-Eater asleep, or put your clubs down and let it wake. The rest of the run bends around whichever you picked, and so does the fight you end on: <strong>Jörmungandr</strong> coiled round the root, or <strong>the Warden Ark</strong>, the Order's flagship, which holds the seal.</p>
+
+<p>It is a proper ship fight. You fly, you dodge, and every weapon you bought along the way has its own trigger. Turn up under-gunned and the hide simply holds, so the briefing that told you to go shopping was not being polite.</p>
+
+<p>Yes, that is the station wagon you left Earth in. No, it was not designed for this.</p>
+
+<h2>Accessibility Features</h2>
+
+<ul>
+<li><strong>Readable text</strong> — scale the whole interface, choose a legible typeface, add letter and word spacing.</li>
+<li><strong>Reduced motion</strong> — seeded from your system, and yours to override.</li>
+<li><strong>Full keyboard play</strong> — aim, modulate power and swing without a pointer, and every overlay is a proper dialog.</li>
+<li><strong>Screen-reader narration</strong> — the hole, the conditions and every shot outcome are spoken, not just drawn.</li>
+<li><strong>Left-handed mode</strong> — mirrors the controls and the whole cast, so a left-handed golfer plays a left-handed game. Golf video games almost never bother. This one does.</li>
+<li><strong>Aim assist on by default</strong> — the game picks a safe, sensible line and club; turn it off when you want the whole rope.</li>
+</ul>
+
+<h2>How this game was made</h2>
+
+<p>The AI disclosure on this page is ticked for <strong>Code</strong> and <strong>Text &amp; Dialog</strong>. That covers a lot of ground, so here is what it actually means.</p>
+
+<p>There are <strong>no AI-generated art assets</strong> in this game. There are no art assets at all. Every visual — the courses, the golfers, the ships, the item cards, even the icon and the banner at the top of this page — is drawn by code, as vectors and canvas drawing, while you play. Nothing came out of Midjourney or Stable Diffusion. There isn't an image file in the project to have generated.</p>
+
+<p>The sound is the same. There isn't an audio file in the project either. <strong>Every note and every effect is synthesized in your browser as it plays.</strong></p>
+
+<p>Who did what:</p>
+
+<ul>
+<li><strong>The AI wrote all of the code.</strong> I wrote none of it — including the code that draws every visual and synthesizes every sound.</li>
+<li><strong>The AI wrote most of the prose</strong> — dialogue, item and card text, and most of the story writing itself.</li>
+<li><strong>The design is mine.</strong> The game modes, the golf feel, the worlds, the story, the characters and the plot. I specified how it should look and sound; the AI implemented that.</li>
+<li><strong>Some of it is the AI's own.</strong> It made countless decisions I never specified, and a fair few came back better than what I had asked for, so I kept those.</li>
+</ul>
+
+<p>The working method was specify, play, reject, repeat. I would describe what I wanted, play what came back, and send it back — sometimes four or five times — because it still did not feel right. Nearly 800 commits in about five weeks, and very little of this game is a first draft.</p>
+
+<p>That loop is the interesting part, and it needs more room than a store page. I'll write it up as a devlog and link it here.</p>
+
+<h2>Built with</h2>
+
+<p>No game engine. The Far Carry is hand-written <strong>TypeScript</strong> running in your browser — the play view is Canvas2D, the hole maps are SVG, and every sound is Web Audio, synthesized as it plays. It is built with <strong>Vite</strong>, tested with <strong>Vitest</strong> and headless Chromium, and wrapped with <strong>Capacitor</strong> for Android.</p>
+
+<p>The whole game ships as a single inlined <code>index.html</code>. No engine runtime, no asset bundle, no font files, no audio files — which is why it loads the way it does.</p>
+
+<h2>No accounts. No tracking.</h2>
+
+<p>The Far Carry collects nothing and sends nothing. No sign-up, no analytics, no telemetry, no ads, no cookies. Your save lives on your own device, and you can export your save as a file to make sure it won't be lost if you clear your browser cache, uninstall or change devices.</p>
+
+<h2>It installs as a web app, and plays offline</h2>
+
+<p>There is nothing to download and nothing to update — but you can install it properly as an app on your home screen. Installed, it runs with no connection at all, and your progress will be saved with the app.</p>
+
+<p>Open <a href="https://farcarry.vulpecula.games/">farcarry.vulpecula.games</a> and:</p>
+
+<ul>
+<li><strong>Android</strong> — in Chrome, let the page finish loading, then open the ⋮ menu and pick whichever option says <strong>Install</strong>. Depending on your version that reads <em>Install app</em>, <em>Add to Home screen</em> or <em>Install and create shortcut</em> — they all give you the real app. One that only says <em>Create shortcut</em> is a bookmark, not an app.</li>
+<li><strong>iPhone / iPad</strong> — open it in <strong>Safari</strong>, then Share → <em>Add to Home Screen</em>. It has to be Safari; on iOS every other browser gives you a bookmark instead.</li>
+<li><strong>Desktop</strong> — Chrome and Edge show an install icon in the address bar.</li>
+<li><strong>Anything else</strong> — most browsers can do it, but they all name it differently. Look for <em>Install</em> or <em>Add to Home screen</em> in the main menu.</li>
+</ul>
+
+<p>Installed properly, the game opens with no address bar. If you can still see one you got a bookmark — remove it, reload the page once, and try again.</p>
+
+<h2>Your save, and how not to lose it</h2>
+
+<p>Progress saves automatically, on your own device. No account and nothing in the cloud — which also means there is nobody who can restore it for you. So:</p>
+
+<ul>
+<li><strong>Export a backup.</strong> Settings → Save data → Export writes one file holding every campaign, your current run and your settings. Import brings it back, on any device, in any browser.</li>
+<li><strong>Clearing your browser's site data erases it.</strong> Private and incognito windows, and browsers that block third-party storage, can stop the game saving at all — if that happens the title screen tells you, rather than letting you find out at the end of a campaign.</li>
+<li><strong>Each place you play keeps its own save.</strong> Playing here, playing at farcarry.vulpecula.games, and the installed app are three separate spaces. The export file is the bridge between them.</li>
+</ul>
+
+<h2>Licence</h2>
+
+<p>The Far Carry is <strong>© 2026 Vulpecula Games, all rights reserved</strong> — the code, the art, the audio, the text and the design. A copy from an official channel is yours to play, and you are welcome to read the source, quote it, critique it and learn from it: that is why the repository is public. Being able to read it is not a licence to reuse it, though. If you want to use something, just ask — permission is usually given.</p>
+
+<p>The game bundles a small amount of open-source code (Vite and Capacitor, both MIT). Their notices are in <code>THIRD-PARTY-NOTICES.md</code> in the repository.</p>
+
+<hr>
+
+<blockquote>
+<p>Golf is the ritual geometry that keeps the lights on. Most beings never know it.</p>
+<p><strong>Go and play a world true.</strong></p>
+</blockquote>
+
+<!-- ==================== END DETAILS BOX ==================== -->
