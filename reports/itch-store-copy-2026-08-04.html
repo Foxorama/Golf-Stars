@@ -118,9 +118,14 @@
         from this one.
   "Made with": deliberately EMPTY (closed list, no TypeScript/Vite option).
 
-  EMBED: viewport 820×760, fullscreen on, mobile friendly on, click-to-play
-  on. 760 must clear 660 or `data-gs-fit` flips to `tight` and the HUD sheds
-  detail.
+  ⚠️ EMBED: NOT RESTATED HERE, ON PURPOSE. The 08-02 header carries
+  "viewport 820×760", and that number is STALE — the embed was re-measured on
+  2026-07-31 and moved to 600×860. What matters is the ASPECT, not the height:
+  the play screen is capped to a portrait strip at aspect ≥ 3/4, so 600×860
+  (0.698) uses 100% of the play area while 820×760 uses 48%, and 600×800 is
+  exactly 0.750 and is the trap. These are ITCH CONSOLE settings — nothing in
+  the repo records them, so this file cannot verify them and will not pretend
+  to. Read them off the console before changing anything.
 
   HOW TO USE: everything between the BEGIN/END markers is one contiguous
   block. Paste it into the Details box via the <> source button. itch strips
