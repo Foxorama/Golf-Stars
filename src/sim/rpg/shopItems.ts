@@ -828,7 +828,7 @@ export const SHOP_ITEMS: readonly ShopItem[] = [
     id: 'rainbow-ball',
     name: 'Rainbow Ball',
     cost: 360,
-    desc: 'Race the rainbow road at your own peril! Warning: unbalanced course. Travel here only if you are worthy…',
+    desc: 'Race the Rainbow Course at your own peril! Warning: unbalanced course. Travel here only if you are worthy…',
     rarity: 'legendary',
     apply: (m) => ({ ...m, rainbowRoad: true, perks: [...m.perks, 'rainbow-ball'] }),
   },
