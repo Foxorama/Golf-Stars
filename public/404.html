@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex" />
+    <title>Not found — The Far Carry</title>
+
+    <!--
+      WHY THIS FILE EXISTS, WHICH IS NOT "so a 404 looks nice".
+
+      Cloudflare Pages falls back to `index.html` for every unmatched route when the output has
+      no `404.html`. Measured on staging before this file was added:
+
+          /src/main.ts              -> 200, 2,399,472 bytes
+          /.env                     -> 200, 2,400,703 bytes
+          /this-path-does-not-exist -> 200, 2,400,703 bytes
+
+      So every vulnerability scanner probing for a config file was handed the ENTIRE GAME with a
+      200. Three costs, in rising order of how much they matter:
+
+        1. Bandwidth. A single day showed 152MB of transfer across the origins, most of it this.
+        2. Status codes stopped separating bots from people. Everything was a 200, so the 404
+           rate — normally the cleanest scanner tell in an access log — read as zero, and the
+           per-path analytics in the site repo could not be trusted.
+        3. It would have followed production. GitHub Pages 404s those probes cheaply today; a
+           move to Cloudflare Pages without this file makes the origin strictly worse.
+
+      GitHub Pages and Cloudflare Pages both use `404.html` from the site root, so this is
+      correct on either host — the same reasoning as `public/_headers`. itch serves a zip and
+      never asks for it.
+
+      ⚠️ SELF-CONTAINED, LIKE EVERYTHING ELSE HERE. No script, no external stylesheet, no font,
+      no image. A 404 page that 404s on its own assets is a joke that writes itself, and this
+      file must stay servable when nothing else is.
+    -->
+
+    <style>
+      /* Values rather than tokens: this page cannot import the app's `:root` block. Kept in
+         step with `--gs-bg`, `--gs-ink`, `--gs-dim` and `--gs-accent` in index.html. */
+      :root {
+        color-scheme: dark;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      body {
+        display: grid;
+        place-content: center;
+        gap: 1.25rem;
+        padding: 2rem;
+        background: #0b0d12;
+        color: #e8e8ea;
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        line-height: 1.5;
+        text-align: center;
+      }
+      h1 {
+        margin: 0;
+        font-size: clamp(2.5rem, 12vw, 4rem);
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        color: #9aa1ad;
+      }
+      p {
+        margin: 0;
+        max-width: 32ch;
+        color: #9aa1ad;
+      }
+      a {
+        justify-self: center;
+        padding: 0.7rem 1.4rem;
+        border: 1px solid #2a3142;
+        border-radius: 10px;
+        background: #161b25;
+        color: #5fd45a;
+        font-weight: 600;
+        text-decoration: none;
+      }
+      a:hover,
+      a:focus-visible {
+        border-color: #5fd45a;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>404</h1>
+    <p>There is nothing at this address. The Far Carry is a single page, and this is not it.</p>
+    <a href="/">Open The Far Carry</a>
+  </body>
+</html>
