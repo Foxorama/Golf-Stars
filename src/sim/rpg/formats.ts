@@ -157,14 +157,21 @@ export const FORMATS: Record<string, RunFormat> = {
     stops: [{ holes: 9, label: "Asgard · The Warrior's Tee" }],
   },
   // The endless survival mode (GS-unending): 4 random holes → Pro Shop → journey lane → 4 more,
-  // forever. Survival is the PER-HOLE bar (endless.ts) — quad bogey for the first 8 holes, one
-  // stroke tighter every 8, birdie-or-better from hole 41 on — while course wildness keeps ramping
-  // with galaxy distance, so the universe itself never stops escalating. Milestones at
-  // 40/60/80/100/120/140 holes bank shard bonuses + unlock the Evergreen cosmetic set.
+  // forever. Survival is the per-SET bar (GS-set-survival, `endless.ts`): a whole four-hole set's
+  // cumulative to-par must clear an allowance that steps down one stroke every TWO sets — +4 for
+  // sets 1–2, then +3 / +2 / +1 / E / −1 / −2 / −3, capped at −4 (average birdie) forever. A single
+  // blow-up is absorbed by the other three holes, so a run only ever ends at a SET boundary. Course
+  // wildness keeps ramping with galaxy distance, so past the cap the holes themselves are what
+  // escalate. Milestones at 40/60/80/100/120/140 holes bank shard bonuses + unlock the Evergreen
+  // cosmetic set.
+  // ⚠️ `blurb` said "every hole has a score to beat" until 2026-08-04 — the PER-HOLE rule this
+  // comment also used to describe. Both predate GS-set-survival and were the last two places in the
+  // repo still stating the old rule. `holeGate` keeps its name (it arms the set-gate UI in
+  // introScreens/playHud/resultScreens); renaming that flag is a refactor, not a copy fix.
   unending: {
     id: 'unending',
     name: 'Unending Universe',
-    blurb: 'Endless survival — every hole has a score to beat',
+    blurb: 'Endless survival — every four-hole set has a score to beat',
     stops: [{ holes: 4, label: '4 holes' }],
     holeGate: true,
     // GS-fuel-2: a tank you actually MANAGE — the old 25-unit tank rarely bound before the run
