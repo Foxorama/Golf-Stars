@@ -1660,6 +1660,46 @@ RENDER junction blend is a separate render-only pass (GS-green-blend). Re-shoot
     the `hashHole` idiom, GS-shot-lag) then pays it once per decision instead of ~4× per render: the
     club the screen pre-arms, the cone it previews and the line it orients the map down are all the same
     question. Cold 10.7ms → 5.4ms → ~0 on every repeat. Guarded by `tests/safe-aim-trees.test.ts`.
+  - **AND THE DEFAULT AIM LAYS UP SHORT OF THE STAND** (GS-auto-aim-trees, `autoAimTarget`/`autoAimClub`,
+    interactive only — the completion of `GS-aim-tree-aware`). The 🛟 pass fixed the mode a player
+    switches to when they are already in trouble; ◎ is the mode everyone is in by default, and it was
+    still pre-arming a driver on a line through a grove. **The fix is a different shape on purpose**:
+    safe SEARCHES a fan and turns; auto may not turn at all, because its job is to position down the
+    hole and the shot map ORIENTS down the resolved aim line (GS-default-aim) — a default that pointed
+    45° into the rough would swing the whole camera off the corridor. So auto does what a player does
+    when the trees are in the way and the hole is not: it lays up short of them, and it takes the club
+    that gets there.
+    Two seams, both extensions of rules that already existed rather than new machinery:
+    **(1) the aim** — `flyableTarget` walks BACK down the ball→target ray to the furthest playable
+    station something in the bag flies to, which is exactly the move `dryStationBefore` and
+    `carryableBefore` already make for a wet target, with a canopy in place of a bank. It asks
+    `longestCarryClub` twice, with the canopy clause and without, precisely so a null from BOTH — no
+    club could carry the bank or land clean — is left alone: that is GS-carry-roll-real's answer to a
+    different question. **(2) the club** — `longestCarryClub` gains a third clause beside "clears what
+    must be cleared" and "lands playable": *and gets there through the air*. The flattest club in the
+    bag is the one a treeline eats, so the walk steps down to the one that fits, which is what a player
+    does. A reachable green is still ATTACKED, gated on `fliesTo`: when nothing can fly to the flag the
+    attack is abandoned for the same lay-up the forced-carry rule already reaches for on water.
+    Measured over 29,343 sampled positions on wooded worlds — shots pre-armed INTO a canopy **16.04% →
+    6.63%**, tee shots **6 → 0**, and **77.8% of the residual is a genuinely trapped bag** (nothing in
+    it flies that line at all — the feature never papers over that, and the census's own test is laxer
+    than the rule, so the true share is higher).
+    Three deliberate exceptions, each named because an unexplained one is a hole: a **par 3** always
+    attacks the flag (there is nowhere else to aim, and the blocked cone over it says "shape this one");
+    the green pick is **capped at the coverage club** (flying the green to dodge a tree trades a
+    knockdown for the back-of-green trouble GS-green-backstop exists to make expensive); and a lay-up
+    shorter than `AUTO_FLY_LAYUP.minYd` is refused (a chip-out sideways is 🛟's job).
+    ⚠️ **`unblockedClub` asks the CANOPY question alone**, and the green attack uses it rather than
+    `longestCarryClub`: the coverage club is chosen on TOTAL (carry + run), so the landing clause would
+    reject a club that carries short of a creek and releases onto the green — good golf, and never that
+    branch's business. Wiring the full rule in there was the first cut, and the guard caught it.
+    ⚠️ **The shared memo returns a COPY on the MISS path too, not only on the hit.** Both resolvers can
+    return a point that belongs to the hole (`pinOf` hands back the hole's own pin), so handing the
+    computed value straight back would let a caller who mutates its target corrupt the course itself —
+    and, through the cache, every later answer. Found by the memo guard, which mutates what it is given.
+    Guarded by `tests/default-aim.test.ts`; the two older club guards there grew the canopy clause
+    rather than an exemption, so "the step-down was FORCED" is still an assertion and not a trust
+    exercise.
   - Greens are varied STAR shapes about `green` (single-valued r(θ)) — `pinInGreen`/`rayPolyDist`/
     `validateCourse` depend on it. Pin ≠ centroid (attack aims at flag; auto/safe at fat-of-green).
   - NO PENALTY HAZARD ON THE PUTTING SURFACE (GS-green-clear, `clearGreenOfPenalty`): the greenside

@@ -185,25 +185,9 @@ by — and it predates GS-flight-shape; that change only altered which shots tun
 Fix shape: step by DISTANCE, not by a count (`ceil(carry / ~4yd)`, clamped), or test the step SEGMENT
 against the blob rather than its endpoint. Not free: `sprayBlocking` probes hundreds of candidate
 landings per hole through the same function, and closing the leniency makes the wooded worlds harder
-again — so it wants the death-spiral harness and probably wants `GS-aim-tree-aware` alongside it.
-
-**GS-aim-tree-aware — HALF SHIPPED: `safe` sees trees now, `auto` still does not** *(surfaced by
-GS-flight-shape; pre-existing. The 🛟 half landed as GS-safe-aim-trees — see Done)*
-`clearLine` only asks whether a line crosses a PENALTY hazard, so the aim family will happily pre-arm a
-driver on a line through a grove. GS-carry-roll-real closed exactly this hole for water ("the default
-aim never points at a hazard, and the pre-armed club never flies into one") and trees are the remaining
-half. It matters more now that the ball genuinely descends into them: knockdowns run at 19% of full
-shots.
-**Done:** `safeAimTarget` gives the SAFE mode the `flightBlockedBy` probe and an escape search — the
-answer to "I am behind a stand and want out". The lay-up flew into a canopy on 13.7% of sampled
-positions on a wooded world.
-**Left:** `autoAimTarget`/`autoAimClub` — the DEFAULT mode, so it is the one most players are in. Its
-job is different from safe's (position down the corridor, not escape), so the fix shape is a TIEBREAK
-rather than a search: among the targets/clubs it already considers, prefer one whose flight is clear.
-Interactive-only so determinism is untouched; `safeAimTarget`'s `flightClearTo` is the seam to reuse,
-and its cost lesson applies (one `lieAt` per candidate is the bill; memoize per decision). Threading it
-into `layupTarget` would also lift the auto AI — but that is `GS-auto-ai-weak`'s job and a harness
-change.
+again — so it wants the death-spiral harness. (It also wanted `GS-aim-tree-aware` alongside it, which
+has since shipped — see Done — so that half is in hand: the default aim and the 🛟 escape both consult
+`flightBlockedBy` now, and both would automatically get stricter with the walk.)
 
 **GS-green-surface-bite — non-penalty hazards eat the putting surface** *(found while building
 GS-green-backstop; real, measured, deliberately left out of that PR)*
@@ -747,6 +731,15 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-aim-tree-aware** — CLOSED by GS-safe-aim-trees (🛟, #740) + GS-auto-aim-trees (◎). The aim
+  family sees canopies now, with a different answer per mode because their jobs differ: safe goes
+  ROUND a stand, the default lays up SHORT of it and takes the club that gets there (turning the
+  default line would swing the shot map off the corridor). Measured over 29,343 positions on wooded
+  worlds, shots pre-armed into a canopy 16.04% → 6.63% and tee shots 6 → 0; 77.8% of the residual is
+  a genuinely trapped bag, which is never papered over. Three named exceptions: a par 3 always
+  attacks the flag, the green pick is capped at the coverage club, and a lay-up under the minimum is
+  refused (that is 🛟's job). `GS-knockdown-tunnel` above is the remaining tree-collision item — it
+  wanted this alongside it, and now has it.
 - **GS-safe-aim-trees + GS-aim-reset** — the two halves of "I can't get the aim back". SAFE (🛟) now
   asks the sim's own knockdown walk whether the lay-up would actually FLY and, when a canopy blocks
   it, hunts a line that gets the ball out to the fairway or the rough (13.7% of sampled positions on

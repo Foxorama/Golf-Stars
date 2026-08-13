@@ -2384,23 +2384,39 @@ export function safeAimTarget(
   bag: readonly Club[] = CLUBS,
   carryMult: number = biomeCarryMult(hole),
 ): Vec {
-  const key = `${ball[0]},${ball[1]},${lie},${carryMult},${bag.map((c) => c.id).join('|')}`;
-  if (safeAimMemo && safeAimMemo.hole === hole && safeAimMemo.key === key) {
-    return [safeAimMemo.out[0], safeAimMemo.out[1]];
-  }
-  const out = computeSafeAimTarget(hole, ball, lie, bag, carryMult);
-  safeAimMemo = { hole, key, out: [out[0], out[1]] };
-  return out;
+  return memoAim('safe', hole, ball, lie, bag, carryMult, computeSafeAimTarget);
 }
 
-/** ONE-ENTRY memo for `safeAimTarget` — the `hashHole` idiom (GS-shot-lag). The escape search costs a
- *  few milliseconds on a wooded hole and the decision screen asks the SAME question several times per
- *  render (the club it pre-arms, the cone it previews, the line it orients the map down) and again on
- *  every re-render of that same decision. Keyed on EVERY input — hole identity, ball, lie, carry
- *  multiplier and the bag's ids — so a hit can only ever hand back the answer the search would have
- *  recomputed, and the function stays pure from the outside. A copy goes in and a copy comes out, so
- *  no caller can write through the cache. */
-let safeAimMemo: { hole: Hole; key: string; out: Vec } | null = null;
+/** ONE-ENTRY-PER-MODE memo for the interactive aim resolvers — the `hashHole` idiom (GS-shot-lag).
+ *  Both searches walk the hole (a `lieAt` per candidate is the bill) and the decision screen asks each
+ *  the SAME question several times per render — the club it pre-arms, the cone it previews, the line it
+ *  orients the map down — and again on every re-render of that same decision. Keyed on EVERY input —
+ *  hole identity, ball, lie, carry multiplier and the bag's ids — so a hit can only ever hand back the
+ *  answer the search would have recomputed, and the resolvers stay pure from the outside. A copy goes
+ *  in and a copy comes out, so no caller can write through the cache. Per MODE, because a player
+ *  toggling ◎ → 🛟 would otherwise evict the answer they are toggling between. */
+const aimMemo = new Map<string, { hole: Hole; key: string; out: Vec }>();
+
+function memoAim(
+  mode: 'safe' | 'auto',
+  hole: Hole,
+  ball: Vec,
+  lie: FeatureKind,
+  bag: readonly Club[],
+  carryMult: number,
+  compute: (h: Hole, b: Vec, l: FeatureKind, g: readonly Club[], m: number) => Vec,
+): Vec {
+  const key = `${ball[0]},${ball[1]},${lie},${carryMult},${bag.map((c) => c.id).join('|')}`;
+  const hit = aimMemo.get(mode);
+  if (hit && hit.hole === hole && hit.key === key) return [hit.out[0], hit.out[1]];
+  const out = compute(hole, ball, lie, bag, carryMult);
+  aimMemo.set(mode, { hole, key, out: [out[0], out[1]] });
+  // A COPY on the miss path too, not just the hit path. Both resolvers can return a point that belongs
+  // to the HOLE (`pinOf` hands back the hole's own pin), so returning the computed value directly would
+  // let a caller who mutated its target corrupt the course itself — and, through the cache, corrupt
+  // every later answer. Caught by the memo guard in `tests/default-aim.test.ts`.
+  return [out[0], out[1]];
+}
 
 function computeSafeAimTarget(
   hole: Hole,
@@ -2509,11 +2525,30 @@ export function autoAimTarget(
   bag: readonly Club[] = CLUBS,
   carryMult: number = biomeCarryMult(hole),
 ): Vec {
+  return memoAim('auto', hole, ball, lie, bag, carryMult, computeAutoAimTarget);
+}
+
+function computeAutoAimTarget(
+  hole: Hole,
+  ball: Vec,
+  lie: FeatureKind,
+  bag: readonly Club[],
+  carryMult: number,
+): Vec {
   const pin = pinOf(hole);
+  // A one-shot hole always attacks the flag: there is nowhere else to aim, the whole shot IS the green,
+  // and a default that pointed away from it on a par 3 would be nonsense however many trees are in the
+  // way. The blocked cone over the aim is what says "you will have to shape this one".
   if (hole.par <= 3) return pin;
   const maxReach = maxReachOf(bag, carryMult, lie);
-  // A shot from off the tee that can carry to the green goes for the flag.
-  if (lie !== 'tee' && maxReach > 0 && dist(ball, pin) <= maxReach) return pin;
+  // A shot from off the tee that can carry to the green goes for the flag — unless NOTHING in the bag
+  // can fly there (GS-auto-aim-trees). A stand between the ball and the green makes an attack a shot
+  // that cannot be made, and the honest default is then the same one the forced-carry rule already
+  // reaches for on water: position short of the trouble and approach from there. Falls through to the
+  // corridor branch below, which lays the line up short of the stand.
+  if (lie !== 'tee' && maxReach > 0 && dist(ball, pin) <= maxReach && fliesTo(hole, ball, pin, lie, carryMult, bag)) {
+    return pin;
+  }
   // Tee shot, or an out-of-reach approach: position DOWN the corridor. Aim at the centreline station a
   // good drive reaches (following any dogleg) — this keeps the camera framed on the hole, not the rough.
   const t0 = nearestCentrelineT(hole, ball);
@@ -2535,9 +2570,15 @@ export function autoAimTarget(
   // playable, flyable point is the same move `dryStationBefore` makes for a wet target — here it lays up
   // short of the bank instead of asking for a carry that does not exist. Interactive only.
   const reachable = (t: Vec): Vec => carryableBefore(hole, ball, t, maxFlight) ?? t;
-  if (clearLine(hole, ball, aimPt) && !lieInfo(lieAt(hole, aimPt)).penalty) return reachable(aimPt);
+  // …AND IT NEVER ASKS FOR A LINE THE BALL CANNOT FLY DOWN (GS-auto-aim-trees). Same sentence, the
+  // other obstacle: a canopy the pre-armed club would be swatted out of the air by. Where 🛟 goes
+  // ROUND a stand (GS-safe-aim-trees), the default aim LAYS UP SHORT of it — auto's job is position
+  // down the hole, and turning the default line sideways would point the map off the corridor.
+  // A treeless world, and any line something in the bag already flies, are untouched.
+  const ok = (t: Vec): Vec => flyableTarget(hole, ball, reachable(t), lie, carryMult, bag);
+  if (clearLine(hole, ball, aimPt) && !lieInfo(lieAt(hole, aimPt)).penalty) return ok(aimPt);
   const safe = safeTarget(hole, ball, pin, maxReach, maxFlight);
-  if (dist(ball, safe) <= maxReach + 1e-6) return reachable(safe);
+  if (dist(ball, safe) <= maxReach + 1e-6) return ok(safe);
   // The safe line runs PAST a drive, so keep the positioning station — but never a wet one. `aimPt` is
   // a raw centreline station, and on a hole whose corridor runs THROUGH a river the station itself sits
   // in the water; the whole chain downstream then reads a lie it must never be handed (`forcedCarry`
@@ -2545,7 +2586,84 @@ export function autoAimTarget(
   // a club to carry a bank that has no far side). Back it DOWN the corridor to the furthest dry station
   // instead: that keeps both properties the two candidates each broke on their own — a target that is
   // playable AND inside one drive. Returns `aimPt` untouched whenever it is already dry.
-  return reachable(dryStationBefore(hole, t0, tAim) ?? safe);
+  return ok(dryStationBefore(hole, t0, tAim) ?? safe);
+}
+
+/** How short a lay-up the tree-aware default aim will accept before it gives up and keeps its line. */
+const AUTO_FLY_LAYUP = {
+  /** Stations probed walking back down the ball→target ray. */
+  steps: 12,
+  /** A lay-up shorter than this is not a positioning shot, it is a chip out sideways — and sideways is
+   *  🛟's job, not the default's. Below it, keep the line and let the blocked cone say why. */
+  minYd: 35,
+  /** …and it must still be a real fraction of the shot that was intended. */
+  minFrac: 0.25,
+} as const;
+
+/** Can ANYTHING in the bag fly to `target` without being swatted out of the air? The gate on attacking
+ *  a green, and it asks `unblockedClub` — the CANOPY question alone, the same seam the green-attack club
+ *  pick uses, so the line and the club can never disagree. Deliberately not the carry/landing rule: a
+ *  green attack has never asked where its club's carry comes down (it is chosen on TOTAL, and carrying
+ *  short of a creek to release onto the green is good golf), so this adds the tree question and changes
+ *  nothing else. True on a treeless hole by construction. */
+function fliesTo(
+  hole: Hole,
+  ball: Vec,
+  target: Vec,
+  lie: FeatureKind,
+  carryMult: number,
+  bag: readonly Club[],
+): boolean {
+  const obstacles = flightObstacles(hole);
+  if (obstacles.length === 0) return true;
+  const cand = bag.filter((c) => c.id !== 'putter');
+  if (cand.length === 0) return true;
+  return unblockedClub(ball, target, lie, carryMult, cand, obstacles) !== null;
+}
+
+/**
+ * The tree half of "the default aim never points at a hazard" (GS-auto-aim-trees): the furthest point
+ * at or before `target` on the same line that SOMETHING in the bag can fly to without being knocked
+ * out of the air, or `target` itself when nothing is in the way — so a treeless world, and every line
+ * a club already flies, are byte-for-byte unchanged.
+ *
+ * The predicate is `longestCarryClub` with its canopy clause armed — the SAME function `autoAimClub`
+ * arms the club with — so the line the default aims down and the club it pre-arms can never disagree
+ * about what flies. Asking it twice (with the clause and without) is also what separates a TREE
+ * problem from a hazard one: a null from both means no club could carry the bank or land clean, which
+ * is GS-carry-roll-real's answer and must be left exactly as it is.
+ *
+ * Pure, zero rng, interactive only.
+ */
+function flyableTarget(
+  hole: Hole,
+  ball: Vec,
+  target: Vec,
+  lie: FeatureKind,
+  carryMult: number,
+  bag: readonly Club[],
+): Vec {
+  const obstacles = flightObstacles(hole);
+  if (obstacles.length === 0) return target;
+  const cand = bag.filter((c) => c.id !== 'putter');
+  if (cand.length === 0) return target;
+  if (longestCarryClub(hole, ball, target, lie, carryMult, cand, obstacles)) return target;
+  // Asked WITHOUT the canopy clause: a null from both means no club could carry the bank or land clean,
+  // which is GS-carry-roll-real's answer to a different question and must be left exactly as it is.
+  if (!longestCarryClub(hole, ball, target, lie, carryMult, cand)) return target;
+  const d = dist(ball, target);
+  if (d < 1e-6) return target;
+  const ux = (target[0] - ball[0]) / d;
+  const uy = (target[1] - ball[1]) / d;
+  const floor = Math.max(AUTO_FLY_LAYUP.minYd, d * AUTO_FLY_LAYUP.minFrac);
+  for (let i = 1; i <= AUTO_FLY_LAYUP.steps; i++) {
+    const r = d * (1 - i / AUTO_FLY_LAYUP.steps);
+    if (r < floor) break;
+    const p: Vec = [ball[0] + ux * r, ball[1] + uy * r];
+    if (lieInfo(lieAt(hole, p)).penalty) continue; // a lay-up has to be somewhere the ball can SIT
+    if (longestCarryClub(hole, ball, p, lie, carryMult, cand, obstacles)) return p;
+  }
+  return target; // nothing short of it flies either — keep the line; going ROUND the stand is 🛟's job
 }
 
 /** The furthest point on the ball→target ray that is BOTH playable and reachable in the AIR — i.e. any
@@ -2611,16 +2729,29 @@ export function autoAimClub(
   dispersionMult = 1,
 ): Club {
   const target = autoAimTarget(hole, ball, lie, bag, carryMult);
-  // Green attack — cover the green (never club short of it).
+  // Green attack — cover the green (never club short of it)…
   if (dist(target, pin(hole)) <= 1) {
-    return suggestPlayerClub(hole, ball, lie, bag, { carryMult, dispersionMult });
+    const cover = suggestPlayerClub(hole, ball, lie, bag, { carryMult, dispersionMult });
+    // …but never a club a canopy eats (GS-auto-aim-trees). `autoAimTarget` only aims here when
+    // SOMETHING in the bag flies to the flag, and this is what makes sure the pre-armed one is that
+    // club: the most club that still gets there through the air, capped at the coverage pick so a
+    // blocked approach can never be answered with MORE club that flies the green entirely — that
+    // trades a knockdown for the back-of-green trouble GS-green-backstop exists to make expensive.
+    // Nothing qualifies (or a treeless hole) ⇒ the coverage club, unchanged.
+    const obstacles = flightObstacles(hole);
+    if (obstacles.length === 0) return cover;
+    const under = bag.filter((c) => c.id !== 'putter' && clubDist(c) <= clubDist(cover));
+    return unblockedClub(ball, target, lie, carryMult, under, obstacles) ?? cover;
   }
   const cand = bag.filter((c) => c.id !== 'putter');
   if (cand.length === 0) return bag[0]!;
   // ONE rule for every positioning shot: the LONGEST club that clears whatever has to be cleared and
   // comes DOWN on a playable spot. The two cases differ only in what to do when no club manages it.
   const longest = cand.reduce((a, b) => (clubDist(b) > clubDist(a) ? b : a));
-  const dry = longestCarryClub(hole, ball, target, lie, carryMult, cand);
+  // Canopy clause armed (GS-auto-aim-trees): the club has to CLEAR what must be cleared, LAND playable
+  // AND get there through the air. `autoAimTarget` has already laid the line up short of a stand
+  // nothing flies over, so on that line this now steps down to the club that fits under/over it.
+  const dry = longestCarryClub(hole, ball, target, lie, carryMult, cand, flightObstacles(hole));
   // Open line down the corridor → the driver off the tee. The landing check still applies: an open line
   // is not an empty one, and the target may be a deliberate lay-up SHORT of a hazard (GS-carry-roll-real
   // taught `autoAimTarget` to lay up rather than aim into a river). Arming the longest club there would
@@ -2643,7 +2774,15 @@ export function autoAimClub(
  * A clear line is the same question with nothing to clear — the landing test still has to be asked,
  * because the target may be a lay-up short of a hazard the longest club would fly into
  * (GS-carry-roll-real), so `forcedCarry` being absent narrows the rule rather than skipping it.
- * Pure, zero rng — used only by the interactive default-club pick.
+ *
+ * With `obstacles` passed (GS-auto-aim-trees) the rule gains its third clause: a club whose flight
+ * gets SWATTED OUT OF THE AIR by a canopy is not a carry club either, so the walk steps down to the
+ * longest one that actually gets there. That is the whole of the club-side fix — the flattest club in
+ * the bag is also the one a treeline eats, and a player behind a stand reaches for more loft, not less.
+ * Omitted ⇒ byte-for-behaviour identical, which is what lets `flyableTarget` ask this same function
+ * both questions (with the clause and without) to tell a tree problem from a hazard one.
+ *
+ * Pure, zero rng — used only by the interactive default aim/club pick.
  */
 function longestCarryClub(
   hole: Hole,
@@ -2652,6 +2791,7 @@ function longestCarryClub(
   lie: FeatureKind,
   carryMult: number,
   cand: readonly Club[],
+  obstacles?: readonly FlightObstacle[],
 ): Club | null {
   const fc = forcedCarry(hole, ball, target);
   const mustCarry = fc ? fc.carry : 0;
@@ -2669,7 +2809,55 @@ function longestCarryClub(
     if (carry < mustCarry) continue; // doesn't reach past the far bank → would drop into the hazard
     const land: Vec = [ball[0] + ux * carry, ball[1] + uy * carry];
     if (lieInfo(lieAt(hole, land)).penalty) continue; // overshoots into another penalty → try shorter
+    if (obstacles && canopyEats(obstacles, ball, land, carry, c)) continue; // …and it has to GET there
     return c;
+  }
+  return null;
+}
+
+/** Does a canopy swat this club's flight to `land` out of the air? The sim's OWN walk (`flightBlockedBy`,
+ *  the path `flightKnockdown` delegates to), on the arc THIS club would actually fly — its family profile
+ *  at its own nominal carry — so a pre-armed club and the blocked cone drawn over it agree by
+ *  construction (contract 5). The ONE canopy question the default aim asks; `longestCarryClub` folds it
+ *  into its carry/landing rule, `unblockedClub` asks it alone. Pure, zero rng. */
+function canopyEats(
+  obstacles: readonly FlightObstacle[],
+  ball: Vec,
+  land: Vec,
+  carry: number,
+  club: Club,
+): boolean {
+  if (obstacles.length === 0) return false;
+  const nominal = clubDist(club);
+  return !!flightBlockedBy(obstacles, ball, land, bearingDeg(ball, land), carry, nominal, flightProfileOf(club.id));
+}
+
+/**
+ * The longest club in `cand` whose flight down the ball→target line is not swatted out of the air, or
+ * null when every one of them is (GS-auto-aim-trees).
+ *
+ * Deliberately asks ONLY the canopy question — this is the GREEN-ATTACK club pick, where the target is
+ * the flag and the coverage club is chosen on TOTAL (carry + run). `longestCarryClub`'s landing clause
+ * would reject a club that carries short of a creek and releases onto the green, which is a perfectly
+ * good approach and was never this branch's business. Pure, zero rng, interactive only.
+ */
+function unblockedClub(
+  ball: Vec,
+  target: Vec,
+  lie: FeatureKind,
+  carryMult: number,
+  cand: readonly Club[],
+  obstacles: readonly FlightObstacle[],
+): Club | null {
+  const total = dist(ball, target);
+  if (total < 1 || obstacles.length === 0) return null;
+  const ux = (target[0] - ball[0]) / total;
+  const uy = (target[1] - ball[1]) / total;
+  const lieM = lieInfo(lie).carryMult;
+  for (const c of [...cand].sort((a, b) => clubDist(b) - clubDist(a))) {
+    const carry = clubDist(c) * flightCarryScale(c.id, clubDist(c)) * carryMult * lieM;
+    const land: Vec = [ball[0] + ux * carry, ball[1] + uy * carry];
+    if (!canopyEats(obstacles, ball, land, carry, c)) return c;
   }
   return null;
 }
