@@ -757,6 +757,28 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     feel one, the two walks are ranked-then-lazy, and a one-entry memo keyed on EVERY input (the
     `hashHole` idiom) pays it once per decision rather than ~4× per render. Guarded by
     `tests/safe-aim-trees.test.ts`.
+  - **AND THE DEFAULT AIM LAYS UP SHORT OF THE STAND — SAME SENTENCE, DIFFERENT JOB** (GS-auto-aim-trees,
+    `autoAimTarget`/`autoAimClub`, interactive only). 🛟 goes ROUND a canopy; ◎ cannot, because auto's
+    job is POSITION down the hole and turning the default line sideways points the map off the corridor.
+    So the tree clause joins the two rules that were already there: the aim never asks for a line the
+    ball cannot fly down (walk BACK down the ray to the furthest playable station something in the bag
+    flies to — the `dryStationBefore`/`carryableBefore` move, for a canopy instead of a bank), and the
+    pre-armed club is the longest that *gets there* (`longestCarryClub` gains a third clause beside
+    "clears the bank" and "lands playable"; the flattest club in the bag is the one a treeline eats, and
+    a player behind a stand reaches for more loft, not less). A reachable green is still ATTACKED — but
+    only while something can fly to the flag; when nothing can, the attack is abandoned for the same
+    lay-up the forced-carry rule already reaches for on water. Measured over 29,343 positions on wooded
+    worlds: shots pre-armed INTO a canopy **16.04% → 6.63%**, tee shots **6 → 0**, and **77.8%** of the
+    residual is a genuinely trapped bag (nothing in it flies that line — never papered over). Three
+    deliberate exceptions, each with a reason: a **par 3** always attacks the flag (there is nowhere
+    else to aim); the green pick is **capped at the coverage club** (flying the green to dodge a tree
+    buys GS-green-backstop's trouble instead); and a lay-up under `AUTO_FLY_LAYUP.minYd` is refused (a
+    chip-out sideways is 🛟's job, not the default's). ⚠️ `unblockedClub` asks the CANOPY question alone
+    for the green attack — `longestCarryClub`'s landing clause would reject a club that carries short of
+    a creek and releases onto the green, which is good golf and was never that branch's business. Both
+    resolvers share ONE per-mode memo (`memoAim`), which must return a COPY on the miss path too:
+    `pinOf` hands back the hole's own pin, so a caller mutating its target would corrupt the course.
+    Guarded by `tests/default-aim.test.ts`.
   - **A CADDY-GRANTED OUTCOME STILL HAS TO BE TRAVELLED** (GS-chipin-roll). Dr Chipinski's chip-in set
     `ballAfter = pin(hole)` and left `rest`/`rollPath` at the natural resting spot, so the drawn ball
     stopped **3.0–5.8yd from a cup of radius 1.2** and the hole-out FX fired on bare ground. The branch
