@@ -736,6 +736,27 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     the ball comes down; 3 step-downs in 1,083 tee shots, all forced). Measured across 3,072 par-4/5 tee
     shots: wet targets 74 → **0**, wet full-swing landings 22 → **0**, carries short of the far bank
     **0**, driver still pre-armed on 99% of forced carries.
+  - **AND "SAFE" MEANS THE BALL GETS OUT — A CANOPY IS PART OF THE AIM, NOT JUST OF THE OUTCOME**
+    (GS-safe-aim-trees, `round.ts safeAimTarget`, interactive only). A lay-up is a CORRIDOR decision:
+    `clearLine` sees penalty hazards, `widthLayupTarget` sees corridor width, and a TREE is neither — so
+    from the rough behind a stand, 🛟 aimed straight into it and the only way out was to swing the aim
+    round by hand and guess where the gap was. Measured over 29,343 ball positions on wooded worlds the
+    lay-up's own flight was **knocked out of the air on 13.7%** of them. `safeAimTarget` asks the sim's
+    OWN knockdown walk (`flightBlockedBy`, the path `flightKnockdown` delegates to and the blocked-cone
+    overlay probes — contract 5) whether the lay-up would fly; if it would, that IS the answer,
+    byte-for-byte (ordinary shots and every treeless world untouched). If not, a fan of candidates is
+    scored on progress + the LIE it finishes in (`LIE_INFO.carryMult` — the sim's own ranking of
+    playable ground, never a second one) − how far the player must TURN, then filtered on in bounds ·
+    not the trouble being escaped · over no penalty · under no canopy. **3,928 of 4,017 blocked lines
+    escape clean, 0 stay blocked, the 89 with no clean line KEEP the lay-up** (never invent a target the
+    shot cannot make good on); mean turn **20.4°**. ⚠️ The AUTO path must never inherit it — so
+    `autoDecision` pins the `layupTarget` it chose its club and power for as an EXPLICIT `target`, which
+    is what keeps the auto-finish reproducing `playHole` byte-for-byte (contract 2) instead of relying
+    on both paths sharing one helper. ⚠️ It sits on the decision RENDER and **75% of its cost is one
+    `lieAt` per candidate** (~23µs on a wooded hole), so the fan's step is a cost decision as much as a
+    feel one, the two walks are ranked-then-lazy, and a one-entry memo keyed on EVERY input (the
+    `hashHole` idiom) pays it once per decision rather than ~4× per render. Guarded by
+    `tests/safe-aim-trees.test.ts`.
   - **A CADDY-GRANTED OUTCOME STILL HAS TO BE TRAVELLED** (GS-chipin-roll). Dr Chipinski's chip-in set
     `ballAfter = pin(hole)` and left `rest`/`rollPath` at the natural resting spot, so the drawn ball
     stopped **3.0–5.8yd from a cup of radius 1.2** and the hole-out FX fired on bare ground. The branch
@@ -1767,6 +1788,15 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     (contract 2); the default CLUB is `autoAimClub` in lockstep (a forced-carry drive picks
     `longestCarryClub`, not a clubbed-down wood). Interactive-only — the headless `playHole` keeps its own
     line, so determinism is untouched. The shot map ORIENTS down the resolved aim line.
+    **AND THERE IS ALWAYS A WAY BACK FROM A BAD AIM** (GS-aim-reset, `PlayFrameParts.aimReset`): the pull
+    gesture's bearing PERSISTS between gestures, so an over-swung drag leaves the shot pointing into the
+    trees with only another delicate drag to walk it back. The 🎯 reset is a PERMANENT cell of the play
+    frame now, greyed where there is no aim to put back — it was the frame's one conditional control,
+    i.e. invisible until the moment you needed it (GS-hud-frame's rule, which it was the exception to) —
+    and it NAMES the setting it restores off `aimModeMeta(selAim)`, because it has never re-aimed at the
+    pin: clearing `selFreeTarget` hands the shot back to `aimTargetOf`, which is auto's corridor line /
+    attack's flag / safe's escape. Required frame part ⇒ a new play state must decide it. The POWER is
+    deliberately untouched. Guarded by `tests/play-hud-frame.test.ts`.
   - **Surgical refreshes, not full renders** — an in-sheet toggle/aim tap swaps `.gs-settings` innerHTML +
     re-wires (`refreshSettings`, GS-settings-flicker); the settings sheet inner is split from its backdrop;
     the pull-to-power drag redraws only the overlay. A full `render()` re-mounts frames and replays slide-up

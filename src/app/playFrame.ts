@@ -100,9 +100,11 @@ export interface PlayFrameParts {
   /** The aim-mode cycler (GS-default-aim) — auto ◎ / attack 🚩 / safe 🛟. Disabled where aim isn't a
    *  choice (the putt has its own ◄/► line, the watch state has no decision left to make). */
   aim: { icon: string; label: string; on: boolean; disabled: boolean };
-  /** Conditional round buttons for the TOP of the action column (today: the re-aim-at-pin 🎯, which
-   *  only exists once the player has dragged the aim off the pin). Never the permanent three. */
-  extraActions?: string;
+  /** The RESET-AIM button (GS-aim-reset) — puts the aim back where the shot started, i.e. wherever
+   *  the player's own aim setting points. `label` names that setting so the button says what it will
+   *  do; `disabled` when the aim has not been moved (or this state has no aim to reset), because it
+   *  is a PERMANENT cell of the frame like every other one — a dead control greys in place. */
+  aimReset: { label: string; disabled: boolean };
   /** Left-handed mode (GS-lefty): mirrors the whole frame. */
   lefty: boolean;
   /** Overlays appended after the frame (shot popup, scramble choice). */
@@ -147,8 +149,16 @@ function caddySlotHTML(id: string | undefined, offDuty: boolean): string {
 }
 
 /**
- * The action column: the BAG in flow at the bottom, with the aim mode, auto-finish and any
- * conditional button STACKED ABOVE IT, over the map (GS-hud-bag).
+ * The action column: the BAG in flow at the bottom, with the reset-aim, aim mode and auto-finish
+ * buttons STACKED ABOVE IT, over the map (GS-hud-bag).
+ *
+ * The 🎯 used to be the frame's ONE conditional control — it appeared only once a drag had moved the
+ * aim, and its own tooltip claimed it re-aimed at the pin, which it has never done (it hands the shot
+ * back to the player's aim SETTING, which off the tee is a corridor line, not the flag). A control
+ * that is absent until the moment you need it is a control nobody knows exists, and the moment you
+ * need it is the moment the aim is 60° into the trees and the pull gesture is a delicate way to walk
+ * it back. So it is a permanent cell like the other four and greys out when there is nothing to reset
+ * — the frame rule (GS-hud-frame), which this button was the standing exception to.
  *
  * The stack floats deliberately. `.gs-hud-bottom`'s height is what the camera measures as the map's
  * clear band (GS-play-hud-space), so a three-button column left in flow would be 170px tall and hand
@@ -162,7 +172,7 @@ function actionColumnHTML(p: PlayFrameParts): string {
   return `
     <div class="gs-hud-actions">
       <div class="gs-hud-actionstack">
-        ${p.extraActions ?? ''}
+        <button class="gs-roundbtn gs-glass" data-aimreset="1" title="Reset aim — back to ${p.aimReset.label}" aria-label="Reset aim back to ${p.aimReset.label}."${p.aimReset.disabled ? ' disabled' : ''}>🎯</button>
         <button class="gs-roundbtn gs-glass${p.aim.on ? ' gs-roundbtn--on' : ''}" data-aimmode="1" title="Aim: ${p.aim.label} — tap to change" aria-label="Aim mode: ${p.aim.label}. Tap to change."${p.aim.disabled ? ' disabled' : ''}>${p.aim.icon}</button>
         <button class="gs-roundbtn gs-glass" data-action='${JSON.stringify({ type: 'autoShotHole' })}' title="Auto-finish this hole"${p.autoFinishDisabled ? ' disabled' : ''}>»</button>
       </div>

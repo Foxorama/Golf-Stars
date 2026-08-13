@@ -1441,6 +1441,14 @@ function aimPart(disabled: boolean): PlayFrameParts['aim'] {
   return { icon: m.icon, label: m.label, on: selAim !== 'auto', disabled };
 }
 
+/** The play frame's RESET-AIM cell (GS-aim-reset) — the way back from a drag that went too far. It
+ *  names the aim SETTING it restores, because that is what the shot started on: clearing the free
+ *  target hands the aim back to `aimTargetOf`, which is auto's corridor line / attack's flag / safe's
+ *  escape — never "the pin", which is what this button used to claim in all three modes. */
+function aimResetPart(disabled: boolean): PlayFrameParts['aimReset'] {
+  return { label: aimModeMeta(selAim).label, disabled };
+}
+
 /** Reset the map view to the default follow-cam (called on a new shot / new hole). */
 function resetMapView(): void {
   mapView = 'follow';
@@ -1547,6 +1555,7 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
       autoFinishDisabled: true,
       bag: bagPart(struck ? struck.club.id : 'putter', true),
       aim: aimPart(true),
+      aimReset: aimResetPart(true),
       lefty: lefty(),
     });
   }
@@ -1856,6 +1865,7 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
       // own ◄/► row here. Both cells still MOUNT (GS-hud-frame) so the corner never moves.
       bag: bagPart('putter', true),
       aim: aimPart(true),
+      aimReset: aimResetPart(true),
       lefty: lefty(),
     });
   }
@@ -2038,11 +2048,6 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
   // …and it carries the live power as a fill behind its own label, so the pull has a number without
   // a second row to put it on.
   const swingBtn = `<button class="gs-btn gs-btn--primary gs-swing" data-swing="1" aria-describedby="${STROKE_KEYS_ID}" title="Swing at the previewed power — or pull down on the map to set it yourself"><span class="gs-swing__inner" id="gs-powerhud">${swingInner()}</span></button>`;
-  // The one CONDITIONAL control in the action column: re-aim at the pin, which can only exist once the
-  // player has dragged the aim off it. It lands ABOVE the three permanent buttons, so they never move.
-  const extraActions = selFreeTarget
-    ? `<button class="gs-roundbtn gs-glass" data-aimreset="1" title="Re-aim at the pin" aria-label="Re-aim at the pin">🎯</button>`
-    : '';
   return playFrameHTML({
     mode: 'aim',
     map: `<div class="gs-bigmap" data-map="1" data-weather="decision">${svg}</div>`,
@@ -2065,7 +2070,8 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
     // A free-drag aim overrides the mode for this shot, so the mode button greys while the 🎯 reset
     // owns the aim — the two controls can never contradict each other (the old row hid it outright).
     aim: aimPart(!!selFreeTarget),
-    extraActions,
+    // …and the reset is live exactly where the mode button is dead: it is the way back.
+    aimReset: aimResetPart(!selFreeTarget),
     lefty: lefty(),
     after: state.scrambleChoice ? scrambleChoiceOverlay() : awaitingShotPopup ? shotPopupOverlay() : '',
   });
@@ -3830,11 +3836,17 @@ function render(): void {
       render();
     });
   });
-  // Re-aim at the pin: clear the gesture's aim nudge so the next shot lines up on the flag again.
+  // Reset the aim (GS-aim-reset): drop the gesture's free target and its bearing, so the shot is aimed
+  // where it was when it started — down whatever line the player's own aim SETTING resolves. The power
+  // is left alone: it is reset per gesture already, and a player nudging the aim back has not asked to
+  // give up the charge they were happy with.
   app.querySelectorAll<HTMLElement>('[data-aimreset]').forEach((el) => {
     el.addEventListener('click', () => {
       selFreeTarget = null;
       selAimBearing = null;
+      resumeAudio();
+      sfx.click();
+      haptic(HAPTICS.tap);
       render();
     });
   });

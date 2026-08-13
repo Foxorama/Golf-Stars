@@ -1046,6 +1046,23 @@ guarded next door in `save-integrity-browser.test.ts`, which now also asserts th
     settings 🎯 dropdown was UNPICKABLE — a click on the `<select>` bubbled through the `[data-settings=
     "keep"]` branch (which `return`ed WITHOUT `stopPropagation`) to the backdrop's close handler, tearing
     the sheet down before you could choose; the keep branch now stops the event.
+  - **THE WAY BACK FROM A BAD AIM IS A PERMANENT BUTTON, AND IT NAMES THE SETTING IT RESTORES**
+    (GS-aim-reset, `app/playFrame.ts PlayFrameParts.aimReset` · `app.ts aimResetPart`). The pull gesture
+    aims by sliding while you charge, and the bearing PERSISTS between gestures — which is what makes a
+    delicate line possible and also means an over-swung drag leaves the shot pointing 60° into the trees,
+    with nothing but another delicate drag to walk it back. A 🎯 reset existed, but it was the frame's ONE
+    conditional control: it appeared only once a drag had already moved the aim, i.e. it was invisible
+    until the moment you needed it and unknown to anyone who had not found it by accident. Worse, its
+    tooltip said *"Re-aim at the pin"*, which it has never done — it clears `selFreeTarget`/`selAimBearing`
+    and hands the shot back to `aimTargetOf`, i.e. to the player's own aim SETTING (auto's corridor line,
+    attack's flag, safe's escape). It is now a permanent cell like the other four, `disabled` where there
+    is no aim to put back — the GS-hud-frame rule this button was the standing exception to — and its
+    label/`aria-label` come from `aimModeMeta(selAim)`, so it says what it will actually do in all three
+    modes. It stays live exactly where the aim-mode button is dead (a free-drag aim greys the mode
+    cycler), so the two aim controls are never both unavailable. `aimReset` is a REQUIRED frame part, so a
+    new play state cannot forget to decide it. The POWER is deliberately untouched: it already resets per
+    gesture, and a player straightening their line has not asked to give up their charge. Guarded by
+    `tests/play-hud-frame.test.ts`.
   - The settings cog rides EVERY screen (appended once in `render()`); "Return to title" is
     NON-destructive (an underway run parks as `resumable`). `persist()` snapshots the live run only
     when one is underway, else passes `state.resumable` through — NEVER snapshot the title's
