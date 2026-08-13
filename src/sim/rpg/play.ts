@@ -28,6 +28,7 @@ import {
   pickBetterExec,
   pinOf,
   puttOutFrom,
+  safeAimTarget,
   shotSpread,
   suggestPlayerClub,
   type BackspinRoll,
@@ -122,8 +123,10 @@ export function shotView(state: HolePlay, loadout: PlayerLoadout): ShotView {
   const dispersionMult = netDispersion(loadout);
   // The driver is tee-only unless the Driver Dan caddy unlocks it from any lie (GS-caddy).
   const bag = usableBag(loadout.bag, state.lie, loadout.driverAnywhere ?? false);
-  // Same forced-carry-aware layup the auto sim uses (same bag/lie/carryMult → byte-for-byte).
-  const safe = layupTarget(state.hole, state.ball, state.lie, bag, carryMult);
+  // The line the player's 🛟 will actually be aimed down — the forced-carry-aware lay-up, or the
+  // canopy-aware escape when that lay-up is blocked (GS-safe-aim-trees). Asked here, not re-derived,
+  // so the club this screen pre-arms is a club for the target the aim resolves to.
+  const safe = safeAimTarget(state.hole, state.ball, state.lie, bag, carryMult);
   return {
     distToPin: Math.round(dist(state.ball, pin)),
     lie: state.lie,
@@ -144,8 +147,13 @@ export function shotView(state: HolePlay, loadout: PlayerLoadout): ShotView {
 /** Resolve a shot decision's aim to a concrete course-space target. SHARED by `previewShot`,
  *  `takeShot` (and the auto-finish) so the contemplated cone, the fired shot, and the headless
  *  auto-finish are byte-for-byte identical (contract 2). A free-drag `target` always wins; otherwise
- *  the aim mode maps to a target — 'attack' the flag, 'safe' the corridor lay-up, 'auto' the smart
- *  default aim (centreline off the tee, flag on a reachable approach). */
+ *  the aim mode maps to a target — 'attack' the flag, 'safe' the corridor lay-up (routed through
+ *  `safeAimTarget`, which finds a way OUT when a canopy blocks that lay-up — GS-safe-aim-trees), 'auto'
+ *  the smart default aim (centreline off the tee, flag on a reachable approach).
+ *
+ *  ⚠️ The AUTO driver never arrives here without a target: `autoDecision` pins the `layupTarget` it
+ *  chose its club and power for as an explicit `target`, so the interactive auto-finish keeps
+ *  resolving the headless `playHole` shot byte-for-byte while the PLAYER's 🛟 gets the escape. */
 function aimTargetOf(
   state: HolePlay,
   decision: ShotDecision,
@@ -155,7 +163,7 @@ function aimTargetOf(
   if (decision.target) return decision.target;
   if (decision.aim === 'attack') return pinOf(state.hole);
   if (decision.aim === 'auto') return autoAimTarget(state.hole, state.ball, state.lie, bag, carryMult);
-  return layupTarget(state.hole, state.ball, state.lie, bag, carryMult);
+  return safeAimTarget(state.hole, state.ball, state.lie, bag, carryMult);
 }
 
 /** The concrete course-space target a decision resolves to — the SAME `aimTargetOf` the preview and the
@@ -247,10 +255,13 @@ export function autoDecision(state: HolePlay, loadout: PlayerLoadout, attackPin 
     }
   }
   // The SAFE line — shares `layupTarget` (incl. the trees/deep-rough punch-out) + `autoShotPower` with the
-  // headless `playHole`, so the interactive auto-finish resolves the identical shot.
+  // headless `playHole`, so the interactive auto-finish resolves the identical shot. The target is passed
+  // EXPLICITLY rather than re-derived from the aim mode: the club and the power below are chosen for THIS
+  // point, and since GS-safe-aim-trees the player's 🛟 resolves a canopy-aware escape instead — a mode the
+  // auto driver must not inherit, or the auto-finish would stop reproducing `playHole` byte-for-byte.
   const safe = layupTarget(state.hole, state.ball, state.lie, bag, carryMult);
   const club = aiClub(state.hole, state.ball, safe, carryMult, bag);
-  return { aim: 'safe', clubId: club.id, power: autoShotPower(state.hole, state.ball, safe, club, carryMult, bag) };
+  return { aim: 'safe', target: safe, clubId: club.id, power: autoShotPower(state.hole, state.ball, safe, club, carryMult, bag) };
 }
 
 /** Resolve one player shot. When the ball comes to rest on the green: if `autoPutt` is on

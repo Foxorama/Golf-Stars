@@ -187,18 +187,23 @@ against the blob rather than its endpoint. Not free: `sprayBlocking` probes hund
 landings per hole through the same function, and closing the leniency makes the wooded worlds harder
 again — so it wants the death-spiral harness and probably wants `GS-aim-tree-aware` alongside it.
 
-**GS-aim-tree-aware — the pre-armed default aim and club are blind to trees** *(surfaced by
-GS-flight-shape; pre-existing, not caused by it)*
-`clearLine` only asks whether a line crosses a PENALTY hazard, so `autoAimTarget`/`autoAimClub` will
-happily pre-arm a driver on a line through a grove. GS-carry-roll-real closed exactly this hole for
-water ("the default aim never points at a hazard, and the pre-armed club never flies into one") and
-trees are the remaining half. It matters more now that the ball genuinely descends into them: knockdowns
-run at 19% of full shots. The player is not defenceless — the aim overlay's blocked cone walks the same
-`flightBlockedBy` and correctly widened — but the DEFAULT should not be a shot into timber.
-Fix shape: give the interactive aim/club picker the same `flightBlockedBy` probe the overlay uses, as a
-tiebreak (prefer a target/club whose flight is clear), interactive-only so determinism is untouched.
-Would also lift the auto AI if threaded into `layupTarget` — but that is `GS-auto-ai-weak`'s job and a
-harness change.
+**GS-aim-tree-aware — HALF SHIPPED: `safe` sees trees now, `auto` still does not** *(surfaced by
+GS-flight-shape; pre-existing. The 🛟 half landed as GS-safe-aim-trees — see Done)*
+`clearLine` only asks whether a line crosses a PENALTY hazard, so the aim family will happily pre-arm a
+driver on a line through a grove. GS-carry-roll-real closed exactly this hole for water ("the default
+aim never points at a hazard, and the pre-armed club never flies into one") and trees are the remaining
+half. It matters more now that the ball genuinely descends into them: knockdowns run at 19% of full
+shots.
+**Done:** `safeAimTarget` gives the SAFE mode the `flightBlockedBy` probe and an escape search — the
+answer to "I am behind a stand and want out". The lay-up flew into a canopy on 13.7% of sampled
+positions on a wooded world.
+**Left:** `autoAimTarget`/`autoAimClub` — the DEFAULT mode, so it is the one most players are in. Its
+job is different from safe's (position down the corridor, not escape), so the fix shape is a TIEBREAK
+rather than a search: among the targets/clubs it already considers, prefer one whose flight is clear.
+Interactive-only so determinism is untouched; `safeAimTarget`'s `flightClearTo` is the seam to reuse,
+and its cost lesson applies (one `lieAt` per candidate is the bill; memoize per decision). Threading it
+into `layupTarget` would also lift the auto AI — but that is `GS-auto-ai-weak`'s job and a harness
+change.
 
 **GS-green-surface-bite — non-penalty hazards eat the putting surface** *(found while building
 GS-green-backstop; real, measured, deliberately left out of that PR)*
@@ -742,6 +747,13 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-safe-aim-trees + GS-aim-reset** — the two halves of "I can't get the aim back". SAFE (🛟) now
+  asks the sim's own knockdown walk whether the lay-up would actually FLY and, when a canopy blocks
+  it, hunts a line that gets the ball out to the fairway or the rough (13.7% of sampled positions on
+  a wooded world were blocked; 3,928 of 4,017 escape clean, 0 stay blocked, mean turn 20.4°). The
+  AUTO path is pinned byte-for-byte by `autoDecision` passing its own `layupTarget` explicitly. And
+  the 🎯 reset is a permanent, correctly-labelled play-frame cell instead of a conditional button
+  claiming to "re-aim at the pin" — it restores whatever the player's aim SETTING points at.
 - **GS-clubhouse-floor** — the clubhouse furniture stands on the floor. Two literal causes behind
   "velcro'd to the wall": nothing but the golfers cast onto the deck, and the bar counter stopped
   **thirty units clear of it**, hanging. Counters now run down to the deck with a toe kick, the

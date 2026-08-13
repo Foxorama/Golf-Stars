@@ -36,7 +36,7 @@ import type { HoleRecord } from './score';
 import type { HoleStat } from './stats';
 import type { Rng } from './rng';
 import { usableBag } from './rpg/economy';
-import { arcApex, ARC_FEEL, clubTotalReach, flightBlockedBy, flightCarryScale, flightClassOf, flightKnockdown, flightObstacles, flightProfileOf, flightScaleFor, rollFractionFor, type FlightClass, type FlightProfile } from './flight';
+import { arcApex, ARC_FEEL, clubTotalReach, flightBlockedBy, flightCarryScale, flightClassOf, flightKnockdown, flightObstacles, flightProfileOf, flightScaleFor, rollFractionFor, type FlightClass, type FlightObstacle, type FlightProfile } from './flight';
 import { insideTent, tentFlightHit, tradeTents, TENT_BOUNCE_MIN, type TentHit, type TentEffectId, type TradeTent } from './tents';
 import { wallRollBounce, wallReflect, WALL_BOUNCE_MIN, WALL_ROLL_RESTITUTION, type WallHit } from './walls';
 import type { ShipWall } from './course/contract';
@@ -2291,6 +2291,171 @@ export function layupTarget(
   const escape = recoveryTarget(hole, ball, lie, maxReach);
   if (escape) return escape;
   return safeTarget(hole, ball, hole.green, maxReach, maxFlightReach);
+}
+
+/**
+ * Feel constants for the tree-aware interactive SAFE aim (GS-safe-aim-trees). Yards and degrees, no
+ * rng, no draws.
+ */
+const SAFE_ESCAPE = {
+  /** How far either side of the intended line the fan is probed (deg). A genuine way out from behind
+   *  a stand is sometimes square to the hole and occasionally backwards, so the fan is nearly a half
+   *  turn each way — the TURN COST below, not a narrow fan, is what keeps the aim honest. */
+  fanDeg: 150,
+  /** Bearing step (deg): ~8yd of lateral resolution at 60 yards — the scale of a real gap in a
+   *  treeline. The step is a COST decision as much as a feel one: every candidate costs a `lieAt`
+   *  sample (~23µs on a wooded hole), which is 75% of the whole search. */
+  stepDeg: 7.5,
+  /** Fractions of the bag's reach probed along each bearing. The short end matters most — a punch-out
+   *  is usually a wedge through a gap, not a full swing. */
+  reachFracs: [0.15, 0.3, 0.5, 0.7, 1] as const,
+  /** Yards of forward progress a degree of turn off the intended line is worth trading. A square (90°)
+   *  turn costs ~14yd, so the aim only spins sideways when the sideways ground is genuinely better. */
+  turnCostPerDeg: 0.16,
+  /** Yards of progress the escape LIE is worth at its best — scaled by that lie's own carry
+   *  multiplier, so `rough` keeps most of it and sand very little. Deliberately reuses `LIE_INFO`
+   *  rather than adding a second ranking of how playable a lie is. */
+  lieBonusYd: 40,
+  /** A candidate has to actually move the ball to be a shot. */
+  minMoveYd: 8,
+  /** Never retreat more than this fraction of the reach — an escape is a way on, not a reset. */
+  maxRetreatFrac: 0.35,
+} as const;
+
+/** Ground an escape may finish on: anything non-penalty that is not the trouble being escaped. */
+function escapableLie(kind: FeatureKind): boolean {
+  if (lieInfo(kind).penalty) return false;
+  return kind !== 'trees' && kind !== 'deeprough';
+}
+
+/**
+ * Would a shot at `target` fly CLEAN, or does it clip a canopy on the way? Asks the sim's OWN
+ * knockdown walk (`flightBlockedBy` — the path `flightKnockdown` delegates to and the aim cone's
+ * blocked-zone overlay probes), with the club the safe line would be played with, so "the aim says
+ * clear" and "the ball flies" are one description (contract 5). Pure.
+ */
+function flightClearTo(
+  hole: Hole,
+  obstacles: readonly FlightObstacle[],
+  ball: Vec,
+  target: Vec,
+  bag: readonly Club[],
+  carryMult: number,
+): boolean {
+  const d = dist(ball, target);
+  if (d < 1e-6) return true;
+  const club = aiClub(hole, ball, target, carryMult, bag);
+  const kd = flightBlockedBy(
+    obstacles,
+    ball,
+    target,
+    bearingDeg(ball, target),
+    d,
+    club.carry,
+    flightProfileOf(club.id),
+  );
+  return kd === null;
+}
+
+/**
+ * The interactive SAFE aim (GS-safe-aim-trees): `layupTarget`, unless the shot to it would be knocked
+ * out of the air by a tree — in which case find the best line that gets the ball back onto playable
+ * ground instead.
+ *
+ * The lay-up is a CORRIDOR decision: it reasons about penalty hazards (`clearLine`) and corridor
+ * width, and trees are neither. So "play safe" from behind a stand aimed straight into it, and the
+ * only way out was for the player to swing the aim round by hand and guess where the gap was — the
+ * 360-no-scope. What "safe" should mean when the line is blocked is *get out to the fairway or the
+ * rough*, which is what this does: a fan of candidate targets, each filtered on the four things that
+ * make an escape an escape — it lands in bounds, on ground worth standing on, over no penalty hazard,
+ * and under no canopy — then scored on forward progress, the lie it finishes in, and how far off the
+ * intended line the player has to turn.
+ *
+ * Interactive only, and deliberately so: the headless `playHole` and the auto-finish keep
+ * `layupTarget` (which `autoDecision` now pins as an explicit target), so every seeded run, the
+ * death-spiral harness and contract 2's auto ≡ interactive equivalence are byte-for-byte untouched.
+ * Returns the lay-up unchanged whenever its line already flies clean, so the ordinary shot — and any
+ * hole with no tall obstacles at all — is unchanged too. Pure, zero rng.
+ */
+export function safeAimTarget(
+  hole: Hole,
+  ball: Vec,
+  lie: FeatureKind = 'fairway',
+  bag: readonly Club[] = CLUBS,
+  carryMult: number = biomeCarryMult(hole),
+): Vec {
+  const key = `${ball[0]},${ball[1]},${lie},${carryMult},${bag.map((c) => c.id).join('|')}`;
+  if (safeAimMemo && safeAimMemo.hole === hole && safeAimMemo.key === key) {
+    return [safeAimMemo.out[0], safeAimMemo.out[1]];
+  }
+  const out = computeSafeAimTarget(hole, ball, lie, bag, carryMult);
+  safeAimMemo = { hole, key, out: [out[0], out[1]] };
+  return out;
+}
+
+/** ONE-ENTRY memo for `safeAimTarget` — the `hashHole` idiom (GS-shot-lag). The escape search costs a
+ *  few milliseconds on a wooded hole and the decision screen asks the SAME question several times per
+ *  render (the club it pre-arms, the cone it previews, the line it orients the map down) and again on
+ *  every re-render of that same decision. Keyed on EVERY input — hole identity, ball, lie, carry
+ *  multiplier and the bag's ids — so a hit can only ever hand back the answer the search would have
+ *  recomputed, and the function stays pure from the outside. A copy goes in and a copy comes out, so
+ *  no caller can write through the cache. */
+let safeAimMemo: { hole: Hole; key: string; out: Vec } | null = null;
+
+function computeSafeAimTarget(
+  hole: Hole,
+  ball: Vec,
+  lie: FeatureKind,
+  bag: readonly Club[],
+  carryMult: number,
+): Vec {
+  const layup = layupTarget(hole, ball, lie, bag, carryMult);
+  const obstacles = flightObstacles(hole);
+  if (obstacles.length === 0) return layup;
+  if (flightClearTo(hole, obstacles, ball, layup, bag, carryMult)) return layup;
+  const maxReach = maxReachOf(bag, carryMult, lie);
+  if (maxReach <= 0) return layup;
+  const flag = pinOf(hole);
+  const here = dist(ball, flag);
+  const aim0 = bearingDeg(ball, layup);
+  // Two passes, because the two walks are ~50× the cost of everything else and this sits on the
+  // decision RENDER: score every candidate on the cheap terms (a lie sample and two distances), rank
+  // them, and only then walk the line and the canopy — best candidate first, stopping at the first
+  // that survives. Same answer as testing the whole fan in order (the sort is stable, so equal scores
+  // keep the generation order the fan-order search broke ties by), for ~1ms instead of ~11.
+  const ranked: { p: Vec; score: number }[] = [];
+  for (let turn = 0; turn <= SAFE_ESCAPE.fanDeg; turn += SAFE_ESCAPE.stepDeg) {
+    for (const side of turn === 0 ? [1] : [1, -1]) {
+      const a = ((aim0 + side * turn) * Math.PI) / 180;
+      const ux = Math.sin(a);
+      const uy = Math.cos(a);
+      for (const frac of SAFE_ESCAPE.reachFracs) {
+        const r = maxReach * frac;
+        if (r < SAFE_ESCAPE.minMoveYd) continue;
+        const p: Vec = [ball[0] + ux * r, ball[1] + uy * r];
+        if (!inBounds(hole, p)) continue;
+        const kind = lieAt(hole, p);
+        if (!escapableLie(kind)) continue;
+        const progress = here - dist(p, flag);
+        if (progress < -maxReach * SAFE_ESCAPE.maxRetreatFrac) continue;
+        ranked.push({
+          p,
+          score:
+            progress +
+            lieInfo(kind).carryMult * SAFE_ESCAPE.lieBonusYd -
+            turn * SAFE_ESCAPE.turnCostPerDeg,
+        });
+      }
+    }
+  }
+  ranked.sort((x, y) => y.score - x.score);
+  for (const cand of ranked) {
+    if (!clearLine(hole, ball, cand.p)) continue;
+    if (!flightClearTo(hole, obstacles, ball, cand.p, bag, carryMult)) continue;
+    return cand.p;
+  }
+  // Nothing in the fan flies clean — keep the lay-up rather than invent a worse target.
+  return layup;
 }
 
 /** Effective max TOTAL reach (yards) the bag can finish at from this lie — where the ball ends

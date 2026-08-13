@@ -64,6 +64,7 @@ describe('the persistent play HUD frame (GS-hud-frame)', () => {
       autoFinishDisabled: mode === 'watch',
       bag: { code: '7i', name: '7-Iron', clubs: 12, disabled: mode !== 'aim' },
       aim: { icon: '◎', label: 'Auto aim', on: false, disabled: mode !== 'aim' },
+      aimReset: { label: 'Auto aim', disabled: mode !== 'aim' },
       lefty: false,
     });
 
@@ -98,6 +99,29 @@ describe('the persistent play HUD frame (GS-hud-frame)', () => {
     // column in flow would hand back none of the screen this feature exists to recover.
     const aim = frameFor('aim', 'space-ducks');
     expect(aim.indexOf('gs-hud-actionstack')).toBeLessThan(aim.indexOf('gs-hud-bagbtn'));
+  });
+
+  it('mounts the reset-aim button in every state, and it names the setting it restores (GS-aim-reset)', () => {
+    // It used to be the frame's ONE conditional control — absent until a drag had already moved the
+    // aim, which is to say absent for every player who had not yet discovered it by accident. It is a
+    // permanent cell now, greyed where there is no aim to put back, like every other dead control on
+    // this frame.
+    for (const mode of ['aim', 'putt', 'watch'] as const) {
+      expect(frameFor(mode), `the reset-aim button is missing in the ${mode} frame`).toContain(
+        'data-aimreset="1"',
+      );
+    }
+    // The button says what it will DO. It has never re-aimed at the pin — it hands the shot back to
+    // the player's aim SETTING, which off the tee is a corridor line and under 🛟 is an escape.
+    const aim = frameFor('aim');
+    expect(aim).toContain('Reset aim — back to Auto aim');
+    expect(aim, 'the old copy promised the flag in all three aim modes').not.toContain('Re-aim at the pin');
+    // The action stack is reset · aim mode · auto-finish, in that order, above the bag.
+    const order = ['data-aimreset="1"', 'data-aimmode="1"', 'autoShotHole', 'gs-hud-bagbtn'].map((s) =>
+      aim.indexOf(s),
+    );
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
   it('the aim + watch panels carry nothing but their commit row (GS-hud-bag)', () => {

@@ -1628,6 +1628,38 @@ RENDER junction blend is a separate render-only pass (GS-green-blend). Re-shoot
     ~1.27→~1.07 toPar and ~20%→~12% floor-hits WITHOUT softening the rough (density unchanged); the
     `tests/characters.test.ts` fences tightened 1.45/0.25 → 1.15/0.15 to match. The residual gap (a
     sparse bag still misses more greens) is a short-game/scoring pass, never softer rough.
+  - **THE PLAYER'S 🛟 GETS THE BALL OUT; TREES ARE NOW PART OF WHAT "SAFE" MEANS** (GS-safe-aim-trees,
+    `round.ts safeAimTarget`, interactive only). `recoveryTarget` above fixed the AUTO sim's forest bomb,
+    and only from a `trees`/`deeprough` LIE. The player's safe aim had the other half of the same
+    problem and nobody had said so: a lay-up is a CORRIDOR decision — `clearLine` sees penalty hazards,
+    `widthLayupTarget` sees corridor width, and a canopy is neither — so standing in the rough BEHIND a
+    stand, "play safe" aimed straight into it and the only way out was to swing the aim round by hand
+    and guess where the gap was (the play-test's *"360 no scope"*). Measured over 29,343 sampled ball
+    positions on wooded worlds, the lay-up's own flight was **knocked out of the air on 13.7%** of them.
+    `safeAimTarget` asks the sim's OWN knockdown walk (`flightBlockedBy`, the path `flightKnockdown`
+    delegates to and the aim cone's blocked-zone overlay probes — the graphic IS the physics, contract 5)
+    whether the lay-up would actually fly; if it would, that IS the answer, byte-for-byte, so the
+    ordinary shot and every treeless world are untouched. If it would not, a fan of candidate targets is
+    scored on forward progress, the LIE it finishes in (`LIE_INFO.carryMult`, reusing the sim's own
+    ranking of how playable ground is rather than adding a second one) and how far off the intended line
+    the player has to turn — then filtered on the four things that make an escape an escape: in bounds,
+    on ground that is not the trouble being escaped, over no penalty hazard, and under no canopy.
+    **3,928 of 4,017 blocked lines found a clean escape; 0 stayed blocked; the 89 that found nothing keep
+    the lay-up** rather than inventing a target the shot cannot make good on. Mean turn off the intended
+    line **20.4°** — it is a way through, not a spin.
+    ⚠️ **The AUTO path must not inherit this**, or the interactive auto-finish stops reproducing the
+    headless `playHole` byte-for-byte (contract 2) and every seeded fixture in the repo moves. So
+    `autoDecision` now passes the `layupTarget` it chose its club and power for as an EXPLICIT `target`,
+    which `aimTargetOf` honours ahead of the aim mode. That is not a workaround, it is the honest
+    reading: the auto driver already computed the point it was clubbing for and was re-deriving it a
+    function later by relying on the two paths sharing one helper.
+    ⚠️ **The search sits on the decision RENDER, and 75% of its cost is `lieAt`** — one sample per
+    candidate at ~23µs on a wooded hole, so the fan's step size is a cost decision as much as a feel
+    one, and the two walks are ranked-then-lazy (best candidate first, stop at the first that survives).
+    A one-entry memo keyed on EVERY input (hole identity, ball, lie, carry multiplier, the bag's ids —
+    the `hashHole` idiom, GS-shot-lag) then pays it once per decision instead of ~4× per render: the
+    club the screen pre-arms, the cone it previews and the line it orients the map down are all the same
+    question. Cold 10.7ms → 5.4ms → ~0 on every repeat. Guarded by `tests/safe-aim-trees.test.ts`.
   - Greens are varied STAR shapes about `green` (single-valued r(θ)) — `pinInGreen`/`rayPolyDist`/
     `validateCourse` depend on it. Pin ≠ centroid (attack aims at flag; auto/safe at fat-of-green).
   - NO PENALTY HAZARD ON THE PUTTING SURFACE (GS-green-clear, `clearGreenOfPenalty`): the greenside
