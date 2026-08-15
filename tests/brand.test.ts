@@ -153,6 +153,23 @@ describe('the product name is single-sourced', () => {
     expect(pkg.version).not.toBe('0.0.0');
   });
 
+  it('the lockfile agrees with package.json about which version this is', () => {
+    // A release bumps `package.json` by hand — `APP_VERSION`, the boot watchdog's `%GS_VERSION%` and
+    // the SW cache name all derive from it, so that one edit is the whole release. The LOCKFILE keeps
+    // its own copy of the same number in two places, nothing derives from them, and so nothing noticed
+    // when they stopped agreeing: they sat at 1.4.1 through 1.5.0 and 1.6.0. Harmless today (npm ci
+    // only reconciles DEPENDENCIES), and exactly the shape this repo keeps getting bitten by — one
+    // fact written in files that cannot share a constant. It cannot be derived away, so it is guarded
+    // by reading both copies (the `sw.js` cache-prefix tier of GS-one-description).
+    const pkg = JSON.parse(src('package.json')) as { version: string };
+    const lock = JSON.parse(src('package-lock.json')) as {
+      version: string;
+      packages: Record<string, { version?: string }>;
+    };
+    expect(lock.version, 'package-lock.json root version').toBe(pkg.version);
+    expect(lock.packages['']?.version, 'package-lock.json self entry').toBe(pkg.version);
+  });
+
   // The surfaces that used to hold their own copy of the title. A literal creeping back into
   // any of them is how half a rename ships.
   it('no user-facing surface hard-codes a product name', () => {
