@@ -234,6 +234,20 @@ incidents, and none of it can be verified without cutting a real tag.
 mismatched tag fails the itch push and still deploys Pages with the wrong `APP_VERSION`. Worth fixing
 when the two workflows merge, since the assertion then becomes one job both destinations gate on.
 
+**And the lockfile keeps its own copy of the version, which nobody was watching.** A release edits
+`package.json` and nothing else by hand — `APP_VERSION` (Vite `define`), the boot watchdog's
+`%GS_VERSION%` and the SW cache name all derive from it, which is the whole point. `package-lock.json`
+writes the same number in two more places (its root, and its `packages[""]` self entry), **nothing
+derives from those**, and so nothing noticed when they stopped agreeing: they sat at `1.4.1` through
+the 1.5.0 and 1.6.0 releases. Harmless in practice — `npm ci` reconciles DEPENDENCIES, not the
+project's own version, and it installs clean either way (checked) — but it is exactly the shape this
+repo keeps paying for: one fact written in files that cannot share a constant. It cannot be derived
+away, so it is guarded the way the three-file SW cache prefix is, by a test that reads both copies
+(`tests/brand.test.ts`, beside the version plumbing it belongs to; the guard was confirmed to fail on
+a deliberately drifted lockfile, not assumed to). ⚠️ Sync it by editing **those two lines only** — a
+blind find-and-replace on the old version string hits a dependency pinned at the same number
+(`dom-serializer` was at 1.4.1) and corrupts the lockfile.
+
 **Why this was looked at at all.** The question was whether to make the repo private. Private repos
 have been free since 2019, but three things silently downgrade on the Free plan: GitHub Pages stops
 publishing from a private repo (Pro/Team/Enterprise only) — which is `farcarry.vulpecula.games`, the
