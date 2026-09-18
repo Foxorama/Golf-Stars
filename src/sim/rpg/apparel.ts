@@ -28,7 +28,9 @@ export type ApparelSlot = 'hat' | 'shirt' | 'pants' | 'bag' | 'driver';
  *  DETONATING star: a white-hot core inside an expanding nebula shell of violet filaments + bright knots,
  *  set-matched to the deep-violet nebula Suit/Leggings (GS-solar-flames). `tricorn` is the galaxy-themed
  *  pirate tricorn of the SPACE PIRATE PARROT set — a cocked three-corner hat washed in nebula + starlight
- *  with gold trim, a star emblem, AND a built-in eye patch drawn over one eye (GS-space-pirate-parrot). */
+ *  with gold trim, a star emblem, AND a built-in eye patch drawn over one eye (GS-space-pirate-parrot).
+ *  `headset` is the AUSSIE TRADER's site ear protection — a padded headband over the crown into a chunky
+ *  ear-defender cup on each ear, with a slim boom mic swung round in front of the mouth (GS-aussie-trader). */
 export type HatShape =
   | 'cap'
   | 'bucket'
@@ -42,6 +44,7 @@ export type HatShape =
   | 'baggy'
   | 'wingedHelm'
   | 'tricorn'
+  | 'headset'
   | 'wardenHalo'
   | 'coilHood';
 /** Shirt silhouettes the drawer renders. `blazer` is a tailored jacket — lapels, buttons, crest.
@@ -52,7 +55,9 @@ export type HatShape =
  *  the chest and solar flames licking up the hem, matched to the flame crown (GS-solar-flames).
  *  `wardenMantle` and `coilShroud` are the two CHAMPION bodies (GS-story-champion-cosmetics): a white-gold
  *  Warden vestment under a shoulder mantle with the Fairway crest at the breast, and the Coil's open
- *  serpent robe over a scaled cuirass with the ouroboros clasp at the throat. */
+ *  serpent robe over a scaled cuirass with the ouroboros clasp at the throat. `hivis` is the AUSSIE
+ *  TRADER's fluro-pink hi-vis site vest — an open-fronted vest over a dark tee, banded with retro-
+ *  reflective silver across the chest and over each shoulder (GS-aussie-trader). */
 export type ShirtShape =
   | 'polo'
   | 'striped'
@@ -64,6 +69,7 @@ export type ShirtShape =
   | 'riftplate'
   | 'solarflare'
   | 'parrot'
+  | 'hivis'
   | 'wardenMantle'
   | 'coilShroud';
 /** Pants silhouettes the drawer renders. `greaves` is armoured legwear — war-skirt tassets over the hips
@@ -72,7 +78,9 @@ export type ShirtShape =
  *  `emberlegs` is the SOLAR FLAMES legwear — dark leggings with solar flames licking up each leg and
  *  red embers flickering, matched to the flame crown + robe (GS-solar-flames). `wardenRaiment` and
  *  `coilScales` are the two CHAMPION legwear pieces (GS-story-champion-cosmetics): white-gold robe tassets
- *  over gilded shin guards, and scaled serpent leggings ridged down each leg in venom green. */
+ *  over gilded shin guards, and scaled serpent leggings ridged down each leg in venom green.
+ *  `cargopants` is the AUSSIE TRADER's legwear — long blue work trousers with a flapped side pocket on
+ *  each thigh, a hammer loop, and a reflective band round each cuff (GS-aussie-trader). */
 export type PantsShape =
   | 'trousers'
   | 'shorts'
@@ -84,6 +92,7 @@ export type PantsShape =
   | 'riftgreaves'
   | 'emberlegs'
   | 'parrotpants'
+  | 'cargopants'
   | 'wardenRaiment'
   | 'coilScales';
 /** Golf-bag silhouettes the drawer renders (the cosmetic BAG slot, GS-unending). */
@@ -467,6 +476,43 @@ export const APPAREL: readonly Apparel[] = [
     blurb: 'Long macaw tail-feathers sweeping down each leg — teal, gold and magenta plumes over cosmic navy, tipped with stars. The tailfeathers of the Space Pirate Parrot set.',
     cost: APPAREL_COST.mythic,
     look: { shape: 'parrotpants', color: '#0e1a3e', accent: '#ff5a9e', glow: '#37e0c4' },
+  },
+
+  // ===== THE AUSSIE TRADER SET (GS-aussie-trader) =====================================
+  // Knock-off time on a worksite somewhere out past the belt: fluro-PINK hi-vis over a dark tee,
+  // long blue work trousers with deep side pockets, and a set of ear defenders you never quite take
+  // off. A mythic three-piece set (shard-bought) — hot safety pink, retro-reflective silver and
+  // workwear blue, wreathed in a hi-vis pink aura. Kept with the other mythic sets, before the
+  // earned/secret blocks, so the per-slot `.find(mythic)` ordering is undisturbed.
+  {
+    id: 'headset-tradie',
+    name: 'Site Ear Defenders',
+    slot: 'hat',
+    set: 'Aussie Trader',
+    rarity: 'mythic',
+    blurb: 'Hi-vis pink ear muffs on a padded band, boom mic swung round in front. You cannot hear the gallery, the wind, or your caddy. The head of the Aussie Trader set.',
+    cost: APPAREL_COST.mythic,
+    look: { shape: 'headset', color: '#ff2e93', accent: '#3f4759', glow: '#ff6fb8' },
+  },
+  {
+    id: 'vest-tradie',
+    name: 'Fluro Pink Hi-Vis',
+    slot: 'shirt',
+    set: 'Aussie Trader',
+    rarity: 'mythic',
+    blurb: 'An open-fronted safety vest in screaming fluro pink, banded with reflective silver. Visible from three fairways away, and from low orbit. The vest of the Aussie Trader set.',
+    cost: APPAREL_COST.mythic,
+    look: { shape: 'hivis', color: '#ff2e93', accent: '#d8dee8', glow: '#ff6fb8' },
+  },
+  {
+    id: 'pants-tradie',
+    name: 'Blue Work Trousers',
+    slot: 'pants',
+    set: 'Aussie Trader',
+    rarity: 'mythic',
+    blurb: 'Long workwear blue, a flapped side pocket on each thigh, a hammer loop and reflective cuffs. Room for a dozen tees, a pencil and a pie. The legs of the Aussie Trader set.',
+    cost: APPAREL_COST.mythic,
+    look: { shape: 'cargopants', color: '#31518a', accent: '#d8dee8', glow: '#ff6fb8' },
   },
 
   // ===== THE VALKYRIE SET (GS-valkyrie) ===============================================

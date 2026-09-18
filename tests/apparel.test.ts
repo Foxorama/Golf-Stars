@@ -196,6 +196,41 @@ describe('apparel catalogue (GS-cosmetics)', () => {
     expect(equippedSet(tricorn.id, 'polo-classic', legs.id)).toBeUndefined();
   });
 
+  it('the mythic Aussie Trader headset + hi-vis + work trousers form one head-to-toe set (GS-aussie-trader)', () => {
+    const headset = apparelById('headset-tradie')!;
+    const vest = apparelById('vest-tradie')!;
+    const legs = apparelById('pants-tradie')!;
+    expect(headset.slot).toBe('hat');
+    expect(vest.slot).toBe('shirt');
+    expect(legs.slot).toBe('pants');
+    for (const piece of [headset, vest, legs]) {
+      expect(piece.set).toBe('Aussie Trader');
+      expect(piece.rarity).toBe('mythic');
+      // Shard-bought, not an earned trophy — always in the market, buyable when affordable.
+      expect(piece.unlockHoles).toBeUndefined();
+      expect(piece.secret).toBeUndefined();
+      expect(piece.cost).toBe(APPAREL_COST.mythic);
+      expect(apparelRevealedInMarket(piece, [])).toBe(true);
+      expect(canBuyApparel(piece, APPAREL_COST.mythic, [])).toBe(true);
+      expect(piece.look.glow).toBeTruthy(); // mythic aura
+    }
+    // Distinct worksite shapes — ear defenders, an open hi-vis vest, long work trousers.
+    expect(headset.look.shape).toBe('headset');
+    expect(vest.look.shape).toBe('hivis');
+    expect(legs.look.shape).toBe('cargopants');
+    // The vest is the fluro PINK the set is named for, and all three share one hi-vis aura.
+    expect(vest.look.color).toBe('#ff2e93');
+    expect(headset.look.color).toBe(vest.look.color); // the ear cups match the vest
+    expect(new Set([headset, vest, legs].map((p) => p.look.glow)).size).toBe(1);
+    // The trousers are blue, banded in the vest's reflective silver.
+    expect(legs.look.color).toBe('#31518a');
+    expect(legs.look.accent).toBe(vest.look.accent);
+    // All three slots → the set reports complete; any missing piece does not.
+    expect(equippedSet(headset.id, vest.id, legs.id)).toBe('Aussie Trader');
+    expect(equippedSet(headset.id, vest.id, undefined)).toBeUndefined();
+    expect(equippedSet(headset.id, 'polo-classic', legs.id)).toBeUndefined();
+  });
+
   it('two-slot sets (Gentleman = hat + pants) complete with just their two pieces', () => {
     // Gentleman defines only a hat (tophat) + pants (plus-fours) — no shirt — so both = complete.
     expect(equippedSet('tophat-ace', undefined, 'knickers-ace')).toBe('Gentleman');

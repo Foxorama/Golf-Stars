@@ -30,6 +30,8 @@ const sets = [
   ['crown-supernova','suit-supernova','leggings-supernova','Supernova (mythic)'],
   ['crown-solarflames','suit-solarflames','leggings-solarflames','Solar Flames (mythic)'],
   ['crown-galaxy','suit-galaxy','leggings-galaxy','Punched Galaxy (mythic)'],
+  ['tricorn-parrot','top-parrot','legs-parrot','Space Pirate Parrot (mythic)'],
+  ['headset-tradie','vest-tradie','pants-tradie','Aussie Trader (mythic)'],
   ['tophat-ace','tee-striped','knickers-ace','Mix & match'],
 ].map(([h,s,p,l]) => tile(golferPreviewSVG(h,s,p,{w:120,h:150}), l, '#ffce54')).join('');
 
