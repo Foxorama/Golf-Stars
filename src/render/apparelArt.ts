@@ -340,6 +340,28 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
         ${patch}`;
       break;
     }
+    case 'headset': {
+      // The AUSSIE TRADER's site ear defenders (GS-aussie-trader): a padded headband arching over the
+      // crown into a chunky ear-defender CUP clamped on each ear, foam lining showing at the inner rim,
+      // and a slim boom mic swung round in front of the mouth. The ears sit at (±7, +0.7) in this
+      // canonical r=7 frame, so the cups land ON them. Mirrors the canvas `drawHat 'headset'`.
+      const hard = accent; // dark band/hardware
+      const foam = '#e6ebf2';
+      const cup = (o: 1 | -1): string =>
+        `<ellipse cx="${(o * 7.2).toFixed(2)}" cy="0.4" rx="2.35" ry="3.3" fill="${color}" ${ink}/>
+         <ellipse cx="${(o * 6.85).toFixed(2)}" cy="0.4" rx="1.25" ry="2.1" fill="${foam}" opacity="0.8"/>
+         <rect x="${(o * 7.2 - 1.5).toFixed(2)}" y="-3.9" width="3" height="1.6" fill="${hard}" ${ink}/>`;
+      // Boom mic: off the +x cup (the face's forward side), swung down and round to the mouth.
+      const boom = `<path d="M6.6,2.4 Q7.6,6.1 3.1,5.5" fill="none" stroke="${hard}" stroke-width="0.85" stroke-linecap="round"/>
+        <ellipse cx="2.5" cy="5.4" rx="1.15" ry="0.85" fill="${hard}" stroke="#0c1116" stroke-width="0.4"/>
+        <ellipse cx="2.3" cy="5.2" rx="0.5" ry="0.35" fill="${color}"/>`;
+      g = `<path d="M-7.2,-2.4 Q-8.1,-9.9 0,-10.4 Q8.1,-9.9 7.2,-2.4" fill="none" stroke="${hard}" stroke-width="2.3" stroke-linecap="round"/>
+        <path d="M-6.4,-3.2 Q-7,-9 0,-9.5 Q7,-9 6.4,-3.2" fill="none" stroke="#ffffff" stroke-width="0.5" opacity="0.22" stroke-linecap="round"/>
+        <rect x="-3" y="-11.9" width="6" height="2.9" fill="${color}" ${ink}/>
+        <path d="M-1.8,-11.2 L1.8,-11.2" stroke="#ffffff" stroke-width="0.5" opacity="0.35" stroke-linecap="round"/>
+        ${cup(-1)}${cup(1)}${boom}`;
+      break;
+    }
     default:
       g = '';
   }
@@ -348,9 +370,11 @@ function hatGlyph(look: ApparelLook, cx: number, cy: number, r: number, uid: str
       ? sparkles([[-11, -9], [11, -8], [0, -18], [-6, 5]])
       : shape === 'tricorn'
         ? sparkles([[-10, -8], [10, -7]])
-        : shape === 'baggy'
-          ? sparkles([[-8, -8], [8, -6]])
-          : '';
+        : shape === 'headset'
+          ? sparkles([[-10, -9], [10, -8]])
+          : shape === 'baggy'
+            ? sparkles([[-8, -8], [8, -6]])
+            : '';
   return `<g transform="translate(${cx} ${cy}) scale(${s.toFixed(3)})">${a}${g}${flair}</g>`;
 }
 
@@ -708,6 +732,40 @@ function shirtDetail(
       detail = worn ? rows(worn.top + 2, worn.bottom - 1, worn.halfW) + stars + gem : rows(-8, 10, 8.5) + stars + gem;
       break;
     }
+    case 'hivis': {
+      // The AUSSIE TRADER's fluro-pink hi-vis (GS-aussie-trader): an OPEN-fronted safety vest over a
+      // dark tee — the torso fill is the vest itself, so the tee shows as a strip down the open front,
+      // banded with retro-reflective silver across the chest and over each shoulder, with a flapped
+      // chest pocket. ONE layout function serves the card and the worn figure (GS-worn-coverage), so
+      // the vest bands the WHOLE torso when worn instead of leaving the belly bare.
+      const silver = accent;
+      const tee = '#3a4150';
+      const inkV = 'stroke="#0c1116" stroke-width="0.4" stroke-linejoin="round"';
+      const vest = (top: number, bottom: number, halfW: number): string => {
+        const h = bottom - top;
+        const gap = Math.max(1.3, halfW * 0.14);
+        const bandH = Math.max(1.9, h * 0.11);
+        const strapW = Math.max(1.6, halfW * 0.26);
+        const edge = halfW * 0.96;
+        const b1 = top + h * 0.38;
+        const b2 = top + h * 0.63;
+        const band = (y: number): string =>
+          `<rect x="${(-edge).toFixed(1)}" y="${y.toFixed(1)}" width="${(edge - gap).toFixed(1)}" height="${bandH.toFixed(1)}" fill="${silver}" ${inkV}/>` +
+          `<rect x="${gap.toFixed(1)}" y="${y.toFixed(1)}" width="${(edge - gap).toFixed(1)}" height="${bandH.toFixed(1)}" fill="${silver}" ${inkV}/>`;
+        const strap = (o: 1 | -1): string =>
+          `<rect x="${(o > 0 ? edge - strapW - halfW * 0.06 : -edge + halfW * 0.06).toFixed(1)}" y="${top.toFixed(1)}" width="${strapW.toFixed(1)}" height="${(b1 - top).toFixed(1)}" fill="${silver}" ${inkV}/>`;
+        const pocket =
+          `<rect x="${(-edge + halfW * 0.08).toFixed(1)}" y="${(b2 + bandH + h * 0.05).toFixed(1)}" width="${(halfW * 0.5).toFixed(1)}" height="${(h * 0.17).toFixed(1)}" rx="0.6" fill="none" stroke="${silver}" stroke-width="0.5" opacity="0.8"/>` +
+          `<line x1="${(-edge + halfW * 0.08).toFixed(1)}" y1="${(b2 + bandH + h * 0.09).toFixed(1)}" x2="${(-edge + halfW * 0.58).toFixed(1)}" y2="${(b2 + bandH + h * 0.09).toFixed(1)}" stroke="${silver}" stroke-width="0.5" opacity="0.8"/>`;
+        return (
+          `<rect x="${(-gap).toFixed(1)}" y="${top.toFixed(1)}" width="${(gap * 2).toFixed(1)}" height="${h.toFixed(1)}" fill="${tee}"/>` +
+          `<g stroke="#0c1116" stroke-width="0.4" opacity="0.45"><line x1="${(-gap).toFixed(1)}" y1="${top.toFixed(1)}" x2="${(-gap).toFixed(1)}" y2="${bottom.toFixed(1)}"/><line x1="${gap.toFixed(1)}" y1="${top.toFixed(1)}" x2="${gap.toFixed(1)}" y2="${bottom.toFixed(1)}"/></g>` +
+          strap(-1) + strap(1) + band(b1) + band(b2) + pocket
+        );
+      };
+      detail = worn ? vest(worn.top + 1, worn.bottom - 1, worn.halfW) : vest(-9, 11, 9);
+      break;
+    }
     default:
       detail = '';
   }
@@ -730,6 +788,7 @@ function shirtGlyph(look: ApparelLook, cx: number, cy: number, uid: string): str
     shape === 'riftplate' ||
     shape === 'solarflare' ||
     shape === 'parrot' ||
+    shape === 'hivis' ||
     shape === 'wardenMantle' ||
     shape === 'coilShroud'
       ? sparkles([[cx - 12, cy - 6], [cx + 12, cy + 2]])
@@ -822,6 +881,28 @@ function pantsGlyph(look: ApparelLook, cx: number, cy: number, uid: string): str
       legFeathers(cx - 3.5, 0) +
       legFeathers(cx + 3.5, 1) +
       `<g fill="#fff"><circle cx="${cx - 3.5}" cy="${cy + 1}" r="0.6"/><circle cx="${cx + 3.5}" cy="${cy + 4}" r="0.6"/><circle cx="${cx - 5.5}" cy="${cy + 6}" r="0.5"/><circle cx="${cx + 5.5}" cy="${cy - 2}" r="0.5"/></g>`;
+  } else if (shape === 'cargopants') {
+    // The AUSSIE TRADER's blue work trousers (GS-aussie-trader): a flapped SIDE POCKET on the outer
+    // face of each thigh, a hammer loop off the left hip, an outer seam down each leg and a retro-
+    // reflective band round each cuff (the tie back to the hi-vis). Mirrors the canvas `drawPants`.
+    const pocket = shade(color, -0.18);
+    const flap = shade(color, -0.34);
+    const seam = shade(color, -0.4);
+    const inkP = 'stroke="#0c1116" stroke-width="0.6" stroke-linejoin="round"';
+    const side = (o: 1 | -1): string => {
+      const x = cx + o * 6.9 - 1.9;
+      return `<rect x="${x.toFixed(1)}" y="${(cy - 4.6).toFixed(1)}" width="3.8" height="5.6" rx="0.8" fill="${pocket}" ${inkP}/>
+        <rect x="${x.toFixed(1)}" y="${(cy - 4.6).toFixed(1)}" width="3.8" height="1.7" rx="0.7" fill="${flap}" ${inkP}/>
+        <circle cx="${(x + 1.9).toFixed(1)}" cy="${(cy - 2.5).toFixed(1)}" r="0.45" fill="${accent}"/>`;
+    };
+    const cuff = (o: 1 | -1): string =>
+      `<rect x="${(cx + o * 4.8 - 2.2).toFixed(1)}" y="${(legBottom - 3.2).toFixed(1)}" width="4.4" height="1.9" fill="${accent}" stroke="none" opacity="0.95"/>`;
+    detail =
+      `<g stroke="${seam}" stroke-width="0.7" opacity="0.8" stroke-linecap="round">
+        <line x1="${(cx - 6.6).toFixed(1)}" y1="${(cy - 6.4).toFixed(1)}" x2="${(cx - 6).toFixed(1)}" y2="${(legBottom - 1).toFixed(1)}"/>
+        <line x1="${(cx + 6.6).toFixed(1)}" y1="${(cy - 6.4).toFixed(1)}" x2="${(cx + 6).toFixed(1)}" y2="${(legBottom - 1).toFixed(1)}"/></g>` +
+      `<path d="M${(cx - 8).toFixed(1)},${(cy - 6.2).toFixed(1)} q-2,1.7 0,3.4" fill="none" stroke="${seam}" stroke-width="0.9" stroke-linecap="round"/>` +
+      side(-1) + side(1) + cuff(-1) + cuff(1);
   } else if (shape === 'wardenRaiment') {
     // The Warden's Raiment (GS-story-champion-cosmetics): robed tassets hanging off the waist (a longer,
     // softer cut than the Valkyrie war-skirt — vestment, not armour) over gilded shin guards, with a gold
@@ -882,6 +963,7 @@ function pantsGlyph(look: ApparelLook, cx: number, cy: number, uid: string): str
     shape === 'riftgreaves' ||
     shape === 'emberlegs' ||
     shape === 'parrotpants' ||
+    shape === 'cargopants' ||
     shape === 'wardenRaiment' ||
     shape === 'coilScales'
       ? sparkles([[cx - 10, cy - 4], [cx + 10, cy + 6]])
@@ -1372,6 +1454,46 @@ export function golferPreviewSVG(
         legPlumes(lHip, lAnk, 0) +
         legPlumes(rHip, rAnk, 1) +
         `<g fill="#fff">${legStars(lHip, lAnk, 0)}${legStars(rHip, rAnk, 1)}</g>`;
+    } else if (pantsShape === 'cargopants') {
+      // The AUSSIE TRADER's work trousers (GS-aussie-trader): a flapped side pocket on the outer face
+      // of each thigh, an outer seam the full length of each leg, a hammer loop off the left hip and a
+      // reflective band round each cuff. Mirrors the wardrobe SVG (`pantsGlyph 'cargopants'`).
+      const pocketCol = shade(pantsCol, -0.18);
+      const flapCol = shade(pantsCol, -0.34);
+      const seamCol = shade(pantsCol, -0.42);
+      const at = (hipC: number, ankC: number, fr: number): [number, number] => [
+        hipC + (ankC - hipC) * fr,
+        hipY + (ankleY - hipY) * fr,
+      ];
+      const halfAt = (fr: number): number => px(5.8) + (px(3.4) - px(5.8)) * fr;
+      // Outer face of the leg: -1 is the left leg's left side, +1 the right leg's right side.
+      const sidePocket = (hipC: number, ankC: number, o: 1 | -1): string => {
+        const [x, y] = at(hipC, ankC, 0.22);
+        const w = px(6.2);
+        const h = px(10);
+        const x0 = x + o * (halfAt(0.22) - px(0.6)) - (o > 0 ? w : 0);
+        return (
+          `<rect x="${f(x0)}" y="${f(y - h / 2)}" width="${f(w)}" height="${f(h)}" rx="${f(px(1))}" fill="${pocketCol}" ${ink}/>` +
+          `<rect x="${f(x0)}" y="${f(y - h / 2)}" width="${f(w)}" height="${f(px(3))}" rx="${f(px(1))}" fill="${flapCol}" ${ink}/>` +
+          `<circle cx="${f(x0 + w / 2)}" cy="${f(y - h / 2 + px(4.4))}" r="${f(px(0.8))}" fill="${pantsAcc}"/>`
+        );
+      };
+      const cuffBand = (hipC: number, ankC: number): string => {
+        const [x, y] = at(hipC, ankC, 0.88);
+        const w = halfAt(0.88) * 2 + px(0.4);
+        return `<rect x="${f(x - w / 2)}" y="${f(y - px(1.8))}" width="${f(w)}" height="${f(px(3.6))}" fill="${pantsAcc}" stroke="none" opacity="0.95"/>`;
+      };
+      const outerSeam = (hipC: number, ankC: number, o: 1 | -1): string =>
+        `<line x1="${f(hipC + o * (halfAt(0) - px(0.9)))}" y1="${f(hipY + px(2))}" x2="${f(ankC + o * (halfAt(1) - px(0.7)))}" y2="${f(ankleY - px(1))}" stroke="${seamCol}" stroke-width="${sw(1.2)}" stroke-linecap="round" opacity="0.85"/>`;
+      const hammerLoop = `<path d="M${f(lHip - px(5.6))},${f(hipY + px(3))} q${f(-px(3))},${f(px(3))} 0,${f(px(6))}" fill="none" stroke="${seamCol}" stroke-width="${sw(1.6)}" stroke-linecap="round"/>`;
+      legDetail =
+        outerSeam(lHip, lAnk, -1) +
+        outerSeam(rHip, rAnk, 1) +
+        hammerLoop +
+        sidePocket(lHip, lAnk, -1) +
+        sidePocket(rHip, rAnk, 1) +
+        cuffBand(lHip, lAnk) +
+        cuffBand(rHip, rAnk);
     } else if (pantsShape === 'greaves') {
       // Valkyrie greaves (GS-valkyrie): war-skirt tassets over the hips + gold shin greave plates.
       const plate = shade(pantsAcc, 0.14);

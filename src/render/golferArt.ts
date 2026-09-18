@@ -568,7 +568,42 @@ export function drawGolfer(
     ctx.fill();
   }
 
-  // Club shaft + head (behind the arms). An equipped cosmetic DRIVER (GS-thor) swaps the plain club head
+  // The Aussie Trader hi-vis (GS-aussie-trader 'hivis'): the torso fill IS the fluro vest, so the dark
+  // tee shows as a strip down the OPEN front, with retro-reflective silver bands across the chest and a
+  // strap over each shoulder. Mirrors the wardrobe SVG (`apparelArt.ts shirtDetail 'hivis'`).
+  if (sShape === 'hivis') {
+    const silver = look.shirtStyle?.accent ?? '#d8dee8';
+    // Tee showing through the open front (the torso runs shoulder y=-50 → hip y=-30).
+    ctx.strokeStyle = '#3a4150';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(torsoX(-49.5), -49.5);
+    ctx.lineTo(torsoX(-30.5), -30.5);
+    ctx.stroke();
+    // Reflective bands across each vest front, split by the open placket.
+    ctx.fillStyle = silver;
+    for (const y of [-43.5, -37]) {
+      const c = torsoX(y);
+      ctx.fillRect(c - 5.8, y - 1, 4.5, 2);
+      ctx.fillRect(c + 1.3, y - 1, 4.5, 2);
+    }
+    // Shoulder straps running from the collar down to the upper band.
+    ctx.lineWidth = 1.7;
+    ctx.strokeStyle = silver;
+    for (const o of [-1, 1] as const) {
+      ctx.beginPath();
+      ctx.moveTo(torsoX(-49) + o * 4.3, -49);
+      ctx.lineTo(torsoX(-44.5) + o * 4.3, -44.5);
+      ctx.stroke();
+    }
+    // Chest pocket outline on the near vest front.
+    ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    ctx.rect(torsoX(-34.5) - 5.3, -34.5, 3.6, 3);
+    ctx.stroke();
+  }
+
+  // Club shaft + club head (behind the arms). An equipped cosmetic DRIVER (GS-thor) swaps the plain club head
   // for a mythic WARHAMMER wreathed in lightning; else a bought themed club set (GS-proshop-2) tints the
   // head + glows; else a plain club head. The driver skin takes precedence over the in-run gear theme.
   const gear = look.gear;
@@ -1526,6 +1561,67 @@ function drawHat(ctx: CanvasRenderingContext2D, hx: number, hy: number, r: numbe
       ctx.fill();
       break;
     }
+    case 'headset': {
+      // The AUSSIE TRADER's site ear defenders (GS-aussie-trader): a padded headband arching over the
+      // crown into a chunky ear-defender cup on each ear, with a slim boom mic swung round to the +x
+      // (facing) side. Mirrors the wardrobe SVG (`apparelArt.ts hatGlyph 'headset'`); authored against
+      // the canonical r=7 head and scaled by s.
+      const s = r / 7;
+      const P = (x: number, y: number): [number, number] => [hx + x * s, hy + y * s];
+      let p: [number, number];
+      let c1: [number, number];
+      let e: [number, number];
+      // Headband arch over the crown.
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 2.3 * s;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      p = P(-7.2, -2.4); ctx.moveTo(p[0], p[1]);
+      c1 = P(-8.1, -9.9); e = P(0, -10.4); ctx.quadraticCurveTo(c1[0], c1[1], e[0], e[1]);
+      c1 = P(8.1, -9.9); e = P(7.2, -2.4); ctx.quadraticCurveTo(c1[0], c1[1], e[0], e[1]);
+      ctx.stroke();
+      // Padded crown pad, in the hi-vis colour.
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#0c1116';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.rect(hx - 3 * s, hy - 11.9 * s, 6 * s, 2.9 * s);
+      ctx.fill();
+      ctx.stroke();
+      // Ear-defender cups clamped on each ear, foam lining showing at the inner rim.
+      for (const o of [-1, 1] as const) {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.ellipse(hx + o * 7.2 * s, hy + 0.4 * s, 2.35 * s, 3.3 * s, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.save();
+        ctx.globalAlpha = (ctx.globalAlpha || 1) * 0.8;
+        ctx.fillStyle = '#e6ebf2';
+        ctx.beginPath();
+        ctx.ellipse(hx + o * 6.85 * s, hy + 0.4 * s, 1.25 * s, 2.1 * s, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        ctx.fillStyle = accent; // the stirrup the cup hangs off
+        ctx.beginPath();
+        ctx.rect(hx + (o * 7.2 - 1.5) * s, hy - 3.9 * s, 3 * s, 1.6 * s);
+        ctx.fill();
+        ctx.stroke();
+      }
+      // Boom mic off the +x cup, swung round in front of the mouth.
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 0.85 * s;
+      ctx.beginPath();
+      p = P(6.6, 2.4); ctx.moveTo(p[0], p[1]);
+      c1 = P(7.6, 6.1); e = P(3.1, 5.5); ctx.quadraticCurveTo(c1[0], c1[1], e[0], e[1]);
+      ctx.stroke();
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      p = P(2.5, 5.4);
+      ctx.ellipse(p[0], p[1], 1.15 * s, 0.85 * s, 0, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
     case 'baggy':
       // The baggy green (GS-unending): a soft crown that slouches back off the brow, over a short
       // front brim, with a gold emblem dot. Mirrors the wardrobe SVG's slouched silhouette.
@@ -1892,6 +1988,51 @@ function drawPants(ctx: CanvasRenderingContext2D, look: ApparelLook, skin: strin
           ctx.fill();
         }
       }
+      break;
+    }
+    case 'cargopants': {
+      // Aussie Trader work trousers (GS-aussie-trader): workwear blue with a flapped side pocket on the
+      // outer face of each thigh, an outer seam, a hammer loop off the hip and a reflective cuff band.
+      // Mirrors the wardrobe SVG (`pantsGlyph 'cargopants'`).
+      legs(color, 7);
+      const at = (fx: number, fy: number, fr: number): [number, number] => [
+        hip[0] + (fx - hip[0]) * fr,
+        hip[1] + (fy - hip[1]) * fr,
+      ];
+      const seam = mixHex(color, '#000000', 0.42);
+      const pocket = mixHex(color, '#000000', 0.3);
+      const flap = mixHex(color, '#000000', 0.5);
+      for (const [fx, fy] of feet) {
+        const o: 1 | -1 = fx < hip[0] ? -1 : 1; // the leg's OUTER side
+        // Outer seam the length of the leg.
+        ctx.strokeStyle = seam;
+        ctx.lineWidth = 0.9;
+        ctx.beginPath();
+        ctx.moveTo(hip[0] + o * 3, hip[1] + 1);
+        ctx.lineTo(fx + o * 2.6, fy - 1);
+        ctx.stroke();
+        // Flapped side pocket on the thigh.
+        const [px0, py0] = at(fx, fy, 0.3);
+        ctx.fillStyle = pocket;
+        ctx.fillRect(px0 + (o > 0 ? 0.2 : -4), py0 - 3, 3.8, 6);
+        ctx.fillStyle = flap;
+        ctx.fillRect(px0 + (o > 0 ? 0.2 : -4), py0 - 3, 3.8, 1.8);
+        // Reflective cuff band.
+        const [cx0, cy0] = at(fx, fy, 0.87);
+        ctx.strokeStyle = accent;
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(cx0 - 3.2, cy0);
+        ctx.lineTo(cx0 + 3.2, cy0);
+        ctx.stroke();
+      }
+      // Hammer loop off the hip.
+      ctx.strokeStyle = seam;
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(hip[0] - 5, hip[1] + 1);
+      ctx.quadraticCurveTo(hip[0] - 9.5, hip[1] + 5, hip[0] - 6.5, hip[1] + 9);
+      ctx.stroke();
       break;
     }
     case 'greaves': {
