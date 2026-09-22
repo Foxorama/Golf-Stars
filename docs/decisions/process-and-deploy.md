@@ -161,6 +161,48 @@ guard that flags 22 correct files is one everybody learns to edit.
 - Use the GitHub MCP tools in the web environment; finish changes by shipping (PR → merge → cleanup).
 - Commit messages explain the *why*; end with the Co-Authored-By: Claude trailer.
 
+### Cutting a release (GS-update-notice, 2026-09-22)
+
+A release is four edits and a tag, in this order — the order matters because the suite enforces
+two of the pairings:
+
+1. **Add a row at the TOP of `RELEASE_NOTES`** (`src/ui/releaseNotes.ts`) for the new version, in
+   the player's voice: what they will notice, one bolded lead + one plain sentence per item. Never a
+   file name or a GS-id (`tests/release-notes.test.ts` scans for both). This is the same text the
+   bump PR's body used to be the only home for.
+2. **Bump `package.json`**. The newest row's `version` must equal it, or the suite goes red — a
+   version the player is told about has a note, and a note can't describe a version that isn't the
+   one shipping.
+3. **Sync the lockfile's two lines** (root + `packages[""]`, `tests/brand.test.ts`) — by line, not
+   by find-and-replace (see the lockfile note above).
+4. PR → merge → `git tag vX.Y.Z` on the merge commit → push the tag. The tag fires `pages.yml` and
+   `itch.yml`, each of which runs the suite before shipping (GS-release-gate).
+
+**Why the note is a row and not the PR body.** 1.6.0 was bumped on `main` on 2026-08-13 with a
+careful PR body — and never tagged, so no player ever saw it; when 1.7.0 shipped five weeks later
+the account of what changed had to be reassembled from three PRs. Worse, even a tagged release's
+story stopped at GitHub: the game auto-updates underneath people (PWA, itch embed), and a player
+opened the app one day to find the aim buttons had moved with nothing saying so. The row is read by
+the game itself on the first boot of a new version, so writing it is no longer optional and reading
+it needs no browser tab.
+
+**What the boot decides, from three facts** (`app.ts armUpdateNotice`): the version stamped at the
+last dismissal (`Settings.seenVersion`, `''` on every pre-feature device), `APP_VERSION`, and
+whether the device has ever saved (`save.savedAt` — on every persisted save, never on a default).
+Progress + no stamp is an upgrade from before the feature and sees the whole table; no progress + no
+stamp is a fresh install and sees nothing, but is stamped quietly so the NEXT release is its first
+card; same-or-newer stamp sees nothing (`versionAdvanced` — the stamp only moves forward, so a
+rollback then an upgrade is told once). A save-integrity fault returns before any of it: silent and
+unstamped, because that title screen already carries the one alert a player must not miss, and the
+notes keep until the save is rescued.
+
+**Where the stamp is written, and why there.** In `fc_settings` — a fact about this device's eyes,
+not the player's progress, and settings merge over defaults so it costs no save bump and no new
+storage key (PRIVACY.md's row for `fc_settings` grew a clause instead). Written from `app.ts` in
+exactly two places, the quiet boot stamp and the `dismissUpdateNotice` action in `dispatch` — never
+the overlay's click handler, so back (which resolves to the same action, tier 0) stamps too. The
+reducer only clears the transient list. `tests/release-notes.test.ts` counts the writes.
+
 ## One CI run, on the pull request (GS-ci-once)
 
 `tests.yml` fired on `push: ['**']` **and** `pull_request`. Both are real events on the same code,

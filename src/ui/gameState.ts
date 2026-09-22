@@ -28,6 +28,7 @@ import type { TournamentAftermath } from '../sim/rpg/storyAftermath';
 import type { QuestBeat } from '../sim/rpg/storyQuestBeat';
 import type { QualifierFormatId } from '../sim/rpg/storyQualifierFormats';
 import type { AimMode, HolePlay, ScrambleShot } from '../sim/rpg/play';
+import type { ReleaseNote } from './releaseNotes';
 import type { HoleDuel } from '../sim/rpg/match';
 import type { Rng } from '../sim/rng';
 
@@ -281,6 +282,11 @@ export interface UiState {
    *  dropped, here's your refund" card; closing it dispatches `dismissPriceNotice`, which clears it (and
    *  persist writes the cleared save, so it never shows again). Absent on new saves / nothing-to-refund. */
   priceRefund?: number;
+  /** The "what's new" card (GS-update-notice): the release notes this device has not seen, newest
+   *  first, computed at boot by `notesSince` and shown over the title until dismissed. Transient —
+   *  the thing that persists is `Settings.seenVersion`, stamped by the app layer on
+   *  `dismissUpdateNotice`. Absent (never an empty array) when there is nothing to tell. */
+  updateNotice?: readonly ReleaseNote[];
   /** The finished Asgard tournament result (GS-asgard) — shown on the result splash. */
   asgardOutcome?: { won: boolean; playerTotal: number; par: number; field: { name: string; total: number }[] };
   /** A one-shot banner shown on the journey map after returning from Asgard (GS-asgard): the victory or
@@ -669,6 +675,7 @@ export type Action =
   | { type: 'buyApparel'; id: string } // buy a cosmetic hat/shirt/pants with shards (global ownership) (GS-cosmetics)
   | { type: 'equipApparel'; id: string } // wear an owned hat/shirt/pants on the managed character (toggles off)
   | { type: 'dismissPriceNotice' } // close the one-off Trade Market price-cut / refund notice (GS-trade-rebalance)
+  | { type: 'dismissUpdateNotice' } // close the "what's new" card (GS-update-notice); the app stamps `seenVersion`
   | { type: 'buyBagTier'; tier: BagTier } // buy a permanent default-bag upgrade with shards (GS-bag-tiers)
   | { type: 'setCharacterBagTier'; tier: BagTier } // pick the managed golfer's Unending-Universe starting bag tier (GS-wardrobe-bagtier)
   | { type: 'requestExit' } // GS-android-back: raise the "leave this round?" confirm (back pressed in a run)

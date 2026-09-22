@@ -43,6 +43,13 @@ export interface Settings {
    *  reachable approach else corridor); 'attack' (always the flag — the old default); 'safe' (always
    *  lay up to the corridor). Set by the in-play ◎ button and the settings pill. */
   aimMode: AimMode;
+  /** The last version whose update notes the player has seen (GS-update-notice): stamped when the
+   *  "what's new" card is dismissed, and quietly on a fresh install (nothing to have changed FROM).
+   *  `''` on every device from before the feature — which `notesSince` reads as "show everything",
+   *  because a device with progress and no stamp IS an upgrade. Lives here rather than in the save
+   *  because it is about this DEVICE's eyes, not the player's progress, and because settings merge
+   *  over defaults so it costs no save bump and no new storage key. */
+  seenVersion: string;
 }
 
 export const SETTINGS_KEY = 'fc_settings';
@@ -69,6 +76,7 @@ function defaults(): Settings {
     aimMode: 'auto',
     readableFont: false,
     uiScale: 1,
+    seenVersion: '',
   };
 }
 

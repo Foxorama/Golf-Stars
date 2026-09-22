@@ -2102,6 +2102,21 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
   thing GS-staging was built to make impossible. Nothing in git enforces this — check it before
   blaming a workflow, and re-add it if the repo or the environment is ever recreated:
   `gh api repos/OWNER/REPO/environments/github-pages/deployment-branch-policies`.
+- **A RELEASE TELLS THE PLAYER WHAT CHANGED, AND THE NOTE IS A ROW** (GS-update-notice,
+  `ui/releaseNotes.ts` pure · `Settings.seenVersion` · `app.ts armUpdateNotice`). The bump PR's body
+  was the only account of a release and it lived on GitHub, not where a player is standing; the
+  first boot on a new version now raises a "what's new" card over the title listing every
+  `RELEASE_NOTES` row this device has not seen, newest first. **The suite REFUSES a package.json
+  version with no row** — that is the direction that rots. Three rules: a FRESH INSTALL IS NOT AN
+  UPDATE (`save.savedAt` is the discriminator — every persisted save carries it, a default never
+  does — so no second storage key); the stamp lives in `fc_settings` (a fact about this DEVICE's
+  eyes, merged over defaults ⇒ no save bump) and only ever moves FORWARD (`versionAdvanced`, so a
+  rollback-then-upgrade is told once); and a save-integrity fault keeps the card silent AND
+  unstamped, because that title already carries the one alert that must not be missed. Back reads
+  the card as "got it" through the SAME action the button dispatches, and the stamp is written on
+  the action in `dispatch` — one source, machine-checked. Copy is player-voice: what they will
+  notice, never a file name or a GS-id (scanned). Guarded by `tests/release-notes.test.ts` +
+  `tests/update-notice.test.ts`.
 - Commit messages explain the *why*; end with the `Co-Authored-By: Claude` trailer.
 - **A RELEASE IS A TAG; `main` IS STAGING** (GS-staging, `docs/decisions/process-and-deploy.md`).
   `pages.yml` used to fire on every push to `main` — and `farcarry.vulpecula.games` is the origin real

@@ -178,6 +178,10 @@ export function backIntent(state: UiState, ctx: BackContext = {}): BackIntent {
   // Tier 0, innermost first. The exit confirm is the newest layer, so back cancels it rather than
   // confirming — a second back press must never be able to leave the round.
   if (state.pendingExit) return { kind: 'dismiss', action: { type: 'cancelExit' } };
+  // GS-update-notice: the "what's new" card is raised at boot over the title and nothing else can be
+  // stacked while it is up (the backdrop inerts the app), so it is the newest layer whenever it exists.
+  // Back reads it as "got it" — the same close the button dispatches, so the stamp happens either way.
+  if (state.updateNotice) return { kind: 'dismiss', action: { type: 'dismissUpdateNotice' } };
   // GS-leave-round: the give-it-up confirm is the same layer and the same rule — back CANCELS it. This
   // one matters more than its twin: `cancelExit` merely keeps you in a round you were going to park,
   // where a stray second press here would throw away a round for good.
