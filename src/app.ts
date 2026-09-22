@@ -58,9 +58,12 @@ import {
   type UiState,
 } from './ui/game';
 import { loadSave, writeSave } from './save/storage';
+import { saveIntegrity } from './save/integrity';
+import { APP_VERSION } from './brand';
+import { notesSince, versionAdvanced } from './ui/releaseNotes';
 import { checkStorage } from './save/durability';
 import { loadStory, loadCampaignStore, setActiveCampaignId } from './save/storyStore';
-import { defaultSave } from './save/schema';
+import { defaultSave, type Save } from './save/schema';
 import { mountIntro } from './render/introView';
 import { mountStoryIntro } from './render/storyIntro';
 import { mountShopArrival } from './render/shopArrival';
@@ -125,7 +128,7 @@ import { loreScreen } from './app/loreScreens';
 import { storyMidBeatScreen, storyQuestBeatScreen, storyQuestOfferScreen } from './app/storyMidroundScreens';
 import { worldPos, CHART_W, CHART_H, SPACEPORT_POS, EARTH_POS, YGGDRASIL_POS, SHIP_DOCK_HEADING, hoverBank } from './render/starTourMap';
 import type { CourseEffectId } from './sim/rpg/effects';
-import { exitConfirmOverlay, leaveConfirmOverlay, priceNoticeOverlay, saveView, scrambleChoiceOverlay, settingsOverlay, settingsSheetInner, shotPopupOverlay } from './app/overlays';
+import { exitConfirmOverlay, leaveConfirmOverlay, priceNoticeOverlay, saveView, scrambleChoiceOverlay, settingsOverlay, settingsSheetInner, shotPopupOverlay, updateNoticeOverlay } from './app/overlays';
 import { applyOverlayFocus, captureFocusOrigin, focusPlayStroke, preservingFocus, wireRoleButtonKeys } from './app/focus';
 import { announce, shotSentence, situationSentence } from './app/announce';
 import {
@@ -195,6 +198,7 @@ function boot(): void {
     // rather than one snapshot, so the lone-run argument is `undefined` here — boot has nothing single
     // to hand over.
     setState(initState(seed, meta, undefined, story, campaigns));
+    armUpdateNotice(save);
     applyDebugParams(); // GS-asgard: test-hub-only `?rainbow=` / `?asgard=` jumps (dormant in the live game)
     // A rotate / desktop window resize changes the play map's frame (GS-play-fullframe). Re-render so
     // the SVG is rebuilt at the new aspect instead of meet-fitting black bands back in. rAF-throttled,
@@ -210,6 +214,29 @@ function boot(): void {
   } catch (err) {
     recover(err);
   }
+}
+
+/**
+ * The "what's new" card (GS-update-notice) — decided ONCE, at boot, from three facts: the version
+ * stamped at the last dismissal, the version running now, and whether this device has ever saved
+ * (`savedAt` is on every persisted save and never on a default — the fresh-install discriminator,
+ * without a second storage key).
+ *
+ * Under a save-integrity fault it stays silent AND unstamped: the title is already carrying the one
+ * alert that must not be missed, and the notes keep until the save is rescued. When there is nothing
+ * to show — a first run, or this version already read — the stamp moves quietly, so the NEXT release
+ * is the first thing this device is told about. The stamp is written from the app layer, never the
+ * reducer: it is a fact about this device's eyes, which is what `Settings` is for.
+ */
+function armUpdateNotice(save: Save): void {
+  if (saveIntegrity.fault) return;
+  const seen = getSettings().seenVersion;
+  const notes = notesSince(seen, APP_VERSION, !!save.savedAt);
+  if (notes.length) {
+    setState({ ...state, updateNotice: notes });
+    return;
+  }
+  if (versionAdvanced(seen, APP_VERSION)) setSetting('seenVersion', APP_VERSION);
 }
 
 /**
@@ -671,6 +698,10 @@ function dispatch(action: Action): void {
     // opened for a new one — the flag is cleared by the reduce, so capture it first.
     const prevPendingStoryNew = state.pendingStoryNew === true;
     setState(reduce(state, action));
+    // GS-update-notice: the "what's new" card was read — by its button or by back, both dispatch this —
+    // so remember it on THIS device. Stamped on the action, not in the overlay's click handler, so
+    // there is exactly one place the stamp can come from.
+    if (action.type === 'dismissUpdateNotice') setSetting('seenVersion', APP_VERSION);
     // Entering character select seeds the difficulty pickers (GS-title-2 / GS-golf-score). Ascension
     // defaults to the LAST tier you chose (persisted pref), clamped to what's now unlocked — so it
     // doesn't snap back to A0 every run. The club set defaults to the owned tier (the strongest bag
@@ -3346,6 +3377,9 @@ function render(): void {
   // The one-off Trade Market price-cut / refund notice (GS-trade-rebalance) rides over every screen
   // until the player closes it — it's stamped by the save migration and shown on the boot title.
   const priceNotice = state.priceRefund != null ? priceNoticeOverlay() : '';
+  // The "what's new" card (GS-update-notice) rides the boot title until dismissed. LAST in the string
+  // below so it is the topmost layer — the focus pass treats the last overlay as the live dialog.
+  const updateNotice = state.updateNotice ? updateNoticeOverlay() : '';
   // The leave-the-round confirm (GS-android-back) rides over every screen like the settings sheet;
   // only a back press inside a run can raise it.
   const exitConfirm = state.pendingExit ? exitConfirmOverlay() : '';
@@ -3371,7 +3405,7 @@ function render(): void {
   // Note what has focus BEFORE the DOM is torn down (GS-a11y-focus) — it is the last moment the
   // information exists, and closing an overlay needs it to hand focus back to whatever opened it.
   captureFocusOrigin();
-  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}${fit ? ' gs-main--fit' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${introTraits}${introField}${priceNotice}${exitConfirm}${leaveConfirm}${clubPicker}`;
+  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}${fit ? ' gs-main--fit' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${introTraits}${introField}${priceNotice}${exitConfirm}${leaveConfirm}${clubPicker}${updateNotice}`;
   app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
 
   // Star Tour star map (GS-star-tour): on first mount, centre the pannable chart on the worlds'

@@ -22,7 +22,7 @@ import { renderHoleSVG } from '../render/holeView';
 import { shotCardHTML } from '../render/cards';
 import { pinOf } from '../sim/round';
 import { dist } from '../sim/course/contract';
-import { GUIDE_URL } from '../brand';
+import { APP_VERSION, GAME_TITLE, GUIDE_URL } from '../brand';
 import { getSettings, clampUiScale, type Settings } from '../settings';
 import { backupNudge, describeBackup, type Backup } from '../save/backup';
 import { storageHealth } from '../save/durability';
@@ -418,6 +418,43 @@ export function priceNoticeOverlay(): string {
  * `stopPropagation`, so an action on the backdrop would ALSO fire on every click that bubbles out of
  * the card. Back/Escape and "Keep playing" are the dismiss paths.
  */
+/**
+ * The "what's new" card (GS-update-notice) — shown once per version, over the boot title, listing
+ * every release note this device has not seen (newest first). One "Got it" dispatches
+ * `dismissUpdateNotice`; the app layer stamps `Settings.seenVersion` on that ACTION, so the card
+ * never returns for this version whether it was closed by the button or by back. Reuses the sheet
+ * chrome like the price notice above; its inner bits carry their own `.gs-whatsnew*` prefix (class
+ * names are global) and are styled inline so no global CSS is added. The `<h2>` is what
+ * `applyOverlayFocus` names the dialog from.
+ */
+export function updateNoticeOverlay(): string {
+  const notes = state.updateNotice ?? [];
+  if (!notes.length) return '';
+  const blocks = notes
+    .map(
+      (n) => `
+      <section class="gs-whatsnew__rel">
+        <h3 class="gs-whatsnew__ver" style="margin:14px 0 4px;font-size:14px;color:var(--gs-gold, #e08a2b);">v${n.version} <span style="font-weight:400;color:var(--gs-dim);">— ${n.title}</span></h3>
+        <ul class="gs-whatsnew__list" style="margin:0;padding-left:18px;line-height:1.45;">
+          ${n.items.map((it) => `<li style="margin:7px 0;"><b>${it.head}</b> <span style="color:var(--gs-dim);">${it.body}</span></li>`).join('')}
+        </ul>
+      </section>`,
+    )
+    .join('');
+  return `
+    <div class="gs-sheet-backdrop" style="align-items:safe center;">
+      <div class="gs-sheet gs-whatsnew" style="max-width:420px;">
+        <div style="font-size:34px;text-align:center;margin:2px 0 6px;" aria-hidden="true">✨</div>
+        <h2 class="gs-whatsnew__head" style="margin:0;text-align:center;font-size:19px;">What's new in v${APP_VERSION}</h2>
+        <p style="margin:8px 0 0;text-align:center;color:var(--gs-dim);line-height:1.5;">${GAME_TITLE} has updated since you last played.</p>
+        ${blocks}
+        <div style="text-align:center;margin-top:16px;">
+          <button class="gs-btn gs-btn--primary" data-action='${JSON.stringify({ type: 'dismissUpdateNotice' })}' style="padding:11px 30px;">Got it</button>
+        </div>
+      </div>
+    </div>`;
+}
+
 export function exitConfirmOverlay(): string {
   const { title, body, confirmLabel } = exitPrompt(state);
   return `

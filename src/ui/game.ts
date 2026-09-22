@@ -2566,6 +2566,14 @@ export function reduce(state: UiState, action: Action): UiState {
       return { ...state, priceRefund: undefined };
     }
 
+    case 'dismissUpdateNotice': {
+      // Close the "what's new" card (GS-update-notice). The reducer only clears the transient list;
+      // remembering that it was read is the app layer's job (`Settings.seenVersion`), because the
+      // stamp is a per-DEVICE fact and settings are the layer that owns those.
+      if (!state.updateNotice) return state;
+      return { ...state, updateNotice: undefined };
+    }
+
     case 'buyBagTier': {
       // Spend Star Shards on a permanent default-bag upgrade (GS-bag-tiers). Guarded: must be at the
       // Trade Market, the tier unlocked (Ascension gate cleared), strictly higher than the current bag,
