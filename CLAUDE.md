@@ -525,7 +525,8 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     dry hole), a coach card per first moment (`rangeLessonDue`), Stableford taught on the end-of-hole
     card, and a wild-ball hole where the Pro Shop's own spray shapers are fitted live as a controls-panel
     ROW quoting the SAME `SprayShape` the cone draws. `RANGE_BALL_SHAPE` may be named in no other file
-    (scanned). Never parked (`runModeOf` → null, `resumeCost` → `practice`) and it ends on `rangeResult`,
+    (scanned) — it is ~10% clean strikes, piled into the two RED zones the guards delete outright, and it
+    is the ONLY shape allowed a `ShapeMod.missCap` above the sim's 60% `MAX_MISS` (also scanned). Never parked (`runModeOf` → null, `resumeCost` → `practice`) and it ends on `rangeResult`,
     never `finishStop`, so it posts and pays nothing by construction. Each hole is scored in its own
     format (`RANGE_SCORING`: stroke · Stableford · matchplay vs a rival on its OWN `:rival` stream, judged
     by the game's `holeDuel`). ⚠️ A coach card must defer only to a card that is actually DRAWN:

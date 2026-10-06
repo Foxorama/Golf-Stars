@@ -113,6 +113,21 @@ key; PRIVACY.md's row names it). Held back during a save-integrity fault.
 Story campaign exists; staging is a separate origin with no campaign, so it is hidden there. A browser
 test pins both halves of the rule.
 
+## Round three: the wild balls were not wild enough
+
+A play-test hit eight shots on the upgrades hole across two passes and saw ONE hook. The first cut
+widened every zone a little (~57% clean), which left the lesson nothing to fix. Now the balls are
+**~10% clean**, with the misses piled into the shank and duck-hook — the two zones Shank Guard and
+Anti-Hook Grip delete OUTRIGHT, so one guard takes clean strikes 10% → ~45% and both → ~80%; the
+correctors' −6% stays honest to their shop rows.
+
+The sim caps total miss at 60% (`MAX_MISS`), so 10% clean was impossible. `ShapeMod` gained an
+optional `missCap` that `applyShapeMod` honours and `combineShapeMods` carries (only emitted when a side
+sets it, so every other combine is the same object as before). It flows through the one function both
+the cone and `resolveShot` use, so the drawn wedge and the sampled shot still agree (contract 5).
+Absent ⇒ byte-for-byte, and a scan allows `missCap:` only in `shot.ts` and the range module, because a
+gameplay mode loosening the cap would be a fairness change.
+
 ## What happened to The Destination
 
 Only the PLACEHOLDER tile went. The Destination is still a promise the Story Tour's Warden ending makes
