@@ -46,6 +46,32 @@ export interface ReleaseNote {
  */
 export const RELEASE_NOTES: readonly ReleaseNote[] = [
   {
+    version: '1.8.0',
+    title: 'the driving range opens',
+    items: [
+      {
+        head: '🎓 The Driving Range',
+        body: 'A three-hole tutorial on the title screen, where the Destination teaser used to be. A coach stops you the first time each thing matters: the swing, your first putt, the first hole with water, and upgrades.',
+      },
+      {
+        head: 'Every scoring format, one per hole',
+        body: 'Stroke play on the first, Stableford on the second, and matchplay against Longshot Larry on the third.',
+      },
+      {
+        head: 'Try upgrades before you buy them',
+        body: 'The last hole is played with battered range balls that fly clean about one shot in ten. Fit Shank Guard or Anti-Hook Grip from the panel and watch the red go off the cone.',
+      },
+      {
+        head: 'It costs nothing',
+        body: 'The range pays no shards, posts no records and parks nothing. Leave or replay it any time.',
+      },
+      {
+        head: 'Fixed: parked Story rounds',
+        body: 'Starting a Voyage, Unending or Star Tour run no longer throws away a Story round you had parked mid-world.',
+      },
+    ],
+  },
+  {
     // 1.6.0 was bumped on main but never tagged, so every device is coming from 1.5.0 — this row
     // covers both.
     version: '1.7.0',
