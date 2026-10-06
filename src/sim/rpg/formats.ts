@@ -249,9 +249,25 @@ export const ASGARD_FORMAT = 'asgard';
  *  (like Asgard) rather than the ordinary Stableford-cut/travel flow. */
 export const STROKEPLAY_FORMAT = 'strokeplay';
 
+/** The Driving Range tutorial format id (GS-driving-range): three lesson holes off the title, never
+ *  persisted and paying nothing. Like Asgard it has no `FORMATS` row — it is never offered on character
+ *  select — and the reducer resolves it to its own graduation screen (`rangeResult`). */
+export const RANGE_FORMAT = 'range';
+
+/** The range's own format row — returned by `getFormat` but deliberately NOT in `FORMATS`, which the
+ *  title and the test hub iterate as the list of modes to offer. Without it `getFormat` would fall back
+ *  to the Unending Universe and the range would quietly wear that mode's set-survival HUD (`holeGate`). */
+const RANGE_RUN_FORMAT: RunFormat = {
+  id: RANGE_FORMAT,
+  name: 'Driving Range',
+  blurb: 'Three lesson holes with a coach — the swing, putting, hazards, scoring and upgrades',
+  stops: [{ holes: 3, label: 'Driving Range · 3 lesson holes' }],
+};
+
 export const DEFAULT_FORMAT = 'unending';
 
 export function getFormat(id: string | undefined): RunFormat {
+  if (id === RANGE_FORMAT) return RANGE_RUN_FORMAT;
   // Retired ids ('flat'/'ladder') fold into the default, so an old save's active run still resumes.
   return (id && FORMATS[id]) || FORMATS[DEFAULT_FORMAT]!;
 }

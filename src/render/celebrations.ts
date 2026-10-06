@@ -17,7 +17,17 @@ import { canvasRatio } from './pixelRatio';
  * guarded so a cosmetic glitch can never strand the player on the hole.
  */
 export function showAceCelebration(
-  info: { holeNo: number; total: number; par: number; club?: string; aceNo: number; shipUnlocked?: boolean },
+  info: {
+    holeNo: number;
+    total: number;
+    par: number;
+    club?: string;
+    aceNo: number;
+    shipUnlocked?: boolean;
+    /** A practice round (GS-driving-range) banks nothing, so the card must not list rewards it will not
+     *  pay: it celebrates the shot and says plainly that the payout lives on tour. */
+    practice?: boolean;
+  },
   onDismiss: () => void,
 ): void {
   try {
@@ -58,7 +68,9 @@ export function showAceCelebration(
 
   const rewardLine = (icon: string, label: string, detail: string): string =>
     `<div class="gs-ace-reward"><span>${icon}</span><div><b>${label}</b><i>${detail}</i></div></div>`;
-  const rewardLines = [
+  const rewardLines = info.practice
+    ? rewardLine('🎓', 'Practice round', 'Nothing is banked on the range — make one on tour and it pays out')
+    : [
     // The named achievement (GS-ace-hole) leads the stack and ABSORBS the lifetime tally, so the
     // badge gets a name without the card growing a fifth cramped row on a phone.
     rewardLine('🏆', 'ACHIEVEMENT — Ace Hole', `Lifetime ace #${info.aceNo} · a permanent record`),
@@ -68,7 +80,7 @@ export function showAceCelebration(
     ...(info.shipUnlocked
       ? [rewardLine('🛸', 'SECRET UNLOCKED — the Comet Rider', 'Fly it on any golfer from the Clubhouse')]
       : []),
-  ].join('');
+    ].join('');
 
   overlay.innerHTML = `
     <canvas class="gs-ace-fx" aria-hidden="true"></canvas>

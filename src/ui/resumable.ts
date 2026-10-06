@@ -17,7 +17,7 @@ import type { UiState } from './gameState';
 import type { StoryLiveRound, StoryState } from '../sim/rpg/story';
 import { snapshotRun } from '../sim/rpg/run';
 import type { RoundProgress } from '../sim/rpg/run';
-import { ASGARD_FORMAT, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
+import { ASGARD_FORMAT, RANGE_FORMAT, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
 import {
   clearSlot,
   runModeOf,
@@ -43,6 +43,8 @@ export interface Resumable {
  *    mode's behaviour would lose a round in whichever mode they learned second.
  *  - `forfeit` — the Asgard tournament, which is never persisted by design: leaving forfeits the
  *    attempt and hands back the suspended run it interrupted.
+ *  - `practice` — the Driving Range (GS-driving-range). Nothing is parked and nothing is lost: it
+ *    is a lesson, and it starts again from the first tee whenever it is opened.
  *
  * There used to be a third, `world`: a Story round was replayed from its first tee, because the
  * campaign owned no run slot. It was an honest promise about a behaviour that was simply too harsh —
@@ -53,7 +55,7 @@ export interface Resumable {
  * Every exit surface reads this — the back-button confirm AND the settings sheet's return-to-title —
  * so no screen can quietly promise something the resume does not do.
  */
-export type ResumeCost = 'hole' | 'forfeit';
+export type ResumeCost = 'hole' | 'forfeit' | 'practice';
 
 export function resumeCost(formatId: string | undefined, storyRound?: boolean): ResumeCost {
   // GS-story-round-resume: a Story world round used to cost the whole round ('world'). It no longer
@@ -61,6 +63,7 @@ export function resumeCost(formatId: string | undefined, storyRound?: boolean): 
   // else, and the "one rule, every mode" promise below is now literally true rather than aspirational.
   if (storyRound) return 'hole';
   if (formatId === ASGARD_FORMAT) return 'forfeit';
+  if (formatId === RANGE_FORMAT) return 'practice';
   return 'hole';
 }
 
@@ -78,8 +81,9 @@ export function resumeCost(formatId: string | undefined, storyRound?: boolean): 
  *  - `'round'`  — a Star Tour round. Discarded, and it posts no record.
  *  - `'run'`    — a Voyage or an Unending run. It ends here and pays out NOTHING (which is a property
  *    of `leaveRound` never touching `runEndUpdates`, not of a flag).
- *  - `null`     — there is no separate abandon here. Asgard is the only case: leaving already forfeits
- *    the tournament (`resumeCost` says so), so a second control would be the same button twice.
+ *  - `null`     — there is no separate abandon here. Asgard: leaving already forfeits the tournament
+ *    (`resumeCost` says so), so a second control would be the same button twice. The Driving Range:
+ *    leaving already discards the lesson, for the same reason.
  *
  * The discrimination is `runModeOf`'s, in the same order and for the same reasons — `storyRound` first
  * because a story round is played on the strokeplay format, then Asgard's null. Voyage and Unending
@@ -90,6 +94,7 @@ export type AbandonCost = 'world' | 'round' | 'run';
 export function abandonCost(formatId: string | undefined, storyRound?: boolean): AbandonCost | null {
   if (storyRound) return 'world';
   if (formatId === ASGARD_FORMAT) return null;
+  if (formatId === RANGE_FORMAT) return null;
   if (formatId === STROKEPLAY_FORMAT) return 'round';
   return 'run';
 }
@@ -195,6 +200,11 @@ export function resumableState(state: UiState): Resumable {
 export function campaignWithLiveRound(state: UiState): StoryState | undefined {
   const story = state.story;
   if (!story) return undefined;
+  // GS-driving-range: a range lesson is not the campaign's business. Without this, opening the range
+  // with a campaign loaded would read "no story round in progress" and REMOVE the round the player had
+  // parked (`persistStory` runs after every action). Note the same reading applies to every non-story
+  // mode today — GS-story-liveround-crossmode in IDEAS — this guard only keeps the range out of it.
+  if (state.run.formatId === RANGE_FORMAT) return story;
   const round = liveStoryRound(state);
   // Nothing in progress ⇒ the field is REMOVED, not left stale. Finishing a round, or walking back to
   // the clubhouse, must clear the offer — the same rule that empties a slot when a run ends. Returning

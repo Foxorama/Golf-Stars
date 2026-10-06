@@ -515,6 +515,14 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
   - **Bosses** play on a separate `:boss` rng and scale with Ascension via `bossEdgeForRun` (the ONE
     source). The three voyage bosses also ESCALATE by arc via `cutBonus`→`arcRank` (GS-boss-escalation);
     rank 0 / A0 / common bag / Arc-I is the classic boss byte-for-byte.
+  - **THE DRIVING RANGE TEACHES THE REAL GAME, AND BANKS NOTHING** (GS-driving-range,
+    `docs/decisions/driving-range.md`). The title's tutorial: three lesson holes chosen by JOB off the
+    live generator (never a pinned seed — a `GENERATOR_VERSION` bump must not hand the hazards lesson a
+    dry hole), a coach card per first moment (`rangeLessonDue`), Stableford taught on the end-of-hole
+    card, and a wild-ball hole where the Pro Shop's own spray shapers are fitted live as a controls-panel
+    ROW quoting the SAME `SprayShape` the cone draws. `RANGE_BALL_SHAPE` may be named in no other file
+    (scanned). Never parked (`runModeOf` → null, `resumeCost` → `practice`) and it ends on `rangeResult`,
+    never `finishStop`, so it posts and pays nothing by construction.
   - **ASGARD interlude** (`docs/decisions/asgard.md`; GS-asgard) — an eagle-or-better on the Rainbow Course opens
     the Bifröst to a 9-hole stroke-play tournament vs three `contender` golfers, scaled by
     `warriorsEdge(depth,ascension,voyage)` and tuned per context (`asgardFieldEdge`; edge 0 = base = byte-

@@ -29,6 +29,7 @@
  */
 import type { Action, Screen, UiState } from './gameState';
 import { abandonTarget, resumeCost } from './resumable';
+import type { RangeLessonId } from '../sim/rpg/drivingRange';
 
 /** What the caller should do about a back press. */
 export type BackIntent =
@@ -63,6 +64,10 @@ export interface BackContext {
    *  realms (`starTourView`, module state in `app.ts`). Back closes the sheet before it ever leaves
    *  the map; without this, pressing back at an open dossier flew you home to the clubhouse. */
   starMapSheetOpen?: boolean;
+  /** The Driving Range coach card on screen, if any (GS-driving-range). Whether a lesson is due depends
+   *  on the play screen's own putt/chip choice (module state in `app.ts`), so the caller says which card
+   *  it drew; back closes it — exactly as its button does — before anything can navigate. */
+  rangeLesson?: RangeLessonId;
 }
 
 /**
@@ -130,6 +135,10 @@ function screenIntent(state: UiState): BackIntent {
       return { kind: 'navigate', action: { type: 'exitStoryFinale' } };
     case 'storyBar':
       return { kind: 'navigate', action: { type: 'exitStoryBar' } };
+    case 'rangeResult':
+      // GS-driving-range: the graduation card. The lesson is over and nothing was banked, so there is
+      // nothing for back to skip — it means what the card's own "Back to the title" button means.
+      return { kind: 'navigate', action: { type: 'toTitle' } };
     case 'storyCredits':
       // GS-story-credits: NOT forward-only, unlike the beats below — the campaign is already complete
       // and banked by the time the roll starts, so there is nothing left for a back press to skip. It
@@ -190,6 +199,9 @@ export function backIntent(state: UiState, ctx: BackContext = {}): BackIntent {
   // never both live; it is listed first because it is the innermost thing a play-screen back can mean.
   if (ctx.clubPickerOpen) return { kind: 'closeClubPicker' };
   if (ctx.settingsOpen) return { kind: 'closeSettings' };
+  // GS-driving-range: the coach card sits over the play screen; back reads it as "got it", the same close
+  // its button dispatches, and only on the screen it can be drawn on.
+  if (ctx.rangeLesson && state.screen === 'playing') return { kind: 'dismiss', action: { type: 'rangeDismissLesson', id: ctx.rangeLesson } };
   // GS-story-campaign-picker: the start-over confirm sits OVER the golfer inspect card that raised it,
   // so it is listed first — and like every other confirm, back CANCELS it. A back press must never be
   // able to destroy a campaign.
@@ -223,6 +235,9 @@ export function resumePromise(state: UiState): string {
   switch (resumeCost(state.run.formatId, state.run.storyRound)) {
     case 'forfeit':
       return 'Leaving forfeits the Asgard tournament — the run it interrupted is saved and waiting.';
+    case 'practice':
+      // GS-driving-range: a lesson parks nothing and costs nothing; say so rather than promise a resume.
+      return 'Nothing to lose — the Driving Range starts fresh whenever you come back.';
     default:
       // GS-story-round-resume: a Story world round used to say "you'll replay this world from its
       // first tee" — an honest promise about a behaviour that was simply too harsh. The campaign now

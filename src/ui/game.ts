@@ -44,7 +44,8 @@ import {
   type RunSnapshot,
 } from '../sim/rpg/run';
 import { effectPatchKind } from '../sim/rpg/effects';
-import { isMatchplayBoss, ASGARD_FORMAT, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
+import { isMatchplayBoss, ASGARD_FORMAT, RANGE_FORMAT, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
+import { isRangeUpgrade, rangeLoadoutFor, RANGE_UPGRADE_HOLE, startRangeRun } from '../sim/rpg/drivingRange';
 import {
   playMatchStop,
   playTeamMatchStop,
@@ -1592,6 +1593,56 @@ export function reduce(state: UiState, action: Action): UiState {
       return { ...state, screen: 'title' };
     }
 
+    case 'openRange': {
+      // THE DRIVING RANGE (GS-driving-range): the tutorial, from the title (or "go again" off its own
+      // graduation card). A self-contained three-hole run straight onto the first tee — no golfer pick,
+      // no intro card: the coach IS the intro. Never parked (`runModeOf` → null) and it pays nothing,
+      // so nothing it does can touch a real run's slot, records or shards.
+      if (state.screen !== 'title' && state.screen !== 'rangeResult') return state;
+      const run = startRangeRun();
+      const course = currentCourse(run);
+      return {
+        ...state,
+        run,
+        course,
+        screen: 'playing',
+        holeRng: new Rng(`${course.seed}:play`),
+        stopPlayed: [],
+        play: beginHole(course.holes[0]!, 0),
+        match: undefined,
+        played: undefined,
+        lastResult: undefined,
+        mulliganPending: undefined,
+        scrambleChoice: undefined,
+        starmartOffer: undefined,
+        starmartRerolls: undefined,
+        viewHole: 0,
+        rangeSeen: [],
+        rangeUpgrades: [],
+      };
+    }
+
+    case 'rangeDismissLesson': {
+      // Close a coach card; the lesson is seen for the rest of this visit (`rangeLessonDue` reads it).
+      if (state.screen !== 'playing' || state.run.formatId !== RANGE_FORMAT) return state;
+      const seen = state.rangeSeen ?? [];
+      if (seen.includes(action.id)) return state;
+      return { ...state, rangeSeen: [...seen, action.id] };
+    }
+
+    case 'rangeToggleUpgrade': {
+      // Fit / remove one upgrade on the wild-ball hole. The loadout is REBUILT through the one rule
+      // (`rangeLoadoutFor`) rather than patched, so on/off/on lands exactly where it started. Refused
+      // anywhere the panel isn't offered — another hole, a finished hole, or an id the range never sold.
+      const play = state.play;
+      if (state.screen !== 'playing' || state.run.formatId !== RANGE_FORMAT || !play || play.done) return state;
+      if (play.holeIndex !== RANGE_UPGRADE_HOLE || !isRangeUpgrade(action.id)) return state;
+      const cur = state.rangeUpgrades ?? [];
+      const rangeUpgrades = cur.includes(action.id) ? cur.filter((u) => u !== action.id) : [...cur, action.id];
+      const run = { ...state.run, loadout: rangeLoadoutFor(state.run, play.holeIndex, rangeUpgrades) };
+      return { ...state, run, rangeUpgrades };
+    }
+
     case 'playYggdrasilRealm': {
       // GS-star-tour-yggdrasil: play a Norse realm off the hidden World Tree on the star map. The tree is
       // revealed only once Thor's Hammer is won, and today ONLY Asgard has bloomed (the other branches are
@@ -1985,6 +2036,26 @@ export function reduce(state: UiState, action: Action): UiState {
           bossReward: bossRewardFor(run, state.course, result),
           ...runEndUpdates(state, run),
           ...aceUpdates(state, result, state.ownedShips),
+        };
+      }
+
+      // THE DRIVING RANGE (GS-driving-range): each lesson hole is played with ITS loadout (the wild-ball
+      // hole adds the range balls + whatever upgrades are fitted), rebuilt through the one rule as the
+      // next tee comes up. The last hole goes to the graduation card — never `finishStop`, which is what
+      // posts scores and pays out, so the range banks nothing by construction rather than by a flag.
+      if (state.run.formatId === RANGE_FORMAT) {
+        if (nextIdx < total) {
+          const run = { ...state.run, loadout: rangeLoadoutFor(state.run, nextIdx, state.rangeUpgrades ?? []) };
+          return { ...state, run, stopPlayed, play: beginHole(state.course.holes[nextIdx]!, nextIdx) };
+        }
+        return {
+          ...state,
+          screen: 'rangeResult',
+          played: stopPlayed,
+          stopPlayed: undefined,
+          play: undefined,
+          holeRng: undefined,
+          viewHole: 0,
         };
       }
 
@@ -2666,6 +2737,9 @@ export function reduce(state: UiState, action: Action): UiState {
         // …and the per-mode picker's own confirm, for the same reason: carried onto the title it
         // would let the NEXT mode's first `selectCharacter` overwrite a slot without asking.
         slotOverwriteId: undefined,
+        // …and the Driving Range's coach state (GS-driving-range) — transient lesson bookkeeping.
+        rangeSeen: undefined,
+        rangeUpgrades: undefined,
         viewHole: 0,
       };
     }
