@@ -24,7 +24,9 @@ import { bearing, dist, type Vec } from './sim/course/contract';
 import { type ShotSpread } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
 import { ACE_CREDIT_BONUS, maxPowerOf, usableBag } from './sim/rpg/economy';
-import { getFormat, ASGARD_FORMAT, STROKEPLAY_FORMAT } from './sim/rpg/formats';
+import { getFormat, ASGARD_FORMAT, RANGE_FORMAT, STROKEPLAY_FORMAT } from './sim/rpg/formats';
+import { rangeLessonDue, RANGE_UPGRADE_HOLE, type RangeLessonId } from './sim/rpg/drivingRange';
+import { rangeCoachOverlay, rangeResultScreen, rangeStablefordHTML, rangeUpgradeRowHTML } from './app/rangeScreens';
 import { holeGateArmed, snapshotRun, currentCourse } from './sim/rpg/run';
 import { shopOffer, starmartOffer } from './sim/rpg/runShop';
 import { shopItem } from './sim/rpg/economy';
@@ -1648,7 +1650,8 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
       : `+${holePts} pt${holePts === 1 ? '' : 's'} this hole`;
     const isAce = play.holed && play.strokes === 1;
     // After the celebration overlay lifts, the end-of-hole screen confirms the ace reward in place.
-    const aceNote = isAce
+    // The range (GS-driving-range) pays nothing, so it must not announce an ace payout it will not make.
+    const aceNote = isAce && state.run.formatId !== RANGE_FORMAT
       ? `<div style="margin:0 0 -2px;max-width:460px;background:linear-gradient(180deg,#1c1708,#120f06);border:1px solid rgba(255,213,74,.4);border-radius:12px;padding:9px 14px;font-size:12.5px;color:var(--gs-gold);">⛳ <b>Hole-in-one!</b> +${ACE_CREDIT_BONUS} credits · Ace's Touch (+8% precision) earned for the run.</div>`
       : '';
     const scoreBanner = `
@@ -1664,7 +1667,7 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
         </div>
         <div style="text-align:center;border-left:1px solid var(--gs-line-2);padding-left:14px;">
           <div style="font-size:28px;font-weight:800;line-height:1;color:var(--gs-accent);">${isAsgard ? grossSoFar : stopPts}</div>
-          <div style="font-size:10px;opacity:.55;letter-spacing:.05em;margin-top:3px;">${isAsgard ? `GROSS · ${toParTag(toParSoFar)}` : 'STOP PTS'}</div>
+          <div style="font-size:10px;opacity:.55;letter-spacing:.05em;margin-top:3px;">${isAsgard ? `GROSS · ${toParTag(toParSoFar)}` : state.run.formatId === RANGE_FORMAT ? 'POINTS' : 'STOP PTS'}</div>
         </div>
       </div>`;
     // GS-story-sigil-live: a Sigil round shows its COMPETITION live every hole — the running match
@@ -1673,7 +1676,11 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
     // GS-story-qualifier-match-live: a `pair-match` QUALIFYING EVENT is a real hole-by-hole match too, so
     // it drives the identical panel (it used to play out blind, with the result only on the recap).
     const sigilLive = state.run.storyTournament || state.run.storyQualifier ? storySigilProgressHTML(playedSoFar) : '';
-    const progress = sigilLive
+    const progress = state.run.formatId === RANGE_FORMAT
+      ? // THE DRIVING RANGE (GS-driving-range): no field to place against — the end-of-hole card is where
+        // Stableford is TAUGHT, against the score just made.
+        rangeStablefordHTML(kept, playedSoFar)
+      : sigilLive
       ? `${sigilLive}<div style="margin-top:10px;">${strokePlayProgressHTML(playedSoFar)}</div>`
       : state.run.formatId === STROKEPLAY_FORMAT
       ? // Star Tour (GS-star-tour): a solo records chase — show the running stroke scorecard, not the
@@ -1695,8 +1702,11 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
           const place = `<p style="font-size:13px;margin:.4em 0 .5em;">You're <b style="color:${me.position <= 3 ? '#5fd45a' : me.position <= board.standings.length / 2 ? '#ffce54' : '#ff6b6b'};">${ordinal(me.position)}</b> of ${board.standings.length} · ${board.thru} hole${board.thru === 1 ? '' : 's'} in.</p>`;
           return place + leaderboardHTML(board, { live: true });
         })();
+    // The range (GS-driving-range) has no credits, fuel or handicap to report — the run header would be a
+    // row of numbers the lesson never explains.
+    const isRange = state.run.formatId === RANGE_FORMAT;
     return `
-      ${header()}
+      ${isRange ? '' : header()}
       <div style="position:relative;">${birdieOrBetter ? burst() : ''}</div>
       ${aceNote}
       ${partnerHole ? `<div style="margin:0 0 12px;">${bestBallRevealHTML(raw, partnerHole, par)}</div>` : ''}
@@ -2088,7 +2098,12 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
       dist: { big: `${v.distToPin}`, cap: 'y to pin' },
       upBearing: bearing(play.ball, orientTarget),
     }),
-    rows: [],
+    // THE DRIVING RANGE (GS-driving-range): on the wild-ball hole the upgrades ride the panel as a row —
+    // the frame's own extension point — reading the SAME spray shape the cone above was drawn from.
+    rows:
+      state.run.formatId === RANGE_FORMAT && play.holeIndex === RANGE_UPGRADE_HOLE
+        ? [rangeUpgradeRowHTML(spray.shape, state.rangeUpgrades ?? [])]
+        : [],
     commit: swingBtn,
     // The pull gesture is pointer-only and the aim cone is a picture, so without this the arrow keys
     // GS-a11y-keyboard added are undiscoverable to exactly the players who need them.
@@ -2115,6 +2130,10 @@ let settingsOpen = false;
 // screen's bag button and closed by picking a club, the ✕, the backdrop, or Escape/Back. Never
 // persisted, and cleared whenever the shot it belonged to is gone.
 let clubPickerOpen = false;
+
+// The Driving Range coach card drawn by the last render (GS-driving-range), if any — derived in
+// `render()`, read by `handleBack` so Back closes the card the player is actually looking at.
+let rangeCoachShown: RangeLessonId | undefined;
 
 // The Ascension tier picked on the character-select screen (GS-title-2) — view state, like the
 // club selection: the [data-asc] chips set it, every golfer card's select action carries it, and
@@ -3296,6 +3315,8 @@ function render(): void {
         starTourChampionScreen()
       : state.screen === 'strokeResult'
       ? strokeResultScreen()
+      : state.screen === 'rangeResult'
+      ? rangeResultScreen()
       : state.screen === 'story'
       ? storyHubScreen() + charLoreOverlay
       : state.screen === 'storyResult'
@@ -3402,10 +3423,25 @@ function render(): void {
           });
         })()
       : '';
+  // THE DRIVING RANGE coach (GS-driving-range) — a DIRECT child of #app like the club picker, so the
+  // focus pass makes it the dialog and the arrow-key aim stands down while it is read. It waits its turn:
+  // never over a shot animation, the shot-result card or a scramble pick, and never over the club picker.
+  // The phase is the play screen's OWN putt question (`selPutt` covers a chosen fringe putt), so the
+  // putting lesson appears on whichever stroke is actually a putt.
+  const rangePlay = state.screen === 'playing' && state.run.formatId === RANGE_FORMAT ? state.play : undefined;
+  rangeCoachShown =
+    rangePlay && !rangePlay.done && !animatingPlay && !awaitingShotPopup && !state.scrambleChoice && !clubPickerOpen && !settingsOpen
+      ? rangeLessonDue(
+          rangePlay.holeIndex,
+          awaitingPutt(rangePlay) || (canPuttFringe(rangePlay) && selPutt) ? 'putt' : 'aim',
+          state.rangeSeen ?? [],
+        ) ?? undefined
+      : undefined;
+  const rangeCoach = rangeCoachShown ? rangeCoachOverlay(rangeCoachShown) : '';
   // Note what has focus BEFORE the DOM is torn down (GS-a11y-focus) — it is the last moment the
   // information exists, and closing an overlay needs it to hand focus back to whatever opened it.
   captureFocusOrigin();
-  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}${fit ? ' gs-main--fit' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${introTraits}${introField}${priceNotice}${exitConfirm}${leaveConfirm}${clubPicker}${updateNotice}`;
+  app.innerHTML = `<main class="gs-main${fullBleed ? ' gs-main--bleed' : ''}${wide ? ' gs-main--wide' : ''}${fit ? ' gs-main--fit' : ''}">${body}</main>${cog}${settingsOpen ? settingsOverlay() : ''}${introTraits}${introField}${priceNotice}${exitConfirm}${leaveConfirm}${clubPicker}${rangeCoach}${updateNotice}`;
   app.setAttribute('data-booted', '1'); // tell the boot watchdog the app painted
 
   // Star Tour star map (GS-star-tour): on first mount, centre the pannable chart on the worlds'
@@ -4447,6 +4483,8 @@ function render(): void {
                   // The secret Comet Rider (GS-ace-ship) is granted at stop scoring on any ace you don't
                   // yet own it; not owning it now = this ace earns it, so reveal it in the takeover.
                   shipUnlocked: !state.ownedShips.includes(ACE_SHIP_ID),
+                  // GS-driving-range: a range ace banks nothing, so the card celebrates without listing payouts.
+                  practice: state.run.formatId === RANGE_FORMAT,
                 },
                 () => render(),
               );
@@ -4585,7 +4623,7 @@ function shouldPlayIntro(): boolean {
 function handleBack(): boolean {
   const starMapSheetOpen =
     !!starTourView.selectedId || starTourView.recordsOpen || starTourView.yggdrasilOpen || !!starTourView.serpentResult;
-  const intent = backIntent(state, { settingsOpen, clubPickerOpen, starMapSheetOpen });
+  const intent = backIntent(state, { settingsOpen, clubPickerOpen, starMapSheetOpen, rangeLesson: rangeCoachShown });
   switch (intent.kind) {
     case 'closeSettings':
       // The Save data panel is a page INSIDE the sheet (GS-settings-more), so back closes it first —

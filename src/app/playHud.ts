@@ -20,7 +20,7 @@ import { lieInfo, reliedLie, roughLieOf, windResistFactor } from '../sim/shot';
 import { playTotals } from '../sim/score';
 import { currentBoss, effectiveCut, holeGateArmed } from '../sim/rpg/run';
 import { endlessSetGateOverPar, endlessSetLabel, endlessSetToPar, formatToPar, toParColour } from '../sim/rpg/endless';
-import { isTeamDuelBoss, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
+import { isTeamDuelBoss, RANGE_FORMAT, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
 import { shotView } from '../sim/rpg/play';
 
 /** Signed yardage as plain words (+ = right of the line). */
@@ -258,6 +258,14 @@ function zoneScoreChip(): string {
     return pod(formatToPar(totals.toPar), `${totals.gross} thru ${done.length}`, {
       col: toParColour(totals.toPar),
       title: `running score — total strokes vs par through ${done.length} holes`,
+    });
+  }
+  // THE DRIVING RANGE (GS-driving-range): there is no cut to make — the running Stableford total is the
+  // thing the end-of-hole card teaches, so the pod shows exactly that and nothing it would have to explain.
+  if (state.run.formatId === RANGE_FORMAT) {
+    const done = state.stopPlayed ?? [];
+    return pod(`${playTotals(done.map((p) => p.record)).stableford}`, 'points', {
+      title: `practice round — Stableford points through ${done.length} hole${done.length === 1 ? '' : 's'}`,
     });
   }
   // The Unending Universe (GS-set-survival): the number that matters is THIS SET's running four-hole

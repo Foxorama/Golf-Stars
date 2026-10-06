@@ -174,7 +174,7 @@ export function titleScreen(): string {
     ${integrityWarningHTML()}
     ${resumeHTML}
     <h2 class="gs-seclabel">${resumeHTML ? 'Or start a new run — choose your game' : 'Choose your game'}</h2>
-    <div class="gs-navtiles gs-navtiles--games">${modes}${storyTileHTML()}${destinationTileHTML()}${universeUnendingTileHTML()}${starTourRewardTileHTML()}</div>
+    <div class="gs-navtiles gs-navtiles--games">${modes}${storyTileHTML()}${drivingRangeTileHTML()}${universeUnendingTileHTML()}${starTourRewardTileHTML()}</div>
     <h2 class="gs-seclabel">Between runs</h2>
     ${navTilesHTML()}`;
 }
@@ -332,18 +332,75 @@ function starTourRewardTileHTML(): string {
     </div>`;
 }
 
-/** Greyed-out placeholder tile beneath THE VOYAGE (GS-title-placeholders): a future campaign,
- *  "The Destination". Non-interactive teaser (a `<div>`, not a button) in the game row, greyed like
- *  the locked Star Tour tile — reuses the Voyage's gold backdrop, muted. Column-aligns under Voyage. */
-function destinationTileHTML(): string {
+/** THE DRIVING RANGE tile (GS-driving-range), beneath THE VOYAGE in the game row — where the greyed
+ *  "The Destination" teaser used to sit. A live doorway into the tutorial: three lesson holes with a coach
+ *  (the swing, putting, hazards, Stableford, upgrades). Always offered — a returning player may want a
+ *  refresher, and the range pays nothing, so there is nothing to gate. The Destination itself is still a
+ *  promise the Story Tour ending makes (GS-the-destination in IDEAS); it lost a placeholder, not a plan. */
+function drivingRangeTileHTML(): string {
   return `
-    <div class="gs-navtile gs-navtile--game" style="--mc:#3a4656;cursor:default;opacity:0.72;" aria-disabled="true" title="Coming soon">
-      <span class="gs-navtile__art" aria-hidden="true" style="filter:grayscale(0.85) brightness(0.55);">${voyageTileArt()}</span>
+    <button class="gs-navtile gs-navtile--game" style="--mc:#5fd45a;" data-action='${JSON.stringify({ type: 'openRange' })}'>
+      <span class="gs-navtile__art" aria-hidden="true">${drivingRangeTileArt()}</span>
       <span class="gs-navtile__cap">
-        <span class="gs-navtile__title">🔒 The Destination</span>
-        <span class="gs-navtile__sub">Coming soon</span>
+        <span class="gs-navtile__title">🎓 Driving Range</span>
+        <span class="gs-navtile__sub">New here? Learn to swing, putt and score</span>
       </span>
-    </div>`;
+    </button>`;
+}
+
+/** Painted backdrop for the Driving Range tile: a practice ground under the stars — a lit hitting mat in
+ *  the foreground, yardage flags receding up the range, a ball arcing out toward them, a bucket of balls
+ *  at the bay. Hand-placed (byte-stable), the same doorway house style as the other game tiles. */
+function drivingRangeTileArt(): string {
+  const stars = [
+    [16, 14], [44, 30], [78, 10], [112, 24], [150, 8], [190, 22], [226, 12], [262, 28], [288, 10], [130, 40], [60, 48],
+  ]
+    .map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${0.8 + (i % 3) * 0.45}" fill="#ffffff" opacity="${0.35 + (i % 4) * 0.14}"/>`)
+    .join('');
+  // Yardage flags receding toward the horizon: [x, base y, pole height, flag colour, label].
+  const flags: [number, number, number, string, string][] = [
+    [84, 96, 16, '#ff6b6b', '50'],
+    [166, 78, 12, '#ffce54', '100'],
+    [226, 66, 9, '#54c8ff', '150'],
+  ];
+  const flagSvg = flags
+    .map(
+      ([x, y, h, c, label]) => `<g>
+      <ellipse cx="${x}" cy="${y}" rx="${h * 0.9}" ry="${h * 0.22}" fill="#9be08a" opacity="0.35"/>
+      <rect x="${x - 0.6}" y="${y - h}" width="1.2" height="${h}" fill="#e8e8ea"/>
+      <path d="M${x + 0.6},${y - h} L${x + 0.6 + h * 0.62},${y - h + h * 0.18} L${x + 0.6},${y - h + h * 0.36} Z" fill="${c}"/>
+      <text x="${x}" y="${y + h * 0.55 + 4}" font-size="${4 + h * 0.18}" font-weight="700" text-anchor="middle" fill="#dff7d8" opacity="0.8">${label}</text>
+    </g>`,
+    )
+    .join('');
+  return `<svg viewBox="0 0 300 150" preserveAspectRatio="xMidYMid slice" width="100%" height="100%">
+    <defs>
+      <radialGradient id="ntRangeSky" cx="50%" cy="0%" r="110%">
+        <stop offset="0%" stop-color="#1d3a4a"/><stop offset="55%" stop-color="#101a30"/><stop offset="100%" stop-color="#090d1c"/>
+      </radialGradient>
+      <linearGradient id="ntRangeTurf" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#2f6b3a"/><stop offset="100%" stop-color="#4fa457"/>
+      </linearGradient>
+    </defs>
+    <rect width="300" height="150" fill="url(#ntRangeSky)"/>
+    ${stars}
+    <!-- the range: a green fan running up to a treeline horizon -->
+    <path d="M0,62 C70,54 230,54 300,62 L300,150 L0,150 Z" fill="url(#ntRangeTurf)"/>
+    <path d="M0,62 C70,54 230,54 300,62" fill="none" stroke="#1d4a28" stroke-width="5" opacity="0.8"/>
+    <!-- mown stripes converging on the horizon -->
+    <path d="M40,150 L120,60 M110,150 L148,58 M190,150 L176,58 M260,150 L206,60" stroke="#5fbb63" stroke-width="10" opacity="0.18"/>
+    ${flagSvg}
+    <!-- a ball's arc out toward the 150 flag -->
+    <path d="M60,128 C110,40 190,30 222,58" fill="none" stroke="#ffffff" stroke-width="1.4" stroke-dasharray="2 4" stroke-linecap="round" opacity="0.75"/>
+    <circle cx="198" cy="40" r="2.6" fill="#ffffff"/>
+    <!-- the hitting bay: mat, tee and the bucket of balls -->
+    <rect x="30" y="122" width="76" height="22" rx="3" fill="#1f5a2c" stroke="#7fd27a" stroke-width="1" opacity="0.95"/>
+    <circle cx="60" cy="128" r="2.4" fill="#ffffff"/>
+    <rect x="59.3" y="130" width="1.4" height="4" fill="#ffce54"/>
+    <path d="M84,138 L88,126 L102,126 L106,138 Z" fill="#c2702e"/>
+    <circle cx="90" cy="125" r="2.2" fill="#ffffff"/><circle cx="95" cy="124" r="2.2" fill="#ffffff"/><circle cx="100" cy="125" r="2.2" fill="#ffffff"/>
+    <circle cx="92.5" cy="121.5" r="2.2" fill="#ffffff"/><circle cx="97.5" cy="121.5" r="2.2" fill="#ffffff"/>
+  </svg>`;
 }
 
 /** Greyed-out placeholder tile beneath the UNENDING UNIVERSE (GS-title-placeholders): a future mode,

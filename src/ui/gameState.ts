@@ -31,6 +31,7 @@ import type { AimMode, HolePlay, ScrambleShot } from '../sim/rpg/play';
 import type { ReleaseNote } from './releaseNotes';
 import type { HoleDuel } from '../sim/rpg/match';
 import type { Rng } from '../sim/rng';
+import type { RangeLessonId } from '../sim/rpg/drivingRange';
 
 /** The rooms aboard your ship (GS-story-ship-interior), in walk order. `bridge` is the entry room. */
 export const SHIP_ROOMS = ['bridge', 'lounge', 'weapons', 'engine', 'locker'] as const;
@@ -101,7 +102,9 @@ export type Screen =
   // GS-story-parrot-bar: "The Crow's Nest" — the Parrot's cantina; tap for campaign-adaptive chatter.
   | 'storyBar'
   // GS-lore: a one-off story-beat popup shown on arrival at a stop (e.g. Driver Dan at the derelict).
-  | 'lore';
+  | 'lore'
+  // GS-driving-range: the tutorial's graduation card — the three-hole card, the points, where next.
+  | 'rangeResult';
 
 export interface UiState {
   run: Run;
@@ -310,6 +313,12 @@ export interface UiState {
    *  not from a Rainbow-Road eagle mid-voyage — so there is no suspended journey to resume. `leaveAsgard`
    *  reads this to return to the star map instead of a travel screen. Transient (never persisted). */
   asgardFromStarTour?: boolean;
+  /** THE DRIVING RANGE (GS-driving-range): the coach cards already read this visit, so each lesson stops
+   *  the player once. Transient — the range is never persisted, and opening it again teaches again. */
+  rangeSeen?: RangeLessonId[];
+  /** The range upgrades fitted on the wild-ball hole (shop item ids from `RANGE_UPGRADES`). The loadout is
+   *  rebuilt from this through `rangeLoadoutFor` — the ONE rule — on every toggle and hole change. */
+  rangeUpgrades?: string[];
   /** GS-story: the active Story Mode campaign, when the player is in Story Mode. Persisted to its OWN
    *  `fc_story` save blob (NOT the main `fc_save`), loaded into state at boot if a campaign exists, and
    *  written back by the app after each action. Absent ⇒ no campaign started on this device. */
@@ -563,6 +572,9 @@ export type Action =
   | { type: 'continue' }
   | { type: 'crossBifrost' } // GS-asgard: cross the Bifröst from the Himinbjörg map into the Asgard tournament
   | { type: 'leaveAsgard' } // GS-asgard: leave the Golden Realm (win or lose) and resume the suspended run
+  | { type: 'openRange' } // GS-driving-range: open the tutorial from the title (or play it again from its result)
+  | { type: 'rangeDismissLesson'; id: RangeLessonId } // close a coach card (the lesson is marked seen)
+  | { type: 'rangeToggleUpgrade'; id: string } // fit / remove one range upgrade on the wild-ball hole
   | { type: 'openStarTour' } // GS-star-tour: open the free-roam star map course picker
   | { type: 'pickStarTourCourse'; courseId: string; effect?: string } // choose a course + weather → character select
   | { type: 'selectStarTourChampion'; characterId: string } // GS-story-startour-champions: free-roam as this finished campaign's protagonist

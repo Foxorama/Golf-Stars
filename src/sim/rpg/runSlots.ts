@@ -26,7 +26,7 @@
  * the alternative on a boot path is a bricked game.
  */
 
-import { ASGARD_FORMAT, STROKEPLAY_FORMAT, getFormat } from './formats';
+import { ASGARD_FORMAT, RANGE_FORMAT, STROKEPLAY_FORMAT, getFormat } from './formats';
 import type { RunSnapshot } from './runSerialise';
 
 /** The four things a player can have going at once. */
@@ -100,10 +100,13 @@ export function isRunMode(s: unknown): s is RunMode {
  * pinned static course), so the format alone would file it under Star Tour and let a campaign round
  * overwrite a parked free-roam round. Asgard returns `null`: the tournament run is ephemeral by
  * design (a mid-tournament quit resumes the SUSPENDED real run), so it belongs in no slot at all.
+ * The Driving Range returns `null` for a simpler reason: a lesson has nothing worth parking.
  */
 export function runModeOf(formatId: string | undefined, storyRound?: boolean): RunMode | null {
   if (storyRound) return 'story';
   if (formatId === ASGARD_FORMAT) return null;
+  // The Driving Range (GS-driving-range) parks nothing: it is a five-minute lesson that pays nothing.
+  if (formatId === RANGE_FORMAT) return null;
   if (formatId === STROKEPLAY_FORMAT) return 'startour';
   return getFormat(formatId).winnable ? 'voyage' : 'endless';
 }

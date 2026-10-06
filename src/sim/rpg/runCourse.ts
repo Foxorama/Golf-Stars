@@ -33,7 +33,8 @@ import {
   type BiomeArchetype,
   type Theme,
 } from '../course/themes';
-import { getFormat, stopSpecFor, type StopSpec } from './formats';
+import { getFormat, stopSpecFor, RANGE_FORMAT, type StopSpec } from './formats';
+import { drivingRangeCourse } from './drivingRangeCourse';
 import { buildStaticCourse } from '../course/staticCourses';
 import { staticCourseSpec, regenerateStaticCourse } from '../course/staticCourseSpecs';
 import type { Run } from './run';
@@ -122,6 +123,9 @@ export function routeTheme(
 
 /** The course awaiting the player at the current stop (shaped by the run format + theme). */
 export function currentCourse(run: Run): Course {
+  // THE DRIVING RANGE (GS-driving-range): the tutorial's three lesson holes, chosen by job off the live
+  // generator. Gated on its own format id, which nothing else sets ⇒ every other path is byte-for-byte.
+  if (run.formatId === RANGE_FORMAT) return drivingRangeCourse();
   // STAR TOUR (GS-star-tour): a stroke-play round plays a PINNED static course, not a generated stop.
   // Serve the fixed designed 18-hole layout and apply the chosen weather sky as pure physics
   // (`applyEffectPhysics` — wind/carry only, no geometry change, so the course records stay comparable).

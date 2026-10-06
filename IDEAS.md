@@ -10,6 +10,15 @@ is the endless survival mode — the old `flat`/`ladder` roguelites are retired 
 under the new format). Avenue (1), a full top-down RPG shell, stays deferred until the loop is exhausted.
 
 ## Now / next
+- **GS-story-liveround-crossmode** — ⚠️ DATA LOSS, found while building GS-driving-range, NOT fixed there.
+  Park a Story world round (title → CONTINUE shows it), then start a Voyage/Unending/Star Tour run: the
+  next `persistStory` writes `campaignWithLiveRound(state)`, which reads "no story round in progress" off
+  the non-story run and REMOVES `liveRound` from that campaign in `fc_story`. Reproduced in a reducer test
+  (story round → hole 1 done → `toTitle` → `start voyage` → `selectCharacter` ⇒ `liveRound` gone). The
+  range is guarded (`RANGE_FORMAT` early-return); the general fix is for `campaignWithLiveRound` to leave
+  the campaign untouched whenever the LIVE run is not that campaign's — but its "walking back to the
+  clubhouse clears the offer" rule must be re-checked against that, so it is its own change with its own
+  tests.
 
 > **THE 1.3.0 PLAY-TEST ITEMS ARE ALL DONE** — GS-runout-seen, GS-fairway-ink-break,
 > GS-clubhouse-floor and GS-scene-isolate have shipped (see Done). The entries below are the
@@ -417,7 +426,8 @@ default). One focused, tested, auto-merged PR each:
   one screen + a reducer divert; zero sim rng, no save bump. Guarded by `tests/story-aftermath.test.ts` +
   `?screen=storyaftermath` browser smoke.
 - **GS-story-betrayal-polish** — balance, dialogue depth, costume polish, docs.
-- **GS-the-destination** — the FUTURE game mode the Warden ending now names: the Coil's remnant (and the
+- **GS-the-destination** — the FUTURE game mode the Warden ending now names (its greyed title placeholder
+  gave way to the Driving Range tile — GS-driving-range — the promise stands, the teaser slot went): the Coil's remnant (and the
   betrayed friend) fled "past the edge of every chart" to **The Destination** — an unknown-deep voyage mode
   where redeeming the friend is the quest. The ending, the mission log, and the story bible all seed the
   name verbatim (GS-story-unending-tease), so the mode ships into an already-told promise. Design TBD
@@ -731,6 +741,13 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-driving-range** — the tutorial. The title's greyed "The Destination" teaser is now a live 🎓
+  Driving Range tile: three lesson holes on Verdant Station (chosen by job off the live generator), a coach
+  card at each first moment (swing · putt · hazards · upgrades), Stableford taught on every end-of-hole
+  card against the score just made, and a wild-ball hole where Shank Guard / Anti-Hook Grip / Slice &
+  Hook Correctors are toggled live from the controls panel and the cone changes under the player's thumb.
+  Never parked, pays nothing. `docs/decisions/driving-range.md`. Follow-up idea: point a brand-new device
+  at it from the title.
 - **GS-aim-tree-aware** — CLOSED by GS-safe-aim-trees (🛟, #740) + GS-auto-aim-trees (◎). The aim
   family sees canopies now, with a different answer per mode because their jobs differ: safe goes
   ROUND a stand, the default lays up SHORT of it and takes the club that gets there (turning the
