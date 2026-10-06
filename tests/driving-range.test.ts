@@ -31,6 +31,11 @@ import {
   rangeLessonDue,
   rangeLoadoutFor,
   rangeText,
+  rangeScoringFor,
+  rangeRivalHole,
+  rangeMatchResult,
+  strokeLadder,
+  RANGE_MATCH_HOLE,
   RANGE_BALL_SHAPE,
   RANGE_GOLFER,
   RANGE_LESSONS,
@@ -42,7 +47,7 @@ import {
 } from '../src/sim/rpg/drivingRange';
 import { hasPenaltyHazard } from '../src/sim/rpg/drivingRangeCourse';
 import { applyShapeMod, DEFAULT_SHAPE } from '../src/sim/shot';
-import { stablefordPoints } from '../src/sim/score';
+import { stablefordPoints, scoreName } from '../src/sim/score';
 import { shopItem } from '../src/sim/rpg/economy';
 
 const shapeOf = (s: UiState) => applyShapeMod(DEFAULT_SHAPE, s.run.loadout.shapeMod);
@@ -157,8 +162,10 @@ describe('the coach', () => {
     // Putting is taught on the first green you putt on, wherever that is (e.g. hole 1 was auto-finished).
     expect(rangeLessonDue(2, 'putt', ['swing', 'hazards', 'upgrades'])).toBe('putt');
     expect(rangeLessonDue(1, 'aim', ['swing', 'putt'])).toBe('hazards');
-    expect(rangeLessonDue(RANGE_UPGRADE_HOLE, 'aim', ['swing', 'putt', 'hazards'])).toBe('upgrades');
-    expect(rangeLessonDue(RANGE_UPGRADE_HOLE, 'aim', ['swing', 'putt', 'hazards', 'upgrades'])).toBeNull();
+    // The last hole: the match is explained before the upgrades, then nothing more.
+    expect(rangeLessonDue(RANGE_UPGRADE_HOLE, 'aim', ['swing', 'putt', 'hazards'])).toBe('match');
+    expect(rangeLessonDue(RANGE_UPGRADE_HOLE, 'aim', ['swing', 'putt', 'hazards', 'match'])).toBe('upgrades');
+    expect(rangeLessonDue(RANGE_UPGRADE_HOLE, 'aim', ['swing', 'putt', 'hazards', 'match', 'upgrades'])).toBeNull();
     // A skipped first hole still meets the swing lesson before anything else.
     expect(rangeLessonDue(RANGE_UPGRADE_HOLE, 'aim', [])).toBe('swing');
   });
@@ -175,6 +182,44 @@ describe('the coach', () => {
       expect(l.steps.length).toBeGreaterThan(0);
       expect(l.cta.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('three holes, three scoring formats', () => {
+  it('teaches stroke play, then Stableford, then matchplay on the last hole', () => {
+    expect([0, 1, 2].map(rangeScoringFor)).toEqual(['stroke', 'stableford', 'match']);
+    expect(RANGE_MATCH_HOLE).toBe(drivingRangeCourse().holes.length - 1);
+  });
+
+  it('the stroke-play ladder is the sim’s own score names', () => {
+    for (const r of strokeLadder(4).filter((r) => r.toPar < 2)) expect(r.name).toBe(scoreName(4, 4 + r.toPar));
+  });
+
+  it('the rival plays the matchplay hole on their own stream: deterministic, and the player’s shots are untouched', () => {
+    const course = drivingRangeCourse();
+    const a = rangeRivalHole(course);
+    expect(JSON.stringify(rangeRivalHole(course))).toBe(JSON.stringify(a));
+    expect(a.record.par).toBe(course.holes[RANGE_MATCH_HOLE]!.par);
+    expect(a.record.strokes).toBeGreaterThan(0);
+    // Two INDEPENDENT walks (each with its own play stream — `holeRng` is a mutable object, so the two
+    // must not share one). In the second the rival is played three extra times mid-hole: if it ever drew
+    // from the player's stream, the player's card would change.
+    const walk = (extra: boolean): UiState => {
+      let s = onRange();
+      for (let i = 0; i < RANGE_MATCH_HOLE; i++) s = finishHole(s);
+      expect(s.rangeRival).toEqual(a);
+      if (extra) for (let k = 0; k < 3; k++) rangeRivalHole(s.course);
+      return finishHole(s);
+    };
+    expect(JSON.stringify(walk(true).played)).toBe(JSON.stringify(walk(false).played));
+  });
+
+  it('the match result is the game’s own matchplay rule', () => {
+    const rival = rangeRivalHole(drivingRangeCourse());
+    const mk = (strokes: number) => ({ ...rival, record: { ...rival.record, strokes } });
+    expect(rangeMatchResult(mk(rival.record.strokes - 1), rival).winner).toBe('player');
+    expect(rangeMatchResult(mk(rival.record.strokes + 1), rival).winner).toBe('boss');
+    expect(rangeMatchResult(mk(rival.record.strokes), rival).winner).toBe('halved');
   });
 });
 
@@ -202,6 +247,7 @@ describe('the reducer', () => {
     expect(s.play?.holeIndex).toBe(0);
     expect(s.rangeSeen).toEqual([]);
     expect(s.rangeUpgrades).toEqual([]);
+    expect(s.rangeRival).toBeUndefined();
     expect(reduce(s, { type: 'openRange' })).toBe(s);
   });
 

@@ -200,11 +200,14 @@ export function resumableState(state: UiState): Resumable {
 export function campaignWithLiveRound(state: UiState): StoryState | undefined {
   const story = state.story;
   if (!story) return undefined;
-  // GS-driving-range: a range lesson is not the campaign's business. Without this, opening the range
-  // with a campaign loaded would read "no story round in progress" and REMOVE the round the player had
-  // parked (`persistStory` runs after every action). Note the same reading applies to every non-story
-  // mode today — GS-story-liveround-crossmode in IDEAS — this guard only keeps the range out of it.
-  if (state.run.formatId === RANGE_FORMAT) return story;
+  // GS-story-liveround-crossmode: only a STORY ROUND can say anything about the campaign's round. Every
+  // other run — a Voyage, an Unending run, a Star Tour round, the Driving Range, the title's placeholder —
+  // is simply not that campaign's business, so the parked round is handed back untouched. Without this,
+  // parking a Story round and then starting any other mode read "no story round in progress" and REMOVED
+  // the round on the next `persistStory` (it runs after every action): ignoring CONTINUE cost the player
+  // their round. The two deliberate ways a round ends — finishing it and `leaveRound` — both ask this
+  // question while the story run is still the live run, so they keep clearing it.
+  if (!state.run.storyRound) return story;
   const round = liveStoryRound(state);
   // Nothing in progress ⇒ the field is REMOVED, not left stale. Finishing a round, or walking back to
   // the clubhouse, must clear the offer — the same rule that empties a slot when a run ends. Returning

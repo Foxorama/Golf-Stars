@@ -45,7 +45,7 @@ import {
 } from '../sim/rpg/run';
 import { effectPatchKind } from '../sim/rpg/effects';
 import { isMatchplayBoss, ASGARD_FORMAT, RANGE_FORMAT, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
-import { isRangeUpgrade, rangeLoadoutFor, RANGE_UPGRADE_HOLE, startRangeRun } from '../sim/rpg/drivingRange';
+import { isRangeUpgrade, rangeLoadoutFor, rangeRivalHole, RANGE_MATCH_HOLE, RANGE_UPGRADE_HOLE, startRangeRun } from '../sim/rpg/drivingRange';
 import {
   playMatchStop,
   playTeamMatchStop,
@@ -1619,6 +1619,7 @@ export function reduce(state: UiState, action: Action): UiState {
         viewHole: 0,
         rangeSeen: [],
         rangeUpgrades: [],
+        rangeRival: undefined,
       };
     }
 
@@ -2046,7 +2047,10 @@ export function reduce(state: UiState, action: Action): UiState {
       if (state.run.formatId === RANGE_FORMAT) {
         if (nextIdx < total) {
           const run = { ...state.run, loadout: rangeLoadoutFor(state.run, nextIdx, state.rangeUpgrades ?? []) };
-          return { ...state, run, stopPlayed, play: beginHole(state.course.holes[nextIdx]!, nextIdx) };
+          // The matchplay hole's rival plays it now, on its own stream, so their line is on the map from
+          // the first decision (the same way a Voyage boss's ball is).
+          const rangeRival = nextIdx === RANGE_MATCH_HOLE ? rangeRivalHole(state.course) : state.rangeRival;
+          return { ...state, run, stopPlayed, rangeRival, play: beginHole(state.course.holes[nextIdx]!, nextIdx) };
         }
         return {
           ...state,
@@ -2740,6 +2744,7 @@ export function reduce(state: UiState, action: Action): UiState {
         // …and the Driving Range's coach state (GS-driving-range) — transient lesson bookkeeping.
         rangeSeen: undefined,
         rangeUpgrades: undefined,
+        rangeRival: undefined,
         viewHole: 0,
       };
     }
@@ -2802,8 +2807,10 @@ export function reduce(state: UiState, action: Action): UiState {
         };
         // …and fold the campaign's now-round-less shape back into state, so the golfer picker (which
         // reads `state.campaigns`, not the blob) cannot go on offering a round that is gone. Writing one
-        // and not the other is GS-resume-slot-loss in the campaign's half.
-        const story = campaignWithLiveRound(next);
+        // and not the other is GS-resume-slot-loss in the campaign's half. The question is asked while the
+        // STORY run is still the live run (with `play` cleared): `campaignWithLiveRound` only lets a story
+        // round speak for the campaign (GS-story-liveround-crossmode), and the placeholder above is not one.
+        const story = campaignWithLiveRound({ ...next, run: state.run });
         return story ? { ...next, story, campaigns: upsertCampaign(next.campaigns, story) } : next;
       }
 

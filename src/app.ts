@@ -25,8 +25,8 @@ import { type ShotSpread } from './sim/round';
 import { type SprayGeomInput } from './render/holeView';
 import { ACE_CREDIT_BONUS, maxPowerOf, usableBag } from './sim/rpg/economy';
 import { getFormat, ASGARD_FORMAT, RANGE_FORMAT, STROKEPLAY_FORMAT } from './sim/rpg/formats';
-import { rangeLessonDue, RANGE_UPGRADE_HOLE, type RangeLessonId } from './sim/rpg/drivingRange';
-import { rangeCoachOverlay, rangeResultScreen, rangeStablefordHTML, rangeUpgradeRowHTML } from './app/rangeScreens';
+import { rangeLessonDue, RANGE_MATCH_HOLE, RANGE_UPGRADE_HOLE, type RangeLessonId } from './sim/rpg/drivingRange';
+import { rangeBannerParts, rangeCoachOverlay, rangeHoleLessonHTML, rangeResultScreen, rangeUpgradeRowHTML } from './app/rangeScreens';
 import { holeGateArmed, snapshotRun, currentCourse } from './sim/rpg/run';
 import { shopOffer, starmartOffer } from './sim/rpg/runShop';
 import { shopItem } from './sim/rpg/economy';
@@ -704,6 +704,10 @@ function dispatch(action: Action): void {
     // so remember it on THIS device. Stamped on the action, not in the overlay's click handler, so
     // there is exactly one place the stamp can come from.
     if (action.type === 'dismissUpdateNotice') setSetting('seenVersion', APP_VERSION);
+    // GS-driving-range-notice: going into the range by ANY door (the announcement's own button, the title
+    // tile, "go round again") means the announcement has done its job. Stamped on the action, so there is
+    // one place it can come from; the announcement's ✕ stamps the same field.
+    if (action.type === 'openRange' && !getSettings().rangeNoticeDone) setSetting('rangeNoticeDone', true);
     // Entering character select seeds the difficulty pickers (GS-title-2 / GS-golf-score). Ascension
     // defaults to the LAST tier you chose (persisted pref), clamped to what's now unlocked — so it
     // doesn't snap back to A0 every run. The club set defaults to the owned tier (the strongest bag
@@ -1645,6 +1649,9 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
     const grossSoFar = playedSoFar.reduce((s, p) => s + p.record.strokes, 0);
     const toParSoFar = grossSoFar - playedSoFar.reduce((s, p) => s + p.record.par, 0);
     const toParTag = (v: number): string => (v === 0 ? 'E' : v > 0 ? `+${v}` : `${v}`);
+    // THE DRIVING RANGE (GS-driving-range): each hole is scored in its own format, so the banner's line and
+    // big number are the ones THAT format scores by (strokes / points / the match result).
+    const rangeBanner = state.run.formatId === RANGE_FORMAT ? rangeBannerParts(play.holeIndex, kept, state.rangeRival) : null;
     const holeLine = isAsgard
       ? `${kept.pickedUp ? 'no return' : d === 0 ? 'level par' : `${toParTag(d)} to par`} this hole`
       : `+${holePts} pt${holePts === 1 ? '' : 's'} this hole`;
@@ -1663,11 +1670,11 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
         <div style="flex:1 1 auto;min-width:0;">
           <div style="font-size:10.5px;opacity:.5;letter-spacing:.1em;">HOLE ${play.holeIndex + 1}${partnerHole ? ' · TEAM BALL' : ''}</div>
           <div style="font-size:18px;font-weight:800;">${name}${lastIsHoled ? ' 🎉' : ''}</div>
-          <div style="font-size:12px;opacity:.7;margin-top:1px;">${holeLine}</div>
+          <div style="font-size:12px;opacity:.7;margin-top:1px;">${rangeBanner ? rangeBanner.line : holeLine}</div>
         </div>
         <div style="text-align:center;border-left:1px solid var(--gs-line-2);padding-left:14px;">
-          <div style="font-size:28px;font-weight:800;line-height:1;color:var(--gs-accent);">${isAsgard ? grossSoFar : stopPts}</div>
-          <div style="font-size:10px;opacity:.55;letter-spacing:.05em;margin-top:3px;">${isAsgard ? `GROSS · ${toParTag(toParSoFar)}` : state.run.formatId === RANGE_FORMAT ? 'POINTS' : 'STOP PTS'}</div>
+          <div style="font-size:28px;font-weight:800;line-height:1;color:var(--gs-accent);">${rangeBanner ? rangeBanner.big : isAsgard ? grossSoFar : stopPts}</div>
+          <div style="font-size:10px;opacity:.55;letter-spacing:.05em;margin-top:3px;">${rangeBanner ? rangeBanner.cap : isAsgard ? `GROSS · ${toParTag(toParSoFar)}` : 'STOP PTS'}</div>
         </div>
       </div>`;
     // GS-story-sigil-live: a Sigil round shows its COMPETITION live every hole — the running match
@@ -1678,8 +1685,8 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
     const sigilLive = state.run.storyTournament || state.run.storyQualifier ? storySigilProgressHTML(playedSoFar) : '';
     const progress = state.run.formatId === RANGE_FORMAT
       ? // THE DRIVING RANGE (GS-driving-range): no field to place against — the end-of-hole card is where
-        // Stableford is TAUGHT, against the score just made.
-        rangeStablefordHTML(kept, playedSoFar)
+        // each scoring format is TAUGHT, one per hole, against the score just made.
+        rangeHoleLessonHTML(play.holeIndex, kept, state.rangeRival)
       : sigilLive
       ? `${sigilLive}<div style="margin-top:10px;">${strokePlayProgressHTML(playedSoFar)}</div>`
       : state.run.formatId === STROKEPLAY_FORMAT
@@ -2010,6 +2017,9 @@ function playingBody(anim: ReturnType<typeof pendingAnimation>): string {
     ghostShots:
       state.match && state.match.setup?.format !== 'bestball'
         ? state.match.bossHoles[play.holeIndex]?.shots
+        : // The Driving Range's matchplay hole draws its rival's line the same way (GS-driving-range).
+          state.run.formatId === RANGE_FORMAT && play.holeIndex === RANGE_MATCH_HOLE
+        ? state.rangeRival?.shots
         : undefined,
     biome: holeBiome(play.hole), themeId: holeThemeId(play.hole),
     rainbow: rainbowActive(),
@@ -3429,13 +3439,15 @@ function render(): void {
   // The phase is the play screen's OWN putt question (`selPutt` covers a chosen fringe putt), so the
   // putting lesson appears on whichever stroke is actually a putt.
   const rangePlay = state.screen === 'playing' && state.run.formatId === RANGE_FORMAT ? state.play : undefined;
+  const rangePhase = rangePlay && (awaitingPutt(rangePlay) || (canPuttFringe(rangePlay) && selPutt)) ? 'putt' : 'aim';
+  // The shot-result card and the scramble pick ride the AIM body's `after` ONLY — the putt frame draws
+  // neither. `awaitingShotPopup` stays TRUE through a putt render (it clears on the next action), so
+  // gating on the bare flag held the putting lesson back behind a card that was never drawn: a ball
+  // struck onto the green got no lesson until AFTER the first putt. Ask what is actually on screen.
+  const rangeCardUp = rangePhase === 'aim' && (awaitingShotPopup || !!state.scrambleChoice);
   rangeCoachShown =
-    rangePlay && !rangePlay.done && !animatingPlay && !awaitingShotPopup && !state.scrambleChoice && !clubPickerOpen && !settingsOpen
-      ? rangeLessonDue(
-          rangePlay.holeIndex,
-          awaitingPutt(rangePlay) || (canPuttFringe(rangePlay) && selPutt) ? 'putt' : 'aim',
-          state.rangeSeen ?? [],
-        ) ?? undefined
+    rangePlay && !rangePlay.done && !animatingPlay && !rangeCardUp && !clubPickerOpen && !settingsOpen
+      ? rangeLessonDue(rangePlay.holeIndex, rangePhase, state.rangeSeen ?? []) ?? undefined
       : undefined;
   const rangeCoach = rangeCoachShown ? rangeCoachOverlay(rangeCoachShown) : '';
   // Note what has focus BEFORE the DOM is torn down (GS-a11y-focus) — it is the last moment the
@@ -4064,6 +4076,13 @@ function render(): void {
       selClubSetTouched = true;
       sfx.click();
       haptic(HAPTICS.tap);
+      render();
+    });
+  });
+  // GS-driving-range-notice: the title's "The Driving Range has opened!" card — ✕ means done with it.
+  app.querySelectorAll<HTMLElement>('[data-range-notice-dismiss]').forEach((el) => {
+    el.addEventListener('click', () => {
+      setSetting('rangeNoticeDone', true);
       render();
     });
   });

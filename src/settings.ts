@@ -50,6 +50,11 @@ export interface Settings {
    *  because it is about this DEVICE's eyes, not the player's progress, and because settings merge
    *  over defaults so it costs no save bump and no new storage key. */
   seenVersion: string;
+  /** The "Driving Range has opened!" announcement on the title is done with (GS-driving-range-notice):
+   *  set when the player dismisses it OR opens the range by any door, so it shows once for everyone and
+   *  then goes away. A fact about this device's eyes, like `seenVersion` — and merged over defaults, so
+   *  every existing device reads `false` and sees it once, with no save bump and no new storage key. */
+  rangeNoticeDone: boolean;
 }
 
 export const SETTINGS_KEY = 'fc_settings';
@@ -77,6 +82,7 @@ function defaults(): Settings {
     readableFont: false,
     uiScale: 1,
     seenVersion: '',
+    rangeNoticeDone: false,
   };
 }
 

@@ -21,6 +21,7 @@ import { playTotals } from '../sim/score';
 import { currentBoss, effectiveCut, holeGateArmed } from '../sim/rpg/run';
 import { endlessSetGateOverPar, endlessSetLabel, endlessSetToPar, formatToPar, toParColour } from '../sim/rpg/endless';
 import { isTeamDuelBoss, RANGE_FORMAT, STROKEPLAY_FORMAT } from '../sim/rpg/formats';
+import { rangeScoringFor, rivalName } from '../sim/rpg/drivingRange';
 import { shotView } from '../sim/rpg/play';
 
 /** Signed yardage as plain words (+ = right of the line). */
@@ -260,13 +261,21 @@ function zoneScoreChip(): string {
       title: `running score — total strokes vs par through ${done.length} holes`,
     });
   }
-  // THE DRIVING RANGE (GS-driving-range): there is no cut to make — the running Stableford total is the
-  // thing the end-of-hole card teaches, so the pod shows exactly that and nothing it would have to explain.
+  // THE DRIVING RANGE (GS-driving-range): no cut to make — each hole is scored in its own format, so the
+  // pod reads what THAT format counts: the round's to-par on the stroke-play hole, the Stableford points
+  // on the Stableford hole, and the opponent on the matchplay hole (a one-hole match is all square
+  // until it is decided).
   if (state.run.formatId === RANGE_FORMAT) {
     const done = state.stopPlayed ?? [];
-    return pod(`${playTotals(done.map((p) => p.record)).stableford}`, 'points', {
-      title: `practice round — Stableford points through ${done.length} hole${done.length === 1 ? '' : 's'}`,
-    });
+    const hole = state.play?.holeIndex ?? done.length;
+    switch (rangeScoringFor(hole)) {
+      case 'stroke':
+        return pod(formatToPar(playTotals(done.map((p) => p.record)).toPar), 'stroke play', { title: 'stroke play — every shot counts' });
+      case 'stableford':
+        return pod(`${playTotals(done.map((p) => p.record)).stableford}`, 'points', { title: 'Stableford points so far' });
+      case 'match':
+        return pod('AS', `vs ${rivalName().split(' ').pop()}`, { title: `matchplay against ${rivalName()} — all square` });
+    }
   }
   // The Unending Universe (GS-set-survival): the number that matters is THIS SET's running four-hole
   // total vs its allowance — show how far under/over you are through the holes played so far, and the

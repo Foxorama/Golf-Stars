@@ -22,7 +22,7 @@ uploaded.
 |---|---|---|
 | Your save — progress, unlocks, records | `localStorage`, key `fc_save` | So a run survives closing the tab |
 | Story Tour campaigns | `localStorage`, key `fc_story` | One campaign per golfer |
-| Your settings — sound, motion, text size, aim mode, and which version's update notes you've read | `localStorage`, key `fc_settings` | So your preferences stick, and the "what's new" card shows once per update |
+| Your settings — sound, motion, text size, aim mode, which version's update notes you've read, and whether you've seen the Driving Range announcement | `localStorage`, key `fc_settings` | So your preferences stick, and the "what's new" card and the Driving Range announcement each show only once |
 | Whether you dismissed the "install" prompt | `localStorage`, key `fc_installNudge` | So it doesn't nag |
 | Whether you've seen the intro this session | `sessionStorage`, key `fc_introSeen` | So it plays once per session |
 | A one-character test write, removed immediately | `localStorage`, key `fc_probe` | To find out whether this browser will let the game save at all, so it can warn you instead of losing your progress silently |

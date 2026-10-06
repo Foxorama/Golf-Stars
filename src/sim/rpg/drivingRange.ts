@@ -24,17 +24,28 @@
  */
 
 import { combineShapeMods, PEN_INFO, type ShapeMod, type SprayZone } from '../shot';
-import { stablefordPoints } from '../score';
+import { stablefordPoints, scoreName } from '../score';
+import { Rng } from '../rng';
+import { playHole, type PlayedHole } from '../round';
+import type { Course } from '../course/contract';
 import { shopItem, type PlayerLoadout } from './economy';
 import { RANGE_FORMAT } from './formats';
-import { startRun, type Run } from './run';
+import { startRun, playerHoleOpts, type Run } from './run';
 import { baseLoadoutForRun } from './runLoadout';
+import { getCharacter } from './characters';
+import { holeDuel, type HoleDuel } from './match';
 
 export { drivingRangeCourse } from './drivingRangeCourse';
 
 /** The golfer the lesson is played as. The tutorial comes BEFORE choosing anyone, so it uses the first
  *  name on the roster — a balanced all-rounder — rather than asking a beginner to pick blind. */
 export const RANGE_GOLFER = 'feather-fade';
+
+/** The opponent (declared before `RANGE_LESSONS`, which names them at load) on the matchplay hole: another starter golfer, playing the range's own course. */
+export const RANGE_RIVAL = 'longshot-larry';
+export function rivalName(): string {
+  return getCharacter(RANGE_RIVAL)?.name ?? 'your rival';
+}
 
 /** Which hole (0-based) is played with the wild range balls and offers the upgrades. */
 export const RANGE_UPGRADE_HOLE = 2;
@@ -103,7 +114,7 @@ export function rangeLoadoutFor(run: Run, holeIndex: number, upgrades: readonly 
 
 /** The moments the coach stops you. Stableford is NOT one of these — it is taught on the end-of-hole
  *  card itself, against the score you just made, every hole (see `stablefordLadder`). */
-export type RangeLessonId = 'swing' | 'putt' | 'hazards' | 'upgrades';
+export type RangeLessonId = 'swing' | 'putt' | 'hazards' | 'match' | 'upgrades';
 
 /** One line of a lesson: an icon (usually the control's own glyph), a bold lead, and the rest. */
 export interface RangeStep {
@@ -165,9 +176,20 @@ export const RANGE_LESSONS: Readonly<Record<RangeLessonId, RangeLesson>> = {
     ],
     cta: 'Play it safe',
   },
+  match: {
+    id: 'match',
+    kicker: 'Driving Range · Lesson 4',
+    title: `Matchplay vs ${rivalName()}`,
+    steps: [
+      { icon: '⚔️', lead: 'The last hole is a match.', text: `You are playing ${rivalName()} head to head. In matchplay you don’t add up strokes — whoever takes FEWER on a hole wins that hole.` },
+      { icon: '👻', lead: 'Your opponent’s ball is on the map.', text: `The faint line is the path ${rivalName()}’s ball took on this hole, so you can see what you have to beat.` },
+      { icon: '🤝', lead: 'Same score is a half.', text: 'Nobody wins a halved hole. Over a longer match you count holes won: "2 up" means two more than your opponent, and a match can be over early — "3 & 2" is three up with only two left to play.' },
+    ],
+    cta: 'Game on',
+  },
   upgrades: {
     id: 'upgrades',
-    kicker: 'Driving Range · Lesson 4',
+    kicker: 'Driving Range · Lesson 5',
     title: 'Upgrades change your shot',
     steps: [
       { icon: '🪣', lead: 'This hole is played with old range balls.', text: 'They spray everywhere — look how wide the orange and red bands are on the cone.' },
@@ -203,8 +225,48 @@ export function rangeLessonDue(holeIndex: number, phase: RangePhase, seen: reado
   if (phase === 'putt') return unseen('putt') ? 'putt' : null;
   if (unseen('swing')) return 'swing';
   if (holeIndex >= 1 && unseen('hazards')) return 'hazards';
+  if (holeIndex >= RANGE_MATCH_HOLE && unseen('match')) return 'match';
   if (holeIndex >= RANGE_UPGRADE_HOLE && unseen('upgrades')) return 'upgrades';
   return null;
+}
+
+// --- Scoring formats ------------------------------------------------------------------------------
+
+/**
+ * How each range hole is SCORED — one format per hole, so the end-of-hole card teaches all three the
+ * game uses: stroke play (Star Tour, the Asgard tournament, some Story events), Stableford (the Voyage's
+ * field, some Story events) and matchplay (every Voyage boss, the Story Sigil duels). Indexed by hole, so
+ * the card, the HUD pod and the graduation card all read the same answer.
+ */
+export type RangeScoring = 'stroke' | 'stableford' | 'match';
+export const RANGE_SCORING: readonly RangeScoring[] = ['stroke', 'stableford', 'match'];
+export function rangeScoringFor(holeIndex: number): RangeScoring {
+  return RANGE_SCORING[Math.max(0, Math.min(RANGE_SCORING.length - 1, holeIndex))]!;
+}
+
+/** The hole played as matchplay — the last one. */
+export const RANGE_MATCH_HOLE = RANGE_SCORING.indexOf('match');
+
+
+/**
+ * The rival's ball on the matchplay hole — the same headless sim every AI golfer plays, on its OWN
+ * stream (`:rival`), so it draws nothing from the player's `:play` stream and the player's shots are
+ * unchanged by its existence. The rival plays proper balls with their starter bag: the wild balls are
+ * the player's teaching prop, and a rival hobbled by them would make the match a lie. Deterministic.
+ */
+export function rangeRivalHole(course: Course): PlayedHole {
+  const rivalRun = startRun('driving-range:rival', RANGE_FORMAT, {}, RANGE_RIVAL);
+  return playHole(course.holes[RANGE_MATCH_HOLE]!, new Rng(`${course.seed}:rival`), playerHoleOpts(rivalRun));
+}
+
+/** The matchplay result for the hole — the game's own `holeDuel`, the rule every Voyage boss uses. */
+export function rangeMatchResult(player: PlayedHole, rival: PlayedHole): HoleDuel {
+  return holeDuel(RANGE_MATCH_HOLE, player.record.par, player, rival);
+}
+
+/** One rung of the stroke-play ladder: the score's NAME, read off the sim's own `scoreName`. */
+export function strokeLadder(par: number): { toPar: number; name: string }[] {
+  return [-2, -1, 0, 1, 2].map((d) => ({ toPar: d, name: d === 2 ? 'Double bogey' : scoreName(par, par + d) }));
 }
 
 // --- Stableford -----------------------------------------------------------------------------------
