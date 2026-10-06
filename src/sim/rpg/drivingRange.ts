@@ -51,12 +51,20 @@ export function rivalName(): string {
 export const RANGE_UPGRADE_HOLE = 2;
 
 /**
- * A bucket of battered range balls: every miss zone is wider than a real ball's. Added on top of the
- * golfer's own shape on the upgrades hole ONLY, so switching an upgrade off a zone is a change the
- * player can see on the cone (a 2% shank is a sliver nobody notices; a 9% one is a wedge of red).
- * Sized so the result stays well under the sim's own `MAX_MISS` cap, which would otherwise rescale it.
+ * A bucket of battered range balls: about ONE CLEAN STRIKE IN TEN until a guard goes on. Added on top
+ * of the golfer's own shape on the upgrades (matchplay) hole ONLY.
+ *
+ * The first cut widened every zone a little (~57% clean) and a play-test hit eight shots for one hook:
+ * a lesson about upgrades on balls that mostly fly straight teaches nothing. So the misses are piled
+ * into the two RED zones — the shank and the duck-hook — because those are exactly what Shank Guard
+ * and Anti-Hook Grip remove OUTRIGHT (−100%): one guard takes clean strikes from ~10% to ~50%, both to
+ * ~85%, a difference nobody can miss on the cone or in the shots. The correctors only trim their
+ * orange zones (−6%), which is honest to the Pro Shop rows and reads as "smaller help".
+ *
+ * `missCap` lifts the sim's ordinary 60% miss ceiling for this prop alone (scanned: no other shape may
+ * carry it). Sized so the sum lands just under the cap, i.e. the quoted odds are the drawn ones.
  */
-export const RANGE_BALL_SHAPE: ShapeMod = { hookL: 0.06, sliceR: 0.06, duckHookL: 0.05, shankR: 0.07 };
+export const RANGE_BALL_SHAPE: ShapeMod = { hookL: 0.02, sliceR: 0.02, duckHookL: 0.31, shankR: 0.35, missCap: 0.9 };
 
 /** One upgrade the range lets you fit: a real Pro Shop row, and the cone zone it acts on. */
 export interface RangeUpgrade {
@@ -192,8 +200,8 @@ export const RANGE_LESSONS: Readonly<Record<RangeLessonId, RangeLesson>> = {
     kicker: 'Driving Range · Lesson 5',
     title: 'Upgrades change your shot',
     steps: [
-      { icon: '🪣', lead: 'This hole is played with old range balls.', text: 'They spray everywhere — look how wide the orange and red bands are on the cone.' },
-      { icon: '🛡', lead: 'Fit an upgrade in the panel below.', text: 'Each one cuts one miss zone. Shank Guard removes the red band on the {R}; watch it vanish and the green band’s odds go up.' },
+      { icon: '🪣', lead: 'This hole is played with battered old range balls.', text: 'Only about one shot in ten flies clean — look how small the green band is, and how huge the red ones are. Against a rival, that will cost you.' },
+      { icon: '🛡', lead: 'Fit a guard in the panel below.', text: 'Shank Guard deletes the red band on the {R}; Anti-Hook Grip deletes the one on the {L}. Fit one and watch your clean-strike odds jump. The correctors trim the orange bands a little.' },
       { icon: '🔁', lead: 'Switch them on and off any time.', text: 'Try a shot with them, then without. On a real run you buy these in the Pro Shop between stops.' },
     ],
     cta: 'Try them out',

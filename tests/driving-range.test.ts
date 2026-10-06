@@ -119,6 +119,35 @@ describe('the wild balls and the upgrades', () => {
     expect(wild.shankR).toBeCloseTo(plain.shankR + RANGE_BALL_SHAPE.shankR!, 6);
   });
 
+  it('is about one clean strike in ten until a guard goes on — and one guard makes it a different game', () => {
+    const green = (ups: string[]) => applyShapeMod(DEFAULT_SHAPE, rangeLoadoutFor(run, RANGE_UPGRADE_HOLE, ups).shapeMod).green;
+    // The play-test: eight shots over two lessons produced ONE hook, i.e. the lesson had nothing to fix.
+    expect(green([])).toBeGreaterThanOrEqual(0.095);
+    expect(green([])).toBeLessThanOrEqual(0.12);
+    // Either guard alone at least quadruples it; both together leave most shots clean.
+    expect(green(['shank-guard'])).toBeGreaterThan(4 * green([]));
+    expect(green(['anti-duck-hook'])).toBeGreaterThan(4 * green([]));
+    expect(green(['shank-guard', 'anti-duck-hook'])).toBeGreaterThan(0.75);
+  });
+
+  it('only the range\u2019s wild balls may lift the sim\u2019s miss cap; every other shape keeps it', () => {
+    // The ordinary ceiling still binds for a shape without the prop's own cap…
+    const capped = applyShapeMod(DEFAULT_SHAPE, { shankR: 0.5, duckHookL: 0.5 });
+    expect(capped.green).toBeCloseTo(0.4, 9);
+    // …and no file outside the cap's definition and the range module may set one.
+    const files: string[] = [];
+    const walk = (d: string): void => {
+      for (const f of readdirSync(d)) {
+        const p = join(d, f);
+        if (statSync(p).isDirectory()) walk(p);
+        else if (p.endsWith('.ts')) files.push(p);
+      }
+    };
+    walk('src');
+    const users = files.filter((f) => /missCap\s*:/.test(readFileSync(f, 'utf8'))).map((f) => f.replace(/\\/g, '/')).sort();
+    expect(users).toEqual(['src/sim/rpg/drivingRange.ts', 'src/sim/shot.ts']);
+  });
+
   it('each upgrade removes or trims exactly the zone its chip names, the freed odds going to the clean strike', () => {
     const wild = applyShapeMod(DEFAULT_SHAPE, rangeLoadoutFor(run, RANGE_UPGRADE_HOLE, []).shapeMod);
     for (const u of RANGE_UPGRADES) {

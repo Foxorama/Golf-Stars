@@ -138,6 +138,11 @@ export interface ShapeMod {
   sliceR?: number;
   duckHookL?: number;
   shankR?: number;
+  /** Raise the total-miss cap for THIS shape (GS-driving-range): the range's wild balls are a teaching
+   *  prop that must be able to miss nine shots in ten, which the ordinary `MAX_MISS` forbids. Absent on
+   *  every other mod, so every other shape is byte-for-byte; only the range's wild-ball prop may carry it
+   *  (source-scanned) — a gameplay mode loosening the cap would be a fairness change, not a prop. */
+  missCap?: number;
 }
 
 /** Total miss probability is capped so green can never go negative (a wild golfer still has a core). */
@@ -150,6 +155,8 @@ export function combineShapeMods(a?: ShapeMod, b?: ShapeMod): ShapeMod {
     sliceR: (a?.sliceR ?? 0) + (b?.sliceR ?? 0),
     duckHookL: (a?.duckHookL ?? 0) + (b?.duckHookL ?? 0),
     shankR: (a?.shankR ?? 0) + (b?.shankR ?? 0),
+    // Only emitted when one side carries it, so an ordinary combine is the same object shape as before.
+    ...(a?.missCap != null || b?.missCap != null ? { missCap: Math.max(a?.missCap ?? 0, b?.missCap ?? 0) } : {}),
   };
 }
 
@@ -163,13 +170,14 @@ export function applyShapeMod(base: SprayShape, mod?: ShapeMod): SprayShape {
   let duckHookL = pos(base.duckHookL + (mod?.duckHookL ?? 0));
   let shankR = pos(base.shankR + (mod?.shankR ?? 0));
   let miss = hookL + sliceR + duckHookL + shankR;
-  if (miss > MAX_MISS) {
-    const k = MAX_MISS / miss;
+  const cap = mod?.missCap ?? MAX_MISS;
+  if (miss > cap) {
+    const k = cap / miss;
     hookL *= k;
     sliceR *= k;
     duckHookL *= k;
     shankR *= k;
-    miss = MAX_MISS;
+    miss = cap;
   }
   return { green: 1 - miss, hookL, sliceR, duckHookL, shankR };
 }
