@@ -319,6 +319,9 @@ export interface UiState {
   /** The range upgrades fitted on the wild-ball hole (shop item ids from `RANGE_UPGRADES`). The loadout is
    *  rebuilt from this through `rangeLoadoutFor` — the ONE rule — on every toggle and hole change. */
   rangeUpgrades?: string[];
+  /** The rival's ball on the range's matchplay hole (`rangeRivalHole`), played when that tee comes up and
+   *  kept for the hole's map, its end-of-hole card and the graduation card. Transient. */
+  rangeRival?: PlayedHole;
   /** GS-story: the active Story Mode campaign, when the player is in Story Mode. Persisted to its OWN
    *  `fc_story` save blob (NOT the main `fc_save`), loaded into state at boot if a campaign exists, and
    *  written back by the app after each action. Absent ⇒ no campaign started on this device. */

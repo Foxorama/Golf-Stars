@@ -10,15 +10,6 @@ is the endless survival mode — the old `flat`/`ladder` roguelites are retired 
 under the new format). Avenue (1), a full top-down RPG shell, stays deferred until the loop is exhausted.
 
 ## Now / next
-- **GS-story-liveround-crossmode** — ⚠️ DATA LOSS, found while building GS-driving-range, NOT fixed there.
-  Park a Story world round (title → CONTINUE shows it), then start a Voyage/Unending/Star Tour run: the
-  next `persistStory` writes `campaignWithLiveRound(state)`, which reads "no story round in progress" off
-  the non-story run and REMOVES `liveRound` from that campaign in `fc_story`. Reproduced in a reducer test
-  (story round → hole 1 done → `toTitle` → `start voyage` → `selectCharacter` ⇒ `liveRound` gone). The
-  range is guarded (`RANGE_FORMAT` early-return); the general fix is for `campaignWithLiveRound` to leave
-  the campaign untouched whenever the LIVE run is not that campaign's — but its "walking back to the
-  clubhouse clears the offer" rule must be re-checked against that, so it is its own change with its own
-  tests.
 
 > **THE 1.3.0 PLAY-TEST ITEMS ARE ALL DONE** — GS-runout-seen, GS-fairway-ink-break,
 > GS-clubhouse-floor and GS-scene-isolate have shipped (see Done). The entries below are the
@@ -741,6 +732,12 @@ Story-only, `npm run check`-green, no Voyage/Unending risk.
 
 ## Done
 Terse log — full story in the linked report / `docs/decisions/` / git history.
+- **GS-story-liveround-crossmode** — ✅ FIXED (follow-up to GS-driving-range). Was DATA LOSS: park a Story
+  world round, start a Voyage/Unending/Star Tour run instead of pressing CONTINUE, and the next
+  `persistStory` removed the round from `fc_story`. Reproduced on 40a8de9 (before the range shipped). Fix:
+  `campaignWithLiveRound` only lets a STORY round speak for the campaign; `leaveRound` asks while the
+  story run is still live. Guarded by `tests/story-liveround-crossmode.test.ts` (every other mode) and a
+  real-localStorage browser case in `tests/driving-range-browser.test.ts`.
 - **GS-driving-range** — the tutorial. The title's greyed "The Destination" teaser is now a live 🎓
   Driving Range tile: three lesson holes on Verdant Station (chosen by job off the live generator), a coach
   card at each first moment (swing · putt · hazards · upgrades), Stableford taught on every end-of-hole

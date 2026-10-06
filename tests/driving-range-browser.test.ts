@@ -1,6 +1,27 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { resolve } from 'node:path';
 import { chromePath } from './chromium';
+import { initState, reduce, type UiState } from '../src/ui/game';
+import { CAMPAIGN_STORE_VERSION } from '../src/sim/rpg/storyRoster';
+
+/** A real `fc_story` blob: Backspin Bo's campaign with a Story world round parked two holes in, built by
+ *  the reducer itself so it is exactly what the game writes. */
+function parkedStoryBlob(): string {
+  const beats = (s: UiState): UiState => {
+    let g = 0;
+    while (s.screen === 'lore' && g++ < 8) s = reduce(s, { type: 'dismissLore' });
+    return s;
+  };
+  let s = beats(reduce(reduce(initState('browser-crossmode'), { type: 'openStory' }), { type: 'selectCharacter', characterId: 'backspin-bo' }));
+  s = reduce(beats(reduce(s, { type: 'storyPlayWorld', courseId: 'standrews-18' })), { type: 'playInteractive' });
+  for (let h = 0; h < 2; h++) {
+    let g = 0;
+    while (s.play && !s.play.done && g++ < 600) s = reduce(s, { type: 'autoShotHole' });
+    s = reduce(s, { type: 'holeComplete' });
+  }
+  const story = reduce(s, { type: 'toTitle' }).story!;
+  return JSON.stringify({ version: CAMPAIGN_STORE_VERSION, campaigns: { 'backspin-bo': story }, activeId: 'backspin-bo' });
+}
 
 /**
  * THE DRIVING RANGE in a real browser (GS-driving-range).
@@ -25,21 +46,26 @@ describe.runIf(chromePath)('the Driving Range (GS-driving-range)', () => {
     await browser?.close();
   });
 
-  async function boot() {
+  async function boot(opts: { settings?: Record<string, unknown>; story?: string } = {}) {
     const page = await browser.newPage({ viewport: PHONE });
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
-    await page.addInitScript(() => {
-      try {
-        if (sessionStorage.getItem('gs-test-seeded')) return;
-        sessionStorage.setItem('gs-test-seeded', '1');
-        localStorage.clear();
-        // Fast Shots skips the per-shot result card, so a hole can be walked without tapping each one.
-        localStorage.setItem('fc_settings', JSON.stringify({ fastShots: true }));
-      } catch {
-        /* storage denied is another feature's problem */
-      }
-    });
+    await page.addInitScript(
+      ({ settings, story }) => {
+        try {
+          if (sessionStorage.getItem('gs-test-seeded')) return;
+          sessionStorage.setItem('gs-test-seeded', '1');
+          localStorage.clear();
+          localStorage.setItem('fc_settings', JSON.stringify(settings));
+          if (story) localStorage.setItem('fc_story', story);
+        } catch {
+          /* storage denied is another feature's problem */
+        }
+      },
+      // Fast Shots skips the per-shot result card, so a hole can be walked without tapping each one —
+      // except where a test needs the card, which passes its own settings.
+      { settings: opts.settings ?? { fastShots: true }, story: opts.story ?? null },
+    );
     await page.goto(`file://${dist}?intro=0&seed=42`, { waitUntil: 'load' });
     await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1', {
       timeout: 15_000,
@@ -106,7 +132,10 @@ describe.runIf(chromePath)('the Driving Range (GS-driving-range)', () => {
           await page.waitForTimeout(400);
         }
       }
-      // Hole 3: the upgrades lesson, then the row in the controls panel.
+      // Hole 3: the matchplay lesson, then the upgrades lesson, then the row in the controls panel.
+      await page.waitForSelector('.gs-range-coach', { timeout: 15_000 });
+      expect(await page.locator('.gs-range-coach').textContent()).toContain('Matchplay vs Longshot Larry');
+      await page.locator('.gs-range-coach button').click();
       await page.waitForSelector('.gs-range-coach', { timeout: 15_000 });
       expect(await page.locator('.gs-range-coach').textContent()).toContain('Upgrades change your shot');
       await page.locator('.gs-range-coach button').click();
@@ -130,4 +159,97 @@ describe.runIf(chromePath)('the Driving Range (GS-driving-range)', () => {
       await page.close();
     }
   }, 120_000);
+
+  it('putting is taught on the FIRST green, even with the shot card on (the default)', async () => {
+    // Fast Shots OFF: every shot raises the result card, and its flag stays set on the putt screen —
+    // which used to hold the putting lesson back until AFTER the first putt.
+    const { page, errors } = await boot({ settings: { fastShots: false } });
+    try {
+      await openRange(page);
+      let sawPuttScreen = false;
+      for (let guard = 0; guard < 60 && !sawPuttScreen; guard++) {
+        const coach = page.locator('.gs-range-coach');
+        if (await page.locator('[data-putt-commit]').count()) {
+          sawPuttScreen = true;
+          // The very first time the putter is in hand, the lesson must already be up.
+          expect(await coach.count()).toBe(1);
+          expect(await coach.textContent()).toContain('Putting');
+          break;
+        }
+        if (await coach.count()) await coach.locator('button').click();
+        else if (await page.locator('[data-popup-continue]').count()) await page.locator('[data-popup-continue]').first().click();
+        else if (await page.locator('[data-swing]:not([disabled])').count()) await page.locator('[data-swing]').click();
+        await page.waitForTimeout(500);
+      }
+      expect(sawPuttScreen).toBe(true);
+      expect(errors).toEqual([]);
+    } finally {
+      await page.close();
+    }
+  }, 120_000);
+
+  it('announces the range once, and ✕ puts it away for good', async () => {
+    const { page, errors } = await boot();
+    try {
+      const notice = page.locator('.gs-range-notice');
+      expect(await notice.count()).toBe(1);
+      expect(await notice.textContent()).toContain('The Driving Range has opened!');
+      await page.locator('[data-range-notice-dismiss]').click();
+      expect(await page.locator('.gs-range-notice').count()).toBe(0);
+      const stamped = await page.evaluate(() => JSON.parse(localStorage.getItem('fc_settings') ?? '{}').rangeNoticeDone);
+      expect(stamped).toBe(true);
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForFunction(() => document.getElementById('app')?.getAttribute('data-booted') === '1');
+      expect(await page.locator('.gs-range-notice').count()).toBe(0);
+      expect(errors).toEqual([]);
+    } finally {
+      await page.close();
+    }
+  }, 60_000);
+
+  it('going into the range by any door also retires the announcement', async () => {
+    const { page, errors } = await boot();
+    try {
+      await page.locator('.gs-range-notice [data-action]').click();
+      await page.waitForSelector('.gs-shot--full');
+      const stamped = await page.evaluate(() => JSON.parse(localStorage.getItem('fc_settings') ?? '{}').rangeNoticeDone);
+      expect(stamped).toBe(true);
+      expect(errors).toEqual([]);
+    } finally {
+      await page.close();
+    }
+  }, 60_000);
+
+  it('the Star Tour tile follows its existing rule: hidden with no campaign, shown once one exists', async () => {
+    const fresh = await boot();
+    try {
+      expect(await fresh.page.locator('.gs-navtiles--games').textContent()).not.toContain('Star Tour');
+    } finally {
+      await fresh.page.close();
+    }
+    const withStory = await boot({ story: parkedStoryBlob() });
+    try {
+      expect(await withStory.page.locator('.gs-navtiles--games').textContent()).toContain('Star Tour');
+      expect(withStory.errors).toEqual([]);
+    } finally {
+      await withStory.page.close();
+    }
+  }, 60_000);
+
+  it('a parked Story round is still in fc_story after starting a Voyage instead (GS-story-liveround-crossmode)', async () => {
+    const blob = parkedStoryBlob();
+    const parked = JSON.parse(blob).campaigns['backspin-bo'].liveRound;
+    expect(parked?.stopHoleIndex).toBe(2);
+    const { page, errors } = await boot({ story: blob });
+    try {
+      await page.locator(`[data-action='{"type":"start","format":"voyage"}']`).click();
+      await page.locator(`[data-action*='"selectCharacter"'][data-action*='longshot-larry']`).first().click();
+      await page.waitForTimeout(500);
+      const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('fc_story') ?? '{}'));
+      expect(stored.campaigns['backspin-bo'].liveRound).toEqual(parked);
+      expect(errors).toEqual([]);
+    } finally {
+      await page.close();
+    }
+  }, 60_000);
 });

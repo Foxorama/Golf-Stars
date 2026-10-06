@@ -255,7 +255,11 @@ This game lives or dies on three axes — put every change through all three bef
   second one would resume you into a different bag, sky, or *scoring format*. `campaignWithLiveRound`
   is the `fc_story` twin of `resumableState` and BOTH writers call it (`persistStory` + `toTitle`):
   writing the round to disk without folding it into `state.campaigns` is exactly GS-resume-slot-loss,
-  because the picker reads state. A finished/abandoned round REMOVES the field (never a stale offer),
+  because the picker reads state. **ONLY A STORY ROUND SPEAKS FOR THE CAMPAIGN'S ROUND**
+  (GS-story-liveround-crossmode): any other live run returns the campaign untouched — before this, parking
+  a round and then starting a Voyage/Unending/Star Tour/range run REMOVED it on the next `persistStory`, so
+  ignoring CONTINUE cost the round. The deliberate endings (finishing, `leaveRound`) ask while the story
+  run is still live. Guarded by `tests/story-liveround-crossmode.test.ts` + a real-localStorage browser case. A finished/abandoned round REMOVES the field (never a stale offer),
   and a `liveRound` whose hole the rebuilt course can't serve falls back to the hub — a
   `GENERATOR_VERSION` bump re-rolls a static course, and a tee that can't be built must not strand a
   campaign. No `BACKUP_VERSION` bump (the roster's SHAPE is unchanged); a v8 campaign meeting a v7
@@ -522,7 +526,11 @@ are preserved verbatim at the bottom of each domain doc under *"Migrated from CL
     card, and a wild-ball hole where the Pro Shop's own spray shapers are fitted live as a controls-panel
     ROW quoting the SAME `SprayShape` the cone draws. `RANGE_BALL_SHAPE` may be named in no other file
     (scanned). Never parked (`runModeOf` → null, `resumeCost` → `practice`) and it ends on `rangeResult`,
-    never `finishStop`, so it posts and pays nothing by construction.
+    never `finishStop`, so it posts and pays nothing by construction. Each hole is scored in its own
+    format (`RANGE_SCORING`: stroke · Stableford · matchplay vs a rival on its OWN `:rival` stream, judged
+    by the game's `holeDuel`). ⚠️ A coach card must defer only to a card that is actually DRAWN:
+    `awaitingShotPopup` stays true through a putt render, so gating on the bare flag hid the putting
+    lesson until after the first putt. A one-time title announcement rides `Settings.rangeNoticeDone`.
   - **ASGARD interlude** (`docs/decisions/asgard.md`; GS-asgard) — an eagle-or-better on the Rainbow Course opens
     the Bifröst to a 9-hole stroke-play tournament vs three `contender` golfers, scaled by
     `warriorsEdge(depth,ascension,voyage)` and tuned per context (`asgardFieldEdge`; edge 0 = base = byte-

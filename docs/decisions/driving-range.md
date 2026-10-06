@@ -86,6 +86,33 @@ question (including a chosen fringe putt).
 **The golfer is Feather Fade.** The tutorial comes before choosing anyone, so it uses the first name on
 the roster rather than asking a beginner to pick blind.
 
+## Follow-up round (play-test feedback)
+
+**Every scoring format, one per hole** (`RANGE_SCORING`). Hole 1 is taught as **stroke play** (count
+every shot, named against par — `scoreName`), hole 2 as **Stableford** (`stablefordPoints`), hole 3 as
+**matchplay** against Longshot Larry. The rival plays the hole headlessly on its OWN `:rival` stream the
+moment the tee comes up (a test plays it three extra times mid-hole and asserts the player's card is
+unchanged), with proper balls — the wild ones are the player's teaching prop. Their line is drawn on the
+map the way a Voyage boss's is, the result is the game's own `holeDuel`, and the HUD pod reads what the
+hole's format counts (to-par / points / `AS vs Larry`). The match lesson card comes before the upgrades
+card on that hole.
+
+**The putting lesson waited for an invisible card.** A ball struck onto the green raised the shot-result
+card flag, but that card only rides the AIM screen; on the putt screen the flag stayed set with nothing
+drawn, and the coach (gated on the bare flag) waited until the first putt cleared it. The walkthrough
+missed it because it ran with Fast Shots on, which skips the card. The gate now asks whether a card is
+actually DRAWN in the current phase; a browser test with Fast Shots OFF asserts the lesson is up the first
+time the putter is in hand (and fails on the old gate).
+
+**"The Driving Range has opened!"** — a one-time inline announcement on the title (not a modal: news, not
+a decision), for every device that has neither dismissed it nor been into the range by any door. Stored
+as `Settings.rangeNoticeDone` in `fc_settings` (device-level, merged over defaults ⇒ no save bump, no new
+key; PRIVACY.md's row names it). Held back during a save-integrity fault.
+
+**Star Tour tile:** unchanged by this work. Its rule (GS-story-startour-unlock, July) hides it until a
+Story campaign exists; staging is a separate origin with no campaign, so it is hidden there. A browser
+test pins both halves of the rule.
+
 ## What happened to The Destination
 
 Only the PLACEHOLDER tile went. The Destination is still a promise the Story Tour's Warden ending makes

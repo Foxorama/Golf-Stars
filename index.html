@@ -1870,6 +1870,21 @@
          the lesson body is new. The upgrades row lives INSIDE the play HUD's controls panel, so its
          chips use the same intrinsic `auto-fit` grid as the club picker (no breakpoint — those
          cannot see the UI scale). */
+      .gs-range-notice {
+        display: flex; gap: 12px; align-items: flex-start; position: relative;
+        margin: 0 0 14px; padding: 12px 40px 12px 14px; border-radius: 14px;
+        background: linear-gradient(135deg, rgba(95, 212, 90, .18), rgba(84, 200, 255, .12));
+        border: 1px solid rgba(95, 212, 90, .55); box-shadow: 0 0 22px rgba(95, 212, 90, .18);
+        animation: gs-sheet-up .25s ease;
+      }
+      .gs-range-notice__icon { font-size: 30px; line-height: 1; }
+      .gs-range-notice__body { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; min-width: 0; font-size: 13.5px; line-height: 1.45; }
+      .gs-range-notice__body b { font-size: 16px; }
+      .gs-range-notice__body span { color: var(--gs-dim); overflow-wrap: anywhere; }
+      .gs-range-notice__x {
+        position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; padding: 0; min-width: 0;
+        display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 13px;
+      }
       .gs-range-coach__kicker { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--gs-accent); opacity: .9; }
       .gs-range-coach__title { font-size: 21px; margin: 4px 0 10px; line-height: 1.2; }
       .gs-range-steps { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 9px; }
@@ -1918,12 +1933,14 @@
       .gs-range-grad__score span { font-size: 14px; font-weight: 600; color: var(--gs-dim); }
       .gs-range-grad__verdict { margin: 8px 0 0; color: var(--gs-dim); }
       .gs-range-card { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(96px, 100%), 1fr)); }
+      .gs-range-card__cell { min-width: 0; }
       .gs-range-card__cell {
         display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 8px;
         border-radius: 12px; background: #0d1016; border: 1px solid var(--gs-line);
       }
       .gs-range-card__n { font-size: 11px; color: var(--gs-dim); }
-      .gs-range-card__s { font: 800 26px/1.1 var(--gs-font); }
+      .gs-range-card__s { font: 800 24px/1.1 var(--gs-font); max-width: 100%; overflow-wrap: anywhere; text-align: center; }
+      .gs-range-card__u { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--gs-dim); }
       .gs-range-card__p { font-size: 12px; color: var(--gs-accent); }
       .gs-range-grad__learned ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
       .gs-range-grad__next p { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; }

@@ -5,6 +5,7 @@
  */
 
 import { state } from './ctx';
+import { getSettings } from '../settings';
 import { storageHealth } from '../save/durability';
 import { faultExplanation, faultHeadline, faultRescue, saveIntegrity } from '../save/integrity';
 import { GAME_TITLE, APP_VERSION, BUILD_ID } from '../brand';
@@ -171,6 +172,7 @@ export function titleScreen(): string {
       </div>
     </header>
     ${storageWarningHTML()}
+    ${rangeNoticeHTML()}
     ${integrityWarningHTML()}
     ${resumeHTML}
     <h2 class="gs-seclabel">${resumeHTML ? 'Or start a new run — choose your game' : 'Choose your game'}</h2>
@@ -329,6 +331,26 @@ function starTourRewardTileHTML(): string {
         <span class="gs-navtile__title">🔒 Star Tour</span>
         <span class="gs-navtile__sub">Complete Story Tour to free-roam the galaxy</span>
       </span>
+    </div>`;
+}
+
+/**
+ * "THE DRIVING RANGE HAS OPENED!" (GS-driving-range-notice) — a one-time announcement on the title for
+ * every device that has neither dismissed it nor been into the range. Inline, not a modal: it is news,
+ * not a decision the player must make before anything else, so it never blocks the title. Held back
+ * while the save is read-only — that title already carries the one alert that must not be missed.
+ */
+function rangeNoticeHTML(): string {
+  if (getSettings().rangeNoticeDone || saveIntegrity.fault) return '';
+  return `
+    <div class="gs-range-notice" role="status">
+      <span class="gs-range-notice__icon" aria-hidden="true">🎓</span>
+      <div class="gs-range-notice__body">
+        <b>The Driving Range has opened! 🎉</b>
+        <span>A three-hole tutorial with a coach: the swing, putting, hazards, every scoring format, and upgrades you can try on the spot.</span>
+        <button class="gs-btn gs-btn--primary gs-mini" data-action='${JSON.stringify({ type: 'openRange' })}'>Take the tutorial ›</button>
+      </div>
+      <button class="gs-btn gs-btn--ghost gs-mini gs-range-notice__x" data-range-notice-dismiss="1" aria-label="Dismiss the Driving Range announcement">✕</button>
     </div>`;
 }
 
